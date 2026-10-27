@@ -9,3 +9,7 @@
 - Executable commit, PR title and branch policy checks, repository checks and workflow lint.
 - Weekly GitHub Actions dependency updates and advisory PR size labels.
 - Development and production branch rules, English project documentation and planned OpenAI environment settings.
+
+### Changed
+
+- Pin checkout and Python setup to current action runtimes.
