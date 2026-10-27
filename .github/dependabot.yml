@@ -5,6 +5,8 @@ updates:
     target-branch: develop
     schedule:
       interval: weekly
-    open-pull-requests-limit: 5
+    # Generated commit bodies conflict with the one-line commit policy.
+    # Enable version-update PRs only after choosing a compatible update process.
+    open-pull-requests-limit: 0
     commit-message:
       prefix: "ci(ci)"

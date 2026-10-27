@@ -72,6 +72,11 @@ Configuration alone does not install or authorize the App.
 Do not mark a PR reviewed when the App is unavailable, skipped or rate-limited.
 CODEOWNERS and written rules do not themselves enforce branch protection; no branch protection is installed by this bootstrap.
 
+Dependabot configuration is prepared for weekly GitHub Actions updates into `develop`.
+Automatic version-update PRs are paused (`open-pull-requests-limit: 0`) because generated commit bodies conflict with the one-line commit policy.
+Apply dependency changes on a normal work branch with compliant commits until an explicit bot policy is chosen.
+The PR size labeler runs for branches within this repository; fork PRs do not receive a write token.
+
 ## Next steps
 
 - Scaffold Next.js and FastAPI with pinned runtimes and dependencies.
