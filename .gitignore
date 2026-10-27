@@ -27,3 +27,7 @@ pgdata/
 *.log
 .DS_Store
 Thumbs.db
+
+# Local agent scratch files
+.workspace/
+.worktrees/

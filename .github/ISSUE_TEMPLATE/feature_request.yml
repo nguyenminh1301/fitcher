@@ -1,0 +1,21 @@
+name: Feature request
+description: Propose a focused user outcome before adding implementation scope.
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: User and problem
+      description: Who needs this, and what prevents them from completing their task?
+    validations:
+      required: true
+  - type: textarea
+    id: outcome
+    attributes:
+      label: Desired outcome and acceptance criteria
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: Constraints and alternatives
+      description: Include relevant data access requirements, API limits and what can be deferred.

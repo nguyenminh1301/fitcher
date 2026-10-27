@@ -1,0 +1,86 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+language: en-US
+tone_instructions: >-
+  Be concise and concrete. State the trigger, impact and smallest useful fix.
+  Separate confirmed defects from optional suggestions. Keep identifiers unchanged.
+early_access: false
+
+reviews:
+  profile: chill
+  request_changes_workflow: true
+  high_level_summary: true
+  review_status: true
+  review_details: true
+  collapse_walkthrough: true
+  poem: false
+  in_progress_fortune: false
+  suggested_labels: false
+  suggested_reviewers: false
+  auto_review:
+    enabled: true
+    auto_incremental_review: true
+    auto_pause_after_reviewed_commits: 0
+    drafts: false
+    base_branches: ["^develop$", "^main$"]
+    ignore_title_keywords: ["WIP", "[skip review]"]
+  path_filters:
+    - "!**/node_modules/**"
+    - "!**/.next/**"
+    - "!**/.venv/**"
+    - "!**/__pycache__/**"
+    - "!.workspace/**"
+    - "!data/**"
+    - "!**/*.parquet"
+  path_instructions:
+    - path: "**/*"
+      instructions: >-
+        Finch currently contains documentation and repository governance only.
+        Next.js, FastAPI, LangGraph, DuckDB and pgvector are planned, not implemented.
+        Review against the stated change and AGENTS.md. Prioritize correctness,
+        security and regressions. Do not require speculative services or abstractions.
+        Tests should prove changed behavior or a real boundary.
+    - path: "**/*.py"
+      instructions: >-
+        Preserve Windows and Linux support. Keep credentials server-side and avoid
+        logging keys or private data. For future API/agent code, check cancellation,
+        bounded outbound calls, SELECT-only SQL validation, query resource limits
+        and consistent embedding model/dimensions. Do not require absent features.
+    - path: "**/*.{ts,tsx,js,jsx}"
+      instructions: >-
+        Preserve server/client boundaries. Never expose secrets through NEXT_PUBLIC
+        variables or browser code. Check loading/error/cancellation behavior and
+        accessibility when UI behavior changes.
+    - path: ".github/**"
+      instructions: >-
+        Use least-privilege permissions and pinned action versions. Never interpolate
+        untrusted PR titles or branch names directly into executable shell text.
+        Do not run untrusted code under pull_request_target. Keep Git policy checks
+        aligned with .github/git-policy.json and .agents/rules/git_workflow.md.
+  pre_merge_checks:
+    docstrings:
+      mode: "off"
+    title:
+      mode: warning
+      requirements: >-
+        Use type(scope): subject with types and scopes from .github/git-policy.json,
+        a lowercase subject and at most 80 characters. Describe the actual change.
+    custom_checks:
+      - name: One-line commit messages
+        mode: warning
+        instructions: >-
+          Every new non-merge commit must be exactly one conventional line with a
+          required scope, no body, no co-author trailer and no agent attribution.
+          The initial README commit predates this rule and is not rewritten.
+
+chat:
+  auto_reply: true
+
+knowledge_base:
+  learnings:
+    scope: local
+  code_guidelines:
+    enabled: true
+    filePatterns:
+      - AGENTS.md
+      - .agents/rules/git_workflow.md
+      - CONTRIBUTING.md

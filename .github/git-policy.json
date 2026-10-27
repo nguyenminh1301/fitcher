@@ -1,0 +1,27 @@
+{
+  "types": [
+    "feat",
+    "fix",
+    "refactor",
+    "test",
+    "chore",
+    "docs",
+    "perf",
+    "ci"
+  ],
+  "branch_types": [
+    "feat",
+    "fix",
+    "chore"
+  ],
+  "scopes": [
+    "web",
+    "api",
+    "agent",
+    "db",
+    "deps",
+    "common",
+    "ci"
+  ],
+  "max_subject_length": 80
+}

@@ -1,0 +1,35 @@
+name: PR Size
+
+on:
+  pull_request:
+    branches: [develop, main]
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+jobs:
+  label-size:
+    name: Label PR size
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: codelytv/pr-size-labeler@5b0747c95a6291730db70b5137b9512ea2110d26 # v1
+        with:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          xs_label: size/XS
+          xs_max_size: 100
+          s_label: size/S
+          s_max_size: 400
+          m_label: size/M
+          m_max_size: 1000
+          l_label: size/L
+          l_max_size: 2000
+          xl_label: size/XL
+          fail_if_xl: false
+          message_if_xl: >-
+            This PR exceeds 2000 changed lines. The label is advisory; consider
+            splitting it into smaller changes so each can be reviewed thoroughly.

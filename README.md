@@ -1,44 +1,82 @@
 # Finch
 
-Finch là dự án hỏi đáp dữ liệu bằng ngôn ngữ tự nhiên. Người dùng nhập câu hỏi, hệ thống sinh SQL, truy vấn dữ liệu và trả kết quả dưới dạng bảng, biểu đồ và phần tóm tắt.
+Finch is a natural-language data analysis project.
+The planned application turns questions into validated SQL and returns tables, charts and summaries over NYC TLC HVFHV Parquet data.
 
-## Trạng thái
+## Current status
 
-Khởi tạo repository. Hiện chỉ có tài liệu giới thiệu và `.gitignore`; chưa có code ứng dụng hoặc lệnh chạy.
+This repository contains project documentation and development governance only.
+There is no application scaffold, dependency manifest, database or runnable service yet.
 
-## Kiến trúc dự kiến
+## Planned architecture
 
-- **Frontend:** Next.js, Plotly — giao diện chat, bảng kết quả, biểu đồ và xem SQL.
-- **Backend:** FastAPI — API và SSE để cập nhật kết quả theo từng bước.
-- **Agent:** LangGraph — lấy ngữ cảnh, sinh SQL, kiểm tra, thực thi và sửa lỗi SQL.
-- **Truy vấn:** DuckDB trên dữ liệu Parquet NYC TLC HVFHV.
-- **Lưu trữ:** PostgreSQL + pgvector cho dictionary, glossary và lịch sử hội thoại.
-- **Triển khai:** Docker Compose với ba service `web`, `api`, `db`.
+| Component | Technology | Responsibility |
+| --- | --- | --- |
+| Web | Next.js, Plotly | Chat, tables, charts and SQL display |
+| API | FastAPI, SSE | Requests and incremental results |
+| Agent | LangGraph | Retrieve context, generate, validate and repair SQL |
+| Query engine | DuckDB | Bounded read-only queries over Parquet |
+| Storage | PostgreSQL, pgvector | Dictionary, glossary, vectors and chat history |
+| Deployment | Docker Compose | Three services: web, api and db |
 
-## Model OpenAI
+## OpenAI models
 
-| Tác vụ | Model dự kiến |
+| Task | Planned model |
 | --- | --- |
-| Sinh và sửa SQL | `gpt-6.1-sol` |
-| Tóm tắt và chọn biểu đồ | `gpt-6-luna` |
-| Embedding dictionary, glossary và câu hỏi | `text-embedding-3-small` |
+| Generate and repair SQL | `gpt-6.1-sol` |
+| Summaries and chart specifications | `gpt-6-luna` |
+| Dictionary, glossary and question embeddings | `text-embedding-3-small` |
 
-Backend dự kiến dùng OpenAI Python SDK, Responses API và Embeddings API. Embedding lưu trong pgvector với 1536 chiều; dữ liệu và câu hỏi phải dùng cùng model và số chiều.
+The backend will use the OpenAI Python SDK with Responses and Embeddings APIs.
+Stored and query embeddings must use the same model and dimensions; the planned pgvector column has 1536 dimensions.
+Changing the embedding model requires rebuilding dictionary and glossary vectors.
+The backend and ingestion scripts own `OPENAI_API_KEY`; it must never reach the browser or Git history.
+The tracked [.env.example](.env.example) documents planned settings; no application consumes them yet.
 
-`OPENAI_API_KEY` sẽ được cấu hình ở backend và script ingest qua biến môi trường. Không commit API key hoặc file `.env`.
+## Repository workflow
 
-## Luồng xử lý dự kiến
+`develop` is the default integration branch; `main` is the production branch.
+Start a focused branch from updated `develop`, then open a PR back to `develop`.
+The repository owner may deliberately push directly to `main`; this exception does not permit direct implementation commits to `develop`.
+The initial governance setup bootstraps `main` and seeds `develop` from the same commit.
 
-1. Người dùng nhập câu hỏi trên giao diện chat.
-2. Agent lấy schema và glossary liên quan qua tìm kiếm vector.
-3. Model sinh SQL; sqlglot kiểm tra SELECT-only, bảng được phép và giới hạn số dòng.
-4. DuckDB thực thi truy vấn với giới hạn thời gian và bộ nhớ.
-5. Nếu có lỗi, agent sửa SQL trong giới hạn số lần thử lại.
-6. Backend trả SQL, dữ liệu, biểu đồ và tóm tắt về giao diện qua SSE.
+```bash
+git switch develop
+git pull --ff-only
+git switch -c chore/common/update-project-setup
+```
 
-## Bước tiếp theo
+Read [CONTRIBUTING.md](CONTRIBUTING.md), [Git rules](.agents/rules/git_workflow.md) and [AGENTS.md](AGENTS.md) before making changes.
+Commit messages and PR titles use `type(scope): subject`, in English, on one line with no body or trailers, at most 80 characters (target 72).
+Types and Finch-specific scopes live in [.github/git-policy.json](.github/git-policy.json).
+The initial README commit predates this policy; do not rewrite published history just to rename it.
 
-- Khởi tạo frontend Next.js và backend FastAPI.
-- Thiết lập Docker Compose, PostgreSQL và pgvector.
-- Chuẩn bị Parquet và ingest dictionary/glossary.
-- Xây dựng luồng hỏi đáp đầu tiên từ câu hỏi đến kết quả.
+## Checks
+
+Python 3.11 or newer is sufficient for the local repository checks; they use the standard library.
+
+```bash
+python scripts/check_repository.py
+python scripts/check_git.py --range origin/develop..HEAD
+python scripts/check_git.py --title "chore(common): update project setup"
+```
+
+CI validates repository text/structure, commit messages, PR titles, source branches and GitHub workflows.
+PR size labels are advisory: XS up to 100 changed lines, S up to 400, M up to 1000, L up to 2000 and XL above 2000.
+Keep PRs at most 1000 changed lines where practical and below 100 changed files for review.
+There are no application tests, builds or dependency audits until application manifests and code exist.
+
+CodeRabbit is configured for `develop` and `main`, skips drafts, and reviews incremental updates without pausing after a fixed number of commits.
+The CodeRabbit GitHub App must have access to this private repository and a plan that supports the requested reviews.
+Configuration alone does not install or authorize the App.
+Do not mark a PR reviewed when the App is unavailable, skipped or rate-limited.
+CODEOWNERS and written rules do not themselves enforce branch protection; no branch protection is installed by this bootstrap.
+
+## Next steps
+
+- Scaffold Next.js and FastAPI with pinned runtimes and dependencies.
+- Add Docker Compose, PostgreSQL and pgvector.
+- Prepare Parquet, dictionary/glossary ingestion and the first question-to-result flow.
+- Extend CI, Dependabot and security scanning as runnable components are introduced.
+
+See [CHANGELOG.md](CHANGELOG.md) for repository changes and [SECURITY.md](SECURITY.md) for vulnerability reporting.
