@@ -1,7 +1,7 @@
 # Contributing
 
 Keep changes focused on a concrete user outcome.
-This repository is private; publication is an owner decision.
+This repository is public; never include credentials or private datasets in contributions.
 Write code identifiers, documentation, comments, commits, issues and PRs in English.
 Chat with the owner in Vietnamese.
 

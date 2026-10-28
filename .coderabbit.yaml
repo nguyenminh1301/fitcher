@@ -34,7 +34,7 @@ reviews:
   path_instructions:
     - path: "**/*"
       instructions: >-
-        Fitcher currently contains documentation and repository governance only.
+        fitcher currently contains documentation and repository governance only.
         Next.js, FastAPI, LangGraph, DuckDB and pgvector are planned, not implemented.
         Review against the stated change and AGENTS.md. Prioritize correctness,
         security and regressions. Do not require speculative services or abstractions.

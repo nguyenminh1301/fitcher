@@ -1,6 +1,6 @@
-# Fitcher
+# fitcher
 
-Fitcher is a natural-language data analysis project.
+fitcher is a natural-language data analysis project.
 The planned application turns questions into validated SQL and returns tables, charts and summaries over NYC TLC HVFHV Parquet data.
 
 ## Current status
@@ -67,7 +67,7 @@ Keep PRs at most 1000 changed lines where practical and below 100 changed files 
 There are no application tests, builds or dependency audits until application manifests and code exist.
 
 CodeRabbit is configured for `develop` and `main`, skips drafts, and reviews incremental updates without pausing after a fixed number of commits.
-The CodeRabbit GitHub App must have access to this private repository and a plan that supports the requested reviews.
+The CodeRabbit GitHub App must have access to this repository and a plan that supports the requested reviews.
 Configuration alone does not install or authorize the App.
 Do not mark a PR reviewed when the App is unavailable, skipped or rate-limited.
 CODEOWNERS and written rules do not themselves enforce branch protection; no branch protection is installed by this bootstrap.

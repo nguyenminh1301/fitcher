@@ -16,3 +16,4 @@
 - Pause automatic dependency version-update PRs to preserve the one-line commit policy.
 - Rename the project and repository to `ai-data-analysis-platform` to describe its purpose.
 - Rename the project and repository to `Fitcher`.
+- Standardize the project and repository name as lowercase `fitcher` and make the repository public.
