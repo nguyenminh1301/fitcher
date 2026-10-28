@@ -6,7 +6,7 @@ There is no deployed production service or response-time guarantee yet.
 ## Reporting
 
 Do not place exploit details, credentials or private datasets in issues or PRs.
-If GitHub provides **Security > Report a vulnerability**, use the [private reporting channel](https://github.com/nguyenminh1301/ai-data-analysis-platform/security/advisories/new).
+If GitHub provides **Security > Report a vulnerability**, use the [private reporting channel](https://github.com/nguyenminh1301/Fitcher/security/advisories/new).
 Availability depends on repository settings and visibility.
 If unavailable, ask the owner to establish a private channel before sharing details.
 Include the affected commit, impact and a minimal reproduction using synthetic data.

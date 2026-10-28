@@ -1,6 +1,6 @@
-# AI Data Analysis Platform
+# Fitcher
 
-AI Data Analysis Platform is a natural-language data analysis project.
+Fitcher is a natural-language data analysis project.
 The planned application turns questions into validated SQL and returns tables, charts and summaries over NYC TLC HVFHV Parquet data.
 
 ## Current status

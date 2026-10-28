@@ -2,7 +2,7 @@
 
 ## Scope
 
-- AI Data Analysis Platform is currently a documentation and governance foundation for a Next.js + FastAPI data analysis application; the planned architecture is not implemented functionality.
+- Fitcher is currently a documentation and governance foundation for a Next.js + FastAPI data analysis application; the planned architecture is not implemented functionality.
 - Implement only the requested scope; do not scaffold application code or add dependencies speculatively.
 - Write code identifiers, documentation and GitHub content in English; chat with the owner in Vietnamese.
 - Read `.agents/rules/git_workflow.md` before branches, commits or PRs; `.github/git-policy.json` is the executable type/scope allowlist.
