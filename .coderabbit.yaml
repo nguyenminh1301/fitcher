@@ -29,6 +29,8 @@ reviews:
     - "!**/.venv/**"
     - "!**/__pycache__/**"
     - "!.workspace/**"
+    - ".workspace/README.md"
+    - ".workspace/.gitignore"
     - "!data/**"
     - "!**/*.parquet"
   path_instructions:
@@ -82,5 +84,5 @@ knowledge_base:
     enabled: true
     filePatterns:
       - AGENTS.md
-      - .agents/rules/git_workflow.md
+      - .agents/rules/*.md
       - CONTRIBUTING.md
