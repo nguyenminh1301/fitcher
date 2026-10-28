@@ -1,4 +1,4 @@
-"""Validate Finch commit messages, PR titles and source branch names."""
+"""Validate project commit messages, PR titles and source branch names."""
 
 import argparse
 import json

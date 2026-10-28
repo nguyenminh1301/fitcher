@@ -1,6 +1,6 @@
-# Finch
+# AI Data Analysis Platform
 
-Finch is a natural-language data analysis project.
+AI Data Analysis Platform is a natural-language data analysis project.
 The planned application turns questions into validated SQL and returns tables, charts and summaries over NYC TLC HVFHV Parquet data.
 
 ## Current status
@@ -48,7 +48,7 @@ git switch -c chore/common/update-project-setup
 
 Read [CONTRIBUTING.md](CONTRIBUTING.md), [Git rules](.agents/rules/git_workflow.md) and [AGENTS.md](AGENTS.md) before making changes.
 Commit messages and PR titles use `type(scope): subject`, in English, on one line with no body or trailers, at most 80 characters (target 72).
-Types and Finch-specific scopes live in [.github/git-policy.json](.github/git-policy.json).
+Types and Project-specific scopes live in [.github/git-policy.json](.github/git-policy.json).
 The initial README commit predates this policy; do not rewrite published history just to rename it.
 
 ## Checks

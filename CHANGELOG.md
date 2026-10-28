@@ -14,3 +14,4 @@
 
 - Pin checkout and Python setup to current action runtimes.
 - Pause automatic dependency version-update PRs to preserve the one-line commit policy.
+- Rename the project and repository to `ai-data-analysis-platform` to describe its purpose.
