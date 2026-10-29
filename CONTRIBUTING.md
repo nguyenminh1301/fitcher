@@ -10,6 +10,9 @@ Chat with the owner in Vietnamese.
 The repository currently contains governance and documentation only.
 Use the [README](README.md) for available commands; do not invent application setup steps.
 Preserve Windows/PowerShell and Linux support.
+Read AGENTS.md or CLAUDE.md and the applicable rules before working.
+Use `.workspace/` for private working output; follow `.workspace/README.md`.
+A reusable project script must live in tracked root `scripts/`, not the ignored workspace.
 Keep secrets, local datasets, database files and scratch material out of Git.
 
 ## Branches and commits

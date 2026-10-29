@@ -4,6 +4,8 @@
 
 ### Added
 
+- Per-developer workspace structure, task continuity guidance and mirrored agent rules.
+
 - Repository ownership, issue and pull request templates, contribution and security policies.
 - CodeRabbit configuration for the planned Python/Next.js stack and both integration and production branches.
 - Executable commit, PR title and branch policy checks, repository checks and workflow lint.
@@ -17,3 +19,5 @@
 - Rename the project and repository to `ai-data-analysis-platform` to describe its purpose.
 - Rename the project and repository to `Fitcher`.
 - Standardize the project and repository name as lowercase `fitcher` and make the repository public.
+- Align workspace and Git rules with the reference workflow, including mandatory branch-based development and the explicit owner-only production exception.
+- Use the backend repository pull request template verbatim.

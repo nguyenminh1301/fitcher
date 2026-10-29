@@ -29,5 +29,4 @@ pgdata/
 Thumbs.db
 
 # Local agent scratch files
-.workspace/
 .worktrees/

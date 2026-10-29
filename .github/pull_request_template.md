@@ -1,21 +1,41 @@
-## Change
+## Summary
 
-Describe the concrete problem and resulting behavior.
-Link an issue when relevant; include screenshots for visual changes and call out configuration, contract or migration changes.
+<!-- Describe what this PR does and why. Include context a reviewer needs to understand the change. -->
 
-## Validation
+## Type of change
 
-List commands run and actual results; mark unavailable or irrelevant checks with a reason.
+- [ ] New feature
+- [ ] Bug fix
+- [ ] Refactor (no behavior change)
+- [ ] Database migration (new Flyway script)
+- [ ] Configuration / infrastructure change
+- [ ] Tests only
 
-- [ ] Repository and Git policy checks pass
-- [ ] Workflow lint passes when Actions files change
-- [ ] Relevant application checks pass, or N/A because no application code is affected
-- [ ] CHANGELOG.md updated
-- [ ] No secrets or private datasets in the diff
-- [ ] CodeRabbit reviewed the latest commit; all actionable findings fixed or answered
+## Module(s) affected
 
-## Branches and review
+<!-- List affected module names, e.g. `auth`, `post`, `social` -->
 
-- [ ] Normal work starts from and targets `develop`, or this is an owner-approved release to `main`
-- [ ] Commits and title follow the one-line conventional format and scope allowlist
-- [ ] PR is at most 1000 changed lines where practical and fewer than 100 changed files
+## Author checklist
+
+Complete every item before requesting review.
+
+- [ ] `./mvnw spotless:check` passes (Google AOSP format)
+- [ ] `./mvnw test` passes locally
+
+## Database migration checklist
+
+Complete only when this PR includes a Flyway migration script.
+
+- [ ] New migration file follows the naming convention `V{next_number}__{description}.sql`
+- [ ] Migration is backward-compatible, or a breaking change is documented in the PR summary
+- [ ] `database/schema.sql` is updated to reflect the final state
+
+## Reviewer checklist
+
+- [ ] Code follows the module layer pattern: `controller → service → repository → entity`
+- [ ] No cyclic dependencies introduced between modules
+- [ ] New endpoints are covered by integration or unit tests
+
+## Related issues
+
+Closes #ISSUE_NUMBER
