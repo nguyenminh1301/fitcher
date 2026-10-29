@@ -106,3 +106,17 @@ def test_inspection_cli_reports_missing_month(dataset, monkeypatch, capsys):
     monkeypatch.setattr("sys.argv", ["check_tlc", "--data-dir", str(dataset), "--month", "2024-04"])
     assert check_tlc.main() == 1
     assert "2024-04" in capsys.readouterr().err
+
+
+def test_top_zones_counts_repeated_and_null_pickups_without_losing_ties(connection):
+    connection.execute("""
+        CREATE OR REPLACE TEMP VIEW trips AS
+        SELECT * FROM (VALUES (1), (1), (1), (999), (999), (NULL), (NULL), (2)) AS t(PULocationID)
+    """)
+    rows = connection.execute((QUERY_DIR / "top_pickup_zones.sql").read_text()).fetchall()
+    assert rows == [
+        (1, "Manhattan", "Alpha", 3),
+        (999, "Unknown", "Unknown", 2),
+        (None, "Unknown", "Unknown", 2),
+        (2, "Brooklyn", "Beta", 1),
+    ]

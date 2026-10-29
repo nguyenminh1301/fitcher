@@ -91,6 +91,8 @@ The source contains 21,280,788 rows: 15,621,998 Uber rows and 5,658,790 Lyft row
 
 These are single warm runs after schema/count inspection, with default DuckDB settings, not cold-cache benchmarks or latency guarantees.
 
+The top-pickup query now aggregates trip counts by location before joining the unique zone lookup. On the same March input, five warm Windows runs alternating the old and new plans produced medians of 0.410 s and 0.117 s respectively (about 3.5x faster). All ten result rows matched exactly. This is a local comparison, not a concurrency or cold-cache performance guarantee; regression fixtures also retain null and unmatched pickup IDs and deterministic ties.
+
 Weekly results:
 
 | Week starting | Uber trips | Base fares (USD) |

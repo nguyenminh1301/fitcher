@@ -19,6 +19,7 @@
 
 ### Changed
 
+- Aggregate pickup counts before joining zone labels to reduce work while preserving unmatched locations, null IDs and deterministic ties.
 - Align mirrored agent guidance with the implemented local application foundation.
 - Pin checkout and Python setup to current action runtimes.
 - Pause automatic dependency version-update PRs to preserve the one-line commit policy.
