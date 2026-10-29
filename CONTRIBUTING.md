@@ -17,6 +17,8 @@ Keep secrets, local datasets, database files and scratch material out of Git.
 
 ## Branches and commits
 
+Follow the [durable naming and explanation rule](.agents/rules/naming.md) for code, files, tests, documentation, branches and commits.
+
 Follow [.agents/rules/git_workflow.md](.agents/rules/git_workflow.md).
 Create each work branch from an up-to-date `develop`; contributors open PRs targeting `develop`.
 `main` is production, and only the owner may deliberately bypass a PR to push there.

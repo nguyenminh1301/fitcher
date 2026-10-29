@@ -4,6 +4,8 @@
 
 ### Added
 
+- Shared durable naming and explanation rules for all tracked project artifacts.
+
 - Per-developer workspace structure, task continuity guidance and mirrored agent rules.
 
 - Repository ownership, issue and pull request templates, contribution and security policies.
