@@ -4,6 +4,7 @@ from decimal import Decimal
 import duckdb
 import pytest
 
+from scripts import check_tlc
 from scripts.check_tlc import QUERY_DIR, initialize_views
 
 
@@ -22,7 +23,8 @@ def dataset(tmp_path):
                         DOLocationID, base_passenger_fare)
         """).write_parquet(str(directory / "fhvhv_tripdata_2024-03.parquet"))
     (directory / "taxi_zone_lookup.csv").write_text(
-        'LocationID,Borough,Zone,service_zone\n1,Manhattan,Alpha,Yellow Zone\n2,Brooklyn,Beta,Boro Zone\n',
+        'LocationID,Borough,Zone,service_zone\n1,Manhattan,Alpha,Yellow Zone\n2,Brooklyn,Beta,Boro Zone\n'
+        + ''.join(f'{i},Queens,Example {i},Boro Zone\n' for i in range(3, 266)),
         encoding="utf-8",
     )
     return directory
@@ -69,3 +71,38 @@ def test_missing_month_fails_before_initializing_views(dataset):
         with pytest.raises(FileNotFoundError, match="2024-04"):
             initialize_views(connection, dataset, "2024-04")
         assert connection.execute("SHOW TABLES").fetchall() == []
+
+
+@pytest.mark.parametrize("zone", ["Alpha", "Conflicting name"])
+def test_duplicate_zone_ids_fail_before_exposing_views(dataset, zone):
+    with (dataset / "taxi_zone_lookup.csv").open("a", encoding="utf-8") as handle:
+        handle.write(f"1,Manhattan,{zone},Yellow Zone\n")
+    with duckdb.connect() as connection:
+        with pytest.raises(ValueError, match="Invalid TLC input"):
+            initialize_views(connection, dataset, "2024-03")
+        assert connection.execute("SHOW TABLES").fetchall() == []
+
+
+def test_inspection_cli_reports_sample_results(dataset, monkeypatch, capsys):
+    monkeypatch.setattr("sys.argv", ["check_tlc", "--data-dir", str(dataset)])
+    assert check_tlc.main() == 0
+    output = capsys.readouterr().out
+    assert "Source rows: 4; Uber trips: 3; zones: 265" in output
+    assert "2024-02-26 | 2 | 30.25" in output
+    assert "999 | Unknown | Unknown | 1" in output
+
+
+def test_inspection_cli_rejects_duplicate_lookup(dataset, monkeypatch, capsys):
+    with (dataset / "taxi_zone_lookup.csv").open("a", encoding="utf-8") as handle:
+        handle.write("1,Manhattan,Alpha,Yellow Zone\n")
+    monkeypatch.setattr("sys.argv", ["check_tlc", "--data-dir", str(dataset)])
+    assert check_tlc.main() == 1
+    output = capsys.readouterr()
+    assert "Invalid TLC input" in output.err
+    assert "top_pickup_zones" not in output.out
+
+
+def test_inspection_cli_reports_missing_month(dataset, monkeypatch, capsys):
+    monkeypatch.setattr("sys.argv", ["check_tlc", "--data-dir", str(dataset), "--month", "2024-04"])
+    assert check_tlc.main() == 1
+    assert "2024-04" in capsys.readouterr().err

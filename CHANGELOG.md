@@ -30,6 +30,7 @@
 
 ### Fixed
 
+- Validate complete unique zone lookups and compatible Parquet types before dataset inspection, with CLI success/failure and safe transport-error regression tests.
 - Document Linux dataset-directory traversal permissions for the non-root API container when the host uses a restrictive umask.
 - Reject incomplete taxi-zone lookups, including row-boundary truncation, and publish downloaded inputs with permissions readable by the Linux API container.
 - Include project source paths in CodeRabbit reviews alongside the workspace baseline exceptions.

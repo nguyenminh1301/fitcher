@@ -32,7 +32,7 @@ Use the corresponding directory and filename when selecting another `--data-dir`
 
 Keep Parquet, CSV, temporary files and databases under ignored `data/`; do not commit them. No OpenAI requests occur during download, inspection or tests.
 
-`check_tlc` opens an in-memory DuckDB connection, binds local file paths to session variables, and loads [init_views.sql](../scripts/init_views.sql). Views are connection-scoped and must be initialized on each new connection. No data is copied into PostgreSQL or a persistent DuckDB database. The source trip columns remain available; the zone lookup has typed `LocationID`, `Borough`, `Zone` and `service_zone` columns.
+`check_tlc` validates both inputs before exposing views, then binds local file paths to session variables in an in-memory DuckDB connection and loads [init_views.sql](../scripts/init_views.sql). Direct inspection applies the same complete, unique zone-ID requirement as downloads; duplicate IDs fail instead of multiplying trip counts during joins. Parquet validation requires a string license, a date or timestamp pickup column, integer location IDs and a numeric base fare. These metadata checks do not scan every data page. Views are connection-scoped and must be initialized on each new connection. No data is copied into PostgreSQL or a persistent DuckDB database. The source trip columns remain available; the zone lookup has typed `LocationID`, `Borough`, `Zone` and `service_zone` columns.
 
 The script prints `DESCRIBE trips`, source/Uber/zone counts and the complete results and wall-clock durations for three [sample queries](../scripts/sample_queries):
 

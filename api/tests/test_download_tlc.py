@@ -138,3 +138,64 @@ def test_published_download_is_readable_by_container_user(tmp_path, monkeypatch)
     monkeypatch.setattr(download_tlc, "urlopen", lambda *a, **kw: response(ZONE_CSV))
     download_tlc.download_file("https://example.invalid/zones", destination)
     assert stat.S_IMODE(destination.stat().st_mode) == 0o644
+
+
+@pytest.mark.parametrize("column,expression", [
+    ("hvfhs_license_num", "123"),
+    ("pickup_datetime", "'not-a-timestamp'"),
+    ("PULocationID", "1.5"),
+    ("DOLocationID", "'1'"),
+    ("base_passenger_fare", "'10.25'"),
+])
+def test_incompatible_parquet_types_are_rejected(tmp_path, column, expression):
+    columns = {
+        "hvfhs_license_num": "'HV0003'", "pickup_datetime": "TIMESTAMP '2024-03-01'",
+        "PULocationID": "1", "DOLocationID": "2", "base_passenger_fare": "10.25",
+    }
+    columns[column] = expression
+    path = tmp_path / "wrong-type.parquet"
+    with duckdb.connect() as connection:
+        connection.sql("SELECT " + ", ".join(f"{value} AS {name}" for name, value in columns.items())).write_parquet(str(path))
+    with pytest.raises(ValueError, match="Invalid TLC input"):
+        download_tlc.validate_file(path, ".parquet")
+
+
+@pytest.mark.parametrize("timestamp_type,fare_type", [("DATE", "DOUBLE"), ("TIMESTAMP_NS", "DECIMAL(18,2)")])
+def test_compatible_parquet_types_are_accepted(tmp_path, timestamp_type, fare_type):
+    path = tmp_path / "compatible.parquet"
+    with duckdb.connect() as connection:
+        connection.sql(f"""
+            SELECT 'HV0003' AS hvfhs_license_num,
+                   CAST('2024-03-01' AS {timestamp_type}) AS pickup_datetime,
+                   1::SMALLINT AS PULocationID, 2::BIGINT AS DOLocationID,
+                   CAST(10.25 AS {fare_type}) AS base_passenger_fare
+        """).write_parquet(str(path))
+    download_tlc.validate_file(path, ".parquet")
+
+
+def test_download_cli_publishes_both_inputs(tmp_path, parquet_bytes, monkeypatch, capsys):
+    monkeypatch.setattr("sys.argv", ["download_tlc", "--data-dir", str(tmp_path)])
+    bodies = {"fhvhv_tripdata_2024-03.parquet": parquet_bytes, "taxi_zone_lookup.csv": ZONE_CSV}
+    monkeypatch.setattr(download_tlc, "urlopen", lambda url, **kwargs: response(bodies[url.rsplit("/", 1)[1]]))
+    assert download_tlc.main() == 0
+    assert (tmp_path / "fhvhv_tripdata_2024-03.parquet").read_bytes() == parquet_bytes
+    assert (tmp_path / "taxi_zone_lookup.csv").read_bytes() == ZONE_CSV
+    assert "Saved taxi_zone_lookup.csv" in capsys.readouterr().out
+
+
+def test_download_cli_returns_failure_for_invalid_cached_input(tmp_path, monkeypatch, capsys):
+    path = tmp_path / "fhvhv_tripdata_2024-03.parquet"
+    path.write_bytes(b"invalid")
+    monkeypatch.setattr("sys.argv", ["download_tlc", "--data-dir", str(tmp_path)])
+    assert download_tlc.main() == 1
+    assert "Invalid TLC input" in capsys.readouterr().err
+    assert path.read_bytes() == b"invalid"
+
+
+def test_download_cli_rejects_invalid_month_before_io(tmp_path, monkeypatch, capsys):
+    monkeypatch.setattr("sys.argv", ["download_tlc", "--data-dir", str(tmp_path), "--month", "../2024-03"])
+    with pytest.raises(SystemExit) as error:
+        download_tlc.main()
+    assert error.value.code == 2
+    assert "--month" in capsys.readouterr().err
+    assert list(tmp_path.iterdir()) == []

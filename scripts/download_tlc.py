@@ -26,10 +26,18 @@ def validate_file(path: Path, suffix: str) -> None:
     try:
         if suffix == ".parquet":
             with duckdb.connect() as connection:
-                columns = connection.read_parquet(str(path)).columns
-            required = {"hvfhs_license_num", "pickup_datetime", "PULocationID", "DOLocationID", "base_passenger_fare"}
-            if not required.issubset(columns):
-                raise ValueError("Missing HVFHV columns")
+                relation = connection.read_parquet(str(path))
+                columns = dict(zip(relation.columns, (kind.id for kind in relation.types)))
+            integers = {"tinyint", "smallint", "integer", "bigint", "utinyint", "usmallint", "uinteger", "ubigint"}
+            required_types = {
+                "hvfhs_license_num": {"varchar"},
+                "pickup_datetime": {"date", "timestamp", "timestamp_s", "timestamp_ms", "timestamp_ns"},
+                "PULocationID": integers,
+                "DOLocationID": integers,
+                "base_passenger_fare": integers | {"float", "double", "decimal"},
+            }
+            if any(columns.get(name) not in kinds for name, kinds in required_types.items()):
+                raise ValueError("Missing or incompatible HVFHV columns")
         else:
             with path.open(encoding="utf-8-sig", newline="") as handle:
                 reader = csv.DictReader(handle)

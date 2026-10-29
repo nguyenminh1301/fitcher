@@ -75,3 +75,14 @@ def test_empty_or_incomplete_response_is_not_success(monkeypatch, capsys, status
     }))
     assert check_openai.main() == 1
     assert "usable text" in capsys.readouterr().err
+
+
+def test_transport_failure_has_safe_diagnostics(monkeypatch, capsys):
+    def fail(request):
+        raise httpx.ConnectError("test-secret-never-print", request=request)
+
+    install_transport(monkeypatch, fail)
+    assert check_openai.main() == 1
+    output = capsys.readouterr()
+    assert "connectivity" in output.err
+    assert "test-secret" not in output.out + output.err
