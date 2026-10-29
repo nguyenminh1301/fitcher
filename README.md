@@ -64,6 +64,17 @@ After changing `.env`, run `docker compose up -d --wait` to recreate containers 
 
 Stop services with `docker compose down`. The `pgdata` named volume persists database contents; the local `data/parquet` directory is mounted read-only into the API.
 
+All three runtime images apply available OS security updates during their builds. API and web images omit package-installation tools; the database runs directly as `postgres` and retains PostgreSQL 17 and pgvector 0.8.7. The existing named volume is reused without reinitialization. A custom bind-mounted database directory must already be owned by the image's `postgres` UID/GID; the non-root entry point cannot repair ownership. Do not delete an existing volume to resolve permissions.
+
+Refresh base images and OS security packages periodically, then recreate the services:
+
+```bash
+docker compose build --pull --no-cache
+docker compose up -d --wait
+```
+
+`--no-cache` ensures the OS update layer is rerun. Dependency versions still come from the committed lockfiles; changes to base image tags and language runtimes need their own compatibility review.
+
 ## Host development and checks
 
 Use Python 3.13, uv 0.13.6, Node 24.21.0 and npm 11.x. Docker pins its own runtimes; host setup does not require changing global versions.
@@ -162,7 +173,9 @@ python scripts/check_git.py --title "chore(common): update project setup"
 CI validates repository text/structure, commit messages, PR titles, source branches and GitHub workflows.
 PR size labels are advisory: XS up to 100 changed lines, S up to 400, M up to 1000, L up to 2000 and XL above 2000.
 Keep PRs at most 1000 changed lines where practical and below 100 changed files for review.
-Run the API suite and web typecheck/build above for application changes. The existing CI still covers repository governance and workflow lint; application CI and automated dependency audits remain future work.
+CI also runs the API/CLI suite on Linux (including POSIX permission checks) and the web frozen install, typecheck and production build. Run the same commands locally for application changes.
+
+The Security workflow runs on PRs, integration/production pushes, manual dispatch and a weekly schedule. It audits locked npm/Python dependencies, scans Git history for secrets, and rebuilds/scans all three runtime images. Image jobs retain complete JSON reports and fail for High/Critical findings with a published fix; unfixed advisories remain visible for review. See [security policy](SECURITY.md) for triage and scanner limits. These jobs do not configure required status checks or branch protection automatically.
 
 CodeRabbit is configured for `develop` and `main`, skips drafts, and reviews incremental updates without pausing after a fixed number of commits.
 The CodeRabbit GitHub App must have access to this repository and a plan that supports the requested reviews.
@@ -179,7 +192,7 @@ The PR size labeler runs for branches within this repository; fork PRs do not re
 
 - Add a bounded read-only executor and SQL validator before text-to-SQL generation.
 - Establish a golden-set baseline, then add self-healing, semantic retrieval, SSE and the chat UI.
-- Extend CI to cover the existing API suite, web checks and application dependency audits.
+- Extend application checks as the bounded executor and analysis API are introduced.
 
 See [CHANGELOG.md](CHANGELOG.md) for repository changes and [SECURITY.md](SECURITY.md) for vulnerability reporting.
 

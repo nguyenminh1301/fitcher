@@ -2,7 +2,8 @@ name: fitcher
 
 services:
   db:
-    image: pgvector/pgvector:0.8.7-pg17-bookworm
+    build:
+      context: ./db
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-fitcher}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-fitcher-local-only}

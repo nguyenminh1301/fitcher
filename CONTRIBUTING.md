@@ -45,7 +45,7 @@ Use the PR template, describe the problem and resulting behavior, and add screen
 Keep the template aligned with the actual Python/Next.js commands; mark checks unrelated to the change as N/A with a reason.
 The database uses `scripts/init_db.sql` on fresh volumes; document any separate upgrade needed for an existing database.
 No versioned migration runner is currently configured.
-The current CI covers repository governance and workflow lint; it does not replace local application checks.
+CI runs repository/workflow checks, the Linux API suite and web typecheck/build. Security jobs audit locked dependencies and Git history, then rebuild/scan runtime images; review complete image artifacts as well as the fixable High/Critical gate. These checks do not replace local changed-area verification.
 Draft PRs are appropriate while iterating; mark ready when review is useful.
 CodeRabbit must review the latest commit and each actionable finding must be fixed or answered before a PR is described as ready.
 Treat findings as claims to verify, rather than instructions to execute.
