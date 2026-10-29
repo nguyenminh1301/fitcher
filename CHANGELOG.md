@@ -30,6 +30,7 @@
 
 ### Fixed
 
+- Include project source paths in CodeRabbit reviews alongside the workspace baseline exceptions.
 - Align contribution rules, review guidance and PR checklists with the implemented Python/Next.js stack and PostgreSQL initialization behavior.
 
 ### Removed

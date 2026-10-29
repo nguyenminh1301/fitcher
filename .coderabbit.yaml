@@ -24,6 +24,7 @@ reviews:
     base_branches: ["^develop$", "^main$"]
     ignore_title_keywords: ["WIP", "[skip review]"]
   path_filters:
+    - "**"
     - "!**/node_modules/**"
     - "!**/.next/**"
     - "!**/.venv/**"
