@@ -20,7 +20,8 @@
 
 ### Changed
 
-- Build patched runtime images without API/web package managers and run PostgreSQL directly as its database user while preserving existing named volumes.
+- Build patched runtime images without API/web language package managers and run PostgreSQL directly as its database user while preserving existing named volumes.
+- Remove Corepack from the web runtime so it cannot bootstrap language package managers.
 - Aggregate pickup counts before joining zone labels to reduce work while preserving unmatched locations, null IDs and deterministic ties.
 - Align mirrored agent guidance with the implemented local application foundation.
 - Pin checkout and Python setup to current action runtimes.

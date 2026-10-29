@@ -64,7 +64,7 @@ After changing `.env`, run `docker compose up -d --wait` to recreate containers 
 
 Stop services with `docker compose down`. The `pgdata` named volume persists database contents; the local `data/parquet` directory is mounted read-only into the API.
 
-All three runtime images apply available OS security updates during their builds. API and web images omit package-installation tools; the database runs directly as `postgres` and retains PostgreSQL 17 and pgvector 0.8.7. The existing named volume is reused without reinitialization. A custom bind-mounted database directory must already be owned by the image's `postgres` UID/GID; the non-root entry point cannot repair ownership. Do not delete an existing volume to resolve permissions.
+All three runtime images apply available OS security updates during their builds. API and web images omit language package managers; the database runs directly as `postgres` and retains PostgreSQL 17 and pgvector 0.8.7. The existing named volume is reused without reinitialization. A custom bind-mounted database directory must already be owned by the image's `postgres` UID/GID; the non-root entry point cannot repair ownership. Do not delete an existing volume to resolve permissions.
 
 Refresh base images and OS security packages periodically, then recreate the services:
 
