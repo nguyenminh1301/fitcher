@@ -19,6 +19,8 @@ The same commands work in PowerShell and Bash. `--data-dir PATH` on both command
 
 The downloader streams each response to a unique temporary file, checks its advertised byte length when present, validates Parquet metadata/required columns or CSV lookup structure, then publishes it atomically. Downloads use a 60-second socket timeout. Existing valid files are reused without downloading again; invalid files are preserved and reported for manual inspection. Interrupted downloads are cleaned up; restarting begins that file again. Validation does not supply an official source checksum or detect every possible damaged Parquet data page.
 
+The zone lookup must contain each current official ID from 1 through 265 exactly once. This also rejects a response truncated at a valid row boundary when no length is advertised. If TLC changes the ID set, review and update the expected taxonomy before accepting the new revision. Newly published files use mode `0644` on Linux so the API's separate user can read them. For files created by older versions with mode `0600`, grant read access to the two downloaded inputs before container inspection; existing cached files are not automatically chmodded.
+
 Keep Parquet, CSV, temporary files and databases under ignored `data/`; do not commit them. No OpenAI requests occur during download, inspection or tests.
 
 `check_tlc` opens an in-memory DuckDB connection, binds local file paths to session variables, and loads [init_views.sql](../scripts/init_views.sql). Views are connection-scoped and must be initialized on each new connection. No data is copied into PostgreSQL or a persistent DuckDB database. The source trip columns remain available; the zone lookup has typed `LocationID`, `Borough`, `Zone` and `service_zone` columns.

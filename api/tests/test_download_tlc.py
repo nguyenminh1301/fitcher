@@ -1,4 +1,6 @@
 from io import BytesIO
+import os
+import stat
 
 import duckdb
 import pytest
@@ -6,7 +8,10 @@ import pytest
 from scripts import download_tlc
 
 
-ZONE_CSV = b'LocationID,Borough,Zone,service_zone\n1,Manhattan,Example,Yellow Zone\n'
+ZONE_CSV = ('LocationID,Borough,Zone,service_zone\n' + ''.join(
+    f'{location_id},Manhattan,Example {location_id},Yellow Zone\n'
+    for location_id in range(1, 266)
+)).encode()
 
 
 @pytest.fixture
@@ -108,3 +113,28 @@ def test_network_interruption_removes_partial_file(tmp_path, monkeypatch):
     with pytest.raises(OSError, match="interrupted"):
         download_tlc.download_file("https://example.invalid/zones", destination)
     assert list(tmp_path.iterdir()) == []
+
+
+@pytest.mark.parametrize("cached", [False, True])
+def test_complete_rows_from_truncated_lookup_are_rejected(tmp_path, monkeypatch, cached):
+    destination = tmp_path / "zones.csv"
+    partial = b'LocationID,Borough,Zone,service_zone\n1,Manhattan,Example,Yellow Zone\n'
+    stream = response(partial)
+    stream.headers = {}
+    monkeypatch.setattr(download_tlc, "urlopen", lambda *a, **kw: stream)
+    if cached:
+        destination.write_bytes(partial)
+    with pytest.raises(ValueError, match="Invalid"):
+        download_tlc.download_file("https://example.invalid/zones", destination)
+    if cached:
+        assert destination.read_bytes() == partial
+    else:
+        assert list(tmp_path.iterdir()) == []
+
+
+@pytest.mark.skipif(os.name != "posix", reason="POSIX permission bits require Linux/macOS")
+def test_published_download_is_readable_by_container_user(tmp_path, monkeypatch):
+    destination = tmp_path / "zones.csv"
+    monkeypatch.setattr(download_tlc, "urlopen", lambda *a, **kw: response(ZONE_CSV))
+    download_tlc.download_file("https://example.invalid/zones", destination)
+    assert stat.S_IMODE(destination.stat().st_mode) == 0o644

@@ -13,6 +13,7 @@ import duckdb
 ROOT = Path(__file__).resolve().parents[1]
 TLC_BASE_URL = "https://d37ci6vzurychx.cloudfront.net"
 DEFAULT_MONTH = "2024-03"
+EXPECTED_ZONE_IDS = frozenset(range(1, 266))
 
 
 def parse_month(value: str) -> str:
@@ -37,8 +38,8 @@ def validate_file(path: Path, suffix: str) -> None:
                 rows = list(reader)
             ids = [int(row["LocationID"]) for row in rows]
             malformed = any(None in row or any(value is None for value in row.values()) for row in rows)
-            if not ids or len(ids) != len(set(ids)) or malformed:
-                raise ValueError("Empty or duplicate/malformed taxi-zone rows")
+            if set(ids) != EXPECTED_ZONE_IDS or len(ids) != len(set(ids)) or malformed:
+                raise ValueError("Incomplete, duplicate or malformed taxi-zone rows")
     except (duckdb.Error, ValueError, KeyError, TypeError, UnicodeError, csv.Error) as error:
         raise ValueError(f"Invalid TLC input: {path.name}. Move invalid existing files aside before retrying.") from error
 
@@ -65,6 +66,7 @@ def download_file(url: str, destination: Path) -> Path:
         if expected_length is not None and received != int(expected_length):
             raise ValueError(f"Download length mismatch for {destination.name}")
         validate_file(temporary, destination.suffix)
+        temporary.chmod(0o644)
         temporary.replace(destination)
     finally:
         if temporary is not None:
