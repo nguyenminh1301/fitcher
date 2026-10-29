@@ -19,6 +19,8 @@ The same commands work in PowerShell and Bash. `--data-dir PATH` on both command
 
 The downloader streams each response to a unique temporary file, checks its advertised byte length when present, validates Parquet metadata/required columns or CSV lookup structure, then publishes it atomically. Downloads use a 60-second socket timeout. Existing valid files are reused without downloading again; invalid files are preserved and reported for manual inspection. Interrupted downloads are cleaned up; restarting begins that file again. Validation does not supply an official source checksum or detect every possible damaged Parquet data page.
 
+Publication uses a same-directory hard link so it never replaces an input published by another process during the transfer. A concurrent winner is validated and reused; an invalid winner is preserved and reported. Use a local filesystem supporting hard links, such as NTFS or ext4. Unsupported filesystems fail without publishing a final file, and the temporary download is removed; there is no unsafe overwrite fallback.
+
 The zone lookup must contain each current official ID from 1 through 265 exactly once. This also rejects a response truncated at a valid row boundary when no length is advertised. If TLC changes the ID set, review and update the expected taxonomy before accepting the new revision. Newly published files use mode `0644` on Linux so the API's separate user can read them. For files created by older versions with mode `0600`, grant read access to the two downloaded inputs before container inspection; existing cached files are not automatically chmodded.
 
 On Linux, a restrictive `umask 077` can also create the mounted `data/parquet` directory with mode `0700`. The API runs as UID `10001` and needs traversal access to this directory even when its files are readable. If needed, grant traversal and read access to these public TLC inputs before running the container check:
@@ -32,7 +34,7 @@ Use the corresponding directory and filename when selecting another `--data-dir`
 
 Keep Parquet, CSV, temporary files and databases under ignored `data/`; do not commit them. No OpenAI requests occur during download, inspection or tests.
 
-`check_tlc` opens an in-memory DuckDB connection, binds local file paths to session variables, and loads [init_views.sql](../scripts/init_views.sql). Views are connection-scoped and must be initialized on each new connection. No data is copied into PostgreSQL or a persistent DuckDB database. The source trip columns remain available; the zone lookup has typed `LocationID`, `Borough`, `Zone` and `service_zone` columns.
+`check_tlc` validates both inputs before exposing views, then binds local file paths to session variables in an in-memory DuckDB connection and loads [init_views.sql](../scripts/init_views.sql). Direct inspection applies the same complete, unique zone-ID requirement as downloads; duplicate IDs fail instead of multiplying trip counts during joins. Parquet validation requires a string license, a date or timestamp pickup column, integer location IDs and a numeric base fare. These metadata checks do not scan every data page. Views are connection-scoped and must be initialized on each new connection. No data is copied into PostgreSQL or a persistent DuckDB database. The source trip columns remain available; the zone lookup has typed `LocationID`, `Borough`, `Zone` and `service_zone` columns.
 
 The script prints `DESCRIBE trips`, source/Uber/zone counts and the complete results and wall-clock durations for three [sample queries](../scripts/sample_queries):
 
@@ -88,6 +90,8 @@ The source contains 21,280,788 rows: 15,621,998 Uber rows and 5,658,790 Lyft row
 | Top pickup zones | 0.218 s | 0.210 s | 0.299 s | 10 rows; JFK Airport leads with 281,614 trips |
 
 These are single warm runs after schema/count inspection, with default DuckDB settings, not cold-cache benchmarks or latency guarantees.
+
+The top-pickup query now aggregates trip counts by location before joining the unique zone lookup. On the same March input, five warm Windows runs alternating the old and new plans produced medians of 0.410 s and 0.117 s respectively (about 3.5x faster). All ten result rows matched exactly. This is a local comparison, not a concurrency or cold-cache performance guarantee; regression fixtures also retain null and unmatched pickup IDs and deterministic ties.
 
 Weekly results:
 

@@ -47,7 +47,7 @@ Repository checks alone support Python 3.11 or newer.
 - No versioned database migration runner is configured; do not prescribe a migration tool or file naming scheme until one is introduced deliberately.
 - Do not delete existing database volumes to make a verification step pass.
 - Keep secrets server-side and exclude local datasets, database files and scratch artifacts from Git.
-- Report actual command results and unavailable checks; the current CI validates repository governance and workflows, not application tests/builds.
+- Report actual command results and unavailable checks; CI runs governance/workflow checks, Linux API tests, web checks and security scans. Image scans retain all findings and block fixable High/Critical advisories; a passing gate does not prove all findings exploitable or all unfixed findings safe.
 - Update CHANGELOG.md for each logical change.
 - Follow the PR review requirements in `git_workflow.md`; do not merge, enable auto-merge, rewrite published history, change repository visibility or contact other people without authorization.
 

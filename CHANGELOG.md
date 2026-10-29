@@ -4,6 +4,7 @@
 
 ### Added
 
+- Linux API/CLI tests, web typecheck/build, dependency and Git-secret audits, and weekly runtime-image security scans with complete report artifacts and fixable High/Critical gates.
 - Official TLC HVFHV and taxi-zone downloads with atomic publication, validated cache reuse, Uber-only DuckDB views and three sample analysis queries with real-data verification.
 - Local Next.js and FastAPI foundation with a liveness endpoint, locked dependencies, three-service Docker Compose setup, pgvector initialization and an explicit OpenAI Responses connectivity check.
 - API health and OpenAI smoke-command tests covering missing credentials, safe error diagnostics and incomplete responses.
@@ -19,6 +20,9 @@
 
 ### Changed
 
+- Build patched runtime images without API/web language package managers and run PostgreSQL directly as its database user while preserving existing named volumes.
+- Remove Corepack from the web runtime so it cannot bootstrap language package managers.
+- Aggregate pickup counts before joining zone labels to reduce work while preserving unmatched locations, null IDs and deterministic ties.
 - Align mirrored agent guidance with the implemented local application foundation.
 - Pin checkout and Python setup to current action runtimes.
 - Pause automatic dependency version-update PRs to preserve the one-line commit policy.
@@ -30,6 +34,8 @@
 
 ### Fixed
 
+- Publish downloads without overwriting concurrent outputs, validate the winning file, and fail safely on filesystems without atomic hard-link support.
+- Validate complete unique zone lookups and compatible Parquet types before dataset inspection, with CLI success/failure and safe transport-error regression tests.
 - Document Linux dataset-directory traversal permissions for the non-root API container when the host uses a restrictive umask.
 - Reject incomplete taxi-zone lookups, including row-boundary truncation, and publish downloaded inputs with permissions readable by the Linux API container.
 - Include project source paths in CodeRabbit reviews alongside the workspace baseline exceptions.

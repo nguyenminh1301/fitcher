@@ -70,8 +70,9 @@ reviews:
         Do not run untrusted code under pull_request_target. Keep Git policy checks
         aligned with .github/git-policy.json and .agents/rules/git_workflow.md.
         Verification reports must use actual Python/uv and Next.js/npm commands
-        when relevant; do not require removed PR checklist sections. Current CI verifies governance and
-        workflows; it does not yet run application tests or builds.
+        when relevant; do not require removed PR checklist sections. CI runs governance,
+        Linux API tests, web checks and security scans. Image gates block fixable High/Critical
+        advisories and retain all findings; assess reachability and unfixed risks separately.
   pre_merge_checks:
     docstrings:
       mode: "off"

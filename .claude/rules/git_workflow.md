@@ -230,6 +230,6 @@ For workflow changes, also run `go run github.com/rhysd/actionlint/cmd/actionlin
 Application checks already exist: `uv run --project api pytest -c api/pyproject.toml`, `npm --prefix web run typecheck` and `npm --prefix web run build`.
 Follow the changed-area verification table in `base.md`, including frozen dependency setup and container/database checks when relevant.
 Documentation-only changes do not require application builds or live OpenAI calls.
-Current CI covers repository governance and workflow lint; it does not run the API suite or web checks yet.
+CI covers repository governance, workflow lint, Linux API tests and web checks. Security jobs audit application dependencies and secrets and rebuild/scan runtime images; review full reports including advisories without fixes.
 Dependabot source branch names are allowed by the executable gate, but generated commits are not exempt from the message policy.
 Automatic version-update PRs remain paused until a compatible update process is explicitly chosen.

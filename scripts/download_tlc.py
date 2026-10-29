@@ -2,6 +2,7 @@
 
 import argparse
 import csv
+import os
 from pathlib import Path
 import re
 import sys
@@ -26,10 +27,18 @@ def validate_file(path: Path, suffix: str) -> None:
     try:
         if suffix == ".parquet":
             with duckdb.connect() as connection:
-                columns = connection.read_parquet(str(path)).columns
-            required = {"hvfhs_license_num", "pickup_datetime", "PULocationID", "DOLocationID", "base_passenger_fare"}
-            if not required.issubset(columns):
-                raise ValueError("Missing HVFHV columns")
+                relation = connection.read_parquet(str(path))
+                columns = dict(zip(relation.columns, (kind.id for kind in relation.types)))
+            integers = {"tinyint", "smallint", "integer", "bigint", "utinyint", "usmallint", "uinteger", "ubigint"}
+            required_types = {
+                "hvfhs_license_num": {"varchar"},
+                "pickup_datetime": {"date", "timestamp", "timestamp_s", "timestamp_ms", "timestamp_ns"},
+                "PULocationID": integers,
+                "DOLocationID": integers,
+                "base_passenger_fare": integers | {"float", "double", "decimal"},
+            }
+            if any(columns.get(name) not in kinds for name, kinds in required_types.items()):
+                raise ValueError("Missing or incompatible HVFHV columns")
         else:
             with path.open(encoding="utf-8-sig", newline="") as handle:
                 reader = csv.DictReader(handle)
@@ -67,7 +76,15 @@ def download_file(url: str, destination: Path) -> Path:
             raise ValueError(f"Download length mismatch for {destination.name}")
         validate_file(temporary, destination.suffix)
         temporary.chmod(0o644)
-        temporary.replace(destination)
+        try:
+            # Linking in the same directory publishes atomically without clobbering a winner.
+            os.link(temporary, destination)
+        except FileExistsError:
+            validate_file(destination, destination.suffix)
+            print(f"Using concurrently published {destination.name}", flush=True)
+            return destination
+        except OSError as error:
+            raise OSError(f"Cannot publish {destination.name} atomically; use a local filesystem supporting hard links.") from error
     finally:
         if temporary is not None:
             temporary.unlink(missing_ok=True)

@@ -7,7 +7,7 @@ from time import perf_counter
 
 import duckdb
 
-from scripts.download_tlc import DEFAULT_MONTH, ROOT, parse_month
+from scripts.download_tlc import DEFAULT_MONTH, ROOT, parse_month, validate_file
 
 QUERY_DIR = Path(__file__).resolve().parent / "sample_queries"
 
@@ -19,6 +19,7 @@ def initialize_views(connection: duckdb.DuckDBPyConnection, data_dir: Path, mont
     for path in (trips, zones):
         if not path.is_file():
             raise FileNotFoundError(f"Missing {path}. Run python -m scripts.download_tlc first.")
+        validate_file(path, path.suffix)
     connection.execute("SET VARIABLE trip_file = ?", [str(trips)])
     connection.execute("SET VARIABLE zones_file = ?", [str(zones)])
     connection.execute((Path(__file__).with_name("init_views.sql")).read_text(encoding="utf-8"))
