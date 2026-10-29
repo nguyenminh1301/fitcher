@@ -20,3 +20,4 @@
 - Rename the project and repository to `Fitcher`.
 - Standardize the project and repository name as lowercase `fitcher` and make the repository public.
 - Align workspace and Git rules with the reference workflow, including mandatory branch-based development and the explicit owner-only production exception.
+- Use the backend repository pull request template verbatim.
