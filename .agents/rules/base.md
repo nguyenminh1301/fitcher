@@ -17,6 +17,7 @@ description: Always active. Sets communication, scope, repository boundaries and
 ## 2. Working standards
 
 - Read `workspace.md` and the current task's progress before acting.
+- Apply `naming.md` to every tracked name and explanation; do not make committed artifacts depend on private task context.
 - Inspect applicable rules, current files and Git state; preserve unrelated user changes.
 - Use the main checkout, never Git worktrees.
 - Load `git_workflow.md` before branches, commits or PRs.

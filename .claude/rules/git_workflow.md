@@ -30,6 +30,8 @@ chore/deps/update-analysis-dependencies
 
 ### Naming must be meaningful to a reviewer
 
+Apply `naming.md` to every durable name and explanation; the one-line commit requirement below remains mandatory.
+
 The `short-description` segment, every commit subject, and every PR title describe the change itself in terms a reviewer who has never seen the internal task tracker can follow.
 Never derive one from an internal task-tracker label, a plan or report file name, a round or attempt number, or any other identifier that is meaningful only inside `.workspace/`.
 `fix/agent/close-pr3-gaps` and `close p3 gaps` fail this: neither says what the gaps were.
