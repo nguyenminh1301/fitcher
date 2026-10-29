@@ -30,6 +30,7 @@
 
 ### Fixed
 
+- Publish downloads without overwriting concurrent outputs, validate the winning file, and fail safely on filesystems without atomic hard-link support.
 - Validate complete unique zone lookups and compatible Parquet types before dataset inspection, with CLI success/failure and safe transport-error regression tests.
 - Document Linux dataset-directory traversal permissions for the non-root API container when the host uses a restrictive umask.
 - Reject incomplete taxi-zone lookups, including row-boundary truncation, and publish downloaded inputs with permissions readable by the Linux API container.

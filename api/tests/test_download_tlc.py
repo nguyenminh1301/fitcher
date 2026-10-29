@@ -199,3 +199,35 @@ def test_download_cli_rejects_invalid_month_before_io(tmp_path, monkeypatch, cap
     assert error.value.code == 2
     assert "--month" in capsys.readouterr().err
     assert list(tmp_path.iterdir()) == []
+
+
+@pytest.mark.parametrize("valid_winner", [True, False])
+def test_concurrent_publication_never_overwrites_the_winner(tmp_path, monkeypatch, valid_winner):
+    destination = tmp_path / "zones.csv"
+    winner = ZONE_CSV.replace(b"Example 1,", b"Updated zone,") if valid_winner else b"invalid"
+
+    def concurrent_response(*args, **kwargs):
+        destination.write_bytes(winner)
+        return response(ZONE_CSV)
+
+    monkeypatch.setattr(download_tlc, "urlopen", concurrent_response)
+    if valid_winner:
+        assert download_tlc.download_file("https://example.invalid/zones", destination) == destination
+    else:
+        with pytest.raises(ValueError, match="Invalid TLC input"):
+            download_tlc.download_file("https://example.invalid/zones", destination)
+    assert destination.read_bytes() == winner
+    assert list(tmp_path.glob("*.part")) == []
+
+
+def test_unsupported_atomic_publication_fails_without_final_file(tmp_path, monkeypatch):
+    destination = tmp_path / "zones.csv"
+    monkeypatch.setattr(download_tlc, "urlopen", lambda *args, **kwargs: response(ZONE_CSV))
+
+    def unsupported_link(*args, **kwargs):
+        raise OSError("Hard links unsupported")
+
+    monkeypatch.setattr(os, "link", unsupported_link)
+    with pytest.raises(OSError, match="atomic"):
+        download_tlc.download_file("https://example.invalid/zones", destination)
+    assert list(tmp_path.iterdir()) == []

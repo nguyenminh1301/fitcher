@@ -2,6 +2,7 @@
 
 import argparse
 import csv
+import os
 from pathlib import Path
 import re
 import sys
@@ -75,7 +76,15 @@ def download_file(url: str, destination: Path) -> Path:
             raise ValueError(f"Download length mismatch for {destination.name}")
         validate_file(temporary, destination.suffix)
         temporary.chmod(0o644)
-        temporary.replace(destination)
+        try:
+            # Linking in the same directory publishes atomically without clobbering a winner.
+            os.link(temporary, destination)
+        except FileExistsError:
+            validate_file(destination, destination.suffix)
+            print(f"Using concurrently published {destination.name}", flush=True)
+            return destination
+        except OSError as error:
+            raise OSError(f"Cannot publish {destination.name} atomically; use a local filesystem supporting hard links.") from error
     finally:
         if temporary is not None:
             temporary.unlink(missing_ok=True)
