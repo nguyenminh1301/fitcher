@@ -10,8 +10,8 @@ description: Always active. Sets communication, scope, repository boundaries and
 
 - Chat with the owner in Vietnamese.
 - Write code identifiers, comments, documentation and GitHub content in English.
-- fitcher currently contains repository governance and documentation only.
-- Next.js, FastAPI, LangGraph, DuckDB and pgvector are planned architecture, not implemented functionality; read README.md for current status.
+- fitcher includes a local Next.js/FastAPI/PostgreSQL foundation with pgvector.
+- Data analysis, LangGraph, DuckDB, SSE and chat/chart features remain planned; read README.md for current status and available commands.
 - Implement only the requested scope; do not add speculative application code, dependencies or abstractions.
 
 ## 2. Working standards

@@ -4,6 +4,8 @@
 
 ### Added
 
+- Local Next.js and FastAPI foundation with a liveness endpoint, locked dependencies, three-service Docker Compose setup, pgvector initialization and an explicit OpenAI Responses connectivity check.
+- API health and OpenAI smoke-command tests covering missing credentials, safe error diagnostics and incomplete responses.
 - Shared durable naming and explanation rules for all tracked project artifacts.
 
 - Per-developer workspace structure, task continuity guidance and mirrored agent rules.
@@ -16,6 +18,7 @@
 
 ### Changed
 
+- Align mirrored agent guidance with the implemented local application foundation.
 - Pin checkout and Python setup to current action runtimes.
 - Pause automatic dependency version-update PRs to preserve the one-line commit policy.
 - Rename the project and repository to `ai-data-analysis-platform` to describe its purpose.
