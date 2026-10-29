@@ -10,9 +10,14 @@ Chat with the owner in Vietnamese.
 The repository includes the local Next.js/FastAPI/PostgreSQL foundation.
 Use the [README](README.md) for setup, the API suite and web checks; later analysis features remain planned.
 Preserve Windows/PowerShell and Linux support.
+Read AGENTS.md or CLAUDE.md and the applicable rules before working.
+Use `.workspace/` for private working output; follow `.workspace/README.md`.
+A reusable project script must live in tracked root `scripts/`, not the ignored workspace.
 Keep secrets, local datasets, database files and scratch material out of Git.
 
 ## Branches and commits
+
+Follow the [durable naming and explanation rule](.agents/rules/naming.md) for code, files, tests, documentation, branches and commits.
 
 Follow [.agents/rules/git_workflow.md](.agents/rules/git_workflow.md).
 Create each work branch from an up-to-date `develop`; contributors open PRs targeting `develop`.

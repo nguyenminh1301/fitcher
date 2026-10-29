@@ -121,7 +121,7 @@ Compose passes the key only to the API container; Docker build contexts exclude 
 `develop` is the default integration branch; `main` is the production branch.
 Start a focused branch from updated `develop`, then open a PR back to `develop`.
 The repository owner may deliberately push directly to `main`; this exception does not permit direct implementation commits to `develop`.
-The initial governance setup bootstraps `main` and seeds `develop` from the same commit.
+The owner exception does not authorize automatic integration or synchronizing implementation changes into both long-lived branches.
 
 ```bash
 git switch develop
@@ -168,3 +168,13 @@ The PR size labeler runs for branches within this repository; fork PRs do not re
 - Extend CI, Dependabot and security scanning as runnable components are introduced.
 
 See [CHANGELOG.md](CHANGELOG.md) for repository changes and [SECURITY.md](SECURITY.md) for vulnerability reporting.
+
+## Agent workspace
+
+Start with [AGENTS.md](AGENTS.md) or [CLAUDE.md](CLAUDE.md), then read the corresponding `workspace.md` and `base.md` rules.
+Rules and workspace guidance are mirrored in `.agents/` and `.claude/`; keep both copies identical.
+The [.workspace guide](.workspace/README.md) explains the tracked baseline directories and ignored per-developer working content.
+Plans, progress, reports, one-off scripts and scratch files stay there; reusable tools stay in tracked root `scripts/`.
+
+The rule wording and presentation follow the [backend workspace rule](https://github.com/luvax-social/backend/blob/develop/.agents/rules/workspace.md), [backend Git rule](https://github.com/luvax-social/backend/blob/develop/.agents/rules/git_workflow.md) and their shared [working-directory](https://github.com/luvax-social/social-media-platforms/blob/main/.agents/rules/WORKING_DIRECTORY.md) and [Git workflow](https://github.com/luvax-social/social-media-platforms/blob/main/.agents/rules/GIT_WORKFLOW.md) rules.
+This repository consolidates the applicable shared rules locally and substitutes its actual stack, scopes and checks; it does not depend on a sibling checkout.
