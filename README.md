@@ -131,7 +131,7 @@ git switch -c chore/common/update-project-setup
 
 Read [CONTRIBUTING.md](CONTRIBUTING.md), [Git rules](.agents/rules/git_workflow.md) and [AGENTS.md](AGENTS.md) before making changes.
 Commit messages and PR titles use `type(scope): subject`, in English, on one line with no body or trailers, at most 80 characters (target 72).
-Types and Project-specific scopes live in [.github/git-policy.json](.github/git-policy.json).
+Types and project-specific scopes live in [.github/git-policy.json](.github/git-policy.json).
 The initial README commit predates this policy; do not rewrite published history just to rename it.
 
 ## Checks
@@ -165,7 +165,7 @@ The PR size labeler runs for branches within this repository; fork PRs do not re
 - Prepare one month of HVFHV Parquet, the Uber filter and zone lookup views.
 - Add a bounded read-only executor and SQL validator before text-to-SQL generation.
 - Establish a golden-set baseline, then add self-healing, semantic retrieval, SSE and the chat UI.
-- Extend CI, Dependabot and security scanning as runnable components are introduced.
+- Extend CI to cover the existing API suite, web checks and application dependency audits.
 
 See [CHANGELOG.md](CHANGELOG.md) for repository changes and [SECURITY.md](SECURITY.md) for vulnerability reporting.
 
@@ -178,3 +178,4 @@ Plans, progress, reports, one-off scripts and scratch files stay there; reusable
 
 The rule wording and presentation follow the [backend workspace rule](https://github.com/luvax-social/backend/blob/develop/.agents/rules/workspace.md), [backend Git rule](https://github.com/luvax-social/backend/blob/develop/.agents/rules/git_workflow.md) and their shared [working-directory](https://github.com/luvax-social/social-media-platforms/blob/main/.agents/rules/WORKING_DIRECTORY.md) and [Git workflow](https://github.com/luvax-social/social-media-platforms/blob/main/.agents/rules/GIT_WORKFLOW.md) rules.
 This repository consolidates the applicable shared rules locally and substitutes its actual stack, scopes and checks; it does not depend on a sibling checkout.
+Reference repositories provide rule structure and writing style; project-specific commands, component boundaries and database procedures must match the current manifests and source.

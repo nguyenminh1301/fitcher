@@ -22,5 +22,6 @@ OpenAI keys belong to backend and ingestion processes only, never browser bundle
 CI currently validates repository files, Git policy and Actions workflows.
 Dependabot is configured for GitHub Actions and targets `develop`, but automatic version-update PRs are paused because generated commit bodies violate the one-line commit policy.
 Security-update behavior is controlled separately by GitHub repository settings; this bootstrap does not enable it.
-Application dependency audits and runtime security checks will be added when application manifests and services exist.
+Application manifests and local services exist, but automated application dependency audits and runtime security checks are not part of the current CI.
+Run the relevant local checks documented in README.md; do not describe governance CI as application or dependency-security validation.
 CodeRabbit review requires a separately installed and authorized App; configuration is not proof of an active review.

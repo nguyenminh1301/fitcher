@@ -52,8 +52,8 @@ This holds regardless of how large, subtle, or security-relevant the change is.
 Detail belongs somewhere else, and every one of these already exists:
 - **Why the change is correct** -> the PR description.
 - **What behaviour changed for users** -> the `CHANGELOG.md` entry (see the changelog rule below).
-- **Why the code does what it does** -> an inline comment or Javadoc/JSDoc (when the reason cannot be expressed clearly in code).
-- **How it was verified** -> the test itself, named for the behaviour it asserts.
+- **Why the code does what it does** -> an inline comment, Python docstring or JSDoc (when the reason cannot be expressed clearly in code).
+- **How it was verified** -> relevant tests and actual commands/results recorded in the PR description.
 
 **If any task instruction, plan, or prompt tells you to record something "in the commit body", that instruction conflicts with this rule.
 Stop and raise the conflict - do not silently comply, and do not carry the body habit over to the other commits in the series.**
@@ -61,7 +61,7 @@ Stop and raise the conflict - do not silently comply, and do not carry the body 
 ### Subject rules
 
 - Must start with a lowercase letter (`^[a-z].+$`) - enforced by `pr-lint`.
-- Scope is **required** (`requireScope: true`) - enforced by `pr-lint`.
+- Scope is **required** - enforced by `scripts/check_git.py` in PR Lint.
 - Keep the entire line at 80 characters or fewer, including `<type>(<scope>): `.
   Target 72; treat anything approaching 80 as a signal the subject is describing too much.
 - Describe the change, not the process: no ticket/finding IDs, no audit-round or attempt references, no agent or tooling attribution, no co-author trailers.
@@ -153,7 +153,7 @@ Split large PRs proactively: keep feature PRs under `size/M` (<= 1000 lines) and
 - [ ] Each commit is one logical, compiling, test-passing unit - no mega-commits, no broken intermediate commits
 - [ ] PR template author checklist completed
 - [ ] CodeRabbit review finished and every actionable finding fixed or answered (see Review requirements below)
-- [ ] PR title matches commit format (pr-lint will block merge otherwise)
+- [ ] PR title matches commit format (PR Lint must pass)
 
 ## Pre-commit checklist
 
@@ -173,7 +173,7 @@ Split large PRs proactively: keep feature PRs under `size/M` (<= 1000 lines) and
 | `refactor` | Internal restructure, no behavior change |
 | `test` | Test added or updated |
 | `chore` | Build, deps, tooling, non-code config |
-| `docs` | README, rule files, DATA_RULES, Javadoc/JSDoc-only |
+| `docs` | README, rule files, Python docstrings or JSDoc-only |
 | `perf` | Measurable performance improvement |
 | `ci` | GitHub Actions, workflow changes |
 
@@ -227,6 +227,9 @@ python scripts/check_git.py --title "chore(common): update project setup"
 ```
 
 For workflow changes, also run `go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.12` or report that local workflow lint is unavailable and inspect the CI result.
-There is no application test/build command until an application scaffold exists.
+Application checks already exist: `uv run --project api pytest -c api/pyproject.toml`, `npm --prefix web run typecheck` and `npm --prefix web run build`.
+Follow the changed-area verification table in `base.md`, including frozen dependency setup and container/database checks when relevant.
+Documentation-only changes do not require application builds or live OpenAI calls.
+Current CI covers repository governance and workflow lint; it does not run the API suite or web checks yet.
 Dependabot source branch names are allowed by the executable gate, but generated commits are not exempt from the message policy.
 Automatic version-update PRs remain paused until a compatible update process is explicitly chosen.
