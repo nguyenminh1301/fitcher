@@ -4,6 +4,7 @@
 
 ### Added
 
+- Official TLC HVFHV and taxi-zone downloads with atomic publication, validated cache reuse, Uber-only DuckDB views and three sample analysis queries with real-data verification.
 - Local Next.js and FastAPI foundation with a liveness endpoint, locked dependencies, three-service Docker Compose setup, pgvector initialization and an explicit OpenAI Responses connectivity check.
 - API health and OpenAI smoke-command tests covering missing credentials, safe error diagnostics and incomplete responses.
 - Shared durable naming and explanation rules for all tracked project artifacts.
@@ -29,6 +30,9 @@
 
 ### Fixed
 
+- Document Linux dataset-directory traversal permissions for the non-root API container when the host uses a restrictive umask.
+- Reject incomplete taxi-zone lookups, including row-boundary truncation, and publish downloaded inputs with permissions readable by the Linux API container.
+- Include project source paths in CodeRabbit reviews alongside the workspace baseline exceptions.
 - Align contribution rules, review guidance and PR checklists with the implemented Python/Next.js stack and PostgreSQL initialization behavior.
 
 ### Removed
