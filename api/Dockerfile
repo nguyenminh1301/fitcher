@@ -12,7 +12,8 @@ COPY api/pyproject.toml api/uv.lock ./
 RUN uv sync --frozen --no-dev --no-install-project --no-managed-python
 
 COPY api/app ./app
-COPY scripts/check_openai.py ./scripts/check_openai.py
+COPY scripts/check_openai.py scripts/download_tlc.py scripts/check_tlc.py scripts/init_views.sql ./scripts/
+COPY scripts/sample_queries ./scripts/sample_queries
 RUN useradd --create-home --uid 10001 app
 USER app
 

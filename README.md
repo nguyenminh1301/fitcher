@@ -7,7 +7,8 @@ The planned application turns questions into validated SQL and returns tables, c
 
 The local foundation is implemented: Next.js serves an initialization page, FastAPI exposes `GET /health`, and Docker Compose starts PostgreSQL with pgvector enabled.
 An explicit smoke command verifies OpenAI connectivity through the Responses API.
-Data ingestion, SQL generation/execution, `/ask`, SSE, chat and charts are planned and are not implemented yet.
+Local HVFHV downloads, Uber-only DuckDB views and sample analysis queries are available.
+The bounded query executor, SQL generation, `/ask`, SSE, chat and charts are planned and are not implemented yet.
 
 ## Run locally
 
@@ -89,6 +90,20 @@ To run the explicit OpenAI check on the host, use `uv run --project api python s
 The API tests use an in-memory HTTP transport for OpenAI and require neither a real key nor network calls.
 Commit dependency changes with the corresponding `api/uv.lock` or `web/package-lock.json`.
 
+## TLC dataset
+
+Prepare the fixed March 2024 lab dataset from NYC TLC (about 508 MB) and inspect the views:
+
+```bash
+uv sync --project api --frozen
+uv run --project api python -m scripts.download_tlc
+uv run --project api python -m scripts.check_tlc
+```
+
+Run these from the root. Valid existing files are reused; partial downloads are not published.
+Inputs remain in ignored `data/parquet/`, outside Git. Neither command requires an OpenAI key.
+See [dataset setup and verification](docs/tlc-dataset.md) for other months, native DuckDB CLI commands, sample query results and measured timings.
+
 ## Planned architecture
 
 | Component | Technology | Responsibility |
@@ -162,7 +177,6 @@ The PR size labeler runs for branches within this repository; fork PRs do not re
 
 ## Next steps
 
-- Prepare one month of HVFHV Parquet, the Uber filter and zone lookup views.
 - Add a bounded read-only executor and SQL validator before text-to-SQL generation.
 - Establish a golden-set baseline, then add self-healing, semantic retrieval, SSE and the chat UI.
 - Extend CI to cover the existing API suite, web checks and application dependency audits.

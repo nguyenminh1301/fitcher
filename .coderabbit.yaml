@@ -37,7 +37,8 @@ reviews:
     - path: "**/*"
       instructions: >-
         fitcher includes a local Next.js/FastAPI/PostgreSQL foundation with pgvector.
-        LangGraph, DuckDB analysis, SSE and chat/chart features remain planned.
+        Local HVFHV downloads and DuckDB views are implemented; the bounded query
+        executor, SQL generation, LangGraph, SSE and chat/chart features remain planned.
         Review against the stated change and AGENTS.md. Prioritize correctness,
         security and regressions. Do not require speculative services or abstractions.
         Tests should prove changed behavior or a real boundary.

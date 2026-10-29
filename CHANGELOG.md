@@ -4,6 +4,7 @@
 
 ### Added
 
+- Official TLC HVFHV and taxi-zone downloads with atomic publication, validated cache reuse, Uber-only DuckDB views and three sample analysis queries with real-data verification.
 - Local Next.js and FastAPI foundation with a liveness endpoint, locked dependencies, three-service Docker Compose setup, pgvector initialization and an explicit OpenAI Responses connectivity check.
 - API health and OpenAI smoke-command tests covering missing credentials, safe error diagnostics and incomplete responses.
 - Shared durable naming and explanation rules for all tracked project artifacts.
