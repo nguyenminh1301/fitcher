@@ -151,7 +151,7 @@ Split large PRs proactively: keep feature PRs under `size/M` (<= 1000 lines) and
 - [ ] Branch follows `<type>/<scope>/<description>` naming
 - [ ] All commits follow `<type>(<scope>): <subject>` with an allowlisted scope
 - [ ] Each commit is one logical, compiling, test-passing unit - no mega-commits, no broken intermediate commits
-- [ ] PR template author checklist completed
+- [ ] PR description follows the current template
 - [ ] CodeRabbit review finished and every actionable finding fixed or answered (see Review requirements below)
 - [ ] PR title matches commit format (PR Lint must pass)
 

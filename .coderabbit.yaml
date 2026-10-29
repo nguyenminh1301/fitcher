@@ -67,8 +67,8 @@ reviews:
         untrusted PR titles or branch names directly into executable shell text.
         Do not run untrusted code under pull_request_target. Keep Git policy checks
         aligned with .github/git-policy.json and .agents/rules/git_workflow.md.
-        PR checklists must use the actual Python/uv and Next.js/npm commands,
-        with unrelated checks marked N/A. Current CI verifies governance and
+        Verification reports must use actual Python/uv and Next.js/npm commands
+        when relevant; do not require removed PR checklist sections. Current CI verifies governance and
         workflows; it does not yet run application tests or builds.
   pre_merge_checks:
     docstrings:

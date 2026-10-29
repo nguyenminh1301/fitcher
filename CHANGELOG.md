@@ -30,3 +30,7 @@
 ### Fixed
 
 - Align contribution rules, review guidance and PR checklists with the implemented Python/Next.js stack and PostgreSQL initialization behavior.
+
+### Removed
+
+- Remove author, database migration and reviewer checklists from the pull request template.
