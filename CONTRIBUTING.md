@@ -7,8 +7,8 @@ Chat with the owner in Vietnamese.
 
 ## Development
 
-The repository currently contains governance and documentation only.
-Use the [README](README.md) for available commands; do not invent application setup steps.
+The repository includes the local Next.js/FastAPI/PostgreSQL foundation.
+Use the [README](README.md) for setup, the API suite and web checks; later analysis features remain planned.
 Preserve Windows/PowerShell and Linux support.
 Keep secrets, local datasets, database files and scratch material out of Git.
 
@@ -32,7 +32,9 @@ Published history is not rewritten unless the owner explicitly requests it.
 Run `python scripts/check_repository.py` and `python scripts/check_git.py --range origin/develop..HEAD` before opening a PR.
 For workflow edits, also run `go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.12` if Go is available; CI runs the same workflow lint.
 Report commands and actual results, with a reason for any unavailable check.
-There are no application test or build commands yet.
+For application changes, run the API suite and web typecheck/build documented in README.md.
+Check Compose startup and pgvector initialization when changing containers or database setup.
+OpenAI connectivity is an explicit billable smoke check, never an automatic unit test or health probe.
 
 Use the PR template, describe the problem and resulting behavior, and add screenshots for visual changes.
 Draft PRs are appropriate while iterating; mark ready when review is useful.

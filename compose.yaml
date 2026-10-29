@@ -1,0 +1,61 @@
+name: fitcher
+
+services:
+  db:
+    image: pgvector/pgvector:0.8.7-pg17-bookworm
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-fitcher}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-fitcher-local-only}
+      POSTGRES_DB: ${POSTGRES_DB:-fitcher}
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./scripts/init_db.sql:/docker-entrypoint-initdb.d/001-vector.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+
+  api:
+    build:
+      context: .
+      dockerfile: api/Dockerfile
+    environment:
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_SQL_MODEL: ${OPENAI_SQL_MODEL:-gpt-6.1-sol}
+      OPENAI_SUMMARY_MODEL: ${OPENAI_SUMMARY_MODEL:-gpt-6-luna}
+      OPENAI_SMOKE_MODEL: ${OPENAI_SMOKE_MODEL:-gpt-6-luna}
+    ports:
+      - "127.0.0.1:8000:8000"
+    volumes:
+      - ./data/parquet:/app/data/parquet:ro
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=2)"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+
+  web:
+    build:
+      context: ./web
+    ports:
+      - "127.0.0.1:3000:3000"
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+
+volumes:
+  pgdata:

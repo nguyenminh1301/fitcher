@@ -4,6 +4,8 @@
 
 ### Added
 
+- Local Next.js and FastAPI foundation with a liveness endpoint, locked dependencies, three-service Docker Compose setup, pgvector initialization and an explicit OpenAI Responses connectivity check.
+- API health and OpenAI smoke-command tests covering missing credentials, safe error diagnostics and incomplete responses.
 - Repository ownership, issue and pull request templates, contribution and security policies.
 - CodeRabbit configuration for the planned Python/Next.js stack and both integration and production branches.
 - Executable commit, PR title and branch policy checks, repository checks and workflow lint.
