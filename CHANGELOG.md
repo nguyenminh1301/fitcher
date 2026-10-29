@@ -30,6 +30,7 @@
 
 ### Fixed
 
+- Document Linux dataset-directory traversal permissions for the non-root API container when the host uses a restrictive umask.
 - Reject incomplete taxi-zone lookups, including row-boundary truncation, and publish downloaded inputs with permissions readable by the Linux API container.
 - Include project source paths in CodeRabbit reviews alongside the workspace baseline exceptions.
 - Align contribution rules, review guidance and PR checklists with the implemented Python/Next.js stack and PostgreSQL initialization behavior.

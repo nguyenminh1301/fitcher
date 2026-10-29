@@ -21,6 +21,15 @@ The downloader streams each response to a unique temporary file, checks its adve
 
 The zone lookup must contain each current official ID from 1 through 265 exactly once. This also rejects a response truncated at a valid row boundary when no length is advertised. If TLC changes the ID set, review and update the expected taxonomy before accepting the new revision. Newly published files use mode `0644` on Linux so the API's separate user can read them. For files created by older versions with mode `0600`, grant read access to the two downloaded inputs before container inspection; existing cached files are not automatically chmodded.
 
+On Linux, a restrictive `umask 077` can also create the mounted `data/parquet` directory with mode `0700`. The API runs as UID `10001` and needs traversal access to this directory even when its files are readable. If needed, grant traversal and read access to these public TLC inputs before running the container check:
+
+```bash
+chmod o+x data/parquet
+chmod a+r data/parquet/fhvhv_tripdata_2024-03.parquet data/parquet/taxi_zone_lookup.csv
+```
+
+Use the corresponding directory and filename when selecting another `--data-dir` or month. These POSIX permission commands apply to Linux hosts; no directory permissions are changed automatically by the downloader.
+
 Keep Parquet, CSV, temporary files and databases under ignored `data/`; do not commit them. No OpenAI requests occur during download, inspection or tests.
 
 `check_tlc` opens an in-memory DuckDB connection, binds local file paths to session variables, and loads [init_views.sql](../scripts/init_views.sql). Views are connection-scoped and must be initialized on each new connection. No data is copied into PostgreSQL or a persistent DuckDB database. The source trip columns remain available; the zone lookup has typed `LocationID`, `Borough`, `Zone` and `service_zone` columns.
