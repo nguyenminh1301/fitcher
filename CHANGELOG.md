@@ -26,3 +26,11 @@
 - Standardize the project and repository name as lowercase `fitcher` and make the repository public.
 - Align workspace and Git rules with the reference workflow, including mandatory branch-based development and the explicit owner-only production exception.
 - Use the backend repository pull request template verbatim.
+
+### Fixed
+
+- Align contribution rules, review guidance and PR checklists with the implemented Python/Next.js stack and PostgreSQL initialization behavior.
+
+### Removed
+
+- Remove author, database migration and reviewer checklists from the pull request template.

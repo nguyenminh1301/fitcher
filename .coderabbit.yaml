@@ -44,7 +44,9 @@ reviews:
     - path: "**/*.py"
       instructions: >-
         Preserve Windows and Linux support. Keep credentials server-side and avoid
-        logging keys or private data. For future API/agent code, check cancellation,
+        logging keys or private data. For the existing API, verify GET /health remains
+        a local liveness probe and OpenAI smoke requests remain explicit, bounded
+        and isolated from tests through mocked transports. Check cancellation,
         bounded outbound calls, SELECT-only SQL validation, query resource limits
         and consistent embedding model/dimensions. Do not require absent features.
     - path: "**/*.{ts,tsx,js,jsx}"
@@ -52,12 +54,22 @@ reviews:
         Preserve server/client boundaries. Never expose secrets through NEXT_PUBLIC
         variables or browser code. Check loading/error/cancellation behavior and
         accessibility when UI behavior changes.
+    - path: "{compose.yaml,**/Dockerfile,scripts/init_db.sql}"
+      instructions: >-
+        Preserve loopback-bound local services, health/readiness behavior and
+        persistent database contents. The PostgreSQL initialization script runs
+        only for new volumes; editing it does not upgrade existing databases.
+        Require an explicit existing-database upgrade plan when relevant, without
+        assuming a migration framework or deleting volumes as a shortcut.
     - path: ".github/**"
       instructions: >-
         Use least-privilege permissions and pinned action versions. Never interpolate
         untrusted PR titles or branch names directly into executable shell text.
         Do not run untrusted code under pull_request_target. Keep Git policy checks
         aligned with .github/git-policy.json and .agents/rules/git_workflow.md.
+        Verification reports must use actual Python/uv and Next.js/npm commands
+        when relevant; do not require removed PR checklist sections. Current CI verifies governance and
+        workflows; it does not yet run application tests or builds.
   pre_merge_checks:
     docstrings:
       mode: "off"
