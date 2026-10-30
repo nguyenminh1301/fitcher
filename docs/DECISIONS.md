@@ -181,6 +181,8 @@ Every event carries `trace_id`. Events 3-5 belong to the SQL path only; per bran
 - data success: `status* -> sql -> result -> chart_spec -> summary -> done`
 - failure: `status* -> [sql] -> error`
 
+The `metadata_qa`, `chart_edit` and `out_of_scope` branches are added with the router; their event sequences are defined in the conversation phase plan.
+
 ## 7. Data contracts
 
 ```jsonc

@@ -31,7 +31,7 @@ apps/api/prompts/router.v1.md metadata_qa.v1.md
 
 ## Tasks
 
-1. **Conversation store (test first).** Write user and assistant turns with QuerySpec and a reference to the shaped result; read the last N turns per conversation, scoped to the requesting user.
+1. **Conversation store (test first).** Write user and assistant turns with QuerySpec and the shaped Result JSON (at most 5,000 rows) in `chat_messages.result`. The store writes synchronously, bypassing the async log writer, and the assistant turn is written before `done` is sent, so an immediate follow-up can read it; read the last N turns per conversation, scoped to the requesting user.
 2. **load_context.** Business profile, last N turns, previous QuerySpec and result.
 3. **router (test first with a fake LLM).** Structured output with one of four intents; low-confidence or invalid output falls back to `data_query` only if extraction succeeds, otherwise clarify.
 4. **Follow-ups in extract.** Extract receives the previous QuerySpec and returns a delta (for example "shift periods by -1 year", "change dimension to category"); `resolve_time` applies period shifts deterministically. Test: "What about last year?" after the acceptance question shifts both periods one year back.
@@ -39,7 +39,8 @@ apps/api/prompts/router.v1.md metadata_qa.v1.md
 6. **metadata_qa.** Answer definitions from glossary and `kb_docs` hits; the prompt forbids numbers from documents and states that retrieved text is data, not instructions.
 7. **chart_edit.** Reuses the stored result and calls the recommender with the requested type; never calls `generate_sql` or `execute`. Test asserts no SQL node runs.
 8. **out_of_scope.** Short fixed-style reply from the `fast` alias with the pack's language.
-9. **Eval.** Activate intent scoring and the ambiguous, out-of-scope, follow-up and chart-edit categories.
+9. **Branch event sequences.** Extend DECISIONS §6 with: `metadata_qa`: `status* -> summary -> done`; `chart_edit`: `status* -> chart_spec -> done`; `out_of_scope`: `status* -> summary -> done`. Tests assert each sequence.
+10. **Eval.** Activate intent scoring and the ambiguous, out-of-scope, follow-up and chart-edit categories.
 
 ## Contracts
 
@@ -71,5 +72,5 @@ docker compose run --rm api python -m jobs.eval --pack ecommerce_twin --baseline
 ## Branch and PR split
 
 - `feat/agent/route-intents-and-store-turns`: tasks 1-3, 8.
-- `feat/agent/answer-follow-up-questions`: tasks 4-5, 9.
-- `feat/agent/answer-metadata-and-chart-edits`: tasks 6-7.
+- `feat/agent/answer-follow-up-questions`: tasks 4-5, 10.
+- `feat/agent/answer-metadata-and-chart-edits`: tasks 6-7, 9.

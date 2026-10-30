@@ -43,7 +43,7 @@ apps/web/
 5. **Chart adapter (test first).** `toEChartsOption(spec, result)` pure function; tests for each chart type, series grouping by `series`, sort and number format.
 6. **Type switcher.** Changes only the local ChartSpec; types outside `allowed_types` are disabled with an explanation; no network request (asserted in a test).
 7. **Export.** PNG through the ECharts instance, CSV from `Result` rows.
-8. **Feedback.** Like/dislike with optional note -> the `app/api/feedback` server route forwards it with the session's access token and `trace_id` -> `POST /feedback` -> `agent_logs.feedback`.
+8. **Feedback.** Like/dislike with optional note -> the `app/api/feedback` server route forwards it with the session's access token and `trace_id` -> `POST /feedback`, which rejects a `trace_id` whose run belongs to another user -> `agent_logs.feedback`. A negative test covers a foreign `trace_id`.
 
 ## Contracts
 
@@ -75,7 +75,7 @@ Plus a manual browser check of the acceptance question, recorded with screenshot
 1. **Token handling.** Default: a Next.js server route proxies `/ask` so access tokens stay out of browser JavaScript; the browser holds only an httpOnly session cookie.
 2. **OIDC library.** Default: Auth.js with the Keycloak provider; alternative: a smaller OIDC client. Decide by compatibility with the pinned Next.js version.
 3. **Frontend test runner.** Default: Vitest with Testing Library; end-to-end browser tests are optional for this lab.
-4. **Bar orientation in ChartSpec.** DECISIONS §7 has no orientation field. Default: add optional `orientation` to the ChartSpec contract in DECISIONS §7, with the owner's approval, in this phase's first PR.
+4. **Bar orientation in ChartSpec.** DECISIONS §7 has no orientation field. Default: add optional `orientation` to the ChartSpec contract in DECISIONS §7, with the owner's approval, in this phase's first PR, which also updates the Pydantic `ChartSpec` model and regenerates the TypeScript types with the Phase 7 generator.
 
 ## Branch and PR split
 

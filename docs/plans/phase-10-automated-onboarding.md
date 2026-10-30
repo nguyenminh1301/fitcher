@@ -57,6 +57,8 @@ npm --prefix apps/web run typecheck
 npm --prefix apps/web run build
 docker compose run --rm api python -m jobs.profile --pack ecommerce_twin
 docker compose run --rm api python -m jobs.draft_pack --pack ecommerce_twin_regen --allow-billable
+# review and approve the drafted items in the Review UI
+docker compose run --rm api python -m jobs.compile_pack --pack ecommerce_twin_regen
 docker compose run --rm api python -m jobs.eval --pack ecommerce_twin_regen --baseline packs/ecommerce_twin/eval_baseline.json
 docker compose run --rm api python -m jobs.eval --pack ecommerce_twin --baseline packs/ecommerce_twin/eval_baseline.json
 ```
