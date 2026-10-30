@@ -58,7 +58,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        service: [api, web]
+        service: [api, web, clickhouse, opensearch, litellm, keycloak]
     env:
       SERVICE: ${{ matrix.service }}
       TRIVY_VERSION: "0.76.1"
@@ -74,14 +74,28 @@ jobs:
             --output "$RUNNER_TEMP/trivy.tar.gz"
           echo "$TRIVY_SHA256  $RUNNER_TEMP/trivy.tar.gz" | sha256sum --check
           tar -xzf "$RUNNER_TEMP/trivy.tar.gz" -C "$RUNNER_TEMP" trivy
-      - name: Build with current OS security packages
-        run: docker compose build --pull --no-cache "$SERVICE"
+      - name: Build repository images or pull pinned third-party images
+        run: |
+          cp .env.example .env
+          image="$(docker compose config --format json | jq -r --arg s "$SERVICE" '.services[$s].image // empty')"
+          if [ -z "$image" ]; then
+            docker compose build --pull --no-cache "$SERVICE"
+            image="fitcher-${SERVICE}:latest"
+          else
+            docker compose pull "$SERVICE"
+          fi
+          echo "IMAGE=$image" >> "$GITHUB_ENV"
       - name: Save all advisories and block fixable High or Critical findings
         run: |
           "$RUNNER_TEMP/trivy" image --image-src docker --scanners vuln \
-            --format json --output image-report.json "fitcher-${SERVICE}:latest"
+            --format json --output image-report.json "$IMAGE"
+          ignore=()
+          if [ -f ".github/trivy/${SERVICE}.trivyignore.yaml" ]; then
+            ignore=(--ignorefile ".github/trivy/${SERVICE}.trivyignore.yaml")
+          fi
+          # Exceptions apply only to this image and expire; see SECURITY.md, Image exceptions.
           "$RUNNER_TEMP/trivy" image --image-src docker --scanners vuln \
-            --ignore-unfixed --severity HIGH,CRITICAL --exit-code 1 "fitcher-${SERVICE}:latest"
+            --ignore-unfixed --severity HIGH,CRITICAL --exit-code 1 "${ignore[@]}" "$IMAGE"
       - name: Preserve complete image report
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

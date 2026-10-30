@@ -5,12 +5,12 @@ The planned application answers questions such as "Top 10 best-selling products 
 
 ## Current status
 
-The repository is a clean monorepo scaffold with no business logic yet.
-FastAPI in `apps/api` exposes `GET /health`, Next.js in `apps/web` serves a placeholder page, and Docker Compose runs both.
-`packs/`, `dbt/`, `jobs/`, `infra/` and `apps/api/prompts/` contain only READMEs describing what each phase adds.
+The repository runs the six lab services with no business logic yet.
+Docker Compose starts ClickHouse, OpenSearch, LiteLLM, Keycloak, the FastAPI skeleton in `apps/api` (`GET /health`) and the Next.js placeholder page in `apps/web`; their configuration lives in [infra/](infra/README.md).
+`packs/`, `dbt/` and `apps/api/prompts/` contain only READMEs describing what each phase adds; `jobs/` holds the LiteLLM smoke job.
 
 The architecture is settled in [DECISIONS.md](docs/DECISIONS.md) and delivered in the order of the [master plan](docs/MASTER_PLAN.md), with one [detailed plan per phase](docs/plans/README.md).
-Phase 0 (six lab services, LiteLLM aliases, `make up` / `make down`) is next.
+Phase 1 (lab dataset and dbt marts) is next.
 
 ## Architecture
 
@@ -27,26 +27,41 @@ Phase 0 (six lab services, LiteLLM aliases, `make up` / `make down`) is next.
 | Packs | YAML + JSON Schema | Per-company profile, datasets, glossary, metrics, policies and eval |
 | Deployment | Docker Compose | Six long-running services plus jobs |
 
-Only `api` and `web` run today; the other services arrive in Phase 0.
 
 ## Run locally
 
-Install Docker with Compose v2 (`--wait` support). Host Node/Python are optional when using Docker.
-Run these commands from the repository root.
+Install Docker with Compose v2 (`--wait` support) and give Docker about 8 GB of free memory; OpenSearch alone takes a 1 GB heap.
+On Linux and WSL2 hosts, OpenSearch needs `vm.max_map_count` of at least 262144; see [infra/opensearch](infra/opensearch/README.md).
+Host Node/Python are optional when using Docker. Run these commands from the repository root.
 
-```bash
-docker compose up --build --wait
-docker compose ps
-```
+Copy [.env.example](.env.example) to `.env` and replace every `change-me` value. Never commit `.env`.
+`OPENAI_API_KEY` is needed only for the smoke call; every service reports healthy without it.
 
-Open [the web app](http://localhost:3000), [API health](http://localhost:8000/health) or [API docs](http://localhost:8000/docs).
+| Make target | Plain command (PowerShell and Bash) |
+| --- | --- |
+| `make up` | `docker compose up --build --wait` |
+| `make ps` | `docker compose ps` |
+| `make logs` | `docker compose logs --follow --tail=200` |
+| `make smoke` | `docker compose exec -T api python -m jobs.smoke_llm` |
+| `make down` | `docker compose down` |
+
+`make` is optional; the Makefile only wraps these commands. `make down` never removes volumes, so ClickHouse and OpenSearch data survive restarts.
+`make smoke` sends one billable request to the `fast` alias through LiteLLM and prints only the reply length.
+
+| Service | Host address | Health check |
+| --- | --- | --- |
+| web | [localhost:3000](http://localhost:3000) | page responds |
+| api | [localhost:8000](http://localhost:8000/health) | `GET /health` |
+| keycloak | [localhost:8080](http://localhost:8080) (realm `finch`) | management `/health/ready` |
+| litellm | localhost:4000 | `/health/liveliness`, no OpenAI call |
+| opensearch | localhost:9200 | cluster status yellow or green |
+| clickhouse | localhost:8123 (HTTP), localhost:9000 (native) | `GET /ping` |
+
 `GET /health` returns `200` and `{"status":"ok"}` as a liveness probe; it calls no other service.
-Ports bind to loopback. Stop services with `docker compose down`.
-
-The scaffold needs no `.env`; [.env.example](.env.example) gains settings as services are added. Never commit `.env`.
+All ports bind to loopback. Open [API docs](http://localhost:8000/docs) for the API skeleton.
 An earlier foundation ran a PostgreSQL `db` service with the `fitcher_pgdata` named volume. When upgrading a checkout that still has that container, start once with `docker compose up --build --wait --remove-orphans` so the old container stops and frees port 5432; this removes the container, not the volume. The volume is left untouched, and removing it with `docker volume rm fitcher_pgdata` is an explicit choice for its owner.
 
-Both runtime images apply available OS security updates during their builds and omit language package managers.
+The `api` and `web` images apply available OS security updates during their builds and omit language package managers.
 Refresh base images and OS security packages periodically, then recreate the services:
 
 ```bash
@@ -55,6 +70,7 @@ docker compose up -d --wait
 ```
 
 `--no-cache` ensures the OS update layer is rerun. Dependency versions still come from the committed lockfiles; changes to base image tags and language runtimes need their own compatibility review.
+ClickHouse, OpenSearch, LiteLLM and Keycloak run upstream images pinned to exact tags in `compose.yaml`; `docker compose pull` changes nothing until a tag is updated deliberately.
 
 ## Host development and checks
 
@@ -113,7 +129,7 @@ PR size labels are advisory: XS up to 100 changed lines, S up to 400, M up to 10
 Keep PRs at most 1000 changed lines where practical and below 100 changed files for review.
 CI also runs the API suite on Linux and the web frozen install, typecheck and production build. Run the same commands locally for application changes.
 
-The Security workflow runs on PRs, integration/production pushes, manual dispatch and a weekly schedule. It audits locked npm/Python dependencies, scans Git history for secrets, and rebuilds/scans both runtime images. Image jobs retain complete JSON reports and fail for High/Critical findings with a published fix; unfixed advisories remain visible for review. See [security policy](SECURITY.md) for triage and scanner limits. These jobs do not configure required status checks or branch protection automatically.
+The Security workflow runs on PRs, integration/production pushes, manual dispatch and a weekly schedule. It audits locked npm/Python dependencies, scans Git history for secrets, rebuilds and scans the `api` and `web` images, and scans the four third-party service images by their pinned tags. Image jobs retain complete JSON reports and fail for High/Critical findings with a published fix; unfixed advisories remain visible for review. See [security policy](SECURITY.md) for triage and scanner limits. These jobs do not configure required status checks or branch protection automatically.
 
 CodeRabbit is configured for `develop` and `main`, skips drafts, and reviews incremental updates without pausing after a fixed number of commits.
 The CodeRabbit GitHub App must have access to this repository and a plan that supports the requested reviews.
@@ -128,7 +144,6 @@ The PR size labeler runs for branches within this repository; fork PRs do not re
 
 ## Next steps
 
-- Phase 0: Compose the six lab services with health checks and the LiteLLM aliases.
 - Phase 1: Load the e-commerce lab dataset into ClickHouse and build the marts with dbt.
 - Later phases follow the [master plan](docs/MASTER_PLAN.md); each starts from its [phase plan](docs/plans/README.md).
 

@@ -11,7 +11,7 @@ description: Always active. Sets communication, scope, repository boundaries and
 - Chat with the owner in Vietnamese.
 - Write code identifiers, comments, documentation and GitHub content in English.
 - fitcher implements the domain-neutral Finch-Lab architecture; `docs/DECISIONS.md` is the binding source of truth and `docs/MASTER_PLAN.md` orders the phases.
-- The repository is a monorepo scaffold: `apps/api` (FastAPI `GET /health`), `apps/web` (placeholder page), `packs/`, `dbt/`, `jobs/` and `infra/`. Read README.md for current status and available commands.
+- The repository is a monorepo whose Compose stack runs the six lab services: `apps/api` (FastAPI `GET /health`), `apps/web` (placeholder page), ClickHouse, OpenSearch, LiteLLM and Keycloak configured under `infra/`, plus `packs/`, `dbt/` and `jobs/`. Read README.md for current status and available commands.
 - Before working on a phase, read DECISIONS.md and that phase's plan in `docs/plans/`. Stop and ask before going against a decision; never add an out-of-scope component from DECISIONS §1.
 - Engine code under `apps/` never hard-codes pack table, column, metric or industry names; LLM calls use LiteLLM aliases only.
 - Implement only the requested scope; do not add speculative application code, dependencies or abstractions.

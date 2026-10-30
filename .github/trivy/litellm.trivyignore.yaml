@@ -1,0 +1,19 @@
+# Fixable High/Critical advisories in ghcr.io/berriai/litellm:v1.106.6 that only an upstream release can fix.
+# The tag was the newest stable release when scanned on 2026-10-30; see SECURITY.md, Image exceptions.
+# Each entry expires; after that date the finding blocks the image audit again.
+vulnerabilities:
+  - id: CVE-2026-112940
+    statement: Bundled filelock in the upstream image; fixed only by a new upstream release.
+    expired_at: 2026-12-31
+  - id: CVE-2026-114605
+    statement: Bundled dnspython in the upstream image; fixed only by a new upstream release.
+    expired_at: 2026-12-31
+  - id: CVE-2026-114613
+    statement: Bundled py3-pip-wheel in the upstream image; fixed only by a new upstream release.
+    expired_at: 2026-12-31
+  - id: CVE-2026-116588
+    statement: Bundled ddtrace in the upstream image; fixed only by a new upstream release.
+    expired_at: 2026-12-31
+  - id: CVE-2026-116589
+    statement: Bundled ddtrace in the upstream image; fixed only by a new upstream release.
+    expired_at: 2026-12-31

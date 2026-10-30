@@ -4,6 +4,7 @@
 
 ### Added
 
+- Run ClickHouse, OpenSearch, LiteLLM and Keycloak beside the API and web skeletons in Docker Compose with pinned images, loopback ports, health checks, the `raw`/`marts`/`data_meta` databases, a disabled ClickHouse `default` user, the four LiteLLM model aliases, a placeholder `finch` realm, Make targets and a billable `fast` alias smoke job.
 - Forbid AI tool attribution in code, documentation, commits, branches, PRs, issues and review replies, and extend the commit message and PR title check to more tool names.
 - English settled decisions for the domain-neutral Finch-Lab architecture, its master plan and a detailed plan for each delivery phase.
 - Linux API/CLI tests, web typecheck/build, dependency and Git-secret audits, and weekly runtime-image security scans with complete report artifacts and fixable High/Critical gates.
@@ -46,6 +47,10 @@
 - Reject incomplete taxi-zone lookups, including row-boundary truncation, and publish downloaded inputs with permissions readable by the Linux API container.
 - Include project source paths in CodeRabbit reviews alongside the workspace baseline exceptions.
 - Align contribution rules, review guidance and PR checklists with the implemented Python/Next.js stack and PostgreSQL initialization behavior.
+
+### Security
+
+- Scan the four pinned third-party service images in the image audit with the same fixable High/Critical gate and complete reports, with per-image expiring exceptions for advisories only an upstream release can fix, and validate the Compose file in CI.
 
 ### Removed
 

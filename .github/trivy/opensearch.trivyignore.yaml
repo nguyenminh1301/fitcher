@@ -1,0 +1,34 @@
+# Fixable High/Critical advisories in opensearchproject/opensearch:3.9.0 that only an upstream release can fix.
+# The tag was the newest stable release when scanned on 2026-10-30; see SECURITY.md, Image exceptions.
+# Each entry expires; after that date the finding blocks the image audit again.
+vulnerabilities:
+  - id: CVE-2026-102554
+    statement: Bundled com.google.guava:guava in the upstream image; fixed only by a new upstream release.
+    expired_at: 2026-12-31
+  - id: CVE-2026-106451
+    statement: Bundled at.yawk.lz4:lz4-java in the upstream image; fixed only by a new upstream release.
+    expired_at: 2026-12-31
+  - id: CVE-2026-108106
+    statement: Bundled org.xerial.snappy:snappy-java in the upstream image; fixed only by a new upstream release.
+    expired_at: 2026-12-31
+  - id: CVE-2026-75140
+    statement: Bundled org.jsoup:jsoup in the upstream image; fixed only by a new upstream release.
+    expired_at: 2026-12-31
+  - id: CVE-2026-77422
+    statement: Bundled org.jline:jline-builtins in the upstream image; fixed only by a new upstream release.
+    expired_at: 2026-12-31
+  - id: CVE-2026-89407
+    statement: Bundled com.fasterxml.jackson.core:jackson-core in the upstream image; fixed only by a new upstream release.
+    expired_at: 2026-12-31
+  - id: CVE-2026-89425
+    statement: Bundled com.fasterxml.jackson.core:jackson-core, tools.jackson.core:jackson-core in the upstream image; fixed only by a new upstream release.
+    expired_at: 2026-12-31
+  - id: CVE-2026-91776
+    statement: Bundled com.fasterxml.jackson.core:jackson-databind, tools.jackson.core:jackson-databind in the upstream image; fixed only by a new upstream release.
+    expired_at: 2026-12-31
+  - id: CVE-2026-91777
+    statement: Bundled com.fasterxml.jackson.core:jackson-databind, tools.jackson.core:jackson-databind in the upstream image; fixed only by a new upstream release.
+    expired_at: 2026-12-31
+  - id: CVE-2026-93451
+    statement: Bundled org.xerial.snappy:snappy-java in the upstream image; fixed only by a new upstream release.
+    expired_at: 2026-12-31
