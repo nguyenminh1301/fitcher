@@ -22,6 +22,7 @@
 
 ### Changed
 
+- Merge pull requests into `develop` as soon as local verification passes, and treat CI and review findings as follow-ups that are verified before they are applied.
 - Align mirrored agent rules, entry points, review configuration, contribution and security guidance, README and the PR template with the domain-neutral architecture, and add the `pack` and `infra` commit scopes.
 - Move the API and web skeletons into `apps/api` and `apps/web` and add documented `packs/`, `dbt/`, `jobs/`, `infra/` and prompt directories for the monorepo layout.
 - Build patched runtime images without API/web language package managers and run PostgreSQL directly as its database user while preserving existing named volumes.
