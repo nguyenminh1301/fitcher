@@ -60,7 +60,7 @@ curl -N -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
   http://127.0.0.1:8000/ask
 ```
 
-`$TOKEN` comes from the lab realm's token endpoint for a sample user (documented in README).
+`$TOKEN` comes from the lab realm's token endpoint (`http://127.0.0.1:8080/realms/finch/protocol/openid-connect/token`) through a lab-only `finch-cli` client with direct access grants, for a sample user whose password Phase 6's `set_lab_passwords.py` set. This phase documents those steps in README.
 
 ## Definition of done
 

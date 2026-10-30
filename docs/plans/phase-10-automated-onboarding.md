@@ -42,11 +42,11 @@ apps/web/app/(review)/              # Review UI pages
 5. **Review API.** List items by file and status, edit, approve, delete, test-run a metric expression against ClickHouse with the admin limits. Restricted to a `pack_reviewer` role.
 6. **Review UI.** Per-file item list with evidence and confidence, inline edit, approve/delete, metric test-run result; approved changes saved to the pack files.
 7. **Compile after review.** Run the Phase 2 compiler; only approved items are used.
-8. **Regeneration experiment.** Remove descriptions from the hand-written pack, regenerate them through the drafter, review, compile and run eval against the hand-written baseline.
+8. **Regeneration experiment.** Copy the hand-written pack to `packs/ecommerce_twin_regen/`, remove the descriptions there and mark those items `status: draft`, so the drafter may fill them without touching approved items. Review, compile and evaluate the copy against the untouched hand-written pack's baseline.
 
 ## Contracts
 
-- Draft item fields: `status`, `evidence: [{kind: profile|doc, ref}]`, `confidence: 0..1`.
+- Draft item fields: `status`, `evidence`, `confidence: 0..1`, using the shared evidence definition from Phase 2 (`manual`, `profile`, `doc`, `error`, `trace`).
 - `profile.json` schema documented in `apps/api/app/onboarding/profiler.py`.
 
 ## Verification
@@ -56,7 +56,8 @@ uv run --project apps/api pytest -c apps/api/pyproject.toml
 npm --prefix apps/web run typecheck
 npm --prefix apps/web run build
 docker compose run --rm api python -m jobs.profile --pack ecommerce_twin
-docker compose run --rm api python -m jobs.draft_pack --pack ecommerce_twin
+docker compose run --rm api python -m jobs.draft_pack --pack ecommerce_twin_regen --allow-billable
+docker compose run --rm api python -m jobs.eval --pack ecommerce_twin_regen --baseline packs/ecommerce_twin/eval_baseline.json
 docker compose run --rm api python -m jobs.eval --pack ecommerce_twin --baseline packs/ecommerce_twin/eval_baseline.json
 ```
 
@@ -69,9 +70,9 @@ docker compose run --rm api python -m jobs.eval --pack ecommerce_twin --baseline
 ## Risks and open questions
 
 1. **Committing approved YAML.** DECISIONS says approved items are committed to Git. Default: the api writes approved YAML to the mounted `packs/` working tree and the reviewer commits through the normal branch and PR workflow; the application never runs Git.
-2. **"Not significantly lower".** Default: execution match within 5 percentage points of the hand-written baseline.
+2. **"Not significantly lower".** MASTER_PLAN leaves the threshold open. Default rule for the owner to confirm: on the Phase 4 eval set, the regenerated pack's execution match is within 5 percentage points of the hand-written baseline, and extraction and retrieval deltas are reported with the Phase 4 per-layer regression rule.
 3. **Document parsing dependencies.** Default: `pypdf` and `python-docx`, pinned; scanned PDFs (OCR) are out of scope.
-4. **Drafting cost.** Drafting all files is billable; the job prints an estimate and requires an explicit flag to run.
+4. **Drafting cost.** Drafting all files is billable; the job prints an estimate and runs only with `--allow-billable`.
 
 ## Branch and PR split
 

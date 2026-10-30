@@ -79,7 +79,7 @@ Phases are ordered to reach **one end-to-end flow as early as possible**. Each p
   - `guard`
   - `explain`
   - `execute`
-  - `check` with a retry loop of at most 3 attempts
+  - `check` with a retry loop of at most 3 retries
   - `shape_result`
   - `summarize`
 

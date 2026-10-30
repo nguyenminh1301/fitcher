@@ -45,9 +45,10 @@ docs/eval/<second_pack>-report.md
 
 ```bash
 docker compose run --rm api python -m jobs.load_data --source <second_pack>
-docker compose run --rm api dbt build --project-dir dbt --profiles-dir dbt --select <second_pack>
+docker compose run --rm api dbt build --project-dir dbt --profiles-dir dbt --select tag:<second_pack>
 docker compose run --rm api python -m jobs.compile_pack --pack <second_pack>
 docker compose run --rm api python -m jobs.eval --pack <second_pack>
+docker compose run --rm api python -m jobs.eval --pack ecommerce_twin --baseline packs/ecommerce_twin/eval_baseline.json
 git diff --stat <phase base>..HEAD -- apps/api apps/web
 python scripts/check_pack_isolation.py
 ```
@@ -58,11 +59,12 @@ python scripts/check_pack_isolation.py
 |---|---|
 | New pack runs with 0 changed lines in `apps/api` and `apps/web` | Empty `git diff --stat` output |
 | Reaches the eval threshold | Eval report in the PR |
+| The first pack does not regress | `ecommerce_twin` eval report and baseline diff in the PR |
 
 ## Risks and open questions
 
 1. **Dataset choice.** Default: Iowa Liquor Sales, bounded to recent full years, because it is real data from a clearly different domain.
-2. **Active pack switching.** DECISIONS allows one active pack per run. Default: switch with `ACTIVE_PACK` and restart `api`; both packs' indices may coexist with a pack field.
+2. **Active pack switching.** DECISIONS allows one active pack per run. Default: switch with `ACTIVE_PACK` and restart `api`; both packs coexist because Phase 2 indices and aliases are pack-scoped (`<pack>_<index>`), and compiling one pack never touches the other's indices.
 3. **dbt selection by pack.** Default: one dbt project with a folder and tag per pack, built with `--select tag:<pack>`.
 
 ## Branch and PR split

@@ -155,7 +155,7 @@ Nodes in order:
 11. **explain**: run `EXPLAIN` on ClickHouse.
 12. **execute**: run as the ClickHouse user for the role. Settings profile `readonly`, `max_execution_time`, `max_result_rows`, `max_memory_usage`. Set `log_comment = trace_id`.
 13. **check**:
-    - SQL or runtime error -> feed the error back to generate_sql, **at most 3 times**; the third attempt uses `sql-gen-hard`
+    - SQL or runtime error -> feed the error back to generate_sql, **at most 3 retries** after the first generation; the third retry uses `sql-gen-hard`
     - **policy violation -> stop, no retry**
     - 0 rows or outside coverage -> return the result with a warning
 14. **shape_result**: attach types and roles to columns, cap at 5,000 rows.
@@ -174,7 +174,12 @@ If all 3 retries fail: return the last SQL + error. Never guess a result.
 5. `summary`
 6. `done` or `error`
 
-Every event carries `trace_id`.
+Every event carries `trace_id`. Events 3-5 belong to the SQL path only; per branch the streams are:
+
+- clarify: `status* -> clarify -> done`
+- deny: `status* -> deny -> done`
+- data success: `status* -> sql -> result -> chart_spec -> summary -> done`
+- failure: `status* -> [sql] -> error`
 
 ## 7. Data contracts
 

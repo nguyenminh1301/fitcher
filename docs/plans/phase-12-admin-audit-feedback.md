@@ -23,15 +23,18 @@ Let operators observe and improve the system: an Admin UI over `agent_logs` (run
 apps/api/app/api/admin.py           # runs, trace detail, audit, cost
 apps/api/app/feedback/proposals.py  # build example proposals from runs
 jobs/propose_examples.py
-apps/web/app/(admin)/runs/ trace/[traceId]/ audit/ costs/
+apps/web/app/(admin)/runs/
+apps/web/app/(admin)/trace/[traceId]/
+apps/web/app/(admin)/audit/
+apps/web/app/(admin)/costs/
 ```
 
 ## Tasks
 
 1. **Admin API (test first).** Paginated runs filtered by user, date range and status; trace detail combining `events`, `llm_calls`, `sql_runs`, `audit` and the query-log view; denied audit rows; cost by day, alias and model. Restricted to an `admin` role; queries use the logs read user.
 2. **Admin UI.** Run list with filters, trace timeline, audit table, cost chart rendered through the existing ChartSpec adapter.
-3. **Proposals (test first).** For each disliked or failed run: the question, the final QuerySpec and SQL, the error or feedback note. The job writes a draft `examples.yaml` item with `status: draft`, `evidence: [{kind: trace, ref: <trace_id>}]` and low confidence; duplicates by normalized question are skipped.
-4. **Review hand-off.** Proposals appear in the Review UI like any draft; approving one also offers adding an `eval.yaml` case for the question.
+3. **Proposals (test first).** For each disliked or failed run, the job stores a proposal in `agent_logs.example_proposals` (90-day TTL, readable only by `pack_reviewer` and `admin`): question, final QuerySpec and SQL, error, feedback note and `trace_id`. Before storage, questions and notes pass a redaction step that masks emails, phone numbers and long digit sequences. Duplicates by normalized question are skipped.
+4. **Review hand-off.** Proposals appear in the Review UI next to pack drafts. Approving one writes only fields the Phase 2 `examples.yaml` schema supports (question, SQL, `status`, `evidence: [{kind: trace, ref: <trace_id>}]`, `confidence`), after the reviewer edits the question and confirms it contains no personal data; feedback notes, errors and QuerySpecs never enter Git. Approval also offers adding an `eval.yaml` case for the question.
 5. **Loop test.** Dislike a failing question, run the proposal job, approve and correct the example, compile, rerun eval; the case passes.
 
 ## Contracts
@@ -57,8 +60,9 @@ docker compose run --rm api python -m jobs.eval --pack ecommerce_twin --baseline
 
 ## Risks and open questions
 
-1. **Privacy of questions in proposals.** Questions may contain personal data. Default: the lab dataset is synthetic; proposals keep only the question and SQL, never result rows.
+1. **Privacy of questions in proposals.** Users can type personal data into questions and notes regardless of the dataset. Default: automatic redaction plus mandatory reviewer confirmation before anything reaches Git; proposals never contain result rows and expire with the log TTL.
 2. **Cost figures.** Depend on LiteLLM's cost table for the configured models; shown as estimates.
+3. **Proposal storage table.** `example_proposals` adds a table to the seven in DECISIONS §10. Default: add it, and update DECISIONS §10 in the same PR with the owner's approval.
 
 ## Branch and PR split
 
