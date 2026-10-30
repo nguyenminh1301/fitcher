@@ -44,7 +44,7 @@ Open [the web app](http://localhost:3000), [API health](http://localhost:8000/he
 Ports bind to loopback. Stop services with `docker compose down`.
 
 The scaffold needs no `.env`; [.env.example](.env.example) gains settings as services are added. Never commit `.env`.
-An earlier foundation used a PostgreSQL service with the `fitcher_pgdata` named volume. Compose no longer uses it; the volume is left untouched, and removing it with `docker volume rm fitcher_pgdata` is an explicit choice for its owner.
+An earlier foundation ran a PostgreSQL `db` service with the `fitcher_pgdata` named volume. When upgrading a checkout that still has that container, start once with `docker compose up --build --wait --remove-orphans` so the old container stops and frees port 5432; this removes the container, not the volume. The volume is left untouched, and removing it with `docker volume rm fitcher_pgdata` is an explicit choice for its owner.
 
 Both runtime images apply available OS security updates during their builds and omit language package managers.
 Refresh base images and OS security packages periodically, then recreate the services:
