@@ -13,7 +13,7 @@
 
 ## Module(s) affected
 
-<!-- List affected areas: api, web, agent, db, deps, common or ci. -->
+<!-- List affected areas: api, web, agent, pack, db, infra, deps, common or ci. Name the phase from docs/MASTER_PLAN.md when relevant. -->
 
 ## Related issues
 

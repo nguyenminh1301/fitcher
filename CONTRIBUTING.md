@@ -7,8 +7,8 @@ Chat with the owner in Vietnamese.
 
 ## Development
 
-The repository includes the local Next.js/FastAPI/PostgreSQL foundation.
-Use the [README](README.md) for setup, the API suite and web checks; later analysis features remain planned.
+The repository is a monorepo scaffold for the architecture in [DECISIONS.md](docs/DECISIONS.md), delivered phase by phase per the [master plan](docs/MASTER_PLAN.md).
+Use the [README](README.md) for setup, the API suite and web checks, and the relevant [phase plan](docs/plans/README.md) before starting phase work.
 Preserve Windows/PowerShell and Linux support.
 Read AGENTS.md or CLAUDE.md and the applicable rules before working.
 Use `.workspace/` for private working output; follow `.workspace/README.md`.
@@ -38,12 +38,12 @@ Run `python scripts/check_repository.py` and `python scripts/check_git.py --rang
 For workflow edits, also run `go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.12` if Go is available; CI runs the same workflow lint.
 Report commands and actual results, with a reason for any unavailable check.
 For application changes, run the API suite and web typecheck/build documented in README.md.
-Check Compose startup and pgvector initialization when changing containers or database setup.
-OpenAI connectivity is an explicit billable smoke check, never an automatic unit test or health probe.
+Check Compose startup and health when changing containers or service initialization.
+Billable LLM, embedding and eval runs are explicit commands, never automatic unit tests or health probes.
 
 Use the PR template, describe the problem and resulting behavior, and add screenshots for visual changes.
 Keep the template aligned with the actual Python/Next.js commands; mark checks unrelated to the change as N/A with a reason.
-The database uses `scripts/init_db.sql` on fresh volumes; document any separate upgrade needed for an existing database.
+Service initialization scripts run on fresh volumes only; document any separate upgrade needed for an existing volume.
 No versioned migration runner is currently configured.
 CI runs repository/workflow checks, the Linux API suite and web typecheck/build. Security jobs audit locked dependencies and Git history, then rebuild/scan runtime images; review complete image artifacts as well as the fixable High/Critical gate. These checks do not replace local changed-area verification.
 Draft PRs are appropriate while iterating; mark ready when review is useful.
