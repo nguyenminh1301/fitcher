@@ -58,3 +58,11 @@ Repository checks alone support Python 3.11 or newer.
 
 `.agents/` and `.claude/` carry identical rule and skill content for their respective entry points.
 Update both copies in the same change; do not maintain divergent policies.
+
+## 5. No AI tool attribution
+
+- Never credit or mention AI assistants, AI coding tools or their vendors as authors, helpers, reviewers or sources of anything tracked or published from this repository: code, comments, tests, documentation, commit messages, branch names, PR titles and descriptions, issues, review replies and release notes.
+- This forbids "Generated with" lines, co-author trailers, tool or model names given as authors or helpers, and statements that work was written, reviewed or suggested by an AI tool.
+- Remove such text immediately wherever it is found; when a template or tool default adds it, delete it before publishing.
+- The product's runtime components defined in `docs/DECISIONS.md` (LLM gateway, model aliases, embedding models, model provider) are architecture, not attribution, and stay documented.
+- The `AGENTS.md`/`.agents/` and `CLAUDE.md`/`.claude/` entry points are paths that tools load by name; keep these file and directory names, but keep their content tool-neutral.
