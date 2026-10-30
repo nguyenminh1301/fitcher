@@ -6,7 +6,7 @@ Load the `ziadatalabs/FreeEcommerceTwin14M` dataset into the ClickHouse `raw` da
 
 ## Scope
 
-- A generic, manifest-driven loader job (`jobs/load_data.py`).
+- A generic, manifest-driven loader (`jobs/load_data.py`) run inside one serialized refresh job (`jobs/refresh_data.py`) that also runs dbt.
 - A dbt project with staging models, the three marts and their tests.
 - A hand-written acceptance query with an independent cross-check.
 
@@ -25,7 +25,8 @@ Load the `ziadatalabs/FreeEcommerceTwin14M` dataset into the ClickHouse `raw` da
 
 ```text
 jobs/
-  load_data.py                      # CLI: --source <name> [--revision <sha>]
+  load_data.py                      # loader: --source <name> [--revision <sha>]
+  refresh_data.py                   # single-flight load + dbt build with refresh-state transitions
   sources/ecommerce_twin.yaml       # HF repo, pinned revision, files, target tables, expected rows
   lib/clickhouse.py                 # shared admin connection helper for jobs
 dbt/
@@ -44,8 +45,8 @@ apps/api/tests/ or jobs/tests/      # loader tests (see open question 3)
 ## Tasks
 
 1. **Inspect the dataset.** Record the pinned Hugging Face revision, file formats, column names/types and the dataset card row counts in `jobs/sources/ecommerce_twin.yaml`. This step decides the real column names used by the marts.
-2. **Loader (test first).** Tests cover: manifest validation (missing table, bad row count type), download reuse of a complete file, refusal to publish a partial download, row-count mismatch failing the run, and a refresh-state gate: ClickHouse cannot swap several tables atomically, so consistency is enforced by state instead. `data_meta.refresh_state` is an append-only MergeTree table of transitions `(ts, status, run_id, detail)`; the current state is `SELECT argMax(status, ts) FROM data_meta.refresh_state`, and each transition is one single-row insert. The loader appends `loading`, replaces each table through a temporary table and `EXCHANGE TABLES`, validates every table, then appends `loaded`; any failure appends `failed`. Tests cover a failure on the last table and a failed state write. Then implement with `huggingface_hub` (pinned revision) and `clickhouse-connect` Arrow inserts. The loader knows nothing about e-commerce; everything comes from the manifest.
-3. **dbt project.** Add `dbt-core` and `dbt-clickhouse` pinned in the jobs dependency group. A wrapper job runs `dbt build` only when the state is `loaded` or `ready`, appends `building` first, then `ready` on success or `failed` on any model or test failure. Every reader of `raw` or `marts` (the agent, `compile_pack`, the onboarding profiler) checks that the state is `ready` and refuses otherwise with the state and run id, so a partial load or a partial mart build is never served; rerunning the load and build restores `ready`. Tests cover a dbt failure after a successful load. Staging models type dates as `Date`/`DateTime` in the pack timezone (open question 4) and money as `Decimal`.
+2. **Loader (test first).** Tests cover: manifest validation (missing table, bad row count type), download reuse of a complete file, refusal to publish a partial download, row-count mismatch failing the run, and a refresh-state gate: ClickHouse cannot swap several tables atomically, so consistency is enforced by state instead. `data_meta.refresh_state` is an append-only MergeTree table of transitions `(ts DateTime64(6), run_id UUID, status, detail)`, and each transition is one single-row insert. The current state is always read as one complete record: `SELECT status, run_id, ts FROM data_meta.refresh_state ORDER BY ts DESC, run_id DESC LIMIT 1`. The loader replaces each table through a temporary table and `EXCHANGE TABLES` and validates every table. Tests cover a failure on the last table and a failed state write. Then implement with `huggingface_hub` (pinned revision) and `clickhouse-connect` Arrow inserts. The loader knows nothing about e-commerce; everything comes from the manifest.
+3. **dbt project.** Add `dbt-core` and `dbt-clickhouse` pinned in the jobs dependency group. `jobs/refresh_data.py` is the only writer of `raw`, `marts` and the refresh state. It first takes an exclusive `flock` on `refresh.lock` in a named volume shared by every `api`-image container, and fails fast if another refresh holds it, so loads and dbt runs never interleave. Holding the lock, it generates a `run_id` and appends `loading`, runs the loader, appends `loaded`, appends `building`, runs `dbt build`, then appends `ready` on success or `failed` on any load, model or test failure. Before each append it reads the latest transition and aborts unless that record carries its own `run_id` (or, for `loading`, a terminal state), so a stale run can never publish `ready` over another run. The `ready` gate applies to serving readers only: the agent, `compile_pack` and the onboarding profiler refuse with the latest state and run id unless it is `ready`, while dbt reads `raw` freely inside the refresh job that holds the lock. A partial load or mart build is therefore never served, and rerunning the refresh restores `ready`. Tests cover a dbt failure after a successful load, dbt reading `raw` while the state is `building` and a serving reader being refused at the same time, a second refresh failing while the lock is held, and a stale run whose `run_id` is no longer latest being unable to append `ready`. Staging models type dates as `Date`/`DateTime` in the pack timezone (open question 4) and money as `Decimal`.
 4. **Marts.**
    - `sales_lines`: one row per order line: order line key, order id, order timestamp and date, product attributes, customer attributes, quantity, unit price, discount, gross and net line amounts. `MergeTree ORDER BY (order_date, product_id)`.
    - `returns_fact`: one row per returned line, joined to the original sale.
@@ -62,13 +63,12 @@ apps/api/tests/ or jobs/tests/      # loader tests (see open question 3)
 ## Verification
 
 ```bash
-docker compose run --rm api python -m jobs.load_data --source ecommerce_twin
-docker compose run --rm api dbt build --project-dir dbt --profiles-dir dbt
+docker compose run --rm api python -m jobs.refresh_data --source ecommerce_twin
 docker compose run --rm api dbt compile --project-dir dbt --profiles-dir dbt --select analyses/top_products_q1_compare
 uv run --project apps/api pytest -c apps/api/pyproject.toml
 ```
 
-Passing: loader reports every table with matching row counts; `dbt build` has zero failing tests; the cross-check test passes.
+Passing: the refresh reports every table with matching row counts, `dbt build` has zero failing tests and the latest refresh state is `ready`; the cross-check test passes.
 
 ## Definition of done
 

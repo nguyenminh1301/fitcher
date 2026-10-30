@@ -30,7 +30,7 @@ docs/eval/<second_pack>-report.md
 ## Tasks
 
 1. **Choose the dataset.** Compare licence, size and shape. Iowa Liquor Sales is real, one wide table and large, so load a bounded date range; Maycee needs its licence and table layout confirmed. Record the choice in DECISIONS §4.
-2. **Load.** Source manifest only; the generic loader from Phase 1 is reused unchanged.
+2. **Load.** Source manifest only; the Phase 1 refresh job and loader are reused unchanged, building only the models tagged with the new pack.
 3. **Marts.** dbt models in a separate folder; 1-3 wide marts.
 4. **Onboard.** `profile.py` -> `ingest_docs.py` (if documents exist) -> `draft_pack.py` -> Review UI -> `compile_pack.py`.
 5. **Eval set.** At least 30 cases covering every DECISIONS §12 category, with reference SQL.
@@ -44,8 +44,7 @@ docs/eval/<second_pack>-report.md
 ## Verification
 
 ```bash
-docker compose run --rm api python -m jobs.load_data --source <second_pack>
-docker compose run --rm api dbt build --project-dir dbt --profiles-dir dbt --select tag:<second_pack>
+docker compose run --rm api python -m jobs.refresh_data --source <second_pack>   # builds --select tag:<second_pack>
 docker compose run --rm api python -m jobs.compile_pack --pack <second_pack>
 docker compose run --rm api python -m jobs.eval --pack <second_pack>
 docker compose run --rm api python -m jobs.eval --pack ecommerce_twin --baseline packs/ecommerce_twin/eval_baseline.json
