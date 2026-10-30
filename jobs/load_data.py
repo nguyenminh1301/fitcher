@@ -173,7 +173,7 @@ def _quote(identifier: str) -> str:
     return "`" + identifier.replace("\\", "\\\\").replace("`", "\\`") + "`"
 
 
-def _print_summary(results: list[TableResult]) -> None:
+def print_summary(results: list[TableResult]) -> None:
     print(f"{'table':<24} {'expected':>12} {'loaded':>12}  status")
     for result in results:
         status = "ok" if result.ok else "MISMATCH"
@@ -192,14 +192,14 @@ def main(argv: list[str] | None = None) -> int:
         client = admin_client()
         results = load_source(manifest, client, args.data_dir, args.revision, download=download_table)
     except LoadError as error:
-        _print_summary(error.results)
+        print_summary(error.results)
         print(f"Load failed, nothing was published: {error}", file=sys.stderr)
         return 1
     except (ManifestError, RuntimeError) as error:
         print(error, file=sys.stderr)
         return 1
 
-    _print_summary(results)
+    print_summary(results)
     print(f"Published {len(results)} tables from {manifest.name} at revision {args.revision or manifest.revision}")
     return 0
 
