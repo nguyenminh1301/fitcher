@@ -4,6 +4,9 @@
 
 ### Added
 
+- Run data jobs in a `jobs` Compose service on the `api` image that alone holds the ClickHouse admin credentials and mounts `./data`, and document loading the CC BY-NC 4.0 lab dataset.
+- Load a manifest source into ClickHouse `raw` tables from its pinned Hugging Face revision, publishing every table only after all row counts match and leaving the previous tables untouched on any failure.
+- Validate source manifests for raw data loads, including pinned revisions, expected row counts, optional load-time date ranges with dataset-card counts, safe identifiers and a `dbt_tag` unique across sources, with the e-commerce lab dataset manifest.
 - Run ClickHouse, OpenSearch, LiteLLM and Keycloak beside the API and web skeletons in Docker Compose with pinned images, loopback ports, health checks, the `raw`/`marts`/`data_meta` databases, a disabled ClickHouse `default` user, the four LiteLLM model aliases, a placeholder `finch` realm, Make targets and a billable `fast` alias smoke job.
 - Forbid AI tool attribution in code, documentation, commits, branches, PRs, issues and review replies, and extend the commit message and PR title check to more tool names.
 - English settled decisions for the domain-neutral Finch-Lab architecture, its master plan and a detailed plan for each delivery phase.
@@ -23,6 +26,7 @@
 
 ### Changed
 
+- Settle the Phase 1 data plan from the inspected lab dataset: date-only typing, net sales without discounts, all-or-nothing raw publication, refresh state with a generation check for readers, unique `dbt_tag` values and a `jobs` Compose service that keeps admin credentials out of `api`.
 - Merge pull requests into `develop` as soon as local verification passes, and treat CI and review findings as follow-ups that are verified before they are applied.
 - Align mirrored agent rules, entry points, review configuration, contribution and security guidance, README and the PR template with the domain-neutral architecture, and add the `pack` and `infra` commit scopes.
 - Move the API and web skeletons into `apps/api` and `apps/web` and add documented `packs/`, `dbt/`, `jobs/`, `infra/` and prompt directories for the monorepo layout.

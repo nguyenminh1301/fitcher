@@ -10,7 +10,7 @@ Docker Compose starts ClickHouse, OpenSearch, LiteLLM, Keycloak, the FastAPI ske
 `packs/`, `dbt/` and `apps/api/prompts/` contain only READMEs describing what each phase adds; `jobs/` holds the LiteLLM smoke job.
 
 The architecture is settled in [DECISIONS.md](docs/DECISIONS.md) and delivered in the order of the [master plan](docs/MASTER_PLAN.md), with one [detailed plan per phase](docs/plans/README.md).
-Phase 1 (lab dataset and dbt marts) is next.
+Phase 1 (lab dataset and dbt marts) is in progress: the loader publishes the lab dataset into ClickHouse `raw`; the dbt marts follow.
 
 ## Architecture
 
@@ -47,6 +47,17 @@ Copy [.env.example](.env.example) to `.env` and replace every `change-me` value.
 
 `make` is optional; the Makefile only wraps these commands. `make down` never removes volumes, so ClickHouse and OpenSearch data survive restarts.
 `make smoke` sends one billable request to the `fast` alias through LiteLLM and prints only the reply length.
+
+### Load the lab dataset
+
+```bash
+docker compose run --rm jobs python -m jobs.load_data --source ecommerce_twin
+```
+
+Jobs run in the `jobs` Compose service (profile `jobs`), which uses the `api` image, mounts `./data` and is the only service holding the ClickHouse admin credentials.
+The loader downloads the seven Parquet files of [`ziadatalabs/FreeEcommerceTwin14M`](https://huggingface.co/datasets/ziadatalabs/FreeEcommerceTwin14M) at the revision pinned in `jobs/sources/ecommerce_twin.yaml` into `data/hf/`, reuses complete downloads on later runs, and publishes the `raw` tables only after every row count matches the manifest.
+The dataset is licensed CC BY-NC 4.0 for non-commercial use only; downloads and derived data stay in the Git-ignored `data/` directory and are never committed.
+On Linux hosts, `./data` must be writable by UID 10001, the non-root user of the `api` image.
 
 | Service | Host address | Health check |
 | --- | --- | --- |
@@ -144,7 +155,7 @@ The PR size labeler runs for branches within this repository; fork PRs do not re
 
 ## Next steps
 
-- Phase 1: Load the e-commerce lab dataset into ClickHouse and build the marts with dbt.
+- Phase 1: Build the e-commerce marts with dbt from the loaded `raw` tables.
 - Later phases follow the [master plan](docs/MASTER_PLAN.md); each starts from its [phase plan](docs/plans/README.md).
 
 See [CHANGELOG.md](CHANGELOG.md) for repository changes and [SECURITY.md](SECURITY.md) for vulnerability reporting.
