@@ -4,6 +4,7 @@
 
 ### Added
 
+- Document the marts refresh, refresh-state protocol, stale-lock recovery and acceptance query, and select the acceptance analysis by name in the Phase 1 verification command.
 - Build the `sales_lines`, `returns_fact` and `sessions_daily` marts from typed staging views with key, relationship, date-range and non-negative tests, and answer the Q1 2024 versus Q1 2025 top-10 products question in SQL with a test that recomputes it from staging.
 - Refresh a source under a per-source lock table, loading its raw tables and building its dbt models and tests, and record each generation as started, completed or failed in `data_meta.refresh_log` so readers can tell a complete refresh from a partial one.
 - Add the dbt project with an environment-driven ClickHouse profile, pinned dbt-core and dbt-clickhouse in the jobs image, per-source model tags and checks that every source folder carries its `dbt_tag` and no model sets an alias.

@@ -71,7 +71,7 @@ Jobs run in a `jobs` Compose service under the `jobs` profile. It uses the `api`
 
 ```bash
 docker compose run --rm jobs python -m jobs.refresh_data --source ecommerce_twin
-docker compose run --rm jobs dbt compile --project-dir dbt --profiles-dir dbt --select analyses/top_products_q1_compare
+docker compose run --rm jobs dbt compile --project-dir dbt --profiles-dir dbt --select top_products_q1_compare
 uv run --project apps/api pytest -c apps/api/pyproject.toml
 ```
 
