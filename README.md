@@ -113,34 +113,12 @@ uv run --project api python -m scripts.check_tlc
 
 Run these from the root. Valid existing files are reused; partial downloads are not published.
 Inputs remain in ignored `data/parquet/`, outside Git. Neither command requires an OpenAI key.
-See [dataset setup and verification](docs/tlc-dataset.md) for other months, native DuckDB CLI commands, sample query results and measured timings.
 
 ## Planned architecture
 
-| Component | Technology | Responsibility |
-| --- | --- | --- |
-| Web | Next.js, Plotly | Chat, tables, charts and SQL display |
-| API | FastAPI, SSE | Requests and incremental results |
-| Agent | LangGraph | Retrieve context, generate, validate and repair SQL |
-| Query engine | DuckDB | Bounded read-only queries over Parquet |
-| Storage | PostgreSQL, pgvector | Dictionary, glossary, vectors and chat history |
-| Deployment | Docker Compose | Three services: web, api and db |
-
-## OpenAI models
-
-| Task | Planned model |
-| --- | --- |
-| Generate and repair SQL | `gpt-6.1-sol` |
-| Summaries and chart specifications | `gpt-6-luna` |
-| Dictionary, glossary and question embeddings | `text-embedding-3-small` |
-
-The connectivity check uses the OpenAI Python SDK and Responses API, following the [official quickstart](https://developers.openai.com/api/docs/quickstart).
-SQL, summary and Embeddings integrations remain planned.
-Stored and query embeddings must use the same model and dimensions; the planned pgvector column has 1536 dimensions.
-Changing the embedding model requires rebuilding dictionary and glossary vectors.
-The backend and ingestion scripts own `OPENAI_API_KEY`; it must never reach the browser or Git history.
-The tracked [.env.example](.env.example) documents local service settings and future model settings.
-Compose passes the key only to the API container; Docker build contexts exclude local environment files.
+fitcher is moving to the domain-neutral Finch-Lab architecture: ClickHouse marts, Domain Packs, OpenSearch retrieval, a LangGraph agent behind LiteLLM aliases, Keycloak roles and a Next.js chat with ECharts.
+[Settled decisions](docs/DECISIONS.md) are the source of truth; the [master plan](docs/MASTER_PLAN.md) and [phase plans](docs/plans/README.md) describe delivery order.
+The TLC, DuckDB and PostgreSQL components above predate this architecture and are scheduled for removal.
 
 ## Repository workflow
 
