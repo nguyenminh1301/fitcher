@@ -18,7 +18,9 @@
     "web",
     "api",
     "agent",
+    "pack",
     "db",
+    "infra",
     "deps",
     "common",
     "ci"

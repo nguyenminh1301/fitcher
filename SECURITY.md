@@ -15,7 +15,7 @@ Include the affected commit, impact and a minimal reproduction using synthetic d
 
 Never commit `.env`, API keys, database credentials, raw datasets or customer data.
 Rotate exposed credentials with the provider; deleting them from a later commit is insufficient.
-OpenAI keys belong to backend and ingestion processes only, never browser bundles or `NEXT_PUBLIC_*` variables.
+The OpenAI key belongs to the LiteLLM gateway only; database and gateway credentials belong to backend and job processes, never browser bundles, `NEXT_PUBLIC_*` variables or LLM prompts.
 
 ## Automated checks
 
@@ -24,7 +24,7 @@ Dependabot is configured for GitHub Actions and targets `develop`, but automatic
 Security-update behavior is controlled separately by GitHub repository settings; this bootstrap does not enable it.
 The Security workflow audits locked npm and Python dependencies, scans Git history with Gitleaks, and rebuilds/scans each runtime image with checksum-verified Trivy. It runs for PRs, pushes to integration/production branches, manual dispatch and weekly on the default branch. Tool failures fail their jobs; a scanner outage is not a clean result. Images fail for High/Critical advisories with available fixes. Complete reports, including unfixed findings, are retained as workflow artifacts for 14 days.
 
-Runtime images apply OS updates during uncached builds. API/web runtimes omit language package managers; PostgreSQL runs as its own user without the unused root handoff helper. Rebuild with `docker compose build --pull --no-cache` to refresh packages, then recreate services while preserving the database volume. Versions in application lockfiles do not cover all OS packages or bundled tooling.
+Runtime images apply OS updates during uncached builds. API/web runtimes omit language package managers. Rebuild with `docker compose build --pull --no-cache` to refresh packages, then recreate services while preserving named volumes. Versions in application lockfiles do not cover all OS packages or bundled tooling.
 
 Review advisory reachability before treating scanner counts as exploitable application defects. For example, Debian documents that [CVE-2023-45853 affects MiniZip code not built into Bookworm's zlib binary](https://security-tracker.debian.org/tracker/CVE-2023-45853). Do not introduce blanket suppressions. Any future exception must identify the advisory, affected artifact, evidence, owner and review/expiry date. Unfixed findings remain a release-review responsibility; the fix-available gate is not a claim that every image is vulnerability-free.
 

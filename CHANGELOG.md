@@ -21,6 +21,8 @@
 
 ### Changed
 
+- Align mirrored agent rules, entry points, review configuration, contribution and security guidance, README and the PR template with the domain-neutral architecture, and add the `pack` and `infra` commit scopes.
+- Move the API and web skeletons into `apps/api` and `apps/web` and add documented `packs/`, `dbt/`, `jobs/`, `infra/` and prompt directories for the monorepo layout.
 - Build patched runtime images without API/web language package managers and run PostgreSQL directly as its database user while preserving existing named volumes.
 - Remove Corepack from the web runtime so it cannot bootstrap language package managers.
 - Aggregate pickup counts before joining zone labels to reduce work while preserving unmatched locations, null IDs and deterministic ties.
@@ -45,5 +47,6 @@
 
 ### Removed
 
+- Remove the TLC HVFHV download, DuckDB views, sample queries, PostgreSQL/pgvector service and OpenAI smoke check, which the domain-neutral ClickHouse architecture replaces.
 - Remove the TLC dataset guide, superseded by the domain-neutral architecture decisions.
 - Remove author, database migration and reviewer checklists from the pull request template.

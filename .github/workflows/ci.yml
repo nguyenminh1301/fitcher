@@ -58,9 +58,9 @@ jobs:
       - name: Install pinned uv and frozen dependencies
         run: |
           python -m pip install uv==0.13.6
-          uv sync --project api --frozen
+          uv sync --project apps/api --frozen
       - name: Run API and CLI tests including POSIX permissions
-        run: uv run --project api pytest -c api/pyproject.toml
+        run: uv run --project apps/api pytest -c apps/api/pyproject.toml
 
   web:
     name: Web checks
@@ -72,13 +72,13 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version-file: web/.nvmrc
+          node-version-file: apps/web/.nvmrc
           cache: npm
-          cache-dependency-path: web/package-lock.json
+          cache-dependency-path: apps/web/package-lock.json
       - name: Install frozen dependencies, check types and build
         env:
           NEXT_TELEMETRY_DISABLED: "1"
         run: |
-          npm --prefix web ci
-          npm --prefix web run typecheck
-          npm --prefix web run build
+          npm --prefix apps/web ci
+          npm --prefix apps/web run typecheck
+          npm --prefix apps/web run build

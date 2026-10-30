@@ -4,7 +4,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "fitcher",
-  description: "Natural-language data analysis lab",
+  description: "Domain-neutral natural-language data analysis lab",
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {

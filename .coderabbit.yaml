@@ -37,30 +37,32 @@ reviews:
   path_instructions:
     - path: "**/*"
       instructions: >-
-        fitcher includes a local Next.js/FastAPI/PostgreSQL foundation with pgvector.
-        Local HVFHV downloads and DuckDB views are implemented; the bounded query
-        executor, SQL generation, LangGraph, SSE and chat/chart features remain planned.
-        Review against the stated change and AGENTS.md. Prioritize correctness,
-        security and regressions. Do not require speculative services or abstractions.
+        fitcher follows the domain-neutral architecture in docs/DECISIONS.md and
+        delivers it phase by phase per docs/MASTER_PLAN.md and docs/plans/. The
+        repository is currently a monorepo scaffold (apps/api, apps/web, packs, dbt,
+        jobs, infra). Review against the stated change, its phase plan and AGENTS.md.
+        Prioritize correctness, security and regressions. Do not require features
+        from later phases or components DECISIONS lists as out of scope.
         Tests should prove changed behavior or a real boundary.
     - path: "**/*.py"
       instructions: >-
         Preserve Windows and Linux support. Keep credentials server-side and avoid
-        logging keys or private data. For the existing API, verify GET /health remains
-        a local liveness probe and OpenAI smoke requests remain explicit, bounded
-        and isolated from tests through mocked transports. Check cancellation,
-        bounded outbound calls, SELECT-only SQL validation, query resource limits
-        and consistent embedding model/dimensions. Do not require absent features.
+        logging keys or private data. Verify GET /health remains a local liveness
+        probe. LLM calls must use LiteLLM aliases, never model names, and unit tests
+        must mock LLM, search and embedding clients. Engine code under apps/ must not
+        hard-code pack table, column, metric or industry names. When present, check
+        SELECT-only SQL guarding, role-scoped execution, query resource limits,
+        cancellation and consistent embedding dimensions. Do not require absent features.
     - path: "**/*.{ts,tsx,js,jsx}"
       instructions: >-
         Preserve server/client boundaries. Never expose secrets through NEXT_PUBLIC
         variables or browser code. Check loading/error/cancellation behavior and
         accessibility when UI behavior changes.
-    - path: "{compose.yaml,**/Dockerfile,scripts/init_db.sql}"
+    - path: "{compose.yaml,**/Dockerfile,infra/**}"
       instructions: >-
         Preserve loopback-bound local services, health/readiness behavior and
-        persistent database contents. The PostgreSQL initialization script runs
-        only for new volumes; editing it does not upgrade existing databases.
+        persistent volume contents. Initialization scripts run only for new
+        volumes; editing them does not upgrade existing databases.
         Require an explicit existing-database upgrade plan when relevant, without
         assuming a migration framework or deleting volumes as a shortcut.
     - path: ".github/**"
@@ -99,5 +101,6 @@ knowledge_base:
     enabled: true
     filePatterns:
       - AGENTS.md
+      - docs/DECISIONS.md
       - .agents/rules/*.md
       - CONTRIBUTING.md

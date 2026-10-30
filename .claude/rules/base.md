@@ -10,8 +10,10 @@ description: Always active. Sets communication, scope, repository boundaries and
 
 - Chat with the owner in Vietnamese.
 - Write code identifiers, comments, documentation and GitHub content in English.
-- fitcher includes a local Next.js/FastAPI/PostgreSQL foundation with pgvector.
-- Local HVFHV downloads and DuckDB dataset views are available. The bounded executor, SQL generation, LangGraph, SSE and chat/chart features remain planned; read README.md for current status and available commands.
+- fitcher implements the domain-neutral Finch-Lab architecture; `docs/DECISIONS.md` is the binding source of truth and `docs/MASTER_PLAN.md` orders the phases.
+- The repository is a monorepo scaffold: `apps/api` (FastAPI `GET /health`), `apps/web` (placeholder page), `packs/`, `dbt/`, `jobs/` and `infra/`. Read README.md for current status and available commands.
+- Before working on a phase, read DECISIONS.md and that phase's plan in `docs/plans/`. Stop and ask before going against a decision; never add an out-of-scope component from DECISIONS §1.
+- Engine code under `apps/` never hard-codes pack table, column, metric or industry names; LLM calls use LiteLLM aliases only.
 - Implement only the requested scope; do not add speculative application code, dependencies or abstractions.
 
 ## 2. Working standards
@@ -35,15 +37,16 @@ Repository checks alone support Python 3.11 or newer.
 | Changed area | Required verification |
 |--------------|-----------------------|
 | Documentation, rules and repository configuration | `python scripts/check_repository.py` and `python scripts/check_git.py --range origin/develop..HEAD` |
-| API Python source, tests or dependencies | `uv sync --project api --frozen` and `uv run --project api pytest -c api/pyproject.toml` |
-| Web TypeScript/React source or dependencies | `npm --prefix web ci`, `npm --prefix web run typecheck` and `npm --prefix web run build` |
+| API or job Python source, tests or dependencies | `uv sync --project apps/api --frozen` and `uv run --project apps/api pytest -c apps/api/pyproject.toml` |
+| Web TypeScript/React source or dependencies | `npm --prefix apps/web ci`, `npm --prefix apps/web run typecheck` and `npm --prefix apps/web run build` |
 | Compose, Dockerfiles or service initialization | `docker compose config --quiet`, `docker compose up --build --wait` and checks for the affected health/readiness behavior |
-| PostgreSQL/pgvector initialization | Verify extension/schema behavior on a fresh test database and document the upgrade path for existing volumes |
+| ClickHouse, OpenSearch or Keycloak initialization | Verify behavior on a fresh volume and provide an idempotent apply path for existing volumes |
+| Domain Pack files or agent behavior (from Phase 4) | `eval.py --pack <pack>` with the baseline; scores must not regress |
 | GitHub Actions workflows | `go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.12`; report explicitly if unavailable locally |
 
-- API tests use isolated/mocked OpenAI transports; no live key or billable request is required.
-- Run the explicit live OpenAI smoke command only when requested; it is not part of unit tests, readiness checks or liveness probes.
-- `scripts/init_db.sql` runs only when PostgreSQL initializes a new volume; it does not migrate an existing database.
+- Unit tests mock LLM, search and embedding clients; no live key or billable request is required.
+- Run billable LLM, embedding or eval commands only when explicitly requested or required by a phase's definition of done; they are never part of unit tests, readiness checks or liveness probes.
+- Database initialization scripts run only on a fresh volume; they do not migrate an existing database.
 - No versioned database migration runner is configured; do not prescribe a migration tool or file naming scheme until one is introduced deliberately.
 - Do not delete existing database volumes to make a verification step pass.
 - Keep secrets server-side and exclude local datasets, database files and scratch artifacts from Git.

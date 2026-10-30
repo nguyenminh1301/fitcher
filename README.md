@@ -1,37 +1,38 @@
 # fitcher
 
-fitcher is a natural-language data analysis project.
-The planned application turns questions into validated SQL and returns tables, charts and summaries over NYC TLC HVFHV Parquet data.
+fitcher is a domain-neutral natural-language data analysis lab.
+The planned application answers questions such as "Top 10 best-selling products in Q1 2024 compared with Q1 2025" with validated SQL, tables, charts and summaries over company data loaded into ClickHouse and described by a Domain Pack.
 
 ## Current status
 
-The local foundation is implemented: Next.js serves an initialization page, FastAPI exposes `GET /health`, and Docker Compose starts PostgreSQL with pgvector enabled.
-An explicit smoke command verifies OpenAI connectivity through the Responses API.
-Local HVFHV downloads, Uber-only DuckDB views and sample analysis queries are available.
-The bounded query executor, SQL generation, `/ask`, SSE, chat and charts are planned and are not implemented yet.
+The repository is a clean monorepo scaffold with no business logic yet.
+FastAPI in `apps/api` exposes `GET /health`, Next.js in `apps/web` serves a placeholder page, and Docker Compose runs both.
+`packs/`, `dbt/`, `jobs/`, `infra/` and `apps/api/prompts/` contain only READMEs describing what each phase adds.
+
+The architecture is settled in [DECISIONS.md](docs/DECISIONS.md) and delivered in the order of the [master plan](docs/MASTER_PLAN.md), with one [detailed plan per phase](docs/plans/README.md).
+Phase 0 (six lab services, LiteLLM aliases, `make up` / `make down`) is next.
+
+## Architecture
+
+| Component | Technology | Responsibility |
+| --- | --- | --- |
+| Web | Next.js, ECharts, TanStack Table | Chat, tables, charts, SQL view, Review and Admin UIs |
+| Auth | Keycloak (OIDC) | Users and roles carried in JWTs |
+| API | FastAPI, SSE | Authenticated requests and streamed results |
+| Agent | LangGraph, sqlglot | Extract, retrieve, generate, guard, execute and summarize |
+| LLM gateway | LiteLLM Proxy (OpenAI) | Aliases `fast`, `sql-gen`, `sql-gen-hard`, `embed` |
+| Data and logs | ClickHouse | `raw`, `marts` and `agent_logs` databases, role-based access |
+| Retrieval | OpenSearch | Hybrid BM25 + kNN over pack indices |
+| Transform | dbt-clickhouse | Raw tables to wide marts |
+| Packs | YAML + JSON Schema | Per-company profile, datasets, glossary, metrics, policies and eval |
+| Deployment | Docker Compose | Six long-running services plus jobs |
+
+Only `api` and `web` run today; the other services arrive in Phase 0.
 
 ## Run locally
 
 Install Docker with Compose v2 (`--wait` support). Host Node/Python are optional when using Docker.
 Run these commands from the repository root.
-
-PowerShell:
-
-```powershell
-Copy-Item .env.example .env
-New-Item -ItemType Directory -Force data/parquet
-```
-
-Bash:
-
-```bash
-cp .env.example .env
-mkdir -p data/parquet
-```
-
-Copy the environment template only on first setup; preserve an existing `.env`.
-Set `OPENAI_API_KEY` in `.env` before the explicit OpenAI check; the local services can start without it.
-The database defaults are for this local lab only. Ports bind to loopback; keep credentials private.
 
 ```bash
 docker compose up --build --wait
@@ -39,33 +40,13 @@ docker compose ps
 ```
 
 Open [the web app](http://localhost:3000), [API health](http://localhost:8000/health) or [API docs](http://localhost:8000/docs).
-`GET /health` returns `200` and `{"status":"ok"}` as a liveness probe; it does not call OpenAI or query PostgreSQL.
-Compose separately waits for database readiness before starting the API.
+`GET /health` returns `200` and `{"status":"ok"}` as a liveness probe; it calls no other service.
+Ports bind to loopback. Stop services with `docker compose down`.
 
-Check that pgvector is enabled:
+The scaffold needs no `.env`; [.env.example](.env.example) gains settings as services are added. Never commit `.env`.
+An earlier foundation ran a PostgreSQL `db` service with the `fitcher_pgdata` named volume. When upgrading a checkout that still has that container, start once with `docker compose up --build --wait --remove-orphans` so the old container stops and frees port 5432; this removes the container, not the volume. The volume is left untouched, and removing it with `docker volume rm fitcher_pgdata` is an explicit choice for its owner.
 
-```bash
-docker compose exec db psql -U fitcher -d fitcher -c "SELECT extname, extversion FROM pg_extension WHERE extname = 'vector';"
-```
-
-Substitute your configured database/user if changed.
-The initialization script runs on a new volume only; for a pre-existing database, run `CREATE EXTENSION IF NOT EXISTS vector;` as the database owner.
-
-Run one small, billable OpenAI request explicitly:
-
-```bash
-docker compose exec api python scripts/check_openai.py
-```
-
-The command has a 30-second timeout, no automatic retries, bounded output and exits nonzero on errors or incomplete/empty output.
-It reports status without printing credentials, raw API errors or generated text.
-Set `OPENAI_SMOKE_MODEL` to a model available to your API project if needed.
-After changing `.env`, run `docker compose up -d --wait` to recreate containers with the new settings; a container restart alone does not reload them.
-
-Stop services with `docker compose down`. The `pgdata` named volume persists database contents; the local `data/parquet` directory is mounted read-only into the API.
-
-All three runtime images apply available OS security updates during their builds. API and web images omit language package managers; the database runs directly as `postgres` and retains PostgreSQL 17 and pgvector 0.8.7. The existing named volume is reused without reinitialization. A custom bind-mounted database directory must already be owned by the image's `postgres` UID/GID; the non-root entry point cannot repair ownership. Do not delete an existing volume to resolve permissions.
-
+Both runtime images apply available OS security updates during their builds and omit language package managers.
 Refresh base images and OS security packages periodically, then recreate the services:
 
 ```bash
@@ -82,43 +63,22 @@ Install [uv](https://docs.astral.sh/uv/getting-started/installation/) if not alr
 From the root, these commands work in PowerShell and Bash:
 
 ```bash
-uv sync --project api --frozen
-uv run --project api pytest -c api/pyproject.toml
-uv run --project api uvicorn app.main:app --app-dir api --host 127.0.0.1 --port 8000
+uv sync --project apps/api --frozen
+uv run --project apps/api pytest -c apps/api/pyproject.toml
+uv run --project apps/api uvicorn app.main:app --app-dir apps/api --host 127.0.0.1 --port 8000
 ```
 
 In another terminal:
 
 ```bash
-npm --prefix web ci
-npm --prefix web run typecheck
-npm --prefix web run build
-npm --prefix web run dev
+npm --prefix apps/web ci
+npm --prefix apps/web run typecheck
+npm --prefix apps/web run build
+npm --prefix apps/web run dev
 ```
 
 Host and Docker services use the same ports; stop the Compose services before starting host servers.
-To run the explicit OpenAI check on the host, use `uv run --project api python scripts/check_openai.py`; it loads the root `.env`, preserving existing environment variables.
-The API tests use an in-memory HTTP transport for OpenAI and require neither a real key nor network calls.
-Commit dependency changes with the corresponding `api/uv.lock` or `web/package-lock.json`.
-
-## TLC dataset
-
-Prepare the fixed March 2024 lab dataset from NYC TLC (about 508 MB) and inspect the views:
-
-```bash
-uv sync --project api --frozen
-uv run --project api python -m scripts.download_tlc
-uv run --project api python -m scripts.check_tlc
-```
-
-Run these from the root. Valid existing files are reused; partial downloads are not published.
-Inputs remain in ignored `data/parquet/`, outside Git. Neither command requires an OpenAI key.
-
-## Planned architecture
-
-fitcher is moving to the domain-neutral Finch-Lab architecture: ClickHouse marts, Domain Packs, OpenSearch retrieval, a LangGraph agent behind LiteLLM aliases, Keycloak roles and a Next.js chat with ECharts.
-[Settled decisions](docs/DECISIONS.md) are the source of truth; the [master plan](docs/MASTER_PLAN.md) and [phase plans](docs/plans/README.md) describe delivery order.
-The TLC, DuckDB and PostgreSQL components above predate this architecture and are scheduled for removal.
+Commit dependency changes with the corresponding `apps/api/uv.lock` or `apps/web/package-lock.json`.
 
 ## Repository workflow
 
@@ -151,9 +111,9 @@ python scripts/check_git.py --title "chore(common): update project setup"
 CI validates repository text/structure, commit messages, PR titles, source branches and GitHub workflows.
 PR size labels are advisory: XS up to 100 changed lines, S up to 400, M up to 1000, L up to 2000 and XL above 2000.
 Keep PRs at most 1000 changed lines where practical and below 100 changed files for review.
-CI also runs the API/CLI suite on Linux (including POSIX permission checks) and the web frozen install, typecheck and production build. Run the same commands locally for application changes.
+CI also runs the API suite on Linux and the web frozen install, typecheck and production build. Run the same commands locally for application changes.
 
-The Security workflow runs on PRs, integration/production pushes, manual dispatch and a weekly schedule. It audits locked npm/Python dependencies, scans Git history for secrets, and rebuilds/scans all three runtime images. Image jobs retain complete JSON reports and fail for High/Critical findings with a published fix; unfixed advisories remain visible for review. See [security policy](SECURITY.md) for triage and scanner limits. These jobs do not configure required status checks or branch protection automatically.
+The Security workflow runs on PRs, integration/production pushes, manual dispatch and a weekly schedule. It audits locked npm/Python dependencies, scans Git history for secrets, and rebuilds/scans both runtime images. Image jobs retain complete JSON reports and fail for High/Critical findings with a published fix; unfixed advisories remain visible for review. See [security policy](SECURITY.md) for triage and scanner limits. These jobs do not configure required status checks or branch protection automatically.
 
 CodeRabbit is configured for `develop` and `main`, skips drafts, and reviews incremental updates without pausing after a fixed number of commits.
 The CodeRabbit GitHub App must have access to this repository and a plan that supports the requested reviews.
@@ -168,9 +128,9 @@ The PR size labeler runs for branches within this repository; fork PRs do not re
 
 ## Next steps
 
-- Add a bounded read-only executor and SQL validator before text-to-SQL generation.
-- Establish a golden-set baseline, then add self-healing, semantic retrieval, SSE and the chat UI.
-- Extend application checks as the bounded executor and analysis API are introduced.
+- Phase 0: Compose the six lab services with health checks and the LiteLLM aliases.
+- Phase 1: Load the e-commerce lab dataset into ClickHouse and build the marts with dbt.
+- Later phases follow the [master plan](docs/MASTER_PLAN.md); each starts from its [phase plan](docs/plans/README.md).
 
 See [CHANGELOG.md](CHANGELOG.md) for repository changes and [SECURITY.md](SECURITY.md) for vulnerability reporting.
 

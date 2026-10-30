@@ -8,7 +8,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 COPY --from=uv /uv /usr/local/bin/uv
 WORKDIR /app
-COPY api/pyproject.toml api/uv.lock ./
+COPY apps/api/pyproject.toml apps/api/uv.lock ./
 RUN uv sync --frozen --no-dev --no-install-project --no-managed-python
 
 FROM python:3.13.18-slim-bookworm AS runtime
@@ -21,9 +21,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PATH="/app/.venv/bin:$PATH"
 WORKDIR /app
 COPY --from=build /app/.venv ./.venv
-COPY api/app ./app
-COPY scripts/check_openai.py scripts/download_tlc.py scripts/check_tlc.py scripts/init_views.sql ./scripts/
-COPY scripts/sample_queries ./scripts/sample_queries
+COPY apps/api/app ./app
 RUN useradd --create-home --uid 10001 app
 USER app
 

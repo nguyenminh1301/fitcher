@@ -9,12 +9,11 @@ __pycache__
 .workspace
 data
 *.parquet
-*.duckdb*
 .agents
 .claude
 .github
 docs
-web
+apps/web
 **/node_modules
 **/.next
 **/.venv

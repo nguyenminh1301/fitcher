@@ -20,9 +20,6 @@ out/
 # Local datasets and databases
 data/
 *.parquet
-*.duckdb
-*.duckdb.wal
-pgdata/
 
 # Local files
 *.log

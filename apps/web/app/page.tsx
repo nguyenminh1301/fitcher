@@ -3,9 +3,9 @@ export default function Home() {
     <main>
       <p className="eyebrow">DATA ANALYSIS LAB</p>
       <h1>fitcher</h1>
-      <p>The local application foundation is ready.</p>
+      <p>The monorepo scaffold is ready.</p>
       <p className="note">
-        Natural-language queries, SQL results and charts will arrive in later phases.
+        Sign-in, chat, SQL results and charts will arrive in later phases.
       </p>
     </main>
   );
