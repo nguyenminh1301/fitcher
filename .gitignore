@@ -28,3 +28,7 @@ Thumbs.db
 
 # Local agent scratch files
 .worktrees/
+
+# dbt build output
+dbt/target/
+dbt/logs/

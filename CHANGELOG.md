@@ -4,6 +4,7 @@
 
 ### Added
 
+- Add the dbt project with an environment-driven ClickHouse profile, pinned dbt-core and dbt-clickhouse in the jobs image, per-source model tags and checks that every source folder carries its `dbt_tag` and no model sets an alias.
 - Run data jobs in a `jobs` Compose service on the `api` image that alone holds the ClickHouse admin credentials and mounts `./data`, and document loading the CC BY-NC 4.0 lab dataset.
 - Load a manifest source into ClickHouse `raw` tables from its pinned Hugging Face revision, publishing every table only after all row counts match and leaving the previous tables untouched on any failure.
 - Validate source manifests for raw data loads, including pinned revisions, expected row counts, optional load-time date ranges with dataset-card counts, safe identifiers and a `dbt_tag` unique across sources, with the e-commerce lab dataset manifest.

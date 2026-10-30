@@ -132,6 +132,9 @@ services:
       CLICKHOUSE_ADMIN_USER: ${CLICKHOUSE_ADMIN_USER:?set CLICKHOUSE_ADMIN_USER in .env}
       CLICKHOUSE_ADMIN_PASSWORD: ${CLICKHOUSE_ADMIN_PASSWORD:?set CLICKHOUSE_ADMIN_PASSWORD in .env}
       HF_HUB_DISABLE_TELEMETRY: "1"
+      # /app/dbt in the image is read-only for the app user.
+      DBT_TARGET_PATH: /tmp/dbt/target
+      DBT_LOG_PATH: /tmp/dbt/logs
     volumes:
       - ./data:/app/data
     depends_on:

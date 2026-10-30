@@ -23,6 +23,7 @@ WORKDIR /app
 COPY --from=build /app/.venv ./.venv
 COPY apps/api/app ./app
 COPY jobs ./jobs
+COPY dbt ./dbt
 RUN useradd --create-home --uid 10001 app
 USER app
 
