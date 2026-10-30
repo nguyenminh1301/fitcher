@@ -33,4 +33,13 @@ CodeRabbit review requires a separately installed and authorized App; configurat
 
 ## Image exceptions
 
-None recorded. Each entry lists the advisory, image and tag, evidence, owner and expiry date.
+Each image's suppressed advisories are listed with their evidence in `.github/trivy/<service>.trivyignore.yaml`; Trivy applies a file only to its own image and stops suppressing an entry after its expiry date.
+On or before expiry, rescan the newest upstream tag, update the pin if it fixes the findings, and remove or renew each entry with fresh evidence.
+
+| Image | Advisories | Evidence | Owner | Expires |
+| --- | --- | --- | --- | --- |
+| `opensearchproject/opensearch:3.9.0` | 10 in bundled Jackson, Guava, jsoup, snappy-java and lz4-java JARs ([list](.github/trivy/opensearch.trivyignore.yaml)) | Newest release on 2026-10-30; the JARs ship inside the upstream distribution | @nguyenminh1301 | 2026-12-31 |
+| `ghcr.io/berriai/litellm:v1.106.6` | 5 in bundled ddtrace, dnspython, filelock and py3-pip-wheel ([list](.github/trivy/litellm.trivyignore.yaml)) | Newest stable release on 2026-10-30; packages are installed by the upstream image build | @nguyenminh1301 | 2026-12-31 |
+| `quay.io/keycloak/keycloak:26.8.1` | 1 in bundled Guava ([list](.github/trivy/keycloak.trivyignore.yaml)) | Newest release on 2026-10-30; the JAR ships inside the upstream distribution | @nguyenminh1301 | 2026-12-31 |
+
+`clickhouse/clickhouse-server:26.8.36.3` had no fixable High or Critical findings when pinned.

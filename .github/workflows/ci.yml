@@ -41,6 +41,10 @@ jobs:
           else
             python scripts/check_git.py --range "$BEFORE..$AFTER"
           fi
+      - name: Validate Compose file with example settings
+        run: |
+          cp .env.example .env
+          docker compose config --quiet
       - name: Validate GitHub workflows
         run: go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.12 -color
 
