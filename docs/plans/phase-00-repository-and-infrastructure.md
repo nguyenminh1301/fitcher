@@ -46,7 +46,7 @@ infra/
 4. **Keycloak service.** Pin an exact `quay.io/keycloak/keycloak` tag, run `start-dev --import-realm` with `KC_HEALTH_ENABLED=true`. Healthcheck on the management `health/ready` endpoint. The realm contains client `finch-web` only.
 5. **api and web services.** Keep the skeleton images. `api` depends on healthy `clickhouse`, `opensearch` and `litellm`; `web` depends on healthy `api` and `keycloak`. The `api` image also carries `jobs/` (open question 2).
 6. **Make targets and docs.** `make up` = `docker compose up --build --wait`; `make down` = `docker compose down` (never `-v`). `make smoke` runs one explicit, billable `fast` call. README documents the plain `docker compose` equivalents for PowerShell users.
-7. **CI and security.** Repository and app jobs unchanged; `docker compose config --quiet` added to CI. The image audit matrix scans the images this repository builds (`api`, `web`); third-party images are pinned by tag and listed in SECURITY.md as reviewed-on-upgrade.
+7. **CI and security.** Repository and app jobs unchanged; `docker compose config --quiet` added to CI. The image audit covers every runtime image: `api` and `web` are rebuilt and scanned as today, and the four third-party images are scanned by their pinned tags with the same fixable High/Critical gate and complete report artifacts. A finding only an upstream release can fix follows the SECURITY.md exception record (advisory, image, evidence, owner, expiry); the gate is never weakened silently.
 
 ## Contracts
 
@@ -81,6 +81,7 @@ Plus the base checks: `python scripts/check_repository.py`, `python scripts/chec
 3. **`make` on Windows.** `make` is not part of a stock PowerShell setup. Default: keep the Makefile thin and document every target as a `docker compose` command; do not add a second task runner.
 4. **Memory footprint.** Six services plus OpenSearch heap may exceed small laptops. Default: document the minimum (about 8 GB free for Docker) and cap the OpenSearch heap at 1 GB.
 5. **Image versions.** Exact tags are chosen and verified at phase start; DECISIONS does not pin them.
+6. **Upstream image findings.** Third-party images may carry fixable advisories that only upstream can patch. Default: choose the newest patched tag; otherwise record a SECURITY.md exception.
 
 ## Branch and PR split
 

@@ -43,7 +43,7 @@ apps/api/prompts/router.v1.md metadata_qa.v1.md
 
 ## Contracts
 
-- `chat_messages` row: `conversation_id, turn, user_id, role, content, query_spec, result_ref, ts`.
+- `chat_messages` row: `conversation_id, turn, user_id, role, content, query_spec, result, ts`; `result` holds the shaped Result JSON (at most 5,000 rows) of assistant turns.
 - `clarify` event: `{trace_id, question, options: [{id, label}]}`.
 
 ## Verification
@@ -64,7 +64,7 @@ docker compose run --rm api python -m jobs.eval --pack ecommerce_twin --baseline
 
 ## Risks and open questions
 
-1. **Where the previous result lives.** `chart_edit` needs rows without re-running SQL. Default: store the shaped result (at most 5,000 rows) as JSON in `chat_messages.result`, within the 90-day TTL.
+1. **Where the previous result lives.** `chart_edit` needs rows without re-running SQL. Default: the shaped result is stored in `chat_messages.result` (see Contracts) within the 90-day TTL. DECISIONS §10 lists the QuerySpec but not the result for this table, so the owner confirms the addition.
 2. **Relative phrases in follow-ups.** "Last year" can mean relative to today or to the previous periods. Default: relative to the previous turn's periods when a previous QuerySpec exists.
 3. **Context length.** Default: N = 6 turns; only QuerySpecs and summaries are sent to the LLM, never full result rows.
 

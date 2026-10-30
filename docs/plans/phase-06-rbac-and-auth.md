@@ -33,13 +33,13 @@ apps/api/tests/integration/test_role_matrix.py
 ## Tasks
 
 1. **Policy model (test first).** Per role: datasets with column lists, optional row filter expression, optional aggregate-only spec (dimensions, measures, minimum group size k). Validation: referenced datasets/columns exist; row filters parse as sqlglot boolean expressions over the dataset's columns.
-2. **DDL generation (test first, golden files).** For each role: `CREATE ROLE IF NOT EXISTS`, `GRANT SELECT(<columns>) ON marts.<table>`, `CREATE ROW POLICY ... USING <filter> TO <role>`, aggregate-only views `marts.agg_<role>_<dataset>` with `HAVING count() >= k` and grants on the view only, and a settings profile. Managed objects carry a naming prefix so the compiler can drop objects no longer in the policy.
+2. **DDL generation (test first, golden files).** For each role: `CREATE ROLE IF NOT EXISTS`, `GRANT SELECT(<columns>) ON marts.<table>`, `CREATE ROW POLICY ... USING <filter> TO <role>`, aggregate-only views `marts.agg_<role>_<dataset>` with `HAVING count() >= k` and grants on the view only, and a settings profile. Managed objects carry a naming prefix. The compiler reconciles to the desired state: it reads the current grants and row policies of managed roles from `system.grants` and `system.row_policies`, revokes every grant and drops every row policy, view, role and user that the policy no longer contains, then applies the missing ones. A policy-shrink test proves that a query allowed before a column or dataset is removed is denied by ClickHouse after `compile_pack`.
 3. **Settings profile.** Use `readonly = 2` with constraints so the agent can set `log_comment` and per-query limits but cannot raise `max_execution_time`, `max_result_rows` or `max_memory_usage` above the profile maximums; `readonly = 1` would reject `log_comment`.
 4. **Users and mapping.** One ClickHouse user per Keycloak role (`agent_<role>`), passwords from env; the api holds credentials and never puts them in prompts.
 5. **Apply.** `compile_pack` applies the DDL as admin, idempotently, after metric checks.
 6. **Role-aware layers.** Retrieval filters every index by `allowed_roles`; guard loads the per-role allowlist; execute connects as the role's user.
-7. **gate deny branch.** No permitted dataset or metric -> deny with an understandable message and an `audit` DENY row; guard policy rejections also write DENY; every executed query writes ALLOW. Denials never enter the retry loop.
-8. **Keycloak realm.** Realm roles equal to policy roles; sample users with lab-only passwords; client scopes put roles into the access token.
+7. **gate deny branch.** No permitted dataset or metric -> deny with an understandable message and an `audit` DENY row; guard policy rejections also write DENY. ALLOW records the gate and guard authorization of a SQL attempt, not a successful execution; ClickHouse rejections and runtime failures are recorded in `sql_runs` with their error and attempt number, and a ClickHouse access-denied error also writes a DENY row. Denials never enter the retry loop.
+8. **Keycloak realm.** Realm roles equal to policy roles; sample users are defined without credentials in the tracked realm file; `jobs/set_lab_passwords.py` sets their passwords from local `.env` values through the Keycloak admin API; client scopes put roles into the access token.
 9. **Matrix tests and eval.** Integration tests run each role against each dataset directly on ClickHouse, with the guard bypassed, and assert the expected allow, deny, filtered-rows or aggregate-only behaviour. Eval cases of category `unauthorized` become active.
 
 ## Contracts
@@ -69,7 +69,7 @@ docker compose run --rm api python -m jobs.eval --pack ecommerce_twin --baseline
 1. **Integration tests in CI.** Default: add a ClickHouse service container to the CI API job for `-m integration`; unit tests remain runnable without it.
 2. **Users with several roles.** Default: the request carries one active role; a user holding several picks one (UI selector in Phase 9), otherwise the first pack role in policy order.
 3. **Aggregate-only granularity.** Default: one view per role and dataset with the dimensions listed in the policy.
-4. **Sample credentials.** Lab users' passwords live only in the realm file for local use and are marked as such; never reused elsewhere.
+4. **Sample credentials.** Lab-user passwords are never committed; they come from the developer's `.env` and are never reused elsewhere.
 
 ## Branch and PR split
 
