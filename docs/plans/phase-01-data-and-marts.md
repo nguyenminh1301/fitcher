@@ -6,7 +6,7 @@ Load the `ziadatalabs/FreeEcommerceTwin14M` dataset into the ClickHouse `raw` da
 
 ## Scope
 
-- A generic, manifest-driven loader job (`jobs/load_data.py`).
+- A generic, manifest-driven loader (`jobs/load_data.py`) and a refresh job (`jobs/refresh_data.py`) that runs the load and the dbt build for one source.
 - A dbt project with staging models, the three marts and their tests.
 - A hand-written acceptance query with an independent cross-check.
 
@@ -25,7 +25,8 @@ Load the `ziadatalabs/FreeEcommerceTwin14M` dataset into the ClickHouse `raw` da
 
 ```text
 jobs/
-  load_data.py                      # CLI: --source <name> [--revision <sha>]
+  load_data.py                      # loader: --source <name> [--revision <sha>]
+  refresh_data.py                   # load + dbt build for one source
   sources/ecommerce_twin.yaml       # HF repo, pinned revision, files, target tables, expected rows
   lib/clickhouse.py                 # shared admin connection helper for jobs
 dbt/
@@ -44,8 +45,8 @@ apps/api/tests/ or jobs/tests/      # loader tests (see open question 3)
 ## Tasks
 
 1. **Inspect the dataset.** Record the pinned Hugging Face revision, file formats, column names/types and the dataset card row counts in `jobs/sources/ecommerce_twin.yaml`. This step decides the real column names used by the marts.
-2. **Loader (test first).** Tests cover: manifest validation (missing table, bad row count type), download reuse of a complete file, refusal to publish a partial download, row-count mismatch failing the run, and idempotent reload (truncate-and-insert inside one table per run). Then implement with `huggingface_hub` (pinned revision) and `clickhouse-connect` Arrow inserts. The loader knows nothing about e-commerce; everything comes from the manifest.
-3. **dbt project.** Add `dbt-core` and `dbt-clickhouse` pinned in the jobs dependency group. Staging models type dates as `Date`/`DateTime` in the pack timezone (open question 4) and money as `Decimal`.
+2. **Loader (test first).** Tests cover: manifest validation (missing table, bad row count type), download reuse of a complete file, refusal to publish a partial download, row-count mismatch failing the run, and a failure on the last table never being served as a complete load (open question 7). Then implement with `huggingface_hub` (pinned revision) and `clickhouse-connect` Arrow inserts. The loader knows nothing about e-commerce; everything comes from the manifest.
+3. **dbt project.** Add `dbt-core` and `dbt-clickhouse` pinned in the jobs dependency group. `jobs/refresh_data.py` loads one source and runs `dbt build` for that source's models; any load, model or test failure fails the refresh, and a partial load or mart build is never served (open question 7). Staging models type dates as `Date`/`DateTime` in the pack timezone (open question 4) and money as `Decimal`.
 4. **Marts.**
    - `sales_lines`: one row per order line: order line key, order id, order timestamp and date, product attributes, customer attributes, quantity, unit price, discount, gross and net line amounts. `MergeTree ORDER BY (order_date, product_id)`.
    - `returns_fact`: one row per returned line, joined to the original sale.
@@ -55,20 +56,19 @@ apps/api/tests/ or jobs/tests/      # loader tests (see open question 3)
 
 ## Contracts
 
-- Source manifest keys: `name`, `hf_repo`, `revision`, `tables[] {name, file, format, expected_rows}`.
+- Source manifest keys: `name`, `hf_repo` (or another pinned download location), `revision`, `dbt_tag`, `tables[] {name, file, format, expected_rows, date_range?}`. The optional `date_range {column, start, end}` bounds a table to a half-open range at load time. `dbt_tag` identifies the source's models, so a refresh builds only its own source. Exact row-count fields and dbt selection are fixed at phase start.
 - Mart column names become the vocabulary of `packs/ecommerce_twin/datasets.yaml` in Phase 2.
 - Net sales definition (open question 1) becomes `metrics.yaml: net_sales.sql_expr`.
 
 ## Verification
 
 ```bash
-docker compose run --rm api python -m jobs.load_data --source ecommerce_twin
-docker compose run --rm api dbt build --project-dir dbt --profiles-dir dbt
+docker compose run --rm api python -m jobs.refresh_data --source ecommerce_twin
 docker compose run --rm api dbt compile --project-dir dbt --profiles-dir dbt --select analyses/top_products_q1_compare
 uv run --project apps/api pytest -c apps/api/pyproject.toml
 ```
 
-Passing: loader reports every table with matching row counts; `dbt build` has zero failing tests; the cross-check test passes.
+Passing: the refresh reports every table with matching row counts, `dbt build` has zero failing tests; the cross-check test passes.
 
 ## Definition of done
 
@@ -80,11 +80,12 @@ Passing: loader reports every table with matching row counts; `dbt build` has ze
 ## Risks and open questions
 
 1. **Net sales definition.** Gross minus discounts, with or without returns? Default: `sum(quantity * unit_price - discount)` excluding cancelled orders, returns not netted; `returns_fact` serves return metrics.
-2. **Raw naming.** DECISIONS §2 says database `raw`; §11 says `raw_*`. Default: database `raw`, tables named after source tables (`raw.orders`).
+2. **Raw naming.** DECISIONS §2 says database `raw`; §11 says `raw_*`. Default: database `raw` as in §2, tables named after source tables (`raw.orders`).
 3. **Where job code and tests live.** Default: `jobs/` is a Python package installed in the api image; its tests live in `jobs/tests/` and run with the api project's pytest configuration.
 4. **Timezone.** Timestamps in the source may be naive. Default: treat source timestamps as UTC and convert to the pack timezone in staging; record the assumption in the manifest.
 5. **Load size and time.** 14.3M rows is small for ClickHouse but download time depends on the network; the loader must resume or reuse completed files.
 6. **Licence.** CC BY-NC 4.0 forbids commercial use; the README states this and no derived data is committed.
+7. **Refresh consistency.** ClickHouse cannot swap several tables atomically, so the mechanism that keeps serving readers (agent, `compile_pack`, onboarding profiler) off a partial load or mart build is designed when this phase starts. It must cover: concurrent refreshes, readers already running when a refresh starts, marts of different packs never overwriting each other, unique `dbt_tag` values, and upstream staging models rebuilt with their marts. Default: refreshes are manual maintenance and brief agent downtime during a refresh is acceptable for a lab.
 
 ## Branch and PR split
 

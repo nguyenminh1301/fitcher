@@ -38,10 +38,10 @@ infra/litellm/callbacks/clickhouse_logger.py   # or built-in integration, see op
 
 ## Tasks
 
-1. **Schema.** `runs`, `events`, `llm_calls`, `sql_runs`, `audit`, `chat_messages`, `feedback`, plus `eval_reports`. MergeTree, `TTL ts + INTERVAL 90 DAY`, `ORDER BY (trace_id, ts)` for trace tables and `(user_id, ts)` for user tables. The same DDL serves `initdb` and the idempotent apply job (`CREATE ... IF NOT EXISTS`).
-2. **Users.** `agent_logs_writer` may only insert into `agent_logs`; a read user for traces may select from `agent_logs` and `system.query_log`. The read-only agent user from Phase 3 gets no access to `agent_logs`.
+1. **Schema.** `runs`, `events`, `llm_calls`, `sql_runs`, `audit`, `chat_messages`, `feedback`, plus `eval_reports` and, for Phase 12, `example_proposals` (`ORDER BY (pack, ts)`, readable only by the `pack_reviewer` and `admin` read paths). MergeTree, `TTL ts + INTERVAL 90 DAY`, `ORDER BY (trace_id, ts)` for trace tables and `(user_id, ts)` for user tables. The same DDL serves `initdb` and the idempotent apply job (`CREATE ... IF NOT EXISTS`).
+2. **Users.** `agent_logs_writer` may only insert into `agent_logs`. The trace read user gets table-level `SELECT` on the trace tables (`runs`, `events`, `llm_calls`, `sql_runs`, `audit`, `eval_reports`) and `system.query_log` only; a separate review read user selects `example_proposals`, `feedback` and `chat_messages` for the `pack_reviewer` and `admin` paths. A negative test proves the trace reader cannot select `example_proposals`. The read-only agent user from Phase 3 gets no access to `agent_logs`.
 3. **Tracing.** OpenTelemetry SDK creates a span per run and per node; `trace_id` is the 32-hex span trace id, carried in graph state.
-4. **Log writer (test first).** Tests: records flush at batch size and at interval, flush on shutdown, bounded queue drops oldest records and counts drops instead of blocking the request, writer failure never fails the run.
+4. **Log writer (test first).** `runs` is a ReplacingMergeTree keyed by `trace_id`: the api writes a `running` row synchronously before the graph starts and a final row synchronously after it ends, so the completeness marker never depends on the batch queue; if either synchronous write fails, the api writes the trace id and error to its stderr log. Other records flush at batch size, at interval and on shutdown. At the end of each run the api awaits the flush of that run's records with a bounded timeout, and failed batches are retried a bounded number of times with a stable batch identity (ClickHouse insert deduplication token), so a retry of a batch that was already written adds no rows. If the queue overflows, a flush times out or ClickHouse rejects a batch, the run still returns its answer, but its `runs` row records `log_complete = false` and the number of lost records. `log_complete` covers only records the api writes (`runs`, `events`, `sql_runs`, `audit`); `llm_calls` rows come from the LiteLLM callback and are reconciled by the trace query, which reports how many LLM calls the api made versus how many rows exist. Tests cover each path, a failure of the first batch, a retried batch that was already written, and that `log_complete` is true only when every api record of the run was written.
 5. **Node instrumentation.** A wrapper records start, end, status and a size-capped payload for each node without changing node signatures.
 6. **SQL runs.** Every execute attempt writes SQL, `query_id`, rows, error and attempt number.
 7. **LLM calls.** The api sends `trace_id` and node name as LiteLLM request metadata; the callback writes alias, resolved model, tokens, cost and error to `llm_calls`.
@@ -60,13 +60,15 @@ uv run --project apps/api pytest -c apps/api/pyproject.toml
 docker compose run --rm api python -m jobs.apply_log_schema
 docker compose run --rm api python -m jobs.ask "<acceptance question>"
 docker compose exec clickhouse clickhouse-client --query "<trace query with the printed trace_id>"
+docker compose run --rm api python -m jobs.eval --pack ecommerce_twin --baseline packs/ecommerce_twin/eval_baseline.json
 ```
 
 ## Definition of done
 
 | DoD item | Proof |
 |---|---|
-| One SQL query returns nodes, LLM calls, SQL and query_log for a trace | Query and its output in the PR |
+| One SQL query returns nodes, LLM calls, SQL and query_log for a trace | Query and output in the PR for a run with `log_complete = true`; incomplete runs are flagged, never presented as complete |
+| No agent regression | Eval report and baseline diff attached to the PR |
 
 ## Risks and open questions
 

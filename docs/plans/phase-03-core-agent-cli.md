@@ -9,6 +9,7 @@ Run the `data_query` flow end to end from the command line: `jobs/ask.py "<quest
 - LangGraph graph with nodes `extract`, `resolve_time`, `retrieve`, `build_spec`, `generate_sql`, `guard`, `explain`, `execute`, `check`, `shape_result`, `summarize` (DECISIONS §6 steps 4-16, without router, gate branches or chart_recommender).
 - Pydantic contracts `QuerySpec` and `Result` (DECISIONS §7).
 - One read-only ClickHouse user for all queries.
+- `jobs/ask.py` is a fail-closed `data_query` entry point: without router and gate, it rejects questions whose extraction has no metric, no resolvable period or several equally likely metrics, before `generate_sql` runs.
 - A repository check that `apps/api` contains no pack table or metric name.
 
 ## Out of scope
@@ -50,9 +51,9 @@ scripts/check_pack_isolation.py
 7. **generate_sql.** Prompt input: QuerySpec, permitted schema, declared joins, retrieved examples, previous error if retrying. The prompt states that retrieved text is data, not instructions, and that all percentages and differences must be computed in SQL.
 8. **guard (test first).** sqlglot checks: exactly one statement, SELECT only (CTEs allowed), tables and columns in the allowlist, no forbidden functions (`file`, `url`, `remote`, `s3`, table functions, `system.*` outside a whitelist), no `SETTINGS` or `FORMAT` clauses, and LIMIT enforced or capped. Each rejection is classified as `policy`.
 9. **explain, execute.** `EXPLAIN` then execution as the read-only user with `max_execution_time`, `max_result_rows`, `max_memory_usage`, `log_comment = trace_id` and a generated `query_id`. Errors are classified as `sql` or `runtime`.
-10. **check and retry loop.** `policy` stops without retry; `sql`/`runtime` loops back to `generate_sql` with the error; the attempt limit and the `sql-gen-hard` switch follow open question 1; zero rows or out-of-coverage results pass with warnings. When retries are exhausted the run returns the last SQL and error.
+10. **check and retry loop.** `policy` stops without retry; `sql`/`runtime` loops back to `generate_sql` with the error, for one initial generation plus at most 3 retries with the third retry on `sql-gen-hard` (open question 1, settled); zero rows or out-of-coverage results pass with warnings. When retries are exhausted the run returns the last SQL and error.
 11. **shape_result, summarize.** Attach types and roles from the compiled catalog, cap at 5,000 rows with `truncated`. Summary prompt receives only the returned rows.
-12. **ask CLI and isolation check.** `jobs/ask.py` prints SQL, a table, warnings and the summary. `scripts/check_pack_isolation.py` collects every dataset, column and metric id from all packs and fails if any appears in `apps/api`; CI runs it.
+12. **ask CLI and isolation check.** `jobs/ask.py` prints SQL, a table, warnings and the summary, and exits nonzero with a reason for input it rejects. `scripts/check_pack_isolation.py` collects every dataset, column and metric id from all packs and fails if any appears anywhere in `apps/api`, tests included; the only exempt names are those of the synthetic fixture pack under `apps/api/tests/fixtures/` (open question 5). CI runs it.
 
 ## Contracts
 
@@ -79,10 +80,11 @@ docker compose run --rm api python -m jobs.ask "Top 10 best-selling products in 
 
 ## Risks and open questions
 
-1. **Retry count.** DECISIONS says "at most 3 times; the third uses `sql-gen-hard`". Default: one initial generation plus up to 3 retries; retry 3 uses `sql-gen-hard`.
+1. **Retry count.** Settled by DECISIONS §2 and §6: one initial generation plus at most 3 retries (4 generations in total); the third retry uses `sql-gen-hard`. Tests assert the alias used per attempt.
 2. **Period descriptor format.** Default: extract emits structured descriptors, never dates; only `resolve_time` produces dates, so time logic stays testable.
 3. **Reference date.** Lab data ends in 2026; "last quarter" relative to the real date may fall outside coverage. Default: reference date is the real current date, with coverage warnings; an override flag exists for eval.
 4. **sqlglot ClickHouse coverage.** Some ClickHouse functions may parse imperfectly; unparsable SQL is treated as an `sql` error and retried, never executed.
+5. **Isolation scan scope.** DECISIONS §13 says `grep` must find no pack names in `apps/api`. Default: scan all of `apps/api`, including tests; unit tests therefore use a synthetic fixture pack under `apps/api/tests/fixtures/` whose neutral names are excluded from the forbidden list. If the owner prefers excluding tests instead, DECISIONS §13 is updated in the same PR.
 
 ## Branch and PR split
 

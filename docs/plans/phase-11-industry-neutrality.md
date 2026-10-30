@@ -29,8 +29,8 @@ docs/eval/<second_pack>-report.md
 
 ## Tasks
 
-1. **Choose the dataset.** Compare licence, size and shape. Iowa Liquor Sales is real, one wide table and large, so load a bounded date range; Maycee needs its licence and table layout confirmed. Record the choice in DECISIONS §4.
-2. **Load.** Source manifest only; the generic loader from Phase 1 is reused unchanged.
+1. **Choose the dataset.** Compare licence, size and shape. Iowa Liquor Sales is real, one wide table and large, so its manifest sets a `date_range` (Phase 1 manifest contract) to load a bounded period; Maycee needs its licence and table layout confirmed. Record the choice in DECISIONS §4.
+2. **Load.** Source manifest only; the Phase 1 refresh job and loader are reused unchanged, building only the models tagged with the new pack.
 3. **Marts.** dbt models in a separate folder; 1-3 wide marts.
 4. **Onboard.** `profile.py` -> `ingest_docs.py` (if documents exist) -> `draft_pack.py` -> Review UI -> `compile_pack.py`.
 5. **Eval set.** At least 30 cases covering every DECISIONS §12 category, with reference SQL.
@@ -44,10 +44,10 @@ docs/eval/<second_pack>-report.md
 ## Verification
 
 ```bash
-docker compose run --rm api python -m jobs.load_data --source <second_pack>
-docker compose run --rm api dbt build --project-dir dbt --profiles-dir dbt --select <second_pack>
+docker compose run --rm api python -m jobs.refresh_data --source <second_pack>   # manifest dbt_tag selects only this pack's models
 docker compose run --rm api python -m jobs.compile_pack --pack <second_pack>
 docker compose run --rm api python -m jobs.eval --pack <second_pack>
+docker compose run --rm api python -m jobs.eval --pack ecommerce_twin --baseline packs/ecommerce_twin/eval_baseline.json   # --pack overrides ACTIVE_PACK (Phase 4)
 git diff --stat <phase base>..HEAD -- apps/api apps/web
 python scripts/check_pack_isolation.py
 ```
@@ -58,11 +58,12 @@ python scripts/check_pack_isolation.py
 |---|---|
 | New pack runs with 0 changed lines in `apps/api` and `apps/web` | Empty `git diff --stat` output |
 | Reaches the eval threshold | Eval report in the PR |
+| The first pack does not regress | `ecommerce_twin` eval report and baseline diff in the PR |
 
 ## Risks and open questions
 
 1. **Dataset choice.** Default: Iowa Liquor Sales, bounded to recent full years, because it is real data from a clearly different domain.
-2. **Active pack switching.** DECISIONS allows one active pack per run. Default: switch with `ACTIVE_PACK` and restart `api`; both packs' indices may coexist with a pack field.
+2. **Active pack switching.** DECISIONS allows one active pack per run. Default: switch with `ACTIVE_PACK` and restart `api`; both packs coexist because Phase 2 indices and aliases are pack-scoped (`<pack>_<index>`), and compiling one pack never touches the other's indices.
 3. **dbt selection by pack.** Default: one dbt project with a folder and tag per pack, built with `--select tag:<pack>`.
 
 ## Branch and PR split
