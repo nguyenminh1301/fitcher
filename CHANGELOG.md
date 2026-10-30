@@ -4,6 +4,7 @@
 
 ### Added
 
+- Run ClickHouse, OpenSearch, LiteLLM and Keycloak beside the API and web skeletons in Docker Compose with pinned images, loopback ports, health checks, the `raw`/`marts`/`data_meta` databases, a disabled ClickHouse `default` user, the four LiteLLM model aliases, a placeholder `finch` realm, Make targets and a billable `fast` alias smoke job.
 - Forbid AI tool attribution in code, documentation, commits, branches, PRs, issues and review replies, and extend the commit message and PR title check to more tool names.
 - English settled decisions for the domain-neutral Finch-Lab architecture, its master plan and a detailed plan for each delivery phase.
 - Linux API/CLI tests, web typecheck/build, dependency and Git-secret audits, and weekly runtime-image security scans with complete report artifacts and fixable High/Critical gates.

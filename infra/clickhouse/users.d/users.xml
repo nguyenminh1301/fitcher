@@ -1,0 +1,12 @@
+<clickhouse>
+    <!--
+        The image entrypoint creates the admin user from CLICKHOUSE_USER and
+        CLICKHOUSE_PASSWORD (set from CLICKHOUSE_ADMIN_USER and
+        CLICKHOUSE_ADMIN_PASSWORD in compose.yaml). The passwordless default
+        user is removed here as well, so it stays disabled even if the
+        entrypoint behaviour changes.
+    -->
+    <users>
+        <default remove="remove"/>
+    </users>
+</clickhouse>

@@ -22,6 +22,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 WORKDIR /app
 COPY --from=build /app/.venv ./.venv
 COPY apps/api/app ./app
+COPY jobs ./jobs
 RUN useradd --create-home --uid 10001 app
 USER app
 
