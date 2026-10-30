@@ -4,6 +4,7 @@
 
 ### Added
 
+- English settled decisions for the domain-neutral Finch-Lab architecture, its master plan and a detailed plan for each delivery phase.
 - Linux API/CLI tests, web typecheck/build, dependency and Git-secret audits, and weekly runtime-image security scans with complete report artifacts and fixable High/Critical gates.
 - Official TLC HVFHV and taxi-zone downloads with atomic publication, validated cache reuse, Uber-only DuckDB views and three sample analysis queries with real-data verification.
 - Local Next.js and FastAPI foundation with a liveness endpoint, locked dependencies, three-service Docker Compose setup, pgvector initialization and an explicit OpenAI Responses connectivity check.
@@ -43,4 +44,5 @@
 
 ### Removed
 
+- Remove the TLC dataset guide, superseded by the domain-neutral architecture decisions.
 - Remove author, database migration and reviewer checklists from the pull request template.
