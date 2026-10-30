@@ -23,6 +23,7 @@
 
 ### Changed
 
+- Settle the Phase 1 data plan from the inspected lab dataset: date-only typing, net sales without discounts, all-or-nothing raw publication, refresh state with a generation check for readers, unique `dbt_tag` values and a `jobs` Compose service that keeps admin credentials out of `api`.
 - Merge pull requests into `develop` as soon as local verification passes, and treat CI and review findings as follow-ups that are verified before they are applied.
 - Align mirrored agent rules, entry points, review configuration, contribution and security guidance, README and the PR template with the domain-neutral architecture, and add the `pack` and `infra` commit scopes.
 - Move the API and web skeletons into `apps/api` and `apps/web` and add documented `packs/`, `dbt/`, `jobs/`, `infra/` and prompt directories for the monorepo layout.
