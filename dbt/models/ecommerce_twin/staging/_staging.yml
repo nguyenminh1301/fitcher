@@ -1,0 +1,24 @@
+version: 2
+
+models:
+  - name: stg_ecommerce_twin__customers
+    columns:
+      - {name: customer_id, data_tests: [unique, not_null]}
+  - name: stg_ecommerce_twin__products
+    columns:
+      - {name: product_id, data_tests: [unique, not_null]}
+  - name: stg_ecommerce_twin__sessions
+    columns:
+      - {name: session_id, data_tests: [unique, not_null]}
+  - name: stg_ecommerce_twin__orders
+    columns:
+      - {name: order_id, data_tests: [unique, not_null]}
+  - name: stg_ecommerce_twin__order_items
+    columns:
+      - {name: order_item_id, data_tests: [unique, not_null]}
+  - name: stg_ecommerce_twin__returns
+    columns:
+      - {name: return_id, data_tests: [unique, not_null]}
+  - name: stg_ecommerce_twin__support_tickets
+    columns:
+      - {name: ticket_id, data_tests: [unique, not_null]}

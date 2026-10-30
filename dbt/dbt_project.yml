@@ -1,0 +1,26 @@
+name: fitcher
+version: "1.0.0"
+config-version: 2
+profile: fitcher
+
+model-paths: ["models"]
+analysis-paths: ["analyses"]
+test-paths: ["tests"]
+macro-paths: ["macros"]
+
+flags:
+  send_anonymous_usage_stats: false
+
+# One folder per source under models/. Each folder carries its manifest's
+# dbt_tag so `dbt build --select +tag:<dbt_tag>` rebuilds that source's staging
+# views and marts only. Staging views live in raw; agent-facing marts in marts.
+models:
+  fitcher:
+    ecommerce_twin:
+      +tags: ["ecommerce_twin"]
+      staging:
+        +schema: raw
+        +materialized: view
+      marts:
+        +schema: marts
+        +materialized: table
