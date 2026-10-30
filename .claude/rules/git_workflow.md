@@ -65,6 +65,7 @@ Stop and raise the conflict - do not silently comply, and do not carry the body 
 - Keep the entire line at 80 characters or fewer, including `<type>(<scope>): `.
   Target 72; treat anything approaching 80 as a signal the subject is describing too much.
 - Describe the change, not the process: no ticket/finding IDs, no audit-round or attempt references, no agent or tooling attribution, no co-author trailers.
+- PR descriptions, issues and review replies follow the same rule: no AI tool attribution or "Generated with" lines (see `base.md` §5).
 
 ```
 fix(agent): reject sql that references an unapproved table     <- good

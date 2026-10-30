@@ -8,8 +8,7 @@ description: Always active. Requires durable, purpose-based names and self-conta
 
 **Rule**: A developer must be able to understand every committed source comment,
 test name, file name, document, and commit message from the repository itself.
-This applies equally to text written by a person or generated with an AI tool,
-in this repository.
+This applies to all text in this repository, whoever wrote it.
 
 - Name files, branches, tests, and commits for the behavior, component, or operational
   purpose they represent. A commit subject must say what changed; the PR description explains why
@@ -19,7 +18,7 @@ in this repository.
   work-session labels as permanent identifiers (for example, `task 2`, `L15 sweep`,
   or `R1 sync`). Replace them with the actual feature, fix, or procedure.
 - Write comments and documentation as explanations for future maintainers. Remove
-  assistant-directed prose, handoff language, unsupported completion claims, and
+  prose addressed to a working session, handoff language, unsupported completion claims, and
   references to conversations or plans that are not available in the repository.
 - Do not make committed artifacts depend on `.workspace/` or another untracked,
   local-only path for their meaning or evidence. Put lasting decisions, commands,

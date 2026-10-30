@@ -1,6 +1,6 @@
-# Claude Instructions
+# Agent Instructions
 
-This file is the entry point for all Claude agent sessions.
+This file is the entry point for all agent sessions.
 
 All project rules and coding conventions are maintained in `.claude/`.
 Current application status and planned architecture are documented in README.md.
