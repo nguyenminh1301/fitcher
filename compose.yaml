@@ -120,6 +120,24 @@ services:
       retries: 10
       start_period: 10s
 
+  # One-off jobs on the api image. Only this service holds the ClickHouse
+  # admin credentials; start it with `docker compose run --rm jobs ...`.
+  jobs:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    profiles: ["jobs"]
+    environment:
+      CLICKHOUSE_HOST: clickhouse
+      CLICKHOUSE_ADMIN_USER: ${CLICKHOUSE_ADMIN_USER:?set CLICKHOUSE_ADMIN_USER in .env}
+      CLICKHOUSE_ADMIN_PASSWORD: ${CLICKHOUSE_ADMIN_PASSWORD:?set CLICKHOUSE_ADMIN_PASSWORD in .env}
+      HF_HUB_DISABLE_TELEMETRY: "1"
+    volumes:
+      - ./data:/app/data
+    depends_on:
+      clickhouse:
+        condition: service_healthy
+
   web:
     build:
       context: ./apps/web
