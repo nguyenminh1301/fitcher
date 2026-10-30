@@ -35,7 +35,7 @@
 
 ### Fixed
 
-- Correct the translated SQL retry rule and branch-specific SSE sequences, and make the phase plans define atomic data and index publication, permission revocation, trace completeness, credential-free realms and redaction of feedback proposals.
+- Correct the translated SQL retry rule and branch-specific SSE sequences, and make the phase plans define atomic index publication, a no-partial-data refresh requirement, permission revocation, trace completeness, credential-free realms and redaction of feedback proposals.
 - Publish downloads without overwriting concurrent outputs, validate the winning file, and fail safely on filesystems without atomic hard-link support.
 - Validate complete unique zone lookups and compatible Parquet types before dataset inspection, with CLI success/failure and safe transport-error regression tests.
 - Document Linux dataset-directory traversal permissions for the non-root API container when the host uses a restrictive umask.
