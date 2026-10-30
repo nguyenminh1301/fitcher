@@ -13,7 +13,7 @@ data
 .claude
 .github
 docs
-web
+apps/web
 **/node_modules
 **/.next
 **/.venv

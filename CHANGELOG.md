@@ -21,6 +21,7 @@
 
 ### Changed
 
+- Move the API and web skeletons into `apps/api` and `apps/web` and add documented `packs/`, `dbt/`, `jobs/`, `infra/` and prompt directories for the monorepo layout.
 - Build patched runtime images without API/web language package managers and run PostgreSQL directly as its database user while preserving existing named volumes.
 - Remove Corepack from the web runtime so it cannot bootstrap language package managers.
 - Aggregate pickup counts before joining zone labels to reduce work while preserving unmatched locations, null IDs and deterministic ties.

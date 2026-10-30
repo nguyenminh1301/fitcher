@@ -1,7 +1,7 @@
 [project]
 name = "fitcher-api"
 version = "0.1.0"
-description = "Natural-language data analysis API"
+description = "Domain-neutral natural-language data analysis API"
 requires-python = ">=3.13,<3.14"
 dependencies = [
     "fastapi==0.162.0",
@@ -16,4 +16,4 @@ dev = [
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-pythonpath = [".", ".."]
+pythonpath = ["."]

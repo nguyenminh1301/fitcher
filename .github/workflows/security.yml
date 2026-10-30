@@ -30,14 +30,14 @@ jobs:
           python-version: "3.13"
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version-file: web/.nvmrc
+          node-version-file: apps/web/.nvmrc
       - name: Audit locked Python dependencies
         run: |
           python -m pip install uv==0.13.6
-          uv export --project api --frozen --no-emit-project --no-hashes --output-file "$RUNNER_TEMP/requirements.txt"
+          uv export --project apps/api --frozen --no-emit-project --no-hashes --output-file "$RUNNER_TEMP/requirements.txt"
           uv tool run pip-audit==2.10.1 --disable-pip --no-deps -r "$RUNNER_TEMP/requirements.txt"
       - name: Audit locked Node dependencies
-        run: npm --prefix web audit --package-lock-only
+        run: npm --prefix apps/web audit --package-lock-only
 
   secrets:
     name: Git secret scan
