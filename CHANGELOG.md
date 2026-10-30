@@ -44,5 +44,6 @@
 
 ### Removed
 
+- Remove the TLC HVFHV download, DuckDB views, sample queries, PostgreSQL/pgvector service and OpenAI smoke check, which the domain-neutral ClickHouse architecture replaces.
 - Remove the TLC dataset guide, superseded by the domain-neutral architecture decisions.
 - Remove author, database migration and reviewer checklists from the pull request template.

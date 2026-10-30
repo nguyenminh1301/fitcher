@@ -9,7 +9,6 @@ __pycache__
 .workspace
 data
 *.parquet
-*.duckdb*
 .agents
 .claude
 .github

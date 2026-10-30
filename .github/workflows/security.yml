@@ -58,7 +58,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        service: [api, web, db]
+        service: [api, web]
     env:
       SERVICE: ${{ matrix.service }}
       TRIVY_VERSION: "0.76.1"

@@ -22,8 +22,6 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 WORKDIR /app
 COPY --from=build /app/.venv ./.venv
 COPY api/app ./app
-COPY scripts/check_openai.py scripts/download_tlc.py scripts/check_tlc.py scripts/init_views.sql ./scripts/
-COPY scripts/sample_queries ./scripts/sample_queries
 RUN useradd --create-home --uid 10001 app
 USER app
 
