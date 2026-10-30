@@ -32,7 +32,7 @@ infra/
   clickhouse/
     config.d/listen.xml           # loopback-only exposure is handled by Compose ports
     users.d/users.xml             # admin user from env; default user disabled
-    initdb/001-databases.sql      # CREATE DATABASE IF NOT EXISTS raw, marts
+    initdb/001-databases.sql      # CREATE DATABASE IF NOT EXISTS raw, marts, data_meta
   litellm/config.yaml             # model_list with fast, sql-gen, sql-gen-hard, embed
   keycloak/realm-finch.json       # realm "finch", one public web client, no users yet
   opensearch/                     # README only unless JVM or plugin settings are needed

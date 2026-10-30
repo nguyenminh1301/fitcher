@@ -53,7 +53,7 @@ scripts/check_pack_isolation.py
 9. **explain, execute.** `EXPLAIN` then execution as the read-only user with `max_execution_time`, `max_result_rows`, `max_memory_usage`, `log_comment = trace_id` and a generated `query_id`. Errors are classified as `sql` or `runtime`.
 10. **check and retry loop.** `policy` stops without retry; `sql`/`runtime` loops back to `generate_sql` with the error, for one initial generation plus at most 3 retries with the third retry on `sql-gen-hard` (open question 1, settled); zero rows or out-of-coverage results pass with warnings. When retries are exhausted the run returns the last SQL and error.
 11. **shape_result, summarize.** Attach types and roles from the compiled catalog, cap at 5,000 rows with `truncated`. Summary prompt receives only the returned rows.
-12. **ask CLI and isolation check.** `jobs/ask.py` prints SQL, a table, warnings and the summary, and exits nonzero with a reason for input it rejects. `scripts/check_pack_isolation.py` collects every dataset, column and metric id from all packs and fails if any appears in the scanned engine paths (open question 5); CI runs it.
+12. **ask CLI and isolation check.** `jobs/ask.py` prints SQL, a table, warnings and the summary, and exits nonzero with a reason for input it rejects. `scripts/check_pack_isolation.py` collects every dataset, column and metric id from all packs and fails if any appears anywhere in `apps/api`, tests included; the only exempt names are those of the synthetic fixture pack under `apps/api/tests/fixtures/` (open question 5). CI runs it.
 
 ## Contracts
 
