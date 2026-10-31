@@ -124,6 +124,16 @@ Every query filters by `allowed_roles`.
 - **Path 2:** chunk by heading -> `kb_docs`, used only to answer definition questions or annotations.
 - **Numbers are never taken from text.** Figures only come from SQL.
 
+Documents are runtime content managed in the application, not files in Git; the pack YAML stays the reviewed source for datasets, metrics and policies.
+
+- **Formats:** PDF (text layer only, no OCR), DOCX, Markdown, plain text and XLSX (cell values with the sheet's header row; formulas are not evaluated and macro-enabled workbooks are rejected). A spreadsheet of business data is data, not a document: it is loaded into ClickHouse (§1).
+- **Upload and delete at any time:** a `pack_reviewer` uploads, lists and deletes documents on the Documents page of the web app, choosing each document's `allowed_roles` from the pack's roles. `ingest_docs.py` loads a folder through the same code path for bulk onboarding.
+- **Storage:** original files live in the `api` service's documents volume. The registry table `data_meta.documents` records id, pack, file name, type, size, SHA-256, uploader, `allowed_roles`, status (`processing`, `indexed`, `failed`) with the error, and upload and delete times; a dedicated ClickHouse user writes only that table. A file whose SHA-256 is already registered for the pack is rejected as a duplicate.
+- **Upload:** check the type from the file content and a size cap, store the file, parse, chunk, embed through `embed` and index the chunks into the pack's live `kb_docs` alias. A failure marks the document `failed` and leaves no chunks.
+- **Delete:** remove the document's chunks from `kb_docs`, delete the stored file and mark the registry row deleted. Pack items whose evidence cites the document are flagged in the Review UI; approved YAML is never changed automatically.
+- **Drafting from a document** is an explicit, billable reviewer action; its items go through review like every draft.
+- **Compile:** each pack generation rebuilds `kb_docs` from the registry's indexed documents, copying the chunks of the live generation when the embedding model is unchanged and re-embedding the stored files otherwise. Uploads and deletes are rejected while that pack compiles, so a compile never drops or restores a document.
+
 ## 6. Runtime flow (LangGraph)
 
 Nodes in order:
@@ -292,7 +302,7 @@ Tables (MergeTree, 90-day TTL, ordered by `(trace_id, ts)` or `(user_id, ts)`):
 
 1. A loader loads data into `raw_*`; dbt builds the marts.
 2. **Profiler** (deterministic): reads `system.columns`, row counts, min/max dates, top-K values, join-key candidates, sample rows.
-3. **ingest_docs**: parse PDF/DOCX/MD, chunk by heading, load into `kb_docs`, and pass them to the drafter.
+3. **Documents**: a reviewer uploads PDF/DOCX/MD/TXT/XLSX files on the Documents page, or `ingest_docs.py` loads a folder; they are parsed, chunked and indexed into `kb_docs`, can be deleted at any time (§5) and can be passed to the drafter.
 4. **Drafter** (`sql-gen`): drafts the whole pack; every item has `evidence` + `confidence`.
 5. **Review UI**: a reviewer approves, edits or deletes each item, and can test-run a metric's `sql_expr`. Approved items are committed to Git.
 6. **compile_pack**:

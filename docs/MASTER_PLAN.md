@@ -183,11 +183,13 @@ Phases are ordered to reach **one end-to-end flow as early as possible**. Each p
 - **Deliverables:**
   - `profile.py`
   - `ingest_docs.py`: parse, chunk, load into `kb_docs`
+  - Documents page in web: upload PDF/DOCX/MD/TXT/XLSX, list and delete company documents at runtime, each with its `allowed_roles`
   - `draft_pack.py`: drafts with `evidence` and `confidence`
   - Review UI in web: approve / edit / delete each item, test-run metrics, write approved YAML
   - Compile the pack after review
 - **DoD:**
   - After deleting the descriptions from the hand-written pack, letting the drafter regenerate them and reviewing them, the eval score is not significantly lower than the hand-written pack's
+  - A document uploaded on the Documents page is found by `kb_docs` search, and after it is deleted search no longer returns it
 
 ## Phase 11: Industry neutrality proof
 
