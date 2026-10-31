@@ -104,8 +104,13 @@ services:
     environment:
       LITELLM_BASE_URL: http://litellm:4000
       LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY:?set LITELLM_MASTER_KEY in .env}
+      ACTIVE_PACK: ${ACTIVE_PACK:?set ACTIVE_PACK in .env}
+      OPENSEARCH_URL: http://opensearch:9200
+      EMBEDDING_DIMENSIONS: ${EMBEDDING_DIMENSIONS:-1024}
     ports:
       - "127.0.0.1:8000:8000"
+    volumes:
+      - compiled-packs:/app/build/packs:ro
     depends_on:
       clickhouse:
         condition: service_healthy
@@ -135,10 +140,20 @@ services:
       # /app/dbt in the image is read-only for the app user.
       DBT_TARGET_PATH: /tmp/dbt/target
       DBT_LOG_PATH: /tmp/dbt/logs
+      OPENSEARCH_URL: http://opensearch:9200
+      LITELLM_BASE_URL: http://litellm:4000
+      LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY:?set LITELLM_MASTER_KEY in .env}
+      EMBEDDING_DIMENSIONS: ${EMBEDDING_DIMENSIONS:-1024}
+      COLUMN_VALUES_TOP_K: ${COLUMN_VALUES_TOP_K:-10000}
     volumes:
       - ./data:/app/data
+      - compiled-packs:/app/build/packs
     depends_on:
       clickhouse:
+        condition: service_healthy
+      opensearch:
+        condition: service_healthy
+      litellm:
         condition: service_healthy
 
   web:
@@ -161,3 +176,5 @@ services:
 volumes:
   clickhouse-data:
   opensearch-data:
+  # compiled.json of each pack, written by compile_pack in jobs and read by api.
+  compiled-packs:

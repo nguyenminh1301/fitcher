@@ -4,6 +4,7 @@
 
 ### Added
 
+- Compile a Domain Pack with `jobs/compile_pack.py`: validate it against the ClickHouse marts, keep approved items, test-run every metric read-only, record dataset date coverage, and publish a new generation of six pack-scoped OpenSearch indices with role-filtered documents, diacritic-folding text, `embed` vectors for hybrid BM25 + kNN search and fuzzy column values, moving all aliases in one request and writing `compiled.json` to a volume the API reads; a failed compile leaves the live generation untouched.
 - Add the hand-written `ecommerce_twin` Domain Pack over the three marts: a USD business profile without time zone or answer language, with the "best-selling = net sales" convention, column roles and indexable string columns, ten metrics, Vietnamese and English glossary aliases, the returns join path, analyst and marketing roles, few-shot examples and one seed eval case per required category, with a test that loads every pack against the dbt mart columns.
 - Check Domain Pack cross-references: unique ids, metric, dataset, column and role references across files, time columns, indexable string columns, dataset `allowed_roles` equal to the roles `policies.yaml` grants, and dataset tables and columns against a warehouse catalog.
 - Define the Domain Pack format as one JSON Schema per pack file with shared id, status, evidence and confidence definitions, load packs into matching Pydantic models with YAML 1.2 scalars, and report every invalid file, missing or unknown field and bad enum value with its file and item path.
