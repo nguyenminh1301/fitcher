@@ -79,8 +79,18 @@ def _check_functions(tree: exp.Expression) -> None:
             raise _Rejected(f"function {name}() is not allowed")
 
 
-def _check_tables(tree: exp.Expression, allowlist: Allowlist, ctes: set[str]) -> set[str]:
-    """Return the allowlisted base tables the query reads."""
+def _base_tables(scopes: list[Scope]) -> list[exp.Table]:
+    """Table nodes that some scope reads as a real table; CTE references resolve to scopes instead."""
+    return [source for scope in scopes for source in scope.sources.values() if isinstance(source, exp.Table)]
+
+
+def _check_tables(tree: exp.Expression, allowlist: Allowlist, scopes: list[Scope]) -> set[str]:
+    """Return the allowlisted base tables the query reads.
+
+    Whether a name means a CTE or a table is decided by each query's own
+    scope, so a CTE defined in a subquery cannot hide an outer table.
+    """
+    base = {id(table) for table in _base_tables(scopes)}
     tables: set[str] = set()
     for table in tree.find_all(exp.Table):
         if not isinstance(table.this, exp.Identifier):
@@ -92,8 +102,8 @@ def _check_tables(tree: exp.Expression, allowlist: Allowlist, ctes: set[str]) ->
             continue
         if table.db == "system":
             raise _Rejected(f"system table system.{table.name} is not allowed")
-        if not table.db and table.name in ctes:
-            continue
+        if id(table) not in base and not table.db:
+            continue  # a CTE reference
         if table.db not in ("", MARTS_DATABASE) or table.name not in allowlist.tables:
             raise _Rejected(f"table {table.sql(dialect='clickhouse')} is not an approved dataset")
         tables.add(table.name)
@@ -134,8 +144,8 @@ def _check_scope_columns(scope: Scope, allowlist: Allowlist) -> None:
             raise _Rejected(f"column {column.name} is not an approved column of the tables it reads")
 
 
-def _check_columns(tree: exp.Expression, allowlist: Allowlist) -> None:
-    for scope in traverse_scope(tree):
+def _check_columns(scopes: list[Scope], allowlist: Allowlist) -> None:
+    for scope in scopes:
         _check_scope_columns(scope, allowlist)
 
 
@@ -143,26 +153,21 @@ def _is_projection(node: exp.Expression) -> bool:
     return isinstance(node.parent, exp.Select) and any(node is projection for projection in node.parent.expressions)
 
 
-def _check_stars(tree: exp.Expression, ctes: set[str]) -> None:
+def _check_stars(tree: exp.Expression, scopes: list[Scope]) -> None:
     """``*`` outside ``count(*)`` or over a base table could return columns outside the allowlist."""
     for star in tree.find_all(exp.Star):
         qualified = star.parent if isinstance(star.parent, exp.Column) else star
         if not isinstance(star.parent, exp.Count) and not _is_projection(qualified):
             raise _Rejected("* is allowed only in count(*) or a select list; name the columns")
-    for select in tree.find_all(exp.Select):
-        star = any(
+    for scope in scopes:
+        select = scope.expression
+        if not isinstance(select, exp.Select) or not any(
             isinstance(projection, exp.Star) or (isinstance(projection, exp.Column) and isinstance(projection.this, exp.Star))
             for projection in select.expressions
-        )
-        if not star:
+        ):
             continue
-        sources = [select.args.get("from_"), *select.args.get("joins", [])]
-        for source in sources:
-            if source is None:
-                continue
-            table = source.this
-            if isinstance(table, exp.Table) and not (not table.db and table.name in ctes):
-                raise _Rejected("SELECT * is not allowed on a dataset; name the columns")
+        if any(isinstance(source, exp.Table) for _, source in scope.selected_sources.values()):
+            raise _Rejected("SELECT * is not allowed on a dataset; name the columns")
 
 
 def _check_clauses(tree: exp.Expression) -> None:
@@ -199,13 +204,13 @@ def guard_sql(sql: str, allowlist: Allowlist, max_rows: int) -> GuardResult:
         return _policy(f"only SELECT queries are allowed, got {tree.key.upper()}")
     try:
         _check_clauses(tree)
-        ctes = {cte.alias for cte in tree.find_all(exp.CTE)}
-        tables = _check_tables(tree, allowlist, ctes)
+        scopes = traverse_scope(tree)
+        tables = _check_tables(tree, allowlist, scopes)
         _check_functions(tree)
         if not tables:
             raise _Rejected("the query reads no approved dataset")
-        _check_stars(tree, ctes)
-        _check_columns(tree, allowlist)
+        _check_stars(tree, scopes)
+        _check_columns(scopes, allowlist)
     except _Rejected as rejection:
         return _policy(str(rejection))
     return GuardResult(sql=_limited(sql, tree, max_rows))

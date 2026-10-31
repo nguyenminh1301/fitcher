@@ -142,6 +142,18 @@ def test_rejections_are_policy_errors(sql, message):
     assert message in error.message
 
 
+@pytest.mark.parametrize("sql", [
+    # an unapproved table read beside an approved one
+    "SELECT w.widget_name FROM secrets AS s JOIN marts.widget_sales AS w ON s.sale_ref = w.sale_ref "
+    "WHERE 1 IN (WITH secrets AS (SELECT 1 AS x) SELECT x FROM secrets)",
+    # SELECT * over an approved table that a nested CTE name would otherwise excuse
+    "SELECT * FROM widget_sales WHERE sale_ref IN "
+    "(WITH widget_sales AS (SELECT sale_ref FROM marts.widget_refunds) SELECT sale_ref FROM widget_sales)",
+])
+def test_a_nested_cte_cannot_hide_an_outer_table(sql):
+    assert rejected(sql).category == "policy"
+
+
 def test_star_over_a_cte_is_accepted():
     accepted("WITH w AS (SELECT widget_name FROM marts.widget_sales) SELECT * FROM w LIMIT 3")
 
