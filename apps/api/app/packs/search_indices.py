@@ -177,7 +177,7 @@ def build_documents(pack: Pack, column_values: Sequence[ColumnValue]) -> dict[st
             ))
 
     for item in column_values:
-        digest = hashlib.sha1(item.value.encode()).hexdigest()[:16]
+        digest = hashlib.sha1(item.value.encode(), usedforsecurity=False).hexdigest()[:16]
         documents["column_values"].append(_document(
             pack, "column_value", f"{item.dataset}.{item.column}.{digest}", roles.column(item.dataset, item.column),
             item.value, f"{item.column} {item.dataset}", dataset=item.dataset, column=item.column,
