@@ -33,6 +33,7 @@
 
 ### Changed
 
+- Take the user's time zone from the browser with each request (UTC for clients that send none) and answer in the language of the question, instead of fixing both in the pack's business profile.
 - Limit CodeRabbit to code by excluding agent instructions and documentation from its review, and let PRs that change only those files merge on passing checks without a CodeRabbit review.
 - Settle the Phase 1 data plan from the inspected lab dataset: date-only typing, net sales without discounts, all-or-nothing raw publication, refresh state with a generation check for readers, unique `dbt_tag` values and a `jobs` Compose service that keeps admin credentials out of `api`.
 - Merge pull requests into `develop` only after every CI and Security check on the latest head commit passes and CodeRabbit has reviewed it with every finding verified and fixed or answered, treat a failing check as blocking even when the change did not cause it, and ask the owner when CodeRabbit does not review.
