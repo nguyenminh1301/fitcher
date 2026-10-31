@@ -23,6 +23,8 @@ reviews:
     drafts: false
     base_branches: ["^develop$", "^main$"]
     ignore_title_keywords: ["WIP", "[skip review]"]
+  # Code only, by owner decision: agent instructions and documentation are
+  # never reviewed. Keep these exclusions; do not re-add those paths.
   path_filters:
     - "**"
     - "!**/node_modules/**"
@@ -30,10 +32,17 @@ reviews:
     - "!**/.venv/**"
     - "!**/__pycache__/**"
     - "!.workspace/**"
-    - ".workspace/README.md"
-    - ".workspace/.gitignore"
     - "!data/**"
     - "!**/*.parquet"
+    - "!AGENTS.md"
+    - "!CLAUDE.md"
+    - "!.agents/**"
+    - "!.claude/**"
+    - "!docs/**"
+    - "!*.md"
+    - "!**/README.md"
+    - "!.github/pull_request_template.md"
+    - "!.github/ISSUE_TEMPLATE/**"
   path_instructions:
     - path: "**/*"
       instructions: >-
