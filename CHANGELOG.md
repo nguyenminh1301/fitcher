@@ -4,6 +4,9 @@
 
 ### Added
 
+- Call the LiteLLM chat aliases `fast`, `sql-gen` and `sql-gen-hard` through one client that refuses model names, requests JSON-schema output validated into Pydantic models or plain text, and reports gateway failures without leaking replies; tests use a scripted fake client.
+- Resolve extracted period descriptors (year, quarter, month, explicit range, relative unit, unit to date and last N units) into labelled half-open date ranges using the pack's fiscal calendar, with fiscal years named by their end year, ISO weeks and the user's time zone for today, falling back to UTC.
+- Define the `QuerySpec` and `Result` contracts with half-open periods, bounded `top_n`, known filter operators, consistent ranking and comparison fields, and row, column and truncation checks capped at 5,000 rows.
 - Add the hand-written `ecommerce_twin` Domain Pack over the three marts: a USD business profile without time zone or answer language, with the "best-selling = net sales" convention, column roles and indexable string columns, ten metrics, Vietnamese and English glossary aliases, the returns join path, analyst and marketing roles, few-shot examples and one seed eval case per required category, with a test that loads every pack against the dbt mart columns.
 - Check Domain Pack cross-references: unique ids, metric, dataset, column and role references across files, time columns, indexable string columns, dataset `allowed_roles` equal to the roles `policies.yaml` grants, and dataset tables and columns against a warehouse catalog.
 - Define the Domain Pack format as one JSON Schema per pack file with shared id, status, evidence and confidence definitions, load packs into matching Pydantic models with YAML 1.2 scalars, and report every invalid file, missing or unknown field and bad enum value with its file and item path.

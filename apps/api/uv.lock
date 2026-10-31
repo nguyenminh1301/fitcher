@@ -409,6 +409,7 @@ source = { virtual = "." }
 default-groups = ["dev", "jobs"]
 dependencies = [
     { name = "fastapi" },
+    { name = "httpx" },
     { name = "jsonschema" },
     { name = "pydantic" },
     { name = "pyyaml" },
@@ -417,7 +418,6 @@ dependencies = [
 
 [package.dev-dependencies]
 dev = [
-    { name = "httpx" },
     { name = "pytest" },
 ]
 jobs = [
@@ -431,6 +431,7 @@ jobs = [
 [package.metadata]
 requires-dist = [
     { name = "fastapi", specifier = "==0.162.0" },
+    { name = "httpx", specifier = "==0.28.1" },
     { name = "jsonschema", specifier = "==4.26.0" },
     { name = "pydantic", specifier = "==2.14.1" },
     { name = "pyyaml", specifier = "==6.0.3" },
@@ -438,10 +439,7 @@ requires-dist = [
 ]
 
 [package.metadata.requires-dev]
-dev = [
-    { name = "httpx", specifier = "==0.28.1" },
-    { name = "pytest", specifier = "==9.2.0" },
-]
+dev = [{ name = "pytest", specifier = "==9.2.0" }]
 jobs = [
     { name = "clickhouse-connect", specifier = "==1.11.0" },
     { name = "dbt-clickhouse", specifier = "==1.10.3" },
