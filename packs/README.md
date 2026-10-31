@@ -24,4 +24,20 @@ The API tests load every pack here against the column lists of the dbt mart sche
 
 [`ecommerce_twin/`](ecommerce_twin/) describes the `sales_lines`, `returns_fact` and `sessions_daily` marts of the e-commerce lab dataset.
 
-See [DECISIONS §5](../docs/DECISIONS.md#5-domain-pack) and the [Phase 2 plan](../docs/plans/phase-02-domain-pack-and-compiler.md); compiling packs into OpenSearch arrives with the pack compiler.
+## Compiling a pack
+
+```bash
+docker compose run --rm jobs python -m jobs.compile_pack --pack ecommerce_twin
+docker compose run --rm jobs python -m jobs.compile_pack --pack ecommerce_twin --check-search "doanh thu"
+```
+
+The compiler (`app.packs.compiler`) loads the pack with the ClickHouse `marts` catalog, keeps approved items, parses every metric's `sql_expr` as one expression and runs it once read-only with a time limit, and reads each dataset's row count and time-column range.
+It then writes generation `v<N+1>` of the six OpenSearch indices `<pack>_<index>_v<N>` (`glossary_terms`, `metrics`, `datasets` with one document per column, `column_values` with the top `COLUMN_VALUES_TOP_K` values of indexable columns, `examples`, and `kb_docs`, which stays empty until runtime documents arrive in Phase 10).
+Every document carries the roles that `policies.yaml` grants its dataset or column.
+Text fields fold case and diacritics; all indices except `column_values` carry an `EMBEDDING_DIMENSIONS`-sized vector from the `embed` alias for the `hybrid_search` pipeline (BM25 and kNN, min-max normalized), and `column_values` adds fuzzy and trigram matching for misspelled values.
+Once every index is filled, one request moves the six `<pack>_<index>` aliases, `compiled.json` (the approved pack, generation and date coverage) is written to the `compiled-packs` volume, and older generations are deleted; a failure before the alias move deletes the partial generation and leaves the live aliases untouched.
+
+Indexing sends billable embedding requests; `--skip-index` stops after the metric test-run without calling LiteLLM or OpenSearch.
+`--check-search` searches the live aliases as every role of the pack, or as each `--role` given.
+
+See [DECISIONS §5](../docs/DECISIONS.md#5-domain-pack) and the [Phase 2 plan](../docs/plans/phase-02-domain-pack-and-compiler.md).
