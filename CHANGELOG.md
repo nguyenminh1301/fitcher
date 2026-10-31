@@ -4,6 +4,7 @@
 
 ### Added
 
+- Check Domain Pack cross-references: unique ids, metric, dataset, column and role references across files, time columns, indexable string columns, dataset `allowed_roles` equal to the roles `policies.yaml` grants, and dataset tables and columns against a warehouse catalog.
 - Define the Domain Pack format as one JSON Schema per pack file with shared id, status, evidence and confidence definitions, load packs into matching Pydantic models with YAML 1.2 scalars, and report every invalid file, missing or unknown field and bad enum value with its file and item path.
 - Document the marts refresh, refresh-state protocol, stale-lock recovery and acceptance query, and select the acceptance analysis by name in the Phase 1 verification command.
 - Build the `sales_lines`, `returns_fact` and `sessions_daily` marts from typed staging views with key, relationship, date-range and non-negative tests, and answer the Q1 2024 versus Q1 2025 top-10 products question in SQL with a test that recomputes it from staging.
