@@ -3,9 +3,7 @@ name: minimal
 display_name: Minimal widget shop
 industry: widget retail
 currency: USD
-timezone: UTC
 fiscal_year_start_month: 1
-language: en
 conventions:
   - id: top_widgets
     description: Rank widgets by revenue when the question names no measure.

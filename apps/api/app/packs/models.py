@@ -38,9 +38,7 @@ class BusinessProfile(PackModel):
     display_name: str
     industry: str
     currency: str
-    timezone: str
     fiscal_year_start_month: int
-    language: str
     conventions: list[Convention]
 
 

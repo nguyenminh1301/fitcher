@@ -5,7 +5,7 @@ Git is the source of truth for packs; the engine under `apps/` contains no pack-
 
 | File | Contents |
 | --- | --- |
-| `business_profile.yaml` | Name (equal to the directory name), industry, currency, time zone, fiscal year start month, answer language and default conventions such as "best-selling = net sales" |
+| `business_profile.yaml` | Name (equal to the directory name), industry, currency, fiscal year start month and default conventions such as "best-selling = net sales"; the user's time zone and answer language come from each request |
 | `datasets.yaml` | One entry per `marts` table: description, grain, primary time column, `allowed_roles` and columns with type, role (dimension, measure, time) and whether their top values are indexed |
 | `glossary.yaml` | Terms with Vietnamese and English aliases, each targeting metrics, columns or column values |
 | `metrics.yaml` | One aggregate `sql_expr` over one dataset, with grain, unit and owner |

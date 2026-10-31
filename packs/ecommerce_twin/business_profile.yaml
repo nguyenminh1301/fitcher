@@ -3,9 +3,7 @@ name: ecommerce_twin
 display_name: E-commerce twin store
 industry: online retail
 currency: USD
-timezone: Asia/Ho_Chi_Minh
 fiscal_year_start_month: 1
-language: vi
 conventions:
   - id: best_selling
     description: >-

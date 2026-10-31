@@ -32,6 +32,9 @@ def _set(path, value):
 INVALID_FILES = [
     ("business_profile.yaml", _delete(("currency",)), "currency", "required field is missing"),
     ("business_profile.yaml", _set(("colour",), "red"), "colour", "unknown field"),
+    # The user's time zone and answer language come from each request, never from the pack.
+    ("business_profile.yaml", _set(("timezone",), "UTC"), "timezone", "unknown field"),
+    ("business_profile.yaml", _set(("language",), "en"), "language", "unknown field"),
     ("business_profile.yaml", _set(("conventions", 0, "status"), "pending"), "conventions[0].status", "is not one of"),
     ("datasets.yaml", _delete(("datasets", 0, "grain")), "datasets[0].grain", "required field is missing"),
     ("datasets.yaml", _set(("datasets", 0, "columns", 0, "colour"), "red"), "datasets[0].columns[0].colour", "unknown field"),

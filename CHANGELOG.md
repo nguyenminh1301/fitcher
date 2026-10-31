@@ -4,7 +4,7 @@
 
 ### Added
 
-- Add the hand-written `ecommerce_twin` Domain Pack over the three marts: a USD business profile with the "best-selling = net sales" convention, column roles and indexable string columns, ten metrics, Vietnamese and English glossary aliases, the returns join path, analyst and marketing roles, few-shot examples and one seed eval case per required category, with a test that loads every pack against the dbt mart columns.
+- Add the hand-written `ecommerce_twin` Domain Pack over the three marts: a USD business profile without time zone or answer language, with the "best-selling = net sales" convention, column roles and indexable string columns, ten metrics, Vietnamese and English glossary aliases, the returns join path, analyst and marketing roles, few-shot examples and one seed eval case per required category, with a test that loads every pack against the dbt mart columns.
 - Check Domain Pack cross-references: unique ids, metric, dataset, column and role references across files, time columns, indexable string columns, dataset `allowed_roles` equal to the roles `policies.yaml` grants, and dataset tables and columns against a warehouse catalog.
 - Define the Domain Pack format as one JSON Schema per pack file with shared id, status, evidence and confidence definitions, load packs into matching Pydantic models with YAML 1.2 scalars, and report every invalid file, missing or unknown field and bad enum value with its file and item path.
 - Document the marts refresh, refresh-state protocol, stale-lock recovery and acceptance query, and select the acceptance analysis by name in the Phase 1 verification command.
