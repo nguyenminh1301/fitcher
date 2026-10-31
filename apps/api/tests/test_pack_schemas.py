@@ -85,6 +85,18 @@ def test_schema_rejects_invalid_item(pack_dir, edit_pack, file_name, change, ite
     assert message in lines[0]
 
 
+def test_duplicate_key_is_reported(pack_dir: Path):
+    path = pack_dir / "policies.yaml"
+    text = path.read_text(encoding="utf-8")
+    # A second columns key would silently replace the first grant list.
+    text = text.replace("columns: [sale_ref, sold_on, widget_name, sale_amount]",
+                        "columns: [sale_ref, sold_on, widget_name, sale_amount]\n        columns: [sale_ref]")
+    path.write_text(text, encoding="utf-8")
+
+    with pytest.raises(PackValidationError, match="policies.yaml: invalid YAML: .*duplicate key 'columns'"):
+        load_pack(pack_dir, schema_dir=SCHEMA_DIR)
+
+
 def test_yes_and_on_are_not_booleans(pack_dir, edit_pack):
     edit_pack("glossary.yaml", _set(("terms", 0, "aliases", "en"), ["yes", "on", "no"]))
     text = (pack_dir / "glossary.yaml").read_text(encoding="utf-8").replace("'", "")

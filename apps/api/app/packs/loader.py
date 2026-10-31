@@ -7,7 +7,7 @@ is collected and reported at once, each naming the file, the item path and the
 field.
 """
 
-from collections.abc import Iterable, Iterator
+from collections.abc import Hashable, Iterable, Iterator
 from dataclasses import dataclass
 import json
 from pathlib import Path
@@ -17,6 +17,7 @@ from typing import Protocol
 from jsonschema import Draft202012Validator
 from referencing import Registry, Resource
 import yaml
+from yaml.constructor import ConstructorError
 
 from app.packs.models import PACK_FILES, Pack
 
@@ -41,8 +42,22 @@ class _PackYamlLoader(yaml.SafeLoader):
     """SafeLoader with YAML 1.2 scalars: dates stay strings and only true/false are booleans.
 
     YAML 1.1 would read a key such as ``on`` as a boolean and an unquoted date
-    as a date object, neither of which the JSON Schemas accept.
+    as a date object, neither of which the JSON Schemas accept. A key repeated
+    in one mapping is an error instead of silently replacing the first value.
     """
+
+    def construct_mapping(self, node: yaml.MappingNode, deep: bool = False) -> dict:
+        seen: set[Hashable] = set()
+        for key_node, _ in node.value:
+            if key_node.tag == "tag:yaml.org,2002:merge":
+                continue
+            key = self.construct_object(key_node, deep=True)
+            if not isinstance(key, Hashable):
+                raise ConstructorError("while constructing a mapping", node.start_mark, "found unhashable key", key_node.start_mark)
+            if key in seen:
+                raise ConstructorError("while constructing a mapping", node.start_mark, f"duplicate key {key!r}", key_node.start_mark)
+            seen.add(key)
+        return super().construct_mapping(node, deep=deep)
 
 
 _PackYamlLoader.yaml_implicit_resolvers = {
