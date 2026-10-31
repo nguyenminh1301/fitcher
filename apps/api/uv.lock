@@ -415,6 +415,7 @@ dependencies = [
     { name = "pydantic" },
     { name = "pyyaml" },
     { name = "sqlglot" },
+    { name = "tzdata", marker = "sys_platform == 'win32'" },
     { name = "uvicorn" },
 ]
 
@@ -438,6 +439,7 @@ requires-dist = [
     { name = "pydantic", specifier = "==2.14.1" },
     { name = "pyyaml", specifier = "==6.0.3" },
     { name = "sqlglot", specifier = "==30.23.0" },
+    { name = "tzdata", marker = "sys_platform == 'win32'", specifier = "==2026.6" },
     { name = "uvicorn", specifier = "==0.54.0" },
 ]
 
