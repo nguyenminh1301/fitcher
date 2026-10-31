@@ -100,6 +100,22 @@ def test_result_matches_the_decisions_example():
     assert result.model_dump()["columns"][2]["format"] == "currency"
 
 
+def test_decisions_example_with_an_abbreviated_row_list_is_valid():
+    # DECISIONS §7 shows one of 20 rows with truncated false.
+    result = Result.model_validate({
+        "columns": [
+            {"name": "period", "type": "string", "role": "dimension"},
+            {"name": "product_name", "type": "string", "role": "dimension"},
+            {"name": "net_sales", "type": "number", "role": "measure", "format": "currency"},
+        ],
+        "rows": [["Q1 2025", "Product A", 12345.6]],
+        "row_count": 20,
+        "truncated": False,
+    })
+
+    assert result.row_count == 20
+
+
 def test_truncated_result_reports_the_full_row_count():
     result = Result(columns=columns(), rows=[["Q1 2025", "Blue", 1.0]], row_count=20, truncated=True)
 
@@ -109,7 +125,6 @@ def test_truncated_result_reports_the_full_row_count():
 @pytest.mark.parametrize(("rows", "row_count", "truncated", "message"), [
     ([["Q1 2025", "Blue"]], 1, False, "2 cells for 3 columns"),
     ([["Q1 2025", "Blue", 1.0]], 0, False, "less than"),
-    ([["Q1 2025", "Blue", 1.0]], 5, False, "truncated"),
     ([["Q1 2025", "Blue", 1.0]], 1, True, "truncated"),
 ])
 def test_inconsistent_results_are_rejected(rows, row_count, truncated, message):

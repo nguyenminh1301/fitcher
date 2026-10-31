@@ -34,6 +34,6 @@ class Result(ContractModel):
                 raise ValueError(f"row {position} has {len(row)} cells for {len(self.columns)} columns")
         if self.row_count < len(self.rows):
             raise ValueError(f"row_count {self.row_count} is less than the {len(self.rows)} rows returned")
-        if self.truncated != (self.row_count > len(self.rows)):
-            raise ValueError("truncated must be true exactly when row_count exceeds the rows returned")
+        if self.truncated and self.row_count <= len(self.rows):
+            raise ValueError("a truncated result must have a row_count above the rows returned")
         return self
