@@ -9,6 +9,8 @@ services:
       CLICKHOUSE_USER: ${CLICKHOUSE_ADMIN_USER:?set CLICKHOUSE_ADMIN_USER in .env}
       CLICKHOUSE_PASSWORD: ${CLICKHOUSE_ADMIN_PASSWORD:?set CLICKHOUSE_ADMIN_PASSWORD in .env}
       CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: "1"
+      # Read by users.d/agent_readonly.xml for the agent's read-only user.
+      CLICKHOUSE_AGENT_PASSWORD: ${CLICKHOUSE_AGENT_PASSWORD:?set CLICKHOUSE_AGENT_PASSWORD in .env}
     ports:
       - "127.0.0.1:8123:8123"
       - "127.0.0.1:9000:9000"
@@ -16,6 +18,7 @@ services:
       - clickhouse-data:/var/lib/clickhouse
       - ./infra/clickhouse/config.d/listen.xml:/etc/clickhouse-server/config.d/listen.xml:ro
       - ./infra/clickhouse/users.d/users.xml:/etc/clickhouse-server/users.d/users.xml:ro
+      - ./infra/clickhouse/users.d/agent_readonly.xml:/etc/clickhouse-server/users.d/agent_readonly.xml:ro
       - ./infra/clickhouse/initdb:/docker-entrypoint-initdb.d:ro
     ulimits:
       nofile:
@@ -104,6 +107,13 @@ services:
     environment:
       LITELLM_BASE_URL: http://litellm:4000
       LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY:?set LITELLM_MASTER_KEY in .env}
+      # The api only ever connects as the read-only agent user.
+      CLICKHOUSE_HOST: clickhouse
+      CLICKHOUSE_AGENT_USER: agent_readonly
+      CLICKHOUSE_AGENT_PASSWORD: ${CLICKHOUSE_AGENT_PASSWORD:?set CLICKHOUSE_AGENT_PASSWORD in .env}
+      QUERY_MAX_EXECUTION_TIME: ${QUERY_MAX_EXECUTION_TIME:-30}
+      QUERY_MAX_RESULT_ROWS: ${QUERY_MAX_RESULT_ROWS:-10000}
+      QUERY_MAX_MEMORY_USAGE: ${QUERY_MAX_MEMORY_USAGE:-2000000000}
       ACTIVE_PACK: ${ACTIVE_PACK:?set ACTIVE_PACK in .env}
       OPENSEARCH_URL: http://opensearch:9200
       EMBEDDING_DIMENSIONS: ${EMBEDDING_DIMENSIONS:-1024}

@@ -7,6 +7,7 @@ See [DECISIONS §3](../docs/DECISIONS.md#3-docker-compose) and the [Phase 0 plan
 | --- | --- |
 | `clickhouse/config.d/listen.xml` | Listen on container interfaces; Compose publishes ports on host loopback only |
 | `clickhouse/users.d/users.xml` | Removes the passwordless `default` user |
+| `clickhouse/users.d/agent_readonly.xml` | Read-only `agent_readonly` user and profile the agent runs generated SQL as |
 | `clickhouse/initdb/001-databases.sql` | Creates `raw`, `marts` and `data_meta` |
 | `litellm/config.yaml` | Aliases `fast`, `sql-gen`, `sql-gen-hard` and `embed`, with models from `LITELLM_MODEL_*` |
 | `keycloak/realm-finch.json` | Realm `finch` with the public `finch-web` client and no users |
@@ -23,6 +24,10 @@ docker compose exec -T clickhouse sh -c 'clickhouse-client --user "$CLICKHOUSE_U
 ```
 
 Changing the admin password in `.env` after the first start also needs only a container recreate, because the entrypoint rewrites the user file on every start.
+
+The agent runs every generated query as `agent_readonly`, whose password is `CLICKHOUSE_AGENT_PASSWORD`.
+It holds only `SELECT` on `marts`; its profile sets `readonly = 2` (reads only, while each query may set its own limits) and constrains `max_execution_time`, `max_result_rows` and `max_memory_usage`.
+The user lives in server configuration, not in the data volume, so it applies to new and existing volumes alike; recreate the container after changing the file or the password: `docker compose up -d --wait clickhouse`.
 
 ## LiteLLM
 
