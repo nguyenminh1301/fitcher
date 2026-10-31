@@ -18,6 +18,7 @@ from app.packs.compiler import (
 )
 from app.packs.loader import PackValidationError, load_pack
 from app.packs.search_indices import INDEX_NAMES
+from app.search.opensearch import SearchError
 
 PACK = "minimal"
 
@@ -132,6 +133,31 @@ def test_embedding_failure_deletes_the_partial_generation(pack_dir, tmp_path):
     assert search.indices == {}
     assert search.aliases == {}
     assert not (tmp_path / "build" / PACK / "compiled.json").exists()
+
+
+def test_failed_cleanup_of_the_old_generation_keeps_the_compile_successful(pack_dir, tmp_path, monkeypatch):
+    search = FakeSearch()
+    run(pack_dir, tmp_path, search)
+
+    def refuse(name):
+        raise SearchError(f"DELETE /{name} returned HTTP 500")
+
+    monkeypatch.setattr(search, "delete_index", refuse)
+    summary = run(pack_dir, tmp_path, search)
+
+    assert summary.generation == 2
+    assert summary.warnings == [f"older index generations were not deleted: DELETE /{PACK}_column_values_v1 returned HTTP 500"]
+    assert search.aliases == {f"{PACK}_{index}": f"{PACK}_{index}_v2" for index in INDEX_NAMES}
+
+
+def test_scans_are_read_only_with_time_and_memory_limits(pack_dir, tmp_path):
+    fake = warehouse()
+
+    run(pack_dir, tmp_path, FakeSearch(), warehouse=fake)
+
+    scans = [settings for sql, settings in fake.queries if "system.columns" in sql or "count(), min(" in sql or "toString(" in sql]
+    assert len(scans) == 4
+    assert all(settings == {"max_execution_time": 300, "max_memory_usage": 2_000_000_000, "readonly": 2} for settings in scans)
 
 
 def test_failing_metric_aborts_with_its_id_and_the_clickhouse_error(pack_dir, tmp_path):

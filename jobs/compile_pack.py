@@ -59,6 +59,8 @@ def print_summary(summary: CompileSummary) -> None:
     print(f"  generation v{summary.generation} is live:")
     for index, count in summary.documents.items():
         print(f"    {index}: {count} documents")
+    for warning in summary.warnings:
+        print(f"  warning: {warning}")
 
 
 def check_search(args: argparse.Namespace, settings, search: OpenSearch, embeddings) -> int:

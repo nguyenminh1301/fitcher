@@ -41,6 +41,8 @@ from app.search.opensearch import OpenSearch
 MARTS_DATABASE = "marts"
 # readonly=2 allows only reads while still letting the query carry its own settings.
 METRIC_TEST_SETTINGS = {"max_execution_time": 30, "readonly": 2}
+# Catalog, coverage and top-value scans read whole tables, so they get more time but a memory cap.
+SCAN_SETTINGS = {"max_execution_time": 300, "max_memory_usage": 2_000_000_000, "readonly": 2}
 ERROR_LIMIT = 500
 _IDENTIFIER = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
 
@@ -66,7 +68,7 @@ class WarehouseCatalog:
     def table_columns(self, table: str) -> set[str] | None:
         if self._tables is None:
             rows = self._warehouse.query(
-                f"SELECT table, name FROM system.columns WHERE database = '{MARTS_DATABASE}'"
+                f"SELECT table, name FROM system.columns WHERE database = '{MARTS_DATABASE}'", settings=SCAN_SETTINGS
             )
             self._tables = {}
             for table_name, column in rows:
@@ -101,6 +103,7 @@ class CompileSummary:
     coverage: dict[str, DateCoverage]
     generation: int | None = None
     documents: dict[str, int] = field(default_factory=dict)
+    warnings: list[str] = field(default_factory=list)
 
 
 def quote(identifier: str) -> str:
@@ -188,7 +191,7 @@ def read_coverage(pack: Pack, warehouse: Warehouse) -> dict[str, DateCoverage]:
     for dataset in pack.datasets.datasets:
         column = quote(dataset.time_column)
         rows, low, high = warehouse.query(
-            f"SELECT count(), min({column}), max({column}) FROM {table_ref(dataset.id)}"
+            f"SELECT count(), min({column}), max({column}) FROM {table_ref(dataset.id)}", settings=SCAN_SETTINGS
         )[0]
         # min/max of an empty table return the type's default value, not NULL.
         coverage[dataset.id] = DateCoverage(
@@ -206,7 +209,8 @@ def read_column_values(pack: Pack, warehouse: Warehouse, top_k: int) -> list[Col
                 continue
             rows = warehouse.query(
                 f"SELECT toString({quote(column.name)}) AS value, count() AS n FROM {table_ref(dataset.id)} "
-                f"WHERE value != '' GROUP BY value ORDER BY n DESC, value LIMIT {int(top_k)}"
+                f"WHERE value != '' GROUP BY value ORDER BY n DESC, value LIMIT {int(top_k)}",
+                settings=SCAN_SETTINGS,
             )
             values.extend(ColumnValue(dataset.id, column.name, value, count) for value, count in rows)
     return values
@@ -329,7 +333,10 @@ def compile_pack(
         _delete_quietly(search, [physical_name(pack.name, index, generation) for index in INDEX_NAMES])
         raise CompileError(f"publishing index generation {generation} failed: {_first_line(error)}") from error
     os.replace(staged, target)
-    delete_older_generations(search, pack.name, generation)
+    try:
+        delete_older_generations(search, pack.name, generation)
+    except Exception as error:  # noqa: BLE001 - the new generation is already live
+        summary.warnings.append(f"older index generations were not deleted: {_first_line(error)}")
     summary.generation = generation
     summary.documents = counts
     return summary
