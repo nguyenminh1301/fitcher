@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "datasets.yaml",
+  "description": "The marts the agent may query, one entry per table in the marts database.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["datasets"],
+  "properties": {
+    "datasets": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "description", "grain", "time_column", "allowed_roles", "columns", "status", "evidence", "confidence"],
+        "properties": {
+          "id": {"$ref": "common.schema.json#/$defs/id", "description": "Table name in the marts database."},
+          "description": {"$ref": "common.schema.json#/$defs/text"},
+          "grain": {"$ref": "common.schema.json#/$defs/text", "description": "What one row represents."},
+          "time_column": {"$ref": "common.schema.json#/$defs/name", "description": "Primary time column; a column with role time."},
+          "allowed_roles": {
+            "description": "Roles granted this dataset in policies.yaml.",
+            "type": "array",
+            "items": {"$ref": "common.schema.json#/$defs/id"}
+          },
+          "columns": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["name", "type", "role", "description"],
+              "properties": {
+                "name": {"$ref": "common.schema.json#/$defs/name"},
+                "type": {"type": "string", "enum": ["string", "number", "date", "datetime", "boolean"]},
+                "role": {"type": "string", "enum": ["dimension", "measure", "time"]},
+                "description": {"$ref": "common.schema.json#/$defs/text"},
+                "indexable": {"type": "boolean", "description": "Index the top values of this string column into column_values."}
+              }
+            }
+          },
+          "status": {"$ref": "common.schema.json#/$defs/status"},
+          "evidence": {"$ref": "common.schema.json#/$defs/evidence"},
+          "confidence": {"$ref": "common.schema.json#/$defs/confidence"}
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,27 @@
+datasets:
+  - id: widget_sales
+    description: One row per widget sale.
+    grain: one row per sale
+    time_column: sold_on
+    allowed_roles: [viewer]
+    status: approved
+    evidence: [{kind: manual, ref: fixture}]
+    confidence: 1.0
+    columns:
+      - {name: sale_ref, type: string, role: dimension, description: Sale key.}
+      - {name: sold_on, type: date, role: time, description: Date of the sale.}
+      - {name: widget_name, type: string, role: dimension, description: Widget sold., indexable: true}
+      - {name: sale_amount, type: number, role: measure, description: Amount paid.}
+  - id: widget_refunds
+    description: One row per refunded widget sale.
+    grain: one row per refund
+    time_column: refunded_on
+    allowed_roles: [viewer]
+    status: approved
+    evidence: [{kind: manual, ref: fixture}]
+    confidence: 1.0
+    columns:
+      - {name: refund_ref, type: string, role: dimension, description: Refund key.}
+      - {name: refunded_on, type: date, role: time, description: Date of the refund.}
+      - {name: sale_ref, type: string, role: dimension, description: Refunded sale.}
+      - {name: refund_total, type: number, role: measure, description: Amount refunded.}

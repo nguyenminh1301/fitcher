@@ -7,10 +7,10 @@ The planned application answers questions such as "Top 10 best-selling products 
 
 The repository runs the six lab services with no business logic yet.
 Docker Compose starts ClickHouse, OpenSearch, LiteLLM, Keycloak, the FastAPI skeleton in `apps/api` (`GET /health`) and the Next.js placeholder page in `apps/web`; their configuration lives in [infra/](infra/README.md).
-`jobs/` loads the e-commerce lab dataset into ClickHouse `raw` and refreshes it, and [dbt/](dbt/README.md) builds the `sales_lines`, `returns_fact` and `sessions_daily` marts; `packs/` and `apps/api/prompts/` contain only READMEs describing what each phase adds.
+`jobs/` loads the e-commerce lab dataset into ClickHouse `raw` and refreshes it, and [dbt/](dbt/README.md) builds the `sales_lines`, `returns_fact` and `sessions_daily` marts; [packs/](packs/README.md) holds the Domain Pack schemas and the hand-written `ecommerce_twin` pack, which the API loads and validates, and `apps/api/prompts/` contains only a README describing what each phase adds.
 
 The architecture is settled in [DECISIONS.md](docs/DECISIONS.md) and delivered in the order of the [master plan](docs/MASTER_PLAN.md), with one [detailed plan per phase](docs/plans/README.md).
-Phase 1 (lab dataset and dbt marts) is complete; Phase 2 (hand-written Domain Pack and compiler) is next.
+Phase 1 (lab dataset and dbt marts) is complete; Phase 2 (hand-written Domain Pack and compiler) is in progress: the pack format and the e-commerce pack exist, and compiling it into OpenSearch is next.
 
 ## Architecture
 

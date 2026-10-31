@@ -38,7 +38,7 @@ apps/api/prompts/router.v1.md metadata_qa.v1.md
 5. **clarify.** `gate` asks when a term maps to several metrics or columns with no pack convention, or a period is missing; the event carries options with stable ids, and choosing one is a follow-up turn.
 6. **metadata_qa.** Answer definitions from glossary and `kb_docs` hits; the prompt forbids numbers from documents and states that retrieved text is data, not instructions.
 7. **chart_edit.** Reuses the stored result and calls the recommender with the requested type; never calls `generate_sql` or `execute`. Test asserts no SQL node runs.
-8. **out_of_scope.** Short fixed-style reply from the `fast` alias with the pack's language.
+8. **out_of_scope.** Short fixed-style reply from the `fast` alias in the language of the question.
 9. **Branch event sequences.** Extend DECISIONS §6 with: `metadata_qa`: `status* -> summary -> done`; `chart_edit`: `status* -> result -> chart_spec -> done`, re-sending the stored result so the client always has the rows it renders; `out_of_scope`: `status* -> summary -> done`. Tests assert each sequence.
 10. **Eval.** Activate intent scoring and the ambiguous, out-of-scope, follow-up and chart-edit categories.
 

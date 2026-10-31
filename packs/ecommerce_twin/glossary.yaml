@@ -1,0 +1,270 @@
+# Vietnamese aliases are drafted for owner review.
+terms:
+  - id: net_sales
+    term: net sales
+    definition: Amount sold in orders that were not cancelled, before returns.
+    aliases:
+      vi: [doanh thu, doanh số, doanh thu thuần, tiền bán hàng]
+      en: [net sales, revenue, sales, sales amount]
+    targets: [{kind: metric, metric: net_sales}]
+    status: approved
+    evidence: &owner [{kind: manual, ref: docs/plans/phase-02-domain-pack-and-compiler.md}]
+    confidence: 1.0
+
+  - id: best_selling
+    term: best-selling
+    definition: Ranked by net sales unless another measure is named; see the best_selling convention.
+    aliases:
+      vi: [bán chạy, bán chạy nhất, sản phẩm bán chạy, top sản phẩm]
+      en: [best-selling, best sellers, top-selling, top products]
+    targets: [{kind: metric, metric: net_sales}]
+    status: approved
+    evidence: *owner
+    confidence: 1.0
+
+  - id: units_sold
+    term: units sold
+    definition: Units on order lines in orders that were not cancelled.
+    aliases:
+      vi: [số lượng bán, sản lượng bán, số đơn vị bán ra]
+      en: [units sold, quantity sold, units, volume]
+    targets: [{kind: metric, metric: units_sold}]
+    status: approved
+    evidence: *owner
+    confidence: 1.0
+
+  - id: order_count
+    term: orders
+    definition: Distinct orders that were not cancelled.
+    aliases:
+      vi: [số đơn hàng, số đơn, đơn hàng]
+      en: [orders, order count, number of orders]
+    targets: [{kind: metric, metric: order_count}]
+    status: approved
+    evidence: *owner
+    confidence: 1.0
+
+  - id: average_order_value
+    term: average order value
+    definition: Net sales per order that was not cancelled.
+    aliases:
+      vi: [giá trị đơn hàng trung bình, giá trị trung bình mỗi đơn]
+      en: [average order value, AOV, average basket]
+    targets: [{kind: metric, metric: average_order_value}]
+    status: approved
+    evidence: *owner
+    confidence: 1.0
+
+  - id: return_rate
+    term: return rate
+    definition: Share of sold order lines that were returned.
+    aliases:
+      vi: [tỉ lệ hoàn trả, tỷ lệ trả hàng, tỉ lệ đổi trả]
+      en: [return rate, returns rate]
+    targets: [{kind: metric, metric: line_return_rate}]
+    status: approved
+    evidence: *owner
+    confidence: 1.0
+
+  - id: refunds
+    term: refunds
+    definition: Money refunded for returned lines, dated by the return.
+    aliases:
+      vi: [tiền hoàn, tiền hoàn trả, số tiền hoàn lại]
+      en: [refunds, refund amount, refunded amount]
+    targets: [{kind: metric, metric: refund_total}]
+    status: approved
+    evidence: *owner
+    confidence: 1.0
+
+  - id: returns
+    term: returns
+    definition: Returned order lines, counted by the return date.
+    aliases:
+      vi: [số lượt trả hàng, lượt hoàn trả, hàng trả lại]
+      en: [returns, number of returns, returned items]
+    targets: [{kind: metric, metric: return_count}]
+    status: approved
+    evidence: *owner
+    confidence: 1.0
+
+  - id: days_to_return
+    term: days to return
+    definition: Days between an order and the return of one of its lines.
+    aliases:
+      vi: [số ngày trả hàng trung bình, thời gian trả hàng]
+      en: [average days to return, time to return]
+    targets: [{kind: metric, metric: average_days_to_return}]
+    status: approved
+    evidence: *owner
+    confidence: 1.0
+
+  - id: sessions
+    term: sessions
+    definition: Visits to the store site.
+    aliases:
+      vi: [phiên truy cập, lượt truy cập, lưu lượng truy cập]
+      en: [sessions, visits, traffic]
+    targets: [{kind: metric, metric: session_count}]
+    status: approved
+    evidence: *owner
+    confidence: 1.0
+
+  - id: conversion_rate
+    term: conversion rate
+    definition: Share of sessions that ended in an order.
+    aliases:
+      vi: [tỉ lệ chuyển đổi, tỷ lệ chuyển đổi]
+      en: [conversion rate, CVR, conversion]
+    targets: [{kind: metric, metric: conversion_rate}]
+    status: approved
+    evidence: *owner
+    confidence: 1.0
+
+  - id: product
+    term: product
+    definition: A product SKU; the source has no product names.
+    aliases:
+      vi: [sản phẩm, mã sản phẩm, mặt hàng]
+      en: [product, SKU, item]
+    targets:
+      - {kind: column, dataset: sales_lines, column: product_id}
+      - {kind: column, dataset: returns_fact, column: product_id}
+    status: approved
+    evidence: *owner
+    confidence: 1.0
+
+  - id: product_category
+    term: category
+    definition: Top-level product category, such as Electronics or Apparel.
+    aliases:
+      vi: [danh mục, ngành hàng, loại sản phẩm]
+      en: [category, product category]
+    targets:
+      - {kind: column, dataset: sales_lines, column: product_category}
+      - {kind: column, dataset: returns_fact, column: product_category}
+    status: approved
+    evidence: *owner
+    confidence: 1.0
+
+  - id: product_subcategory
+    term: subcategory
+    definition: Product subcategory within a category, such as Phones or Shoes.
+    aliases:
+      vi: [danh mục con, nhóm sản phẩm, dòng sản phẩm]
+      en: [subcategory, product type]
+    targets:
+      - {kind: column, dataset: sales_lines, column: product_subcategory}
+      - {kind: column, dataset: returns_fact, column: product_subcategory}
+    status: approved
+    evidence: *owner
+    confidence: 1.0
+
+  - id: brand
+    term: brand
+    definition: Product brand.
+    aliases:
+      vi: [thương hiệu, nhãn hàng, hãng]
+      en: [brand, label]
+    targets:
+      - {kind: column, dataset: sales_lines, column: product_brand}
+      - {kind: column, dataset: returns_fact, column: product_brand}
+    status: approved
+    evidence: *owner
+    confidence: 1.0
+
+  - id: region
+    term: region
+    definition: US region of the customer.
+    aliases:
+      vi: [khu vực, vùng, miền]
+      en: [region, area]
+    targets:
+      - {kind: column, dataset: sales_lines, column: customer_region}
+      - {kind: column, dataset: returns_fact, column: customer_region}
+      - {kind: column, dataset: sessions_daily, column: customer_region}
+    status: approved
+    evidence: *owner
+    confidence: 1.0
+
+  - id: customer_segment
+    term: customer segment
+    definition: "Customer segment: new, casual, loyal or vip."
+    aliases:
+      vi: [phân khúc khách hàng, nhóm khách hàng, phân khúc]
+      en: [customer segment, segment, customer group]
+    targets:
+      - {kind: column, dataset: sales_lines, column: customer_segment}
+      - {kind: column, dataset: returns_fact, column: customer_segment}
+      - {kind: column, dataset: sessions_daily, column: customer_segment}
+    status: approved
+    evidence: *owner
+    confidence: 1.0
+
+  - id: channel
+    term: channel
+    definition: Traffic channel of a session, such as organic, paid or email.
+    aliases:
+      vi: [kênh, kênh truy cập, nguồn truy cập]
+      en: [channel, traffic source, marketing channel]
+    targets: [{kind: column, dataset: sessions_daily, column: channel}]
+    status: approved
+    evidence: *owner
+    confidence: 1.0
+
+  - id: device
+    term: device
+    definition: Device of a session.
+    aliases:
+      vi: [thiết bị, loại thiết bị]
+      en: [device, device type]
+    targets: [{kind: column, dataset: sessions_daily, column: device}]
+    status: approved
+    evidence: *owner
+    confidence: 1.0
+
+  - id: payment_method
+    term: payment method
+    definition: How an order was paid, such as card or paypal.
+    aliases:
+      vi: [phương thức thanh toán, hình thức thanh toán]
+      en: [payment method, payment type]
+    targets: [{kind: column, dataset: sales_lines, column: payment_method}]
+    status: approved
+    evidence: *owner
+    confidence: 1.0
+
+  - id: return_reason
+    term: return reason
+    definition: Reason the customer gave for a return.
+    aliases:
+      vi: [lý do trả hàng, lý do hoàn trả]
+      en: [return reason, reason for return]
+    targets: [{kind: column, dataset: returns_fact, column: return_reason}]
+    status: approved
+    evidence: *owner
+    confidence: 1.0
+
+  - id: vip_customers
+    term: VIP customers
+    definition: Customers in the vip segment.
+    aliases:
+      vi: [khách VIP, khách hàng VIP]
+      en: [VIP customers, VIPs]
+    targets:
+      - {kind: value, dataset: sales_lines, column: customer_segment, value: vip}
+      - {kind: value, dataset: sessions_daily, column: customer_segment, value: vip}
+    status: approved
+    evidence: *owner
+    confidence: 1.0
+
+  - id: cancelled_orders
+    term: cancelled orders
+    definition: Orders with status cancelled; net sales already excludes them.
+    aliases:
+      vi: [đơn bị hủy, đơn hủy, đơn hàng đã hủy]
+      en: [cancelled orders, canceled orders, cancellations]
+    targets: [{kind: value, dataset: sales_lines, column: order_status, value: cancelled}]
+    status: approved
+    evidence: *owner
+    confidence: 1.0

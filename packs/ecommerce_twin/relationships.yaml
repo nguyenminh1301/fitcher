@@ -1,0 +1,14 @@
+relationships:
+  - id: returns_to_sales_lines
+    description: >-
+      Each return refers to one order line. returns_fact already carries the
+      sale's attributes, so this join is needed only for sales_lines columns
+      that returns_fact lacks.
+    from_dataset: returns_fact
+    to_dataset: sales_lines
+    on:
+      - {from_column: order_item_id, to_column: order_item_id}
+    cardinality: many_to_one
+    status: approved
+    evidence: [{kind: manual, ref: dbt/models/ecommerce_twin/marts/returns_fact.sql}]
+    confidence: 1.0
