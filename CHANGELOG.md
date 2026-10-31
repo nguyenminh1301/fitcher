@@ -4,6 +4,8 @@
 
 ### Added
 
+- Run agent SQL on ClickHouse as a read-only `agent_readonly` user granted only `marts`, whose profile caps the per-query time, row and memory limits; every query carries `log_comment = trace_id` and a generated `query_id`, runs `EXPLAIN` first, and its errors are classified as `sql`, `runtime` or `policy` for the retry loop.
+- Guard generated SQL with sqlglot: exactly one read query (SELECT, set operations, CTEs) over allowlisted `marts` tables and columns, no table functions, external-access, dictionary or sleep functions, `system` tables, `SELECT *` on datasets or `SETTINGS`/`FORMAT` clauses, and an outer LIMIT added or capped; rejections are policy errors and unparsable SQL is an `sql` error to retry.
 - Add the hand-written `ecommerce_twin` Domain Pack over the three marts: a USD business profile without time zone or answer language, with the "best-selling = net sales" convention, column roles and indexable string columns, ten metrics, Vietnamese and English glossary aliases, the returns join path, analyst and marketing roles, few-shot examples and one seed eval case per required category, with a test that loads every pack against the dbt mart columns.
 - Check Domain Pack cross-references: unique ids, metric, dataset, column and role references across files, time columns, indexable string columns, dataset `allowed_roles` equal to the roles `policies.yaml` grants, and dataset tables and columns against a warehouse catalog.
 - Define the Domain Pack format as one JSON Schema per pack file with shared id, status, evidence and confidence definitions, load packs into matching Pydantic models with YAML 1.2 scalars, and report every invalid file, missing or unknown field and bad enum value with its file and item path.

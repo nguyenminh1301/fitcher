@@ -1,0 +1,38 @@
+<clickhouse>
+    <!--
+        Read-only user the agent runs every generated query as (Phase 3 uses
+        one user for all queries; Phase 6 adds per-role users). The password
+        comes from CLICKHOUSE_AGENT_PASSWORD in the clickhouse container.
+        readonly=2 permits only reads but lets each query set its own limits,
+        which the constraints below cap. The user is defined in configuration,
+        so it applies to new and existing volumes on every server start.
+    -->
+    <profiles>
+        <agent_readonly>
+            <readonly>2</readonly>
+            <max_execution_time>30</max_execution_time>
+            <max_result_rows>10000</max_result_rows>
+            <max_memory_usage>2000000000</max_memory_usage>
+            <constraints>
+                <readonly><const/></readonly>
+                <max_execution_time><max>120</max></max_execution_time>
+                <max_result_rows><max>100000</max></max_result_rows>
+                <max_memory_usage><max>4000000000</max></max_memory_usage>
+            </constraints>
+        </agent_readonly>
+    </profiles>
+
+    <users>
+        <agent_readonly>
+            <password from_env="CLICKHOUSE_AGENT_PASSWORD"/>
+            <profile>agent_readonly</profile>
+            <quota>default</quota>
+            <networks>
+                <ip>::/0</ip>
+            </networks>
+            <grants>
+                <query>GRANT SELECT ON marts.*</query>
+            </grants>
+        </agent_readonly>
+    </users>
+</clickhouse>
