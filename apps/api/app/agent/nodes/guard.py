@@ -1,0 +1,175 @@
+"""Check generated SQL before it reaches ClickHouse (DECISIONS §6 step 10).
+
+The guard is the second of three permission layers: it rejects early with an
+understandable message, while ClickHouse grants remain the real security
+layer. It parses the SQL with sqlglot and accepts exactly one read query
+(``SELECT``, set operations and CTEs) over allowlisted ``marts`` tables and
+columns, without table functions, external-access or blocking functions,
+``system`` tables, or ``SETTINGS``/``FORMAT`` clauses. Every rejection is a
+``policy`` error; SQL that does not parse is an ``sql`` error, so it is
+retried instead of executed.
+
+The SQL text is executed as generated: re-rendering it through sqlglot can
+change ClickHouse functions, so the guard only adds or caps the outer LIMIT.
+Columns are checked against every allowlisted column of the tables the query
+reads; per-column grants are enforced by ClickHouse.
+"""
+
+from collections.abc import Mapping
+from dataclasses import dataclass
+
+import sqlglot
+from sqlglot import exp
+
+from app.agent.errors import AgentError
+
+NODE = "guard"
+MARTS_DATABASE = "marts"
+# system tables a query may read; none are needed yet.
+SYSTEM_TABLE_WHITELIST: frozenset[str] = frozenset()
+FORBIDDEN_FUNCTIONS = frozenset(name.lower() for name in (
+    # table functions and external access
+    "file", "url", "urlCluster", "remote", "remoteSecure", "s3", "s3Cluster", "gcs", "azureBlobStorage",
+    "azureBlobStorageCluster", "hdfs", "hdfsCluster", "mysql", "postgresql", "mongodb", "redis", "sqlite",
+    "jdbc", "odbc", "executable", "input", "cluster", "clusterAllReplicas", "merge", "view", "dictionary",
+    "generateRandom", "numbers", "numbers_mt", "zeros", "zeros_mt", "values", "format", "null", "iceberg",
+    "deltaLake", "hudi", "loop", "fuzzJSON",
+    # reads outside the query's tables
+    "joinGet", "joinGetOrNull",
+    # deliberate stalls
+    "sleep", "sleepEachRow",
+))
+FORBIDDEN_PREFIXES = ("dictget", "dicthas", "dictis")
+
+
+@dataclass(frozen=True)
+class Allowlist:
+    """``marts`` tables a query may read, each with the columns it may use."""
+
+    tables: Mapping[str, frozenset[str]]
+
+
+@dataclass(frozen=True)
+class GuardResult:
+    sql: str | None = None
+    error: AgentError | None = None
+
+
+class _Rejected(Exception):
+    pass
+
+
+def _policy(message: str) -> GuardResult:
+    return GuardResult(error=AgentError("policy", NODE, message))
+
+
+def _function_name(node: exp.Func) -> str:
+    return (node.name if isinstance(node, exp.Anonymous) else node.sql_name()).lower()
+
+
+def _check_functions(tree: exp.Expression) -> None:
+    for node in tree.find_all(exp.Func):
+        name = _function_name(node)
+        if name in FORBIDDEN_FUNCTIONS or name.startswith(FORBIDDEN_PREFIXES):
+            raise _Rejected(f"function {name}() is not allowed")
+
+
+def _check_tables(tree: exp.Expression, allowlist: Allowlist, ctes: set[str]) -> set[str]:
+    """Return the allowlisted base tables the query reads."""
+    tables: set[str] = set()
+    for table in tree.find_all(exp.Table):
+        if not isinstance(table.this, exp.Identifier):
+            name = _function_name(table.this) if isinstance(table.this, exp.Func) else table.this.sql()
+            raise _Rejected(f"table function {name}() is not allowed")
+        if table.catalog:
+            raise _Rejected(f"table {table.sql(dialect='clickhouse')} is not allowed")
+        if table.db == "system" and table.name in SYSTEM_TABLE_WHITELIST:
+            continue
+        if table.db == "system":
+            raise _Rejected(f"system table system.{table.name} is not allowed")
+        if not table.db and table.name in ctes:
+            continue
+        if table.db not in ("", MARTS_DATABASE) or table.name not in allowlist.tables:
+            raise _Rejected(f"table {table.sql(dialect='clickhouse')} is not an approved dataset")
+        tables.add(table.name)
+    return tables
+
+
+def _check_columns(tree: exp.Expression, allowlist: Allowlist, tables: set[str], ctes: set[str]) -> None:
+    allowed = set().union(*(allowlist.tables[name] for name in tables))
+    aliases = {alias.alias for alias in tree.find_all(exp.Alias)}
+    table_aliases = {alias.name for alias in tree.find_all(exp.TableAlias) if alias.name}
+    for alias in tree.find_all(exp.TableAlias):
+        aliases.update(column.name for column in alias.columns)
+    qualifiers = tables | ctes | table_aliases
+    for column in tree.find_all(exp.Column):
+        if column.table and column.table not in qualifiers:
+            raise _Rejected(f"column {column.sql(dialect='clickhouse')} refers to an unknown table")
+        if isinstance(column.this, exp.Star):
+            continue
+        if column.name not in allowed and column.name not in aliases:
+            raise _Rejected(f"column {column.name} is not an approved column of {', '.join(sorted(tables)) or 'any table'}")
+
+
+def _check_stars(tree: exp.Expression, ctes: set[str]) -> None:
+    """``SELECT *`` over a base table could return columns outside the allowlist."""
+    for select in tree.find_all(exp.Select):
+        star = any(
+            isinstance(projection, exp.Star) or (isinstance(projection, exp.Column) and isinstance(projection.this, exp.Star))
+            for projection in select.expressions
+        )
+        if not star:
+            continue
+        sources = [select.args.get("from_"), *select.args.get("joins", [])]
+        for source in sources:
+            if source is None:
+                continue
+            table = source.this
+            if isinstance(table, exp.Table) and not (not table.db and table.name in ctes):
+                raise _Rejected("SELECT * is not allowed on a dataset; name the columns")
+
+
+def _check_clauses(tree: exp.Expression) -> None:
+    for node in tree.walk():
+        if node.args.get("settings"):
+            raise _Rejected("SETTINGS clauses are not allowed")
+        if node.args.get("format"):
+            raise _Rejected("FORMAT clauses are not allowed")
+
+
+def _limited(sql: str, tree: exp.Query, max_rows: int) -> str:
+    """Return SQL whose outer result has at most ``max_rows`` rows."""
+    body = sql.strip().rstrip(";").rstrip()
+    limit = tree.args.get("limit")
+    value = limit.expression if isinstance(limit, exp.Limit) and not limit.expressions else None
+    if isinstance(value, exp.Literal) and not value.is_string and int(value.this) <= max_rows:
+        return body
+    if limit is None and isinstance(tree, exp.Select):
+        return f"{body}\nLIMIT {max_rows}"
+    return f"SELECT * FROM (\n{body}\n) LIMIT {max_rows}"
+
+
+def guard_sql(sql: str, allowlist: Allowlist, max_rows: int) -> GuardResult:
+    """Return the SQL to run, with its outer LIMIT capped at ``max_rows``, or a classified error."""
+    try:
+        statements = [statement for statement in sqlglot.parse(sql, read="clickhouse") if statement is not None]
+    except sqlglot.errors.ParseError as error:
+        first = " ".join(str(error).split())[:300]
+        return GuardResult(error=AgentError("sql", NODE, f"SQL does not parse: {first}"))
+    if len(statements) != 1:
+        return _policy(f"exactly one statement is allowed, got {len(statements)}")
+    tree = statements[0]
+    if not isinstance(tree, exp.Query):
+        return _policy(f"only SELECT queries are allowed, got {tree.key.upper()}")
+    try:
+        _check_clauses(tree)
+        ctes = {cte.alias for cte in tree.find_all(exp.CTE)}
+        tables = _check_tables(tree, allowlist, ctes)
+        _check_functions(tree)
+        if not tables:
+            raise _Rejected("the query reads no approved dataset")
+        _check_stars(tree, ctes)
+        _check_columns(tree, allowlist, tables, ctes)
+    except _Rejected as rejection:
+        return _policy(str(rejection))
+    return GuardResult(sql=_limited(sql, tree, max_rows))
