@@ -24,7 +24,10 @@ COPY --from=build /app/.venv ./.venv
 COPY apps/api/app ./app
 COPY jobs ./jobs
 COPY dbt ./dbt
-RUN useradd --create-home --uid 10001 app
+COPY packs ./packs
+# Compiled packs live in a named volume mounted here; Docker copies this
+# directory's owner into a new volume, so the app user can write to it.
+RUN useradd --create-home --uid 10001 app     && mkdir -p /app/build/packs     && chown app /app/build/packs
 USER app
 
 EXPOSE 8000

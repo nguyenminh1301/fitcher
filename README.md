@@ -7,10 +7,10 @@ The planned application answers questions such as "Top 10 best-selling products 
 
 The repository runs the six lab services with no business logic yet.
 Docker Compose starts ClickHouse, OpenSearch, LiteLLM, Keycloak, the FastAPI skeleton in `apps/api` (`GET /health`) and the Next.js placeholder page in `apps/web`; their configuration lives in [infra/](infra/README.md).
-`jobs/` loads the e-commerce lab dataset into ClickHouse `raw` and refreshes it, and [dbt/](dbt/README.md) builds the `sales_lines`, `returns_fact` and `sessions_daily` marts; [packs/](packs/README.md) holds the Domain Pack schemas and the hand-written `ecommerce_twin` pack, which the API loads and validates, and `apps/api/prompts/` contains only a README describing what each phase adds.
+`jobs/` loads the e-commerce lab dataset into ClickHouse `raw` and refreshes it, and [dbt/](dbt/README.md) builds the `sales_lines`, `returns_fact` and `sessions_daily` marts; [packs/](packs/README.md) holds the Domain Pack schemas and the hand-written `ecommerce_twin` pack, which `jobs/compile_pack.py` validates, test-runs and indexes into OpenSearch, and `apps/api/prompts/` contains only a README describing what each phase adds.
 
 The architecture is settled in [DECISIONS.md](docs/DECISIONS.md) and delivered in the order of the [master plan](docs/MASTER_PLAN.md), with one [detailed plan per phase](docs/plans/README.md).
-Phase 1 (lab dataset and dbt marts) is complete; Phase 2 (hand-written Domain Pack and compiler) is in progress: the pack format and the e-commerce pack exist, and compiling it into OpenSearch is next.
+Phases 1 (lab dataset and dbt marts) and 2 (hand-written Domain Pack and compiler) are complete; Phase 3 (core agent on the CLI) is next.
 
 ## Architecture
 
@@ -60,6 +60,15 @@ Jobs run in the `jobs` Compose service (profile `jobs`), which uses the `api` im
 The loader downloads the seven Parquet files of [`ziadatalabs/FreeEcommerceTwin14M`](https://huggingface.co/datasets/ziadatalabs/FreeEcommerceTwin14M) at the revision pinned in `jobs/sources/ecommerce_twin.yaml` into `data/hf/`, reuses complete downloads on later runs, and publishes the `raw` tables only after every row count matches the manifest.
 The dataset is licensed CC BY-NC 4.0 for non-commercial use only; downloads and derived data stay in the Git-ignored `data/` directory and are never committed.
 On Linux hosts, `./data` must be writable by UID 10001, the non-root user of the `api` image.
+
+### Compile the Domain Pack
+
+```bash
+docker compose run --rm jobs python -m jobs.compile_pack --pack ecommerce_twin
+```
+
+The compile validates the pack against the marts, test-runs every metric, embeds pack items through the `embed` alias (billable, needs `OPENAI_API_KEY`) and publishes the pack's OpenSearch indices and `compiled.json`; see [packs/](packs/README.md#compiling-a-pack).
+`ACTIVE_PACK` in `.env` names the pack the API serves.
 
 | Service | Host address | Health check |
 | --- | --- | --- |
