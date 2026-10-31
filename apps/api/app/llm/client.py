@@ -53,9 +53,9 @@ class LiteLLMClient:
         content = self._complete(alias, prompt, response_format)
         try:
             return schema.model_validate(json.loads(content))
-        except (json.JSONDecodeError, ValidationError) as error:
-            # The validation details may echo reply content, so only the schema is named.
-            raise LLMError(f"alias {alias} replied with JSON that does not match {schema.__name__}") from error
+        except (json.JSONDecodeError, ValidationError):
+            # The validation details echo reply content, so neither the message nor a chained cause carries them.
+            raise LLMError(f"alias {alias} replied with JSON that does not match {schema.__name__}") from None
 
     def text(self, alias: str, prompt: str) -> str:
         return self._complete(alias, prompt, None)
