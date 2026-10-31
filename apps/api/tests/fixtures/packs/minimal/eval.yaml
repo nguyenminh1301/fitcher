@@ -1,0 +1,21 @@
+cases:
+  - id: top_widgets_by_revenue
+    question: Top 5 widgets by revenue
+    language: en
+    category: top_n
+    role: viewer
+    expected:
+      intent: data_query
+      outcome: answer
+      metrics: [widget_revenue]
+      top_n: 5
+      rank_by: widget_revenue
+      dataset: widget_sales
+      columns: [widget_name]
+    expected_sql: >-
+      SELECT widget_name, sum(sale_amount) AS widget_revenue
+      FROM marts.widget_sales GROUP BY widget_name
+      ORDER BY widget_revenue DESC LIMIT 5
+    status: approved
+    evidence: [{kind: manual, ref: fixture}]
+    confidence: 1.0

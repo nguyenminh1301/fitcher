@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "examples.yaml",
+  "description": "Questions with their canonical SQL, used as few-shot examples.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["examples"],
+  "properties": {
+    "examples": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "question", "language", "sql", "datasets", "metrics", "status", "evidence", "confidence"],
+        "properties": {
+          "id": {"$ref": "common.schema.json#/$defs/id"},
+          "question": {"$ref": "common.schema.json#/$defs/text"},
+          "language": {"$ref": "common.schema.json#/$defs/language"},
+          "sql": {"$ref": "common.schema.json#/$defs/text"},
+          "datasets": {"type": "array", "minItems": 1, "items": {"$ref": "common.schema.json#/$defs/id"}},
+          "metrics": {"type": "array", "items": {"$ref": "common.schema.json#/$defs/id"}},
+          "status": {"$ref": "common.schema.json#/$defs/status"},
+          "evidence": {"$ref": "common.schema.json#/$defs/evidence"},
+          "confidence": {"$ref": "common.schema.json#/$defs/confidence"}
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "glossary.yaml",
+  "description": "Business terms with Vietnamese and English aliases, each pointing to metrics, columns or column values.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["terms"],
+  "properties": {
+    "terms": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "term", "definition", "aliases", "targets", "status", "evidence", "confidence"],
+        "properties": {
+          "id": {"$ref": "common.schema.json#/$defs/id"},
+          "term": {"$ref": "common.schema.json#/$defs/text"},
+          "definition": {"$ref": "common.schema.json#/$defs/text"},
+          "aliases": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["vi", "en"],
+            "properties": {
+              "vi": {"type": "array", "minItems": 1, "items": {"$ref": "common.schema.json#/$defs/text"}},
+              "en": {"type": "array", "minItems": 1, "items": {"$ref": "common.schema.json#/$defs/text"}}
+            }
+          },
+          "targets": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["kind"],
+              "properties": {
+                "kind": {"type": "string", "enum": ["metric", "column", "value"]},
+                "metric": {"$ref": "common.schema.json#/$defs/id"},
+                "dataset": {"$ref": "common.schema.json#/$defs/id"},
+                "column": {"$ref": "common.schema.json#/$defs/name"},
+                "value": {"$ref": "common.schema.json#/$defs/text"}
+              },
+              "allOf": [
+                {"if": {"properties": {"kind": {"const": "metric"}}}, "then": {"required": ["metric"]}},
+                {"if": {"properties": {"kind": {"const": "column"}}}, "then": {"required": ["dataset", "column"]}},
+                {"if": {"properties": {"kind": {"const": "value"}}}, "then": {"required": ["dataset", "column", "value"]}}
+              ]
+            }
+          },
+          "status": {"$ref": "common.schema.json#/$defs/status"},
+          "evidence": {"$ref": "common.schema.json#/$defs/evidence"},
+          "confidence": {"$ref": "common.schema.json#/$defs/confidence"}
+        }
+      }
+    }
+  }
+}

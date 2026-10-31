@@ -1,0 +1,13 @@
+examples:
+  - id: revenue_by_widget
+    question: Top 10 widgets by revenue
+    language: en
+    sql: >-
+      SELECT widget_name, sum(sale_amount) AS widget_revenue
+      FROM marts.widget_sales GROUP BY widget_name
+      ORDER BY widget_revenue DESC LIMIT 10
+    datasets: [widget_sales]
+    metrics: [widget_revenue]
+    status: approved
+    evidence: [{kind: manual, ref: fixture}]
+    confidence: 1.0

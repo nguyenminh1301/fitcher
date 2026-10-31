@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "policies.yaml",
+  "description": "Roles and the datasets, columns and rows each may read; the single source of access rules.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["roles"],
+  "properties": {
+    "roles": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "description", "datasets", "status", "evidence", "confidence"],
+        "properties": {
+          "id": {"$ref": "common.schema.json#/$defs/id"},
+          "description": {"$ref": "common.schema.json#/$defs/text"},
+          "datasets": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["dataset", "columns"],
+              "properties": {
+                "dataset": {"$ref": "common.schema.json#/$defs/id"},
+                "columns": {"type": "array", "minItems": 1, "items": {"$ref": "common.schema.json#/$defs/name"}},
+                "row_filter": {"$ref": "common.schema.json#/$defs/text", "description": "Boolean expression over the dataset columns."}
+              }
+            }
+          },
+          "status": {"$ref": "common.schema.json#/$defs/status"},
+          "evidence": {"$ref": "common.schema.json#/$defs/evidence"},
+          "confidence": {"$ref": "common.schema.json#/$defs/confidence"}
+        }
+      }
+    }
+  }
+}

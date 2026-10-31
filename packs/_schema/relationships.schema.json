@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "relationships.yaml",
+  "description": "The only join paths generated SQL may use.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["relationships"],
+  "properties": {
+    "relationships": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "description", "from_dataset", "to_dataset", "on", "cardinality", "status", "evidence", "confidence"],
+        "properties": {
+          "id": {"$ref": "common.schema.json#/$defs/id"},
+          "description": {"$ref": "common.schema.json#/$defs/text"},
+          "from_dataset": {"$ref": "common.schema.json#/$defs/id"},
+          "to_dataset": {"$ref": "common.schema.json#/$defs/id"},
+          "on": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["from_column", "to_column"],
+              "properties": {
+                "from_column": {"$ref": "common.schema.json#/$defs/name"},
+                "to_column": {"$ref": "common.schema.json#/$defs/name"}
+              }
+            }
+          },
+          "cardinality": {"type": "string", "enum": ["one_to_one", "many_to_one", "one_to_many"]},
+          "status": {"$ref": "common.schema.json#/$defs/status"},
+          "evidence": {"$ref": "common.schema.json#/$defs/evidence"},
+          "confidence": {"$ref": "common.schema.json#/$defs/confidence"}
+        }
+      }
+    }
+  }
+}
