@@ -24,14 +24,21 @@ class FakeResult:
 
 
 class FakeClient:
-    def __init__(self, error: Exception | None = None):
+    def __init__(self, error: Exception | None = None, empty: bool = False):
         self.error = error
+        self.empty = empty
         self.calls: list[tuple[str, dict]] = []
 
     def query(self, sql, settings=None):
         self.calls.append((sql, settings))
         if self.error is not None:
             raise self.error
+        if sql.startswith("DESCRIBE TABLE"):
+            return FakeResult(("name", "type"), [FakeType("String"), FakeType("String")], [
+                ("widget_name", "String", "", "", "", "", ""), ("revenue", "Float64", "", "", "", "", ""),
+            ])
+        if self.empty:
+            return FakeResult((), [], [])
         return FakeResult(("widget_name", "revenue"), [FakeType("String"), FakeType("Float64")], [["Blue", 3.5]])
 
 
@@ -60,6 +67,17 @@ def test_execute_sends_limits_trace_id_and_query_id():
         "max_execution_time": 12, "max_result_rows": 345, "max_memory_usage": 678,
         "log_comment": "trace-9", "query_id": "qid-1",
     })]
+
+
+def test_empty_result_reads_its_columns_with_describe():
+    client = FakeClient(empty=True)
+
+    result = execute(runner(client), "SELECT widget_name, revenue FROM marts.widget_sales WHERE 0", "trace-9")
+
+    assert result.output.rows == []
+    assert result.output.columns == ["widget_name", "revenue"]
+    assert result.output.types == ["String", "Float64"]
+    assert client.calls[1][0] == "DESCRIBE TABLE (SELECT widget_name, revenue FROM marts.widget_sales WHERE 0)"
 
 
 def test_explain_prefixes_the_query_and_reports_success_as_none():

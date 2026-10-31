@@ -129,12 +129,14 @@ class ClickHouseRunner:
 
     def run(self, sql: str, trace_id: str) -> QueryOutput:
         query_id, result = self._query(sql, trace_id)
-        return QueryOutput(
-            query_id=query_id,
-            columns=list(result.column_names),
-            types=[column_type.name for column_type in result.column_types],
-            rows=[tuple(row) for row in result.result_rows],
-        )
+        columns = list(result.column_names)
+        types = [column_type.name for column_type in result.column_types]
+        if not columns:
+            # An empty result arrives without column metadata; DESCRIBE reads it without running the query.
+            _, described = self._query(f"DESCRIBE TABLE ({sql})", trace_id)
+            columns = [row[0] for row in described.result_rows]
+            types = [row[1] for row in described.result_rows]
+        return QueryOutput(query_id=query_id, columns=columns, types=types, rows=[tuple(row) for row in result.result_rows])
 
 
 def agent_client(env: Mapping[str, str] | None = None):
