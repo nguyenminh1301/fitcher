@@ -54,7 +54,8 @@ class LiteLLMClient:
         try:
             return schema.model_validate(json.loads(content))
         except (json.JSONDecodeError, ValidationError) as error:
-            raise LLMError(f"alias {alias} replied with JSON that does not match {schema.__name__}: {error}") from error
+            # The validation details may echo reply content, so only the schema is named.
+            raise LLMError(f"alias {alias} replied with JSON that does not match {schema.__name__}") from error
 
     def text(self, alias: str, prompt: str) -> str:
         return self._complete(alias, prompt, None)
@@ -70,8 +71,16 @@ class LiteLLMClient:
             raise LLMError(f"request to alias {alias} failed: {type(error).__name__}") from error
         if response.status_code != 200:
             raise LLMError(f"alias {alias} returned HTTP {response.status_code}")
-        choices = response.json().get("choices") or [{}]
-        content = (choices[0].get("message") or {}).get("content") or ""
-        if not content.strip():
+        try:
+            envelope = response.json()
+        except ValueError as error:
+            raise LLMError(f"alias {alias} returned a reply that is not JSON") from error
+        choices = envelope.get("choices") if isinstance(envelope, dict) else None
+        first = choices[0] if isinstance(choices, list) and choices and isinstance(choices[0], dict) else {}
+        message = first.get("message")
+        content = message.get("content") if isinstance(message, dict) else None
+        if content is not None and not isinstance(content, str):
+            raise LLMError(f"alias {alias} returned a malformed reply")
+        if not content or not content.strip():
             raise LLMError(f"alias {alias} returned an empty reply")
         return content

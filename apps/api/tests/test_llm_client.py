@@ -67,10 +67,22 @@ def test_only_chat_alias_names_are_accepted(alias):
     (reply("   "), "empty reply"),
     (reply("not json"), "does not match Answer"),
     (reply('{"word": "x"}'), "does not match Answer"),
+    (httpx.Response(200, content=b"<html>"), "not JSON"),
+    (httpx.Response(200, json=["not", "an", "object"]), "empty reply"),
+    (httpx.Response(200, json={"choices": []}), "empty reply"),
+    (httpx.Response(200, json={"choices": [{"message": "text"}]}), "empty reply"),
+    (httpx.Response(200, json={"choices": [{"message": {"content": 42}}]}), "malformed reply"),
 ])
 def test_failures_raise_llm_error(response, message):
     with pytest.raises(LLMError, match=message):
         client(lambda request: response).structured("fast", "hi", Answer)
+
+
+def test_schema_mismatch_does_not_echo_the_reply():
+    with pytest.raises(LLMError) as raised:
+        client(lambda request: reply('{"word": "secret-value", "count": "many"}')).structured("fast", "hi", Answer)
+
+    assert "secret-value" not in str(raised.value) and "many" not in str(raised.value)
 
 
 def test_missing_gateway_settings_are_rejected():
