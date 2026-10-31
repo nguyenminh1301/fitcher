@@ -1,0 +1,78 @@
+datasets:
+  - id: sales_lines
+    description: >-
+      Order lines with their order, product and customer attributes. Net sales
+      excludes cancelled orders; returns are not netted, see returns_fact. The
+      source has no discounts and no order times.
+    grain: one row per order line
+    time_column: order_date
+    allowed_roles: [analyst]
+    status: approved
+    evidence: &marts [{kind: manual, ref: dbt/models/ecommerce_twin/marts/schema.yml}]
+    confidence: 1.0
+    columns:
+      - {name: order_item_id, type: string, role: dimension, description: Order line key.}
+      - {name: order_id, type: string, role: dimension, description: Order the line belongs to.}
+      - {name: order_date, type: date, role: time, description: Date the order was placed.}
+      - {name: order_status, type: string, role: dimension, indexable: true, description: "Order status: delivered, shipped, returned or cancelled."}
+      - {name: payment_method, type: string, role: dimension, indexable: true, description: Payment method of the order.}
+      - {name: customer_id, type: string, role: dimension, description: Customer who placed the order.}
+      - {name: customer_region, type: string, role: dimension, indexable: true, description: Customer region.}
+      - {name: customer_segment, type: string, role: dimension, indexable: true, description: "Customer segment: new, casual, loyal or vip."}
+      - {name: customer_signup_date, type: date, role: time, description: Date the customer signed up.}
+      - {name: product_id, type: string, role: dimension, indexable: true, description: Product SKU sold on the line; the source has no product names.}
+      - {name: product_category, type: string, role: dimension, indexable: true, description: Product category.}
+      - {name: product_subcategory, type: string, role: dimension, indexable: true, description: Product subcategory.}
+      - {name: product_brand, type: string, role: dimension, indexable: true, description: Product brand.}
+      - {name: product_list_price, type: number, role: measure, description: Current list price of the product.}
+      - {name: product_unit_cost, type: number, role: measure, description: Current unit cost of the product.}
+      - {name: quantity, type: number, role: measure, description: Units sold on the line.}
+      - {name: unit_price, type: number, role: measure, description: Price per unit on the line.}
+      - {name: line_amount, type: number, role: measure, description: quantity * unit_price for the line.}
+      - {name: is_returned, type: boolean, role: dimension, description: Whether the line was returned.}
+
+  - id: returns_fact
+    description: Returned order lines with the attributes of the original sale.
+    grain: one row per return
+    time_column: return_date
+    allowed_roles: [analyst]
+    status: approved
+    evidence: *marts
+    confidence: 1.0
+    columns:
+      - {name: return_id, type: string, role: dimension, description: Return key.}
+      - {name: return_date, type: date, role: time, description: Date the return was recorded.}
+      - {name: return_reason, type: string, role: dimension, indexable: true, description: Reason given for the return.}
+      - {name: refund_amount, type: number, role: measure, description: Amount refunded.}
+      - {name: order_item_id, type: string, role: dimension, description: Returned order line.}
+      - {name: order_id, type: string, role: dimension, description: Order of the returned line.}
+      - {name: order_date, type: date, role: time, description: Date of the original order.}
+      - {name: order_status, type: string, role: dimension, indexable: true, description: Status of the original order.}
+      - {name: product_id, type: string, role: dimension, indexable: true, description: Returned product SKU.}
+      - {name: product_category, type: string, role: dimension, indexable: true, description: Product category.}
+      - {name: product_subcategory, type: string, role: dimension, indexable: true, description: Product subcategory.}
+      - {name: product_brand, type: string, role: dimension, indexable: true, description: Product brand.}
+      - {name: customer_id, type: string, role: dimension, description: Customer of the original order.}
+      - {name: customer_region, type: string, role: dimension, indexable: true, description: Customer region.}
+      - {name: customer_segment, type: string, role: dimension, indexable: true, description: Customer segment.}
+      - {name: quantity, type: number, role: measure, description: Units on the original line.}
+      - {name: line_amount, type: number, role: measure, description: Amount of the original line.}
+      - {name: days_to_return, type: number, role: measure, description: Days between the order date and the return date.}
+
+  - id: sessions_daily
+    description: Daily session and conversion counts by device, channel and customer group.
+    grain: one row per day, device, channel, customer region and customer segment
+    time_column: session_date
+    allowed_roles: [analyst, marketing]
+    status: approved
+    evidence: *marts
+    confidence: 1.0
+    columns:
+      - {name: session_date, type: date, role: time, description: Day the sessions started.}
+      - {name: device, type: string, role: dimension, indexable: true, description: "Device: desktop, mobile or tablet."}
+      - {name: channel, type: string, role: dimension, indexable: true, description: Traffic channel.}
+      - {name: customer_region, type: string, role: dimension, indexable: true, description: Region of the session's customer.}
+      - {name: customer_segment, type: string, role: dimension, indexable: true, description: Segment of the session's customer.}
+      - {name: sessions, type: number, role: measure, description: Number of sessions.}
+      - {name: converted_sessions, type: number, role: measure, description: Sessions that converted into an order.}
+      - {name: pages_viewed, type: number, role: measure, description: Total pages viewed in the sessions.}
