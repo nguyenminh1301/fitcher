@@ -83,7 +83,7 @@ def test_schema_mismatch_does_not_echo_the_reply():
         client(lambda request: reply('{"word": "secret-value", "count": "many"}')).structured("fast", "hi", Answer)
 
     assert "secret-value" not in str(raised.value) and "many" not in str(raised.value)
-    assert raised.value.__cause__ is None and raised.value.__suppress_context__
+    assert raised.value.__cause__ is None and raised.value.__context__ is None
 
 
 def test_missing_gateway_settings_are_rejected():
