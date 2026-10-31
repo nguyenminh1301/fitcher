@@ -139,8 +139,16 @@ def _check_columns(tree: exp.Expression, allowlist: Allowlist) -> None:
         _check_scope_columns(scope, allowlist)
 
 
+def _is_projection(node: exp.Expression) -> bool:
+    return isinstance(node.parent, exp.Select) and any(node is projection for projection in node.parent.expressions)
+
+
 def _check_stars(tree: exp.Expression, ctes: set[str]) -> None:
-    """``SELECT *`` over a base table could return columns outside the allowlist."""
+    """``*`` outside ``count(*)`` or over a base table could return columns outside the allowlist."""
+    for star in tree.find_all(exp.Star):
+        qualified = star.parent if isinstance(star.parent, exp.Column) else star
+        if not isinstance(star.parent, exp.Count) and not _is_projection(qualified):
+            raise _Rejected("* is allowed only in count(*) or a select list; name the columns")
     for select in tree.find_all(exp.Select):
         star = any(
             isinstance(projection, exp.Star) or (isinstance(projection, exp.Column) and isinstance(projection.this, exp.Star))
@@ -181,7 +189,7 @@ def guard_sql(sql: str, allowlist: Allowlist, max_rows: int) -> GuardResult:
     """Return the SQL to run, with its outer LIMIT capped at ``max_rows``, or a classified error."""
     try:
         statements = [statement for statement in sqlglot.parse(sql, read="clickhouse") if statement is not None]
-    except sqlglot.errors.ParseError as error:
+    except sqlglot.errors.SqlglotError as error:  # parse and tokenizer errors alike
         first = " ".join(str(error).split())[:300]
         return GuardResult(error=AgentError("sql", NODE, f"SQL does not parse: {first}"))
     if len(statements) != 1:

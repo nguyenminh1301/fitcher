@@ -23,6 +23,16 @@ class FakeResult:
     result_rows: list
 
 
+class BrokenRowsResult(FakeResult):
+    @property
+    def result_rows(self):
+        raise ConnectionResetError("connection reset while reading rows")
+
+    @result_rows.setter
+    def result_rows(self, value):
+        pass
+
+
 class FakeClient:
     def __init__(self, error: Exception | None = None, empty: bool = False):
         self.error = error
@@ -101,6 +111,16 @@ def test_explain_prefixes_the_query_and_reports_success_as_none():
 ])
 def test_clickhouse_errors_are_classified(code, name, category):
     assert classify(driver_error(code, name)) == (category, code)
+
+
+def test_failure_while_reading_rows_is_classified():
+    class Client(FakeClient):
+        def query(self, sql, settings=None):
+            return BrokenRowsResult(("widget_name",), [FakeType("String")], [])
+
+    result = execute(runner(Client()), "SELECT widget_name FROM marts.widget_sales", "t")
+
+    assert (result.error.category, result.query_id) == ("runtime", "qid-1")
 
 
 def test_connection_failure_is_a_runtime_error():

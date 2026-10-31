@@ -91,6 +91,13 @@ def test_count_star_is_accepted():
     accepted("SELECT count(*) AS sales FROM marts.widget_sales")
 
 
+def test_unterminated_string_is_an_sql_error_to_retry():
+    error = rejected("SELECT 'abc FROM marts.widget_sales")
+
+    assert error.category == "sql"
+    assert error.message.startswith("SQL does not parse")
+
+
 def test_unparsable_sql_is_an_sql_error_to_retry():
     error = rejected("SELECT widget_name FROM marts.widget_sales WHERE")
 
@@ -110,6 +117,8 @@ def test_unparsable_sql_is_an_sql_error_to_retry():
     ("SELECT w.refund_total FROM marts.widget_sales AS w", "column refund_total is not an approved column of w"),
     ("SELECT q.secret FROM (SELECT widget_name FROM marts.widget_sales) AS q", "column secret is not an approved column of q"),
     ("SELECT COLUMNS('.*') FROM marts.widget_sales", "function columns()"),
+    ("SELECT tuple(*) AS t FROM marts.widget_sales", "* is allowed only in count(*) or a select list"),
+    ("SELECT toString(w.*) AS t FROM marts.widget_sales AS w", "* is allowed only in count(*) or a select list"),
     ("SELECT widget_name FROM marts.customers", "is not an approved dataset"),
     ("SELECT widget_name FROM raw.widget_sales", "is not an approved dataset"),
     ("SELECT name FROM system.tables", "system table system.tables"),

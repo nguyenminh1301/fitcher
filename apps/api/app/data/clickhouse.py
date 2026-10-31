@@ -116,30 +116,38 @@ class ClickHouseRunner:
             "query_id": query_id,
         }
 
-    def _query(self, sql: str, trace_id: str, max_result_rows: int | None = None):
+    def _query(self, sql: str, trace_id: str, max_result_rows: int | None = None) -> QueryOutput:
+        """Run one query and read its whole result; any failure, including while reading rows, is a QueryError."""
         query_id = self._new_query_id()
         try:
-            return query_id, self._client.query(sql, settings=self._settings(trace_id, query_id, max_result_rows))
+            result = self._client.query(sql, settings=self._settings(trace_id, query_id, max_result_rows))
+            return QueryOutput(
+                query_id=query_id,
+                columns=list(result.column_names),
+                types=[column_type.name for column_type in result.column_types],
+                rows=[tuple(row) for row in result.result_rows],
+            )
         except Exception as error:  # noqa: BLE001 - every driver failure is classified, never raised raw
             category, code = classify(error)
             raise QueryError(category, _message(error), query_id, code) from error
 
     def explain(self, sql: str, trace_id: str) -> str:
         """Run ``EXPLAIN`` on the query; return the EXPLAIN query's id."""
-        query_id, _ = self._query(f"EXPLAIN {sql}", trace_id)
-        return query_id
+        return self._query(f"EXPLAIN {sql}", trace_id).query_id
 
     def run(self, sql: str, trace_id: str) -> QueryOutput:
-        query_id, result = self._query(sql, trace_id)
-        columns = list(result.column_names)
-        types = [column_type.name for column_type in result.column_types]
-        if not columns:
-            # An empty result arrives without column metadata; DESCRIBE reads it without running the query.
-            # The newline ends a trailing line comment, and 0 lifts the row limit for the column list.
-            _, described = self._query(f"DESCRIBE TABLE (\n{sql}\n)", trace_id, max_result_rows=0)
-            columns = [row[0] for row in described.result_rows]
-            types = [row[1] for row in described.result_rows]
-        return QueryOutput(query_id=query_id, columns=columns, types=types, rows=[tuple(row) for row in result.result_rows])
+        output = self._query(sql, trace_id)
+        if output.columns:
+            return output
+        # An empty result arrives without column metadata; DESCRIBE reads it without running the query.
+        # The newline ends a trailing line comment, and 0 lifts the row limit for the column list.
+        described = self._query(f"DESCRIBE TABLE (\n{sql}\n)", trace_id, max_result_rows=0)
+        return QueryOutput(
+            query_id=output.query_id,
+            columns=[row[0] for row in described.rows],
+            types=[row[1] for row in described.rows],
+            rows=output.rows,
+        )
 
 
 def agent_client(env: Mapping[str, str] | None = None):
