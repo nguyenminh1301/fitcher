@@ -14,12 +14,15 @@ pass UTC (DECISIONS §6).
 
 from collections.abc import Sequence
 from datetime import UTC, date, datetime, timedelta
-from typing import Literal, Self
+from typing import TYPE_CHECKING, Literal, Self
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from app.contracts.query_spec import Period
+
+if TYPE_CHECKING:
+    from app.agent.state import AgentDeps, AgentState
 
 Unit = Literal["day", "week", "month", "quarter", "year"]
 
@@ -190,3 +193,14 @@ def resolve_periods(
     if len(set(labels)) != len(labels):
         raise TimeResolutionError(f"the question names the same period twice: {labels}")
     return periods
+
+
+def resolve_time(state: "AgentState", deps: "AgentDeps") -> dict:
+    """Graph node: resolve the extracted periods against the deps' reference date."""
+    try:
+        periods = resolve_periods(
+            state["extraction"].periods, deps.today, deps.compiled.pack.business_profile.fiscal_year_start_month
+        )
+    except TimeResolutionError as error:
+        return {"rejection": f"the period cannot be resolved: {error}"}
+    return {"periods": periods}

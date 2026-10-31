@@ -9,6 +9,7 @@ They share the `api` image, which copies this directory to `/app/jobs`, and run 
 | `load_data.py` | `docker compose run --rm jobs python -m jobs.load_data --source <name>` | Loads the source described by `sources/<name>.yaml` into ClickHouse `raw`; publishes all tables or none |
 
 | `refresh_data.py` | `docker compose run --rm jobs python -m jobs.refresh_data --source <name>` | Loads the source, then runs `dbt build --select +tag:<dbt_tag>`; records the generation in `data_meta.refresh_log` |
+| `ask.py` | `docker compose run --rm api python -m jobs.ask "<question>"` | Runs the `data_query` agent as the read-only ClickHouse user and prints the SQL attempts, result table, warnings and summary; billable LiteLLM calls; `--timezone`, `--reference-date`, `--inject-sql-fault` |
 | `compile_pack.py` | `docker compose run --rm jobs python -m jobs.compile_pack --pack <name>` | Validates the pack, test-runs its metrics and publishes a new generation of its search indices; billable embeddings unless `--skip-index`; `--check-search "<query>"` searches the live pack |
 
 A refresh records `started`, then `completed` only when the load and every dbt model and test succeed, or `failed` otherwise.

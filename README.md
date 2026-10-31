@@ -5,12 +5,12 @@ The planned application answers questions such as "Top 10 best-selling products 
 
 ## Current status
 
-The repository runs the six lab services with no business logic yet.
+The repository runs the six lab services and answers `data_query` questions from the command line.
 Docker Compose starts ClickHouse, OpenSearch, LiteLLM, Keycloak, the FastAPI skeleton in `apps/api` (`GET /health`) and the Next.js placeholder page in `apps/web`; their configuration lives in [infra/](infra/README.md).
-`jobs/` loads the e-commerce lab dataset into ClickHouse `raw` and refreshes it, and [dbt/](dbt/README.md) builds the `sales_lines`, `returns_fact` and `sessions_daily` marts; [packs/](packs/README.md) holds the Domain Pack schemas and the hand-written `ecommerce_twin` pack, which `jobs/compile_pack.py` validates, test-runs and indexes into OpenSearch, and `apps/api/prompts/` contains only a README describing what each phase adds.
+`jobs/` loads the e-commerce lab dataset into ClickHouse `raw` and refreshes it, and [dbt/](dbt/README.md) builds the `sales_lines`, `returns_fact` and `sessions_daily` marts; [packs/](packs/README.md) holds the Domain Pack schemas and the hand-written `ecommerce_twin` pack, which `jobs/compile_pack.py` validates, test-runs and indexes into OpenSearch; `jobs/ask.py` runs the LangGraph agent in `apps/api/app/agent` over the compiled pack, with its prompts in `apps/api/prompts/`.
 
 The architecture is settled in [DECISIONS.md](docs/DECISIONS.md) and delivered in the order of the [master plan](docs/MASTER_PLAN.md), with one [detailed plan per phase](docs/plans/README.md).
-Phases 1 (lab dataset and dbt marts) and 2 (hand-written Domain Pack and compiler) are complete; Phase 3 (core agent on the CLI) is next.
+Phases 1 (lab dataset and dbt marts), 2 (hand-written Domain Pack and compiler) and 3 (core agent on the CLI) are complete; Phase 4 (eval harness) is next.
 
 ## Architecture
 
@@ -69,6 +69,16 @@ docker compose run --rm jobs python -m jobs.compile_pack --pack ecommerce_twin
 
 The compile validates the pack against the marts, test-runs every metric, embeds pack items through the `embed` alias (billable, needs `OPENAI_API_KEY`) and publishes the pack's OpenSearch indices and `compiled.json`; see [packs/](packs/README.md#compiling-a-pack).
 `ACTIVE_PACK` in `.env` names the pack the API serves.
+
+### Ask a question
+
+```bash
+docker compose run --rm api python -m jobs.ask "Top 10 best-selling products in Q1 2024 compared with Q1 2025"
+```
+
+The agent extracts the question, resolves its periods, retrieves pack context, builds a QuerySpec, generates SQL through `sql-gen`, guards it, runs `EXPLAIN` and the query as the read-only `agent_readonly` ClickHouse user, repairs failing SQL up to three times (the third through `sql-gen-hard`) and summarizes the rows in the question's language.
+Each run sends billable requests to the LiteLLM aliases. Pass `--timezone <IANA name>` for relative periods (UTC by default) and `--inject-sql-fault` to watch a broken first query being repaired.
+Without the router and clarify branch of later phases, a question that names no measure or period, or whose measure is ambiguous, exits with code 2 and the reason; a query that cannot be repaired exits with code 1 after printing the last SQL and error.
 
 | Service | Host address | Health check |
 | --- | --- | --- |
@@ -167,7 +177,7 @@ The PR size labeler runs for branches within this repository; fork PRs do not re
 
 ## Next steps
 
-- Phase 2: Write the e-commerce Domain Pack over the marts and compile it into OpenSearch.
+- Phase 4: Measure extraction, retrieval and execution results with `eval.py --pack ecommerce_twin` and record a baseline.
 - Later phases follow the [master plan](docs/MASTER_PLAN.md); each starts from its [phase plan](docs/plans/README.md).
 
 See [CHANGELOG.md](CHANGELOG.md) for repository changes and [SECURITY.md](SECURITY.md) for vulnerability reporting.
