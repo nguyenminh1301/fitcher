@@ -409,6 +409,9 @@ source = { virtual = "." }
 default-groups = ["dev", "jobs"]
 dependencies = [
     { name = "fastapi" },
+    { name = "jsonschema" },
+    { name = "pydantic" },
+    { name = "pyyaml" },
     { name = "uvicorn" },
 ]
 
@@ -423,12 +426,14 @@ jobs = [
     { name = "dbt-core" },
     { name = "huggingface-hub" },
     { name = "pyarrow" },
-    { name = "pyyaml" },
 ]
 
 [package.metadata]
 requires-dist = [
     { name = "fastapi", specifier = "==0.162.0" },
+    { name = "jsonschema", specifier = "==4.26.0" },
+    { name = "pydantic", specifier = "==2.14.1" },
+    { name = "pyyaml", specifier = "==6.0.3" },
     { name = "uvicorn", specifier = "==0.54.0" },
 ]
 
@@ -443,7 +448,6 @@ jobs = [
     { name = "dbt-core", specifier = "==1.12.6" },
     { name = "huggingface-hub", specifier = "==2.4.0" },
     { name = "pyarrow", specifier = "==26.0.0" },
-    { name = "pyyaml", specifier = "==6.0.3" },
 ]
 
 [[package]]

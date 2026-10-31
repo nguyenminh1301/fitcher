@@ -46,7 +46,7 @@ apps/web/lib/contracts/             # generated .ts files, committed
 
 ## Contracts
 
-- Request: `{"question": str, "conversation_id": str | null}`; header `Authorization: Bearer <JWT>`.
+- Request: `{"question": str, "conversation_id": str | null, "timezone": str | null}` with the browser's IANA time zone (UTC when null); header `Authorization: Bearer <JWT>`.
 - SSE frames: `event: <name>` and `data: <json>`; heartbeat comments every 15 s.
 - Config: `KEYCLOAK_ISSUER`, `KEYCLOAK_AUDIENCE`, `KEYCLOAK_JWKS_URL`, `RATE_LIMIT_PER_MINUTE`.
 

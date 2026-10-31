@@ -4,6 +4,9 @@
 
 ### Added
 
+- Add the hand-written `ecommerce_twin` Domain Pack over the three marts: a USD business profile without time zone or answer language, with the "best-selling = net sales" convention, column roles and indexable string columns, ten metrics, Vietnamese and English glossary aliases, the returns join path, analyst and marketing roles, few-shot examples and one seed eval case per required category, with a test that loads every pack against the dbt mart columns.
+- Check Domain Pack cross-references: unique ids, metric, dataset, column and role references across files, time columns, indexable string columns, dataset `allowed_roles` equal to the roles `policies.yaml` grants, and dataset tables and columns against a warehouse catalog.
+- Define the Domain Pack format as one JSON Schema per pack file with shared id, status, evidence and confidence definitions, load packs into matching Pydantic models with YAML 1.2 scalars, and report every invalid file, missing or unknown field and bad enum value with its file and item path.
 - Document the marts refresh, refresh-state protocol, stale-lock recovery and acceptance query, and select the acceptance analysis by name in the Phase 1 verification command.
 - Build the `sales_lines`, `returns_fact` and `sessions_daily` marts from typed staging views with key, relationship, date-range and non-negative tests, and answer the Q1 2024 versus Q1 2025 top-10 products question in SQL with a test that recomputes it from staging.
 - Refresh a source under a per-source lock table, loading its raw tables and building its dbt models and tests, and record each generation as started, completed or failed in `data_meta.refresh_log` so readers can tell a complete refresh from a partial one.
@@ -31,6 +34,7 @@
 ### Changed
 
 - Plan company documents as runtime content: reviewers upload PDF, DOCX, Markdown, text and XLSX files on a Documents page and delete them at any time, with stored originals, a `data_meta.documents` registry, role-scoped `kb_docs` chunks and compiles that carry documents into each index generation.
+- Take the user's time zone from the browser with each request (UTC for clients that send none) and answer in the language of the question, instead of fixing both in the pack's business profile.
 - Limit CodeRabbit to code by excluding agent instructions and documentation from its review, and let PRs that change only those files merge on passing checks without a CodeRabbit review.
 - Settle the Phase 1 data plan from the inspected lab dataset: date-only typing, net sales without discounts, all-or-nothing raw publication, refresh state with a generation check for readers, unique `dbt_tag` values and a `jobs` Compose service that keeps admin credentials out of `api`.
 - Merge pull requests into `develop` only after every CI and Security check on the latest head commit passes and CodeRabbit has reviewed it with every finding verified and fixed or answered, treat a failing check as blocking even when the change did not cause it, and ask the owner when CodeRabbit does not review.
@@ -50,6 +54,7 @@
 
 ### Fixed
 
+- Reject a key repeated within one mapping of a Domain Pack YAML file instead of silently keeping its last value.
 - Correct the translated SQL retry rule and branch-specific SSE sequences, and make the phase plans define atomic index publication, a no-partial-data refresh requirement, permission revocation, trace completeness, credential-free realms and redaction of feedback proposals.
 - Publish downloads without overwriting concurrent outputs, validate the winning file, and fail safely on filesystems without atomic hard-link support.
 - Validate complete unique zone lookups and compatible Parquet types before dataset inspection, with CLI success/failure and safe transport-error regression tests.

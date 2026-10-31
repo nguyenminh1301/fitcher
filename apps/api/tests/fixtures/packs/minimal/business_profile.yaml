@@ -1,0 +1,13 @@
+# Synthetic pack used by the engine tests; its names are neutral on purpose.
+name: minimal
+display_name: Minimal widget shop
+industry: widget retail
+currency: USD
+fiscal_year_start_month: 1
+conventions:
+  - id: top_widgets
+    description: Rank widgets by revenue when the question names no measure.
+    metric: widget_revenue
+    status: approved
+    evidence: [{kind: manual, ref: fixture}]
+    confidence: 1.0

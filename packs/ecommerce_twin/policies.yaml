@@ -1,0 +1,29 @@
+# Phase 6 compiles these roles into ClickHouse roles, grants and row policies.
+roles:
+  - id: analyst
+    description: Reads every mart and column.
+    datasets:
+      - dataset: sales_lines
+        columns: [order_item_id, order_id, order_date, order_status, payment_method, customer_id, customer_region,
+          customer_segment, customer_signup_date, product_id, product_category, product_subcategory, product_brand,
+          product_list_price, product_unit_cost, quantity, unit_price, line_amount, is_returned]
+      - dataset: returns_fact
+        columns: [return_id, return_date, return_reason, refund_amount, order_item_id, order_id, order_date, order_status,
+          product_id, product_category, product_subcategory, product_brand, customer_id, customer_region, customer_segment,
+          quantity, line_amount, days_to_return]
+      - dataset: sessions_daily
+        columns: [session_date, device, channel, customer_region, customer_segment, sessions, converted_sessions,
+          pages_viewed]
+    status: approved
+    evidence: &owner [{kind: manual, ref: docs/plans/phase-02-domain-pack-and-compiler.md}]
+    confidence: 1.0
+
+  - id: marketing
+    description: Reads site traffic and conversion only; no sales or returns.
+    datasets:
+      - dataset: sessions_daily
+        columns: [session_date, device, channel, customer_region, customer_segment, sessions, converted_sessions,
+          pages_viewed]
+    status: approved
+    evidence: *owner
+    confidence: 1.0

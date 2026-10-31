@@ -1,0 +1,151 @@
+# Seed cases, one per required category (DECISIONS §12); the eval phase grows
+# the set. active_from_phase marks cases whose branch a later phase builds.
+cases:
+  - id: top_products_q1_2024_vs_q1_2025
+    question: Top 10 sản phẩm bán chạy nhất quý 1 năm 2024 so với quý 1 năm 2025
+    language: vi
+    category: two_period_compare
+    role: analyst
+    expected:
+      intent: data_query
+      outcome: answer
+      metrics: [net_sales]
+      periods:
+        - {label: Q1 2024, start: "2024-01-01", end: "2024-04-01"}
+        - {label: Q1 2025, start: "2025-01-01", end: "2025-04-01"}
+      top_n: 10
+      rank_by: net_sales
+      dataset: sales_lines
+      columns: [product_id, order_date]
+    expected_sql: |-
+      SELECT
+          product_id,
+          sumIf(line_amount, order_date >= toDate('2025-01-01') AND order_date < toDate('2025-04-01')) AS net_sales_q1_2025,
+          sumIf(line_amount, order_date >= toDate('2024-01-01') AND order_date < toDate('2024-04-01')) AS net_sales_q1_2024
+      FROM marts.sales_lines
+      WHERE order_status != 'cancelled'
+        AND order_date >= toDate('2024-01-01')
+        AND order_date < toDate('2025-04-01')
+      GROUP BY product_id
+      ORDER BY net_sales_q1_2025 DESC, product_id
+      LIMIT 10
+    status: approved
+    evidence: &owner [{kind: manual, ref: docs/DECISIONS.md#1-goals-and-scope}]
+    confidence: 1.0
+
+  - id: top_brands_by_units_2025
+    question: Top 5 brands by units sold in 2025
+    language: en
+    category: top_n
+    role: analyst
+    expected:
+      intent: data_query
+      outcome: answer
+      metrics: [units_sold]
+      periods:
+        - {label: "2025", start: "2025-01-01", end: "2026-01-01"}
+      top_n: 5
+      rank_by: units_sold
+      dataset: sales_lines
+      columns: [product_brand, order_date]
+    expected_sql: |-
+      SELECT product_brand, sumIf(quantity, order_status != 'cancelled') AS units_sold
+      FROM marts.sales_lines
+      WHERE order_date >= toDate('2025-01-01') AND order_date < toDate('2026-01-01')
+      GROUP BY product_brand
+      ORDER BY units_sold DESC, product_brand
+      LIMIT 5
+    status: approved
+    evidence: &cases [{kind: manual, ref: docs/DECISIONS.md#12-eval}]
+    confidence: 1.0
+
+  - id: electronics_net_sales_west_2024
+    question: Doanh thu ngành hàng Electronics ở khu vực West năm 2024 là bao nhiêu?
+    language: vi
+    category: string_filter
+    role: analyst
+    expected:
+      intent: data_query
+      outcome: answer
+      metrics: [net_sales]
+      periods:
+        - {label: "2024", start: "2024-01-01", end: "2025-01-01"}
+      dataset: sales_lines
+      columns: [product_category, customer_region, order_date]
+    expected_sql: |-
+      SELECT sumIf(line_amount, order_status != 'cancelled') AS net_sales
+      FROM marts.sales_lines
+      WHERE product_category = 'Electronics'
+        AND customer_region = 'West'
+        AND order_date >= toDate('2024-01-01') AND order_date < toDate('2025-01-01')
+    status: approved
+    evidence: *cases
+    confidence: 1.0
+
+  - id: monthly_conversion_rate_2025
+    question: Monthly conversion rate in 2025
+    language: en
+    category: monthly_trend
+    role: analyst
+    expected:
+      intent: data_query
+      outcome: answer
+      metrics: [conversion_rate]
+      periods:
+        - {label: "2025", start: "2025-01-01", end: "2026-01-01"}
+      dataset: sessions_daily
+      columns: [session_date]
+    expected_sql: |-
+      SELECT
+          toStartOfMonth(session_date) AS month,
+          sum(converted_sessions) / nullIf(sum(sessions), 0) AS conversion_rate
+      FROM marts.sessions_daily
+      WHERE session_date >= toDate('2025-01-01') AND session_date < toDate('2026-01-01')
+      GROUP BY month
+      ORDER BY month
+    status: approved
+    evidence: *cases
+    confidence: 1.0
+
+  - id: best_product_without_measure
+    question: Sản phẩm nào tốt nhất năm 2025?
+    language: vi
+    category: ambiguous
+    role: analyst
+    expected:
+      intent: data_query
+      outcome: clarify
+      periods:
+        - {label: "2025", start: "2025-01-01", end: "2026-01-01"}
+    active_from_phase: 8
+    status: approved
+    evidence: *cases
+    confidence: 1.0
+
+  - id: marketing_asks_for_refunds
+    question: Tổng tiền hoàn trả năm 2025 là bao nhiêu?
+    language: vi
+    category: unauthorized
+    role: marketing
+    expected:
+      intent: data_query
+      outcome: deny
+      metrics: [refund_total]
+      dataset: returns_fact
+    active_from_phase: 6
+    status: approved
+    evidence: *cases
+    confidence: 1.0
+
+  - id: weather_question
+    question: Thời tiết Hà Nội hôm nay thế nào?
+    language: vi
+    category: out_of_scope
+    role: analyst
+    expected:
+      intent: out_of_scope
+      outcome: answer
+    active_from_phase: 8
+    status: approved
+    evidence: *cases
+    confidence: 1.0

@@ -1,0 +1,61 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "eval.yaml",
+  "description": "Questions labelled with the expected result per layer: intent, extraction, retrieval and execution.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["cases"],
+  "properties": {
+    "cases": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "question", "language", "category", "role", "expected", "status", "evidence", "confidence"],
+        "properties": {
+          "id": {"$ref": "common.schema.json#/$defs/id"},
+          "question": {"$ref": "common.schema.json#/$defs/text"},
+          "language": {"$ref": "common.schema.json#/$defs/language"},
+          "category": {
+            "type": "string",
+            "enum": ["two_period_compare", "top_n", "string_filter", "monthly_trend", "ambiguous", "unauthorized", "out_of_scope"]
+          },
+          "role": {"$ref": "common.schema.json#/$defs/id", "description": "Role the question is asked as."},
+          "expected": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["intent", "outcome"],
+            "properties": {
+              "intent": {"type": "string", "enum": ["data_query", "metadata_qa", "chart_edit", "out_of_scope"]},
+              "outcome": {"type": "string", "enum": ["answer", "clarify", "deny"]},
+              "metrics": {"type": "array", "items": {"$ref": "common.schema.json#/$defs/id"}},
+              "periods": {
+                "description": "Half-open date ranges [start, end).",
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["label", "start", "end"],
+                  "properties": {
+                    "label": {"$ref": "common.schema.json#/$defs/text"},
+                    "start": {"type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}$"},
+                    "end": {"type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}$"}
+                  }
+                }
+              },
+              "top_n": {"type": "integer", "minimum": 1},
+              "rank_by": {"$ref": "common.schema.json#/$defs/id", "description": "Metric the result is ranked by."},
+              "dataset": {"$ref": "common.schema.json#/$defs/id"},
+              "columns": {"type": "array", "items": {"$ref": "common.schema.json#/$defs/name"}}
+            }
+          },
+          "expected_sql": {"$ref": "common.schema.json#/$defs/text", "description": "Reference SQL whose result the answer must match."},
+          "active_from_phase": {"type": "integer", "minimum": 0, "description": "Delivery phase that builds the feature this case needs; earlier phases skip the case."},
+          "status": {"$ref": "common.schema.json#/$defs/status"},
+          "evidence": {"$ref": "common.schema.json#/$defs/evidence"},
+          "confidence": {"$ref": "common.schema.json#/$defs/confidence"}
+        }
+      }
+    }
+  }
+}

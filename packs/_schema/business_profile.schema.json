@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "business_profile.yaml",
+  "description": "Company profile and the default conventions the agent applies to ambiguous questions. The user's time zone and answer language come from each request, not from the pack.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["name", "display_name", "industry", "currency", "fiscal_year_start_month", "conventions"],
+  "properties": {
+    "name": {"$ref": "common.schema.json#/$defs/id", "description": "Pack name; equals the pack directory name."},
+    "display_name": {"$ref": "common.schema.json#/$defs/text"},
+    "industry": {"$ref": "common.schema.json#/$defs/text"},
+    "currency": {"type": "string", "pattern": "^[A-Z]{3}$", "description": "ISO 4217 code."},
+    "fiscal_year_start_month": {"type": "integer", "minimum": 1, "maximum": 12},
+    "conventions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "description", "metric", "status", "evidence", "confidence"],
+        "properties": {
+          "id": {"$ref": "common.schema.json#/$defs/id"},
+          "description": {"$ref": "common.schema.json#/$defs/text"},
+          "metric": {"$ref": "common.schema.json#/$defs/id", "description": "Metric applied when a question using this convention names no measure."},
+          "status": {"$ref": "common.schema.json#/$defs/status"},
+          "evidence": {"$ref": "common.schema.json#/$defs/evidence"},
+          "confidence": {"$ref": "common.schema.json#/$defs/confidence"}
+        }
+      }
+    }
+  }
+}

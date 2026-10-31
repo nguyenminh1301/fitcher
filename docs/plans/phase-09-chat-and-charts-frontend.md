@@ -38,7 +38,7 @@ apps/web/
 
 1. **chart_recommender (test first).** Table-driven tests for every row of DECISIONS §8: KPI, line with at most 6 series, bar with horizontal switch for long labels, grouped bar, pie only for share with at most 6 non-negative groups, scatter, table fallback. `allowed_types` lists every type valid for the data; time series never allow pie. The backend decides bar orientation and records it in an optional ChartSpec field `orientation: vertical | horizontal` (open question 4), so the frontend never duplicates the rule. The `fast` tie-break runs only when two rules match equally.
 2. **Auth.** OIDC authorization code with PKCE against Keycloak; session held server-side; the api call carries the access token from the server.
-3. **SSE chat.** Stream parser (tests for split frames, multiple events per chunk, heartbeats); per-node status list; cancel button aborts the request.
+3. **SSE chat.** Stream parser (tests for split frames, multiple events per chunk, heartbeats); per-node status list; cancel button aborts the request. Every request sends the browser's IANA time zone from `Intl.DateTimeFormat().resolvedOptions().timeZone`.
 4. **Result panels.** TanStack Table with column formats from `Result.columns`; SQL view; warning banner; clarify options as buttons that send a follow-up turn.
 5. **Chart adapter (test first).** `toEChartsOption(spec, result)` pure function; tests for each chart type, series grouping by `series`, sort and number format.
 6. **Type switcher.** Changes only the local ChartSpec; types outside `allowed_types` are disabled with an explanation; no network request (asserted in a test).

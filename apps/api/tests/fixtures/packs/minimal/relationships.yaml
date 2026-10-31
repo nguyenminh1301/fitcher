@@ -1,0 +1,11 @@
+relationships:
+  - id: refunds_to_sales
+    description: A refund belongs to one sale.
+    from_dataset: widget_refunds
+    to_dataset: widget_sales
+    on:
+      - {from_column: sale_ref, to_column: sale_ref}
+    cardinality: many_to_one
+    status: approved
+    evidence: [{kind: manual, ref: fixture}]
+    confidence: 1.0

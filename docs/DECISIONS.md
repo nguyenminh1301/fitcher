@@ -94,7 +94,7 @@ Path: `packs/<company>/`. Git is the source of truth. Packs live in Git and are 
 
 | File | Contents |
 |---|---|
-| `business_profile.yaml` | industry, currency, timezone, fiscal year start month, language, default conventions (e.g. "best-selling" = by revenue) |
+| `business_profile.yaml` | industry, currency, fiscal year start month, default conventions (e.g. "best-selling" = by revenue); never the user's time zone or answer language (§6) |
 | `datasets.yaml` | marts: table/column descriptions, types, roles (dimension/measure/time), grain, primary time column, allowed_roles |
 | `glossary.yaml` | terms with **Vietnamese + English** aliases, pointing to metrics/columns/values |
 | `metrics.yaml` | id, sql_expr, dataset, grain, unit, owner |
@@ -149,7 +149,8 @@ Nodes in order:
    - `chart_edit` -> reuse the previous result -> chart_recommender. No SQL execution, no SQL generation.
    - `out_of_scope` -> short reply.
 4. **extract** (`fast`, JSON schema): metric, dimensions, `periods[]`, filters, `top_n`, `rank_by`, `compare`.
-5. **resolve_time** (deterministic): convert periods to half-open date ranges `[start, end)` using the pack's fiscal calendar and timezone. Supports multiple periods and relative phrases ("last quarter").
+5. **resolve_time** (deterministic): convert periods to half-open date ranges `[start, end)` using the pack's fiscal calendar and the user's time zone. Supports multiple periods and relative phrases ("last quarter").
+   The browser sends its IANA time zone with every request; clients without one (CLI, eval) pass it explicitly, otherwise UTC is used.
 6. **retrieve**: OpenSearch hybrid search over the 6 indices, filtered by role.
 7. **build_spec** -> `QuerySpec`, with a coverage check (dataset min/max dates versus the requested periods).
 8. **gate**:
@@ -171,6 +172,8 @@ Nodes in order:
 14. **shape_result**: attach types and roles to columns, cap at 5,000 rows.
 15. **chart_recommender**: choose by rules; call the `fast` LLM only when rules tie.
 16. **summarize** (`fast`): reads only the returned rows. Every calculation (%, differences) must already be done in SQL.
+
+Every reply (summary, clarify, deny, out-of-scope) is written in the language of the user's question; packs set no answer language.
 17. **stream**: send SSE to the UI.
 
 If all 3 retries fail: return the last SQL + error. Never guess a result.
