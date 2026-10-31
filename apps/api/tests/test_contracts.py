@@ -101,14 +101,14 @@ def test_result_matches_the_decisions_example():
 
 
 def test_decisions_example_with_an_abbreviated_row_list_is_valid():
-    # DECISIONS §7 shows one of 20 rows with truncated false.
+    # DECISIONS §7 shows one of 20 rows with truncated false; names follow the fixture pack.
     result = Result.model_validate({
         "columns": [
             {"name": "period", "type": "string", "role": "dimension"},
-            {"name": "product_name", "type": "string", "role": "dimension"},
-            {"name": "net_sales", "type": "number", "role": "measure", "format": "currency"},
+            {"name": "widget_name", "type": "string", "role": "dimension"},
+            {"name": "widget_revenue", "type": "number", "role": "measure", "format": "currency"},
         ],
-        "rows": [["Q1 2025", "Product A", 12345.6]],
+        "rows": [["Q1 2025", "Widget A", 12345.6]],
         "row_count": 20,
         "truncated": False,
     })
