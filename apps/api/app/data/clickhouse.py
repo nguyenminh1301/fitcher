@@ -107,19 +107,19 @@ class ClickHouseRunner:
         self._limits = limits
         self._new_query_id = new_query_id
 
-    def _settings(self, trace_id: str, query_id: str) -> dict:
+    def _settings(self, trace_id: str, query_id: str, max_result_rows: int | None) -> dict:
         return {
             "max_execution_time": self._limits.max_execution_time,
-            "max_result_rows": self._limits.max_result_rows,
+            "max_result_rows": self._limits.max_result_rows if max_result_rows is None else max_result_rows,
             "max_memory_usage": self._limits.max_memory_usage,
             "log_comment": trace_id,
             "query_id": query_id,
         }
 
-    def _query(self, sql: str, trace_id: str):
+    def _query(self, sql: str, trace_id: str, max_result_rows: int | None = None):
         query_id = self._new_query_id()
         try:
-            return query_id, self._client.query(sql, settings=self._settings(trace_id, query_id))
+            return query_id, self._client.query(sql, settings=self._settings(trace_id, query_id, max_result_rows))
         except Exception as error:  # noqa: BLE001 - every driver failure is classified, never raised raw
             category, code = classify(error)
             raise QueryError(category, _message(error), query_id, code) from error
@@ -135,7 +135,8 @@ class ClickHouseRunner:
         types = [column_type.name for column_type in result.column_types]
         if not columns:
             # An empty result arrives without column metadata; DESCRIBE reads it without running the query.
-            _, described = self._query(f"DESCRIBE TABLE ({sql})", trace_id)
+            # The newline ends a trailing line comment, and 0 lifts the row limit for the column list.
+            _, described = self._query(f"DESCRIBE TABLE (\n{sql}\n)", trace_id, max_result_rows=0)
             columns = [row[0] for row in described.result_rows]
             types = [row[1] for row in described.result_rows]
         return QueryOutput(query_id=query_id, columns=columns, types=types, rows=[tuple(row) for row in result.result_rows])

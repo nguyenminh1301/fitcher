@@ -77,7 +77,8 @@ def test_empty_result_reads_its_columns_with_describe():
     assert result.output.rows == []
     assert result.output.columns == ["widget_name", "revenue"]
     assert result.output.types == ["String", "Float64"]
-    assert client.calls[1][0] == "DESCRIBE TABLE (SELECT widget_name, revenue FROM marts.widget_sales WHERE 0)"
+    assert client.calls[1][0] == "DESCRIBE TABLE (\nSELECT widget_name, revenue FROM marts.widget_sales WHERE 0\n)"
+    assert client.calls[1][1]["max_result_rows"] == 0
 
 
 def test_explain_prefixes_the_query_and_reports_success_as_none():
