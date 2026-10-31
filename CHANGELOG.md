@@ -4,6 +4,7 @@
 
 ### Added
 
+- Answer `data_query` questions from the command line with `jobs/ask.py`: a LangGraph flow extracts terms and period descriptors through `fast`, resolves periods, retrieves pack context from the six indices, maps terms to metrics, columns and values with the pack's conventions and a coverage check, generates SQL through `sql-gen` with up to three repairs (the third through `sql-gen-hard`), guards and runs it as the read-only user, types the result from the compiled catalog and summarizes the rows in the question's language; questions with no measure or period, or an ambiguous measure, are refused before any SQL is generated.
 - Call the LiteLLM chat aliases `fast`, `sql-gen` and `sql-gen-hard` through one client that refuses model names, requests JSON-schema output validated into Pydantic models or plain text, and reports gateway failures without leaking replies; tests use a scripted fake client.
 - Resolve extracted period descriptors (year, quarter, month, explicit range, relative unit, unit to date and last N units) into labelled half-open date ranges using the pack's fiscal calendar, with fiscal years named by their end year, ISO weeks and the user's time zone for today, falling back to UTC.
 - Define the `QuerySpec` and `Result` contracts with half-open periods, bounded `top_n`, known filter operators, consistent ranking and comparison fields, and row, column and truncation checks capped at 5,000 rows.

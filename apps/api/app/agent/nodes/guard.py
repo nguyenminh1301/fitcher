@@ -25,6 +25,8 @@ from sqlglot import exp
 from sqlglot.optimizer.scope import Scope, traverse_scope
 
 from app.agent.errors import AgentError
+from app.agent.state import AgentDeps, AgentState, record_error
+from app.contracts.result import MAX_RESULT_ROWS
 from app.data.clickhouse import MARTS_DATABASE
 
 NODE = "guard"
@@ -209,3 +211,18 @@ def guard_sql(sql: str, allowlist: Allowlist, max_rows: int) -> GuardResult:
     except _Rejected as rejection:
         return _policy(str(rejection))
     return GuardResult(sql=_limited(sql, tree, max_rows))
+
+
+def allowlist_for(pack) -> Allowlist:
+    """Phase 3 allowlist: every column of every approved dataset."""
+    return Allowlist({dataset.id: frozenset(column.name for column in dataset.columns) for dataset in pack.datasets.datasets})
+
+
+def guard(state: AgentState, deps: AgentDeps) -> dict:
+    """Graph node. The cap is one row above the result limit, so shape_result can tell a result was cut."""
+    result = guard_sql(state["sql"], allowlist_for(deps.compiled.pack), MAX_RESULT_ROWS + 1)
+    if result.error is not None:
+        return {**record_error(state, result.error), "sql": state["sql"]}
+    attempts = list(state["attempts"])
+    attempts[-1] = attempts[-1].model_copy(update={"sql": result.sql})
+    return {"sql": result.sql, "attempts": attempts}
