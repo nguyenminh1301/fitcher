@@ -19,6 +19,7 @@ out/
 
 # Local datasets and databases
 data/
+!apps/api/app/data/
 *.parquet
 
 # Local files
