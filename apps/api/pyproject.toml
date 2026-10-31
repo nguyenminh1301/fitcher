@@ -4,11 +4,13 @@ version = "0.1.0"
 description = "Domain-neutral natural-language data analysis API"
 requires-python = ">=3.13,<3.14"
 dependencies = [
+    "clickhouse-connect==1.11.0",
     "fastapi==0.162.0",
     "httpx==0.28.1",
     "jsonschema==4.26.0",
     "pydantic==2.14.1",
     "pyyaml==6.0.3",
+    "sqlglot==30.23.0",
     # zoneinfo reads IANA zones from this package on Windows, which has no system zone database.
     "tzdata==2026.6; sys_platform == 'win32'",
     "uvicorn==0.54.0",
@@ -19,7 +21,6 @@ dev = [
     "pytest==9.2.0",
 ]
 jobs = [
-    "clickhouse-connect==1.11.0",
     "dbt-clickhouse==1.10.3",
     "dbt-core==1.12.6",
     "huggingface-hub==2.4.0",

@@ -8,6 +8,7 @@ node_modules
 __pycache__
 .workspace
 data
+build
 *.parquet
 .agents
 .claude

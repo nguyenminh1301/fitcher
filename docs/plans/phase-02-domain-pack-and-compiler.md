@@ -60,9 +60,11 @@ jobs/compile_pack.py                # CLI: --pack <name> [--skip-index]
 
 ```bash
 uv run --project apps/api pytest -c apps/api/pyproject.toml
-docker compose run --rm api python -m jobs.compile_pack --pack ecommerce_twin
-docker compose run --rm api python -m jobs.compile_pack --pack broken_fixture   # must fail
+docker compose run --rm jobs python -m jobs.compile_pack --pack ecommerce_twin
+python -m jobs.compile_pack --pack <copy> --packs-dir <dir> --skip-index      # a copy with a broken schema or sql_expr must fail
 ```
+
+The compile runs in the `jobs` service, the only one holding the ClickHouse admin credentials (Phase 1).
 
 Search checks are scripted in `jobs/compile_pack.py --check-search "<query>"` or a test against a live OpenSearch marked `integration`.
 
