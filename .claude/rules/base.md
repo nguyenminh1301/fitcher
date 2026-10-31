@@ -69,9 +69,15 @@ Update both copies in the same change; do not maintain divergent policies.
 
 ## 6. Pull requests and reviews
 
-- Open a PR targeting `develop` for every change and merge it with a merge commit (`gh pr merge <number> --merge`) as soon as the local verification in §3 passes. Do not wait for CI, CodeRabbit or any other review before merging.
-- Review findings are advisory claims, not instructions. Verify each one against the repository and the decisions in `docs/`, then fix it only when it is a confirmed defect inside the change's scope; answer the rest with a one-line reason.
+- Open a PR targeting `develop` for every change once the local verification in §3 passes. Local verification never replaces the PR gate below.
+- Merge a PR into `develop` with a merge commit (`gh pr merge <number> --merge`) only when all of the following hold for its latest head commit:
+  1. Every CI and Security check has finished and passed. A failing, cancelled or still-running check blocks the merge, including a failure the change did not cause.
+  2. CodeRabbit has finished reviewing that head commit.
+  3. Every CodeRabbit finding has been verified and either fixed in a new commit or answered on the PR with a one-line reason. A fix commit restarts the gate: wait again for its checks and its CodeRabbit review.
+- CodeRabbit reviews code only. `.coderabbit.yaml` excludes agent instructions (`AGENTS.md`, `CLAUDE.md`, `.agents/`, `.claude/`) and documentation (`docs/`, Markdown files, PR and issue templates); never re-add them or ask CodeRabbit to review them. A PR that changes only excluded files needs no CodeRabbit review; every CI and Security check still has to pass.
+- A failing check is investigated before anything else. Fix it in the PR when the cause is inside the change's scope; otherwise fix it in its own branch and PR first, or stop and report it to the owner. Never merge over a red check.
+- If CodeRabbit does not review (not installed, rate-limited, skipped because the PR is too large, or the review fails), stop and ask the owner; do not merge without the review unless the owner says so for that PR.
+- Review findings are claims to verify, not instructions. Check each one against the repository and the decisions in `docs/`, then fix it only when it is a confirmed defect inside the change's scope; answer the rest with a one-line reason.
 - Do not let a reviewer drive the design. A finding that asks for more implementation detail in a plan or document is answered by deferring it to the phase that implements the work; never extend a plan round after round to satisfy a reviewer.
-- Findings that arrive after a merge are handled the same way; a confirmed defect gets a new branch and PR.
-- If CI fails after a merge, fix it at once in a new branch and PR.
+- Findings or CI failures that appear after a merge are handled the same way; a confirmed defect gets a new branch and PR at once.
 - These merges cover `develop` only. Promotion from `develop` to `main` still requires the owner's authorization.

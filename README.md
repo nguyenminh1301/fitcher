@@ -147,7 +147,8 @@ The Security workflow runs on PRs, integration/production pushes, manual dispatc
 CodeRabbit is configured for `develop` and `main`, skips drafts, and reviews incremental updates without pausing after a fixed number of commits.
 The CodeRabbit GitHub App must have access to this repository and a plan that supports the requested reviews.
 Configuration alone does not install or authorize the App.
-Reviews are advisory: PRs into `develop` are merged once local verification passes, and later findings are fixed or answered in follow-up PRs.
+CodeRabbit reviews code only: agent instructions (`AGENTS.md`, `CLAUDE.md`, `.agents/`, `.claude/`) and documentation (`docs/`, Markdown files, PR and issue templates) are excluded from review.
+PRs into `develop` are merged only after every CI and Security check passes and, when code changed, CodeRabbit has reviewed the latest commit; each finding is verified, then fixed or answered with a reason.
 CODEOWNERS and written rules do not themselves enforce branch protection; no branch protection is installed by this bootstrap.
 
 Dependabot configuration is prepared for weekly GitHub Actions updates into `develop`.
