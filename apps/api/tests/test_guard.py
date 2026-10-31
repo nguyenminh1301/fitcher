@@ -142,16 +142,63 @@ def test_rejections_are_policy_errors(sql, message):
     assert message in error.message
 
 
-@pytest.mark.parametrize("sql", [
-    # an unapproved table read beside an approved one
-    "SELECT w.widget_name FROM secrets AS s JOIN marts.widget_sales AS w ON s.sale_ref = w.sale_ref "
-    "WHERE 1 IN (WITH secrets AS (SELECT 1 AS x) SELECT x FROM secrets)",
+@pytest.mark.parametrize(("sql", "message"), [
+    # an unapproved table read beside an approved one, with no column of it named
+    (
+        "SELECT w.widget_name FROM secrets CROSS JOIN marts.widget_sales AS w "
+        "WHERE 1 IN (WITH secrets AS (SELECT 1 AS x) SELECT x FROM secrets)",
+        "table secrets is not an approved dataset",
+    ),
     # SELECT * over an approved table that a nested CTE name would otherwise excuse
-    "SELECT * FROM widget_sales WHERE sale_ref IN "
-    "(WITH widget_sales AS (SELECT sale_ref FROM marts.widget_refunds) SELECT sale_ref FROM widget_sales)",
+    (
+        "SELECT * FROM widget_sales WHERE sale_ref IN "
+        "(WITH widget_sales AS (SELECT sale_ref FROM marts.widget_refunds) SELECT sale_ref FROM widget_sales)",
+        "SELECT * is not allowed on a dataset",
+    ),
 ])
-def test_a_nested_cte_cannot_hide_an_outer_table(sql):
-    assert rejected(sql).category == "policy"
+def test_a_nested_cte_cannot_hide_an_outer_table(sql, message):
+    error = rejected(sql)
+
+    assert error.category == "policy"
+    assert message in error.message
+
+
+def test_correlated_subquery_may_use_the_outer_tables():
+    accepted(
+        "SELECT w.widget_name FROM marts.widget_sales AS w WHERE EXISTS "
+        "(SELECT 1 FROM marts.widget_refunds AS r WHERE r.sale_ref = w.sale_ref) LIMIT 5"
+    )
+
+
+def test_correlated_subquery_cannot_reach_unapproved_outer_columns():
+    error = rejected(
+        "SELECT w.widget_name FROM marts.widget_sales AS w WHERE EXISTS "
+        "(SELECT 1 FROM marts.widget_refunds AS r WHERE r.sale_ref = w.secret)"
+    )
+
+    assert "column secret is not an approved column of w" in error.message
+
+
+def test_qualified_star_over_a_cte_beside_a_dataset_is_accepted():
+    accepted(
+        "WITH c AS (SELECT sale_ref FROM marts.widget_sales) "
+        "SELECT c.*, r.refund_total FROM c JOIN marts.widget_refunds AS r ON c.sale_ref = r.sale_ref LIMIT 5"
+    )
+
+
+def test_qualified_star_over_a_dataset_is_rejected():
+    error = rejected(
+        "WITH c AS (SELECT sale_ref FROM marts.widget_sales) "
+        "SELECT r.* FROM c JOIN marts.widget_refunds AS r ON c.sale_ref = r.sale_ref"
+    )
+
+    assert "SELECT * is not allowed on a dataset" in error.message
+
+
+def test_duplicate_source_aliases_are_an_sql_error():
+    error = rejected("WITH w AS (SELECT widget_name FROM marts.widget_sales) SELECT * FROM w AS a JOIN w AS a ON 1")
+
+    assert error.category == "sql"
 
 
 def test_star_over_a_cte_is_accepted():

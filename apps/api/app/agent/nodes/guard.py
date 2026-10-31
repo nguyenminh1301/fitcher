@@ -124,13 +124,28 @@ def _visible_aliases(column: exp.Column, select: exp.Expression) -> set[str]:
     return {projection.alias for projection in projections if isinstance(projection, exp.Alias)}
 
 
-def _check_scope_columns(scope: Scope, allowlist: Allowlist) -> None:
+def _source_columns(scope: Scope, allowlist: Allowlist) -> dict[str, set[str]]:
+    """Columns each source name of ``scope`` exposes, including the enclosing scopes' sources.
+
+    A correlated subquery may refer to an outer query's tables; the scope's own
+    sources shadow outer ones with the same name.
+    """
     columns_of: dict[str, set[str]] = {}
-    for name, source in scope.sources.items():
-        if isinstance(source, exp.Table):
-            columns_of[name] = set(allowlist.tables.get(source.name, frozenset()))
-        else:
-            columns_of[name] = set(source.expression.named_selects)
+    current: Scope | None = scope
+    while current is not None:
+        for name, source in current.sources.items():
+            if name in columns_of:
+                continue
+            if isinstance(source, exp.Table):
+                columns_of[name] = set(allowlist.tables.get(source.name, frozenset()))
+            else:
+                columns_of[name] = set(source.expression.named_selects)
+        current = current.parent
+    return columns_of
+
+
+def _check_scope_columns(scope: Scope, allowlist: Allowlist) -> None:
+    columns_of = _source_columns(scope, allowlist)
     unqualified = set().union(*columns_of.values())
     for column in scope.columns:
         if isinstance(column.this, exp.Star):
@@ -161,13 +176,18 @@ def _check_stars(tree: exp.Expression, scopes: list[Scope]) -> None:
             raise _Rejected("* is allowed only in count(*) or a select list; name the columns")
     for scope in scopes:
         select = scope.expression
-        if not isinstance(select, exp.Select) or not any(
-            isinstance(projection, exp.Star) or (isinstance(projection, exp.Column) and isinstance(projection.this, exp.Star))
-            for projection in select.expressions
-        ):
+        if not isinstance(select, exp.Select):
             continue
-        if any(isinstance(source, exp.Table) for _, source in scope.selected_sources.values()):
-            raise _Rejected("SELECT * is not allowed on a dataset; name the columns")
+        for projection in select.expressions:
+            if isinstance(projection, exp.Star):
+                # An unqualified * reads every selected source.
+                sources = [source for _, source in scope.selected_sources.values()]
+            elif isinstance(projection, exp.Column) and isinstance(projection.this, exp.Star):
+                sources = [scope.sources.get(projection.table)]
+            else:
+                continue
+            if any(isinstance(source, exp.Table) for source in sources):
+                raise _Rejected("SELECT * is not allowed on a dataset; name the columns")
 
 
 def _check_clauses(tree: exp.Expression) -> None:
@@ -213,4 +233,6 @@ def guard_sql(sql: str, allowlist: Allowlist, max_rows: int) -> GuardResult:
         _check_columns(scopes, allowlist)
     except _Rejected as rejection:
         return _policy(str(rejection))
+    except sqlglot.errors.OptimizeError as error:  # for example two sources with the same alias
+        return GuardResult(error=AgentError("sql", NODE, f"SQL cannot be resolved: {' '.join(str(error).split())[:300]}"))
     return GuardResult(sql=_limited(sql, tree, max_rows))
