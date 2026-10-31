@@ -18,6 +18,8 @@ import clickhouse_connect
 from app.agent.errors import ErrorCategory
 
 DEFAULT_AGENT_USER = "agent_readonly"
+# The only database the agent reads (DECISIONS §4); also its connection default.
+MARTS_DATABASE = "marts"
 
 # ClickHouse error codes for queries that were valid but could not finish.
 RUNTIME_CODES = frozenset({
@@ -150,4 +152,5 @@ def agent_client(env: Mapping[str, str] | None = None):
         port=int(env.get("CLICKHOUSE_HTTP_PORT", "8123")),
         username=env.get("CLICKHOUSE_AGENT_USER") or DEFAULT_AGENT_USER,
         password=password,
+        database=MARTS_DATABASE,
     )

@@ -11,8 +11,10 @@ retried instead of executed.
 
 The SQL text is executed as generated: re-rendering it through sqlglot can
 change ClickHouse functions, so the guard only adds or caps the outer LIMIT.
-Columns are checked against every allowlisted column of the tables the query
-reads; per-column grants are enforced by ClickHouse.
+Columns are checked per SELECT scope: a qualified column against its own
+table or subquery, an unqualified one against the scope's tables and
+subqueries or an alias the scope defines (in the select list, only aliases
+defined before it). ClickHouse grants remain the final column check.
 """
 
 from collections.abc import Mapping
@@ -20,11 +22,12 @@ from dataclasses import dataclass
 
 import sqlglot
 from sqlglot import exp
+from sqlglot.optimizer.scope import Scope, traverse_scope
 
 from app.agent.errors import AgentError
+from app.data.clickhouse import MARTS_DATABASE
 
 NODE = "guard"
-MARTS_DATABASE = "marts"
 # system tables a query may read; none are needed yet.
 SYSTEM_TABLE_WHITELIST: frozenset[str] = frozenset()
 FORBIDDEN_FUNCTIONS = frozenset(name.lower() for name in (
@@ -34,6 +37,8 @@ FORBIDDEN_FUNCTIONS = frozenset(name.lower() for name in (
     "jdbc", "odbc", "executable", "input", "cluster", "clusterAllReplicas", "merge", "view", "dictionary",
     "generateRandom", "numbers", "numbers_mt", "zeros", "zeros_mt", "values", "format", "null", "iceberg",
     "deltaLake", "hudi", "loop", "fuzzJSON",
+    # column matchers that bypass the column allowlist
+    "columns",
     # reads outside the query's tables
     "joinGet", "joinGetOrNull",
     # deliberate stalls
@@ -95,20 +100,43 @@ def _check_tables(tree: exp.Expression, allowlist: Allowlist, ctes: set[str]) ->
     return tables
 
 
-def _check_columns(tree: exp.Expression, allowlist: Allowlist, tables: set[str], ctes: set[str]) -> None:
-    allowed = set().union(*(allowlist.tables[name] for name in tables))
-    aliases = {alias.alias for alias in tree.find_all(exp.Alias)}
-    table_aliases = {alias.name for alias in tree.find_all(exp.TableAlias) if alias.name}
-    for alias in tree.find_all(exp.TableAlias):
-        aliases.update(column.name for column in alias.columns)
-    qualifiers = tables | ctes | table_aliases
-    for column in tree.find_all(exp.Column):
-        if column.table and column.table not in qualifiers:
-            raise _Rejected(f"column {column.sql(dialect='clickhouse')} refers to an unknown table")
+def _visible_aliases(column: exp.Column, select: exp.Expression) -> set[str]:
+    """Aliases of ``select`` that ``column`` may refer to."""
+    if not isinstance(select, exp.Select):
+        return set()
+    projections = select.expressions
+    node: exp.Expression | None = column
+    while node is not None and node.parent is not select:
+        node = node.parent
+    if node is not None and any(node is projection for projection in projections):
+        position = next(index for index, projection in enumerate(projections) if projection is node)
+        projections = projections[:position]
+    return {projection.alias for projection in projections if isinstance(projection, exp.Alias)}
+
+
+def _check_scope_columns(scope: Scope, allowlist: Allowlist) -> None:
+    columns_of: dict[str, set[str]] = {}
+    for name, source in scope.sources.items():
+        if isinstance(source, exp.Table):
+            columns_of[name] = set(allowlist.tables.get(source.name, frozenset()))
+        else:
+            columns_of[name] = set(source.expression.named_selects)
+    unqualified = set().union(*columns_of.values())
+    for column in scope.columns:
         if isinstance(column.this, exp.Star):
             continue
-        if column.name not in allowed and column.name not in aliases:
-            raise _Rejected(f"column {column.name} is not an approved column of {', '.join(sorted(tables)) or 'any table'}")
+        if column.table:
+            if column.table not in columns_of:
+                raise _Rejected(f"column {column.sql(dialect='clickhouse')} refers to an unknown table")
+            if column.name not in columns_of[column.table]:
+                raise _Rejected(f"column {column.name} is not an approved column of {column.table}")
+        elif column.name not in unqualified and column.name not in _visible_aliases(column, scope.expression):
+            raise _Rejected(f"column {column.name} is not an approved column of the tables it reads")
+
+
+def _check_columns(tree: exp.Expression, allowlist: Allowlist) -> None:
+    for scope in traverse_scope(tree):
+        _check_scope_columns(scope, allowlist)
 
 
 def _check_stars(tree: exp.Expression, ctes: set[str]) -> None:
@@ -142,7 +170,7 @@ def _limited(sql: str, tree: exp.Query, max_rows: int) -> str:
     body = sql.strip().rstrip(";").rstrip()
     limit = tree.args.get("limit")
     value = limit.expression if isinstance(limit, exp.Limit) and not limit.expressions else None
-    if isinstance(value, exp.Literal) and not value.is_string and int(value.this) <= max_rows:
+    if isinstance(value, exp.Literal) and value.is_int and int(value.this) <= max_rows:
         return body
     if limit is None and isinstance(tree, exp.Select):
         return f"{body}\nLIMIT {max_rows}"
@@ -169,7 +197,7 @@ def guard_sql(sql: str, allowlist: Allowlist, max_rows: int) -> GuardResult:
         if not tables:
             raise _Rejected("the query reads no approved dataset")
         _check_stars(tree, ctes)
-        _check_columns(tree, allowlist, tables, ctes)
+        _check_columns(tree, allowlist)
     except _Rejected as rejection:
         return _policy(str(rejection))
     return GuardResult(sql=_limited(sql, tree, max_rows))

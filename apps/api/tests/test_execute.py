@@ -129,6 +129,15 @@ def test_limits_come_from_the_environment_with_defaults():
     )
 
 
+def test_agent_client_connects_to_the_marts_database(monkeypatch):
+    seen = {}
+    monkeypatch.setattr("app.data.clickhouse.clickhouse_connect.get_client", lambda **kwargs: seen.update(kwargs))
+
+    agent_client({"CLICKHOUSE_AGENT_PASSWORD": "pw"})
+
+    assert (seen["username"], seen["database"]) == ("agent_readonly", "marts")
+
+
 def test_agent_client_requires_its_password():
     with pytest.raises(RuntimeError, match="CLICKHOUSE_AGENT_PASSWORD"):
         agent_client({})

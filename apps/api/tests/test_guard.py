@@ -71,6 +71,22 @@ def test_union_and_limit_by_are_capped_by_wrapping():
     assert accepted(limit_by).endswith(f") LIMIT {MAX_ROWS}")
 
 
+def test_aliases_in_the_select_list_and_clauses_are_accepted():
+    accepted(
+        "SELECT sum(sale_amount) AS total, total * 2 AS doubled FROM marts.widget_sales "
+        "GROUP BY widget_name HAVING doubled > 0 ORDER BY total DESC LIMIT 5"
+    )
+
+
+def test_fully_qualified_columns_are_accepted():
+    accepted("SELECT marts.widget_sales.widget_name AS widget_name FROM marts.widget_sales LIMIT 5")
+
+
+@pytest.mark.parametrize("limit", ["1.5", "1e3"])
+def test_non_integer_limit_is_wrapped_instead_of_raising(limit):
+    assert accepted(f"SELECT widget_name FROM marts.widget_sales LIMIT {limit}").endswith(f") LIMIT {MAX_ROWS}")
+
+
 def test_count_star_is_accepted():
     accepted("SELECT count(*) AS sales FROM marts.widget_sales")
 
@@ -88,6 +104,12 @@ def test_unparsable_sql_is_an_sql_error_to_retry():
     ("INSERT INTO marts.widget_sales SELECT * FROM marts.widget_sales", "only SELECT"),
     ("ALTER TABLE marts.widget_sales DELETE WHERE 1", "only SELECT"),
     ("SELECT secret FROM marts.widget_sales", "column secret is not an approved column"),
+    ("SELECT secret AS secret FROM marts.widget_sales", "column secret is not an approved column"),
+    ("SELECT secret AS a, a AS secret FROM marts.widget_sales", "column secret is not an approved column"),
+    ("SELECT secret FROM marts.widget_sales WHERE 1 IN (SELECT 1 AS secret)", "column secret is not an approved column"),
+    ("SELECT w.refund_total FROM marts.widget_sales AS w", "column refund_total is not an approved column of w"),
+    ("SELECT q.secret FROM (SELECT widget_name FROM marts.widget_sales) AS q", "column secret is not an approved column of q"),
+    ("SELECT COLUMNS('.*') FROM marts.widget_sales", "function columns()"),
     ("SELECT widget_name FROM marts.customers", "is not an approved dataset"),
     ("SELECT widget_name FROM raw.widget_sales", "is not an approved dataset"),
     ("SELECT name FROM system.tables", "system table system.tables"),
