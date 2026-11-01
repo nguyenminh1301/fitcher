@@ -73,6 +73,7 @@
 
 ### Security
 
+- Record the pyasn1, pypdf and py3-pip-wheel advisories published after the LiteLLM v1.106.6 pin as expiring image exceptions, because no newer stable LiteLLM release fixes them.
 - Scan the four pinned third-party service images in the image audit with the same fixable High/Critical gate and complete reports, with per-image expiring exceptions for advisories only an upstream release can fix, and validate the Compose file in CI.
 
 ### Removed
