@@ -52,7 +52,7 @@ def build_graph(deps: AgentDeps):
     graph.add_edge(START, "extract")
     graph.add_conditional_edges("extract", _unless_rejected("resolve_time"), ["resolve_time", END])
     graph.add_conditional_edges("resolve_time", _unless_rejected("retrieve"), ["retrieve", END])
-    graph.add_edge("retrieve", "build_spec")
+    graph.add_conditional_edges("retrieve", _unless_rejected("build_spec"), ["build_spec", END])
     graph.add_conditional_edges("build_spec", _unless_rejected("generate_sql"), ["generate_sql", END])
     graph.add_conditional_edges("generate_sql", _unless_failed("guard"), ["guard", "check"])
     graph.add_conditional_edges("guard", _unless_failed("explain"), ["explain", "check"])

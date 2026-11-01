@@ -1,10 +1,13 @@
 """The data_query graph end to end with fake LLM, search and ClickHouse."""
 
 from agent_fixtures import GOOD_SQL, deps, extraction_reply, good_output
-from fakes import FakeRunner
+from fakes import FakeEmbeddings, FakeRunner
+import pytest
 
 from app.agent.graph import run_question
 from app.data.clickhouse import QueryError
+from app.llm.embeddings import EmbeddingError
+from app.search.opensearch import SearchError
 
 QUESTION = "Top 10 best-selling widgets in Q1 2024 compared with Q1 2025"
 SUMMARY = "Blue widgets led Q1 2025."
@@ -99,6 +102,21 @@ def test_out_of_coverage_period_passes_with_a_warning():
 
     assert state["result"] is not None
     assert any("2030 is outside the data" in warning for warning in state["warnings"])
+
+
+@pytest.mark.parametrize("error", [EmbeddingError("alias embed returned HTTP 503"), SearchError("POST /x returned HTTP 500")])
+def test_retrieval_failure_is_rejected_before_sql(error):
+    class Broken(FakeEmbeddings):
+        def embed(self, texts):
+            raise error
+
+    agent = deps([extraction_reply()], embeddings=Broken())
+
+    state = run_question(QUESTION, agent)
+
+    assert state["rejection"] == f"the pack context could not be retrieved: {error}"
+    assert [call.alias for call in agent.llm.calls] == ["fast"]
+    assert state.get("spec") is None and state["attempts"] == []
 
 
 def test_question_without_a_measure_is_rejected_before_sql():
