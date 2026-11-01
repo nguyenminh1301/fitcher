@@ -91,13 +91,13 @@ def compare_results(expected: Result, actual: Result, *, ordered: bool, toleranc
     def actual_key(row) -> tuple:
         return tuple(_normalize(row[key_map[index]]) for index in expected_keys)
 
-    def sort_key(key: tuple, row) -> tuple:
-        return tuple(map(_order, key)), tuple(_order(_normalize(value)) for value in row)
+    def sort_key(key: tuple, values=()) -> tuple:
+        return tuple(map(_order, key)), tuple(_order(_normalize(value)) for value in values)
 
     expected_rows, actual_rows = list(expected.rows), list(actual.rows)
     if not ordered:
-        expected_rows.sort(key=lambda row: sort_key(expected_key(row), row))
-        actual_rows.sort(key=lambda row: sort_key(actual_key(row), row))
+        expected_rows.sort(key=lambda row: sort_key(expected_key(row)))
+        actual_rows.sort(key=lambda row: sort_key(actual_key(row)))
     expected_sequence = [expected_key(row) for row in expected_rows]
     actual_sequence = [actual_key(row) for row in actual_rows]
     missing = Counter(expected_sequence) - Counter(actual_sequence)
@@ -107,17 +107,43 @@ def compare_results(expected: Result, actual: Result, *, ordered: bool, toleranc
         if wanted != got:
             return Comparison(False, f"row order differs at row {position}")
 
-    pairs = list(zip(expected_rows, actual_rows, strict=True))
-    actual_measures = [i for i, column in enumerate(actual.columns) if column.role == "measure"]
-    used: set[int] = set()
-    for index, column in enumerate(expected.columns):
-        if column.role != "measure":
-            continue
-        found = _first_match(
-            actual_measures, used,
-            lambda candidate: all(values_match(want[index], got[candidate], tolerance) for want, got in pairs),
+    # Unordered rows that share a key cannot be paired until the measure
+    # columns are mapped, so a measure first matches as a multiset within each
+    # key group; the rows are then paired by their mapped measure values.
+    groups: list[tuple[list, list]] = []
+    for position, key in enumerate(expected_sequence):
+        if ordered or position == 0 or key != expected_sequence[position - 1]:
+            groups.append(([], []))
+        groups[-1][0].append(expected_rows[position])
+        groups[-1][1].append(actual_rows[position])
+
+    def column_matches(index: int, candidate: int) -> bool:
+        return all(
+            all(
+                values_match(want, got, tolerance)
+                for want, got in zip(
+                    sorted((_normalize(row[index]) for row in wanted), key=_order),
+                    sorted((_normalize(row[candidate]) for row in got), key=_order),
+                    strict=True,
+                )
+            )
+            for wanted, got in groups
         )
+
+    expected_measures = [i for i, column in enumerate(expected.columns) if column.role == "measure"]
+    actual_measures = [i for i, column in enumerate(actual.columns) if column.role == "measure"]
+    measure_map: dict[int, int] = {}
+    for index in expected_measures:
+        found = _first_match(actual_measures, set(measure_map.values()), lambda candidate: column_matches(index, candidate))
         if found is None:
-            return Comparison(False, f"no column matches measure {column.name}")
-        used.add(found)
+            return Comparison(False, f"no column matches measure {expected.columns[index].name}")
+        measure_map[index] = found
+
+    for expected_group, actual_group in groups:
+        expected_group.sort(key=lambda row: sort_key((), (row[i] for i in expected_measures)))
+        actual_group.sort(key=lambda row: sort_key((), (row[measure_map[i]] for i in expected_measures)))
+        for want, have in zip(expected_group, actual_group, strict=True):
+            for index in expected_measures:
+                if not values_match(want[index], have[measure_map[index]], tolerance):
+                    return Comparison(False, f"no row matches the measures of key {expected_key(want)}")
     return Comparison(True)

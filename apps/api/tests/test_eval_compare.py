@@ -120,3 +120,27 @@ def test_null_and_mixed_type_keys_sort_without_error():
 
 def test_scalar_result_without_keys():
     assert compare_results(_scalar(42.5), _scalar(42.5), ordered=False).match is True
+
+
+DUPLICATE_KEYS = table(
+    [("product", "dimension"), ("units", "measure"), ("revenue", "measure")],
+    [["A", 1.0, 100.0], ["A", 2.0, 50.0]],
+)
+
+
+def test_duplicate_key_rows_match_with_reordered_measure_columns():
+    actual = table(
+        [("revenue_x", "measure"), ("item", "dimension"), ("units_x", "measure")],
+        [[100.0, "A", 1.0], [50.0, "A", 2.0]],
+    )
+
+    assert compare_results(DUPLICATE_KEYS, actual, ordered=False).match is True
+
+
+def test_duplicate_key_rows_with_recombined_measures_do_not_match():
+    actual = table(
+        [("product", "dimension"), ("units", "measure"), ("revenue", "measure")],
+        [["A", 1.0, 50.0], ["A", 2.0, 100.0]],
+    )
+
+    assert compare_results(DUPLICATE_KEYS, actual, ordered=False).match is False
