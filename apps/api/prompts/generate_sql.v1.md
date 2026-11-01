@@ -28,5 +28,7 @@ Declared join paths:
 $joins
 
 Examples of questions with correct SQL:
+<examples>
 $examples
+</examples>
 $retry

@@ -14,7 +14,11 @@ unknown function, so a live run shows the repair loop at work.
 import argparse
 from datetime import date
 from pathlib import Path
+import re
 import sys
+
+import sqlglot
+from sqlglot.tokens import Tokenizer, TokenType
 
 from app.agent.graph import run_question
 from app.agent.nodes.resolve_time import TimeResolutionError, reference_date
@@ -27,6 +31,8 @@ from app.packs.compiler import CompileError, load_compiled
 from app.search.opensearch import OpenSearch
 
 TABLE_ROWS = 50
+_CONTROL = re.compile(r"[\x00-\x1f\x7f]")
+_ESCAPES = {"\n": "\\n", "\r": "\\r", "\t": "\\t"}
 FAULT = "fitcherInjectedFault() AS injected_fault, "
 
 
@@ -44,10 +50,21 @@ class FaultInjectingLLM:
         reply = self._inner.text(alias, prompt)
         if alias.startswith("sql-gen") and not self._injected:
             self._injected = True
-            position = reply.upper().rfind("SELECT")
-            if position >= 0:
-                reply = reply[:position + 6] + " " + FAULT + reply[position + 6:].lstrip()
+            reply = inject_fault(reply)
         return reply
+
+
+def inject_fault(sql: str) -> str:
+    """Add the fault after the last SELECT keyword; text that is not SQL is left as it is."""
+    try:
+        tokens = Tokenizer(dialect="clickhouse").tokenize(sql)
+    except sqlglot.errors.SqlglotError:
+        return sql
+    selects = [token for token in tokens if token.token_type == TokenType.SELECT]
+    if not selects:
+        return sql
+    end = selects[-1].end + 1
+    return sql[:end] + " " + FAULT + sql[end:].lstrip()
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -59,8 +76,15 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
+def _cell(value: object) -> str:
+    """One display line per cell: control characters such as line breaks are escaped."""
+    if value is None:
+        return ""
+    return _CONTROL.sub(lambda match: _ESCAPES.get(match.group(), f"\\x{ord(match.group()):02x}"), str(value))
+
+
 def format_table(columns: list[str], rows: list[list], limit: int = TABLE_ROWS) -> str:
-    cells = [columns, *[["" if value is None else str(value) for value in row] for row in rows[:limit]]]
+    cells = [columns, *[[_cell(value) for value in row] for row in rows[:limit]]]
     widths = [max(len(row[index]) for row in cells) for index in range(len(columns))]
     lines = [" | ".join(value.ljust(width) for value, width in zip(row, widths, strict=True)) for row in cells]
     lines.insert(1, "-+-".join("-" * width for width in widths))

@@ -10,7 +10,9 @@ agent searches as every role of the pack.
 from pydantic import BaseModel, ConfigDict
 
 from app.agent.state import AgentDeps, AgentState
+from app.llm.embeddings import EmbeddingError
 from app.packs.search_indices import HYBRID_PIPELINE, alias_name, hybrid_query, value_query
+from app.search.opensearch import SearchError
 
 HITS_PER_QUERY = 5
 
@@ -35,6 +37,13 @@ class Retrieval(BaseModel):
 
 
 def retrieve(state: AgentState, deps: AgentDeps) -> dict:
+    try:
+        return {"retrieval": _retrieve(state, deps)}
+    except (EmbeddingError, SearchError) as error:
+        return {"rejection": f"the pack context could not be retrieved: {error}"}
+
+
+def _retrieve(state: AgentState, deps: AgentDeps) -> "Retrieval":
     extraction = state["extraction"]
     pack = deps.compiled.pack
     roles = [role.id for role in pack.policies.roles]
@@ -56,11 +65,10 @@ def retrieve(state: AgentState, deps: AgentDeps) -> dict:
         hits = deps.search.search(alias_name(pack.name, "column_values"), value_query(text, roles, HITS_PER_QUERY))
         return [Hit(index="column_values", **hit) for hit in hits]
 
-    retrieval = Retrieval(
+    return Retrieval(
         metric_terms={term: semantic("glossary_terms", term) + semantic("metrics", term) for term in metric_terms},
         dimension_terms={term: semantic("glossary_terms", term) + semantic("datasets", term) for term in dimension_terms},
         values={value: lexical(value) for value in values},
         examples=semantic("examples", state["question"]),
         datasets=semantic("datasets", state["question"]),
     )
-    return {"retrieval": retrieval}

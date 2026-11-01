@@ -4,7 +4,7 @@ from agent_fixtures import GOOD_SQL, deps, extraction_reply
 from fake_llm import FakeLLMClient
 
 from app.agent.graph import run_question
-from jobs.ask import FaultInjectingLLM, format_table, report
+from jobs.ask import FaultInjectingLLM, format_table, inject_fault, report
 
 
 def test_successful_run_prints_sql_table_warnings_and_summary(capsys):
@@ -46,6 +46,19 @@ def test_fault_injection_breaks_only_the_first_generated_sql():
     assert llm.text("sql-gen", "p") == "SELECT fitcherInjectedFault() AS injected_fault, a FROM t"
     assert llm.text("sql-gen", "p") == "SELECT a FROM t"
     assert llm.text("fast", "p") == "summary"
+
+
+def test_fault_goes_after_a_select_keyword_not_into_a_literal():
+    sql = "WITH c AS (SELECT a FROM t) SELECT a FROM c WHERE name = 'SELECT'"
+
+    assert inject_fault(sql) == "WITH c AS (SELECT a FROM t) SELECT fitcherInjectedFault() AS injected_fault, a FROM c WHERE name = 'SELECT'"
+    assert inject_fault("not sql at all") == "not sql at all"
+
+
+def test_cells_keep_one_line_each():
+    table = format_table(["note"], [["two\nlines\tand\x07bell"]])
+
+    assert table.splitlines()[2] == "two\\nlines\\tand\\x07bell"
 
 
 def test_table_is_aligned_and_limited():

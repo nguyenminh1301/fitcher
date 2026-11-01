@@ -6,6 +6,8 @@ Without a router or clarify branch yet, a question with no metric or no period
 is refused here, before any SQL is generated.
 """
 
+import json
+
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.agent.nodes.resolve_time import PeriodDescriptor
@@ -42,7 +44,8 @@ class Extraction(BaseModel):
 
 def extract(state: AgentState, deps: AgentDeps) -> dict:
     try:
-        extraction = deps.llm.structured(ALIAS, render(PROMPT, question=state["question"]), Extraction)
+        prompt = render(PROMPT, question=json.dumps(state["question"], ensure_ascii=False))
+        extraction = deps.llm.structured(ALIAS, prompt, Extraction)
     except LLMError as error:
         return {"rejection": f"the question could not be read: {error}"}
     if not extraction.metric_terms and extraction.rank_term is None:

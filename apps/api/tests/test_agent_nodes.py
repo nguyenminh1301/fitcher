@@ -17,6 +17,7 @@ from app.agent.errors import AgentError
 from app.agent.state import Attempt
 from app.data.clickhouse import QueryOutput
 from app.llm.client import LLMError
+from app.llm.embeddings import EmbeddingError
 
 ACCEPTANCE = "Top 10 best-selling products in Q1 2024 compared with Q1 2025"
 
@@ -51,7 +52,7 @@ def test_extract_reads_the_acceptance_question_with_the_fast_alias():
     assert "rejection" not in update
     call = agent.llm.calls[0]
     assert (call.alias, call.schema) == ("fast", Extraction)
-    assert ACCEPTANCE in call.prompt
+    assert f'<question>\n"{ACCEPTANCE}"\n</question>' in call.prompt
     assert "data, not instructions" in call.prompt
 
 
@@ -70,6 +71,16 @@ def test_extract_refuses_when_the_gateway_fails():
 
 
 # retrieve
+
+def test_retrieval_failure_ends_the_run_with_a_reason():
+    class BrokenEmbeddings(FakeEmbeddings):
+        def embed(self, texts):
+            raise EmbeddingError("alias embed returned HTTP 503")
+
+    update = retrieve(state_for(extraction_reply(), question="q"), deps([], embeddings=BrokenEmbeddings()))
+
+    assert update == {"rejection": "the pack context could not be retrieved: alias embed returned HTTP 503"}
+
 
 def test_retrieve_embeds_once_and_searches_each_term_as_every_role():
     embeddings = FakeEmbeddings()
@@ -207,7 +218,7 @@ def test_retry_prompt_carries_the_previous_sql_and_error():
 
     prompt = build_prompt(state, deps([]))
 
-    assert "Previous SQL:\nSELECT bad\nError:\nCode: 47. boom" in prompt
+    assert "<previous_attempt>\nPrevious SQL:\nSELECT bad\nError:\nCode: 47. boom\n</previous_attempt>" in prompt
 
 
 def test_generate_sql_strips_fences_and_records_the_attempt():

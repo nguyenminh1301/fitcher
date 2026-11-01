@@ -21,7 +21,7 @@ def summarize(state: AgentState, deps: AgentDeps) -> dict:
     prompt = render(
         PROMPT,
         language=state["extraction"].language,
-        question=state["question"],
+        question=json.dumps(state["question"], ensure_ascii=False),
         spec=json.dumps(state["spec"].model_dump(mode="json", exclude={"warnings"}), ensure_ascii=False),
         warnings="\n".join(f"- {warning}" for warning in state.get("warnings", [])) or "none",
         columns=", ".join(f"{column.name} ({column.role}{', ' + column.format if column.format else ''})" for column in result.columns),
