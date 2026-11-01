@@ -18,7 +18,7 @@ import re
 import sys
 
 import sqlglot
-from sqlglot.tokens import Tokenizer, TokenType
+from sqlglot.tokens import TokenType
 
 from app.agent.graph import run_question
 from app.agent.nodes.resolve_time import TimeResolutionError, reference_date
@@ -57,7 +57,7 @@ class FaultInjectingLLM:
 def inject_fault(sql: str) -> str:
     """Add the fault after the last SELECT keyword; text that is not SQL is left as it is."""
     try:
-        tokens = Tokenizer(dialect="clickhouse").tokenize(sql)
+        tokens = sqlglot.Dialect.get_or_raise("clickhouse").tokenize(sql)
     except sqlglot.errors.SqlglotError:
         return sql
     selects = [token for token in tokens if token.token_type == TokenType.SELECT]

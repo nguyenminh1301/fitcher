@@ -55,6 +55,12 @@ def test_fault_goes_after_a_select_keyword_not_into_a_literal():
     assert inject_fault("not sql at all") == "not sql at all"
 
 
+def test_fault_is_injected_past_a_backslash_escaped_quote():
+    sql = r"SELECT a FROM t WHERE name = 'O\'Reilly'"
+
+    assert inject_fault(sql) == r"SELECT fitcherInjectedFault() AS injected_fault, a FROM t WHERE name = 'O\'Reilly'"
+
+
 def test_cells_keep_one_line_each():
     table = format_table(["note"], [["two\nlines\tand\x07bell"]])
 
