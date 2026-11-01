@@ -65,6 +65,8 @@ jobs:
           uv sync --project apps/api --frozen
       - name: Run API and CLI tests including POSIX permissions
         run: uv run --project apps/api pytest -c apps/api/pyproject.toml
+      - name: Check that engine code names no pack dataset, column or metric
+        run: uv run --project apps/api python scripts/check_pack_isolation.py
 
   web:
     name: Web checks

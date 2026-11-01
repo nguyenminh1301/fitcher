@@ -5,6 +5,7 @@ from typing import Protocol
 
 from app.agent.errors import AgentError
 from app.data.clickhouse import QueryError, QueryOutput
+from app.agent.state import AgentDeps, AgentState, record_error
 
 NODE = "execute"
 
@@ -26,3 +27,12 @@ def execute(runner: Runner, sql: str, trace_id: str) -> ExecutionResult:
     except QueryError as error:
         return ExecutionResult(error=AgentError(error.category, NODE, error.message), query_id=error.query_id)
     return ExecutionResult(output=output, query_id=output.query_id)
+
+
+def execute_node(state: AgentState, deps: AgentDeps) -> dict:
+    result = execute(deps.runner, state["sql"], state["trace_id"])
+    if result.error is not None:
+        return record_error(state, result.error, result.query_id)
+    attempts = list(state["attempts"])
+    attempts[-1] = attempts[-1].model_copy(update={"query_id": result.query_id})
+    return {"output": result.output, "attempts": attempts}

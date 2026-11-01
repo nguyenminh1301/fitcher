@@ -72,7 +72,7 @@ class FakeSearch:
     that substring fail; ``search_results`` maps an alias to the hits returned.
     """
 
-    def __init__(self, fail_bulk_into: str | None = None, search_results: dict[str, list[dict]] | None = None):
+    def __init__(self, fail_bulk_into: str | None = None, search_results=None):
         self.indices: dict[str, dict] = {}
         self.documents: dict[str, list[dict]] = {}
         self.aliases: dict[str, str] = {}
@@ -125,4 +125,33 @@ class FakeSearch:
 
     def search(self, index: str, body: dict, pipeline: str | None = None) -> list[dict]:
         self.searches.append((index, body, pipeline))
+        if callable(self.search_results):
+            return self.search_results(index, body)
         return self.search_results.get(index, [])
+
+
+class FakeRunner:
+    """Scripted ClickHouse runner: each EXPLAIN or run pops the next outcome.
+
+    An outcome is a QueryError to raise or, for ``run``, a QueryOutput; EXPLAIN
+    succeeds when its queue is empty.
+    """
+
+    def __init__(self, explains: list | None = None, runs: list | None = None):
+        self.explains = list(explains or [])
+        self.runs = list(runs or [])
+        self.calls: list[tuple[str, str, str]] = []
+
+    def explain(self, sql: str, trace_id: str) -> str:
+        self.calls.append(("explain", sql, trace_id))
+        outcome = self.explains.pop(0) if self.explains else None
+        if isinstance(outcome, Exception):
+            raise outcome
+        return "explain-id"
+
+    def run(self, sql: str, trace_id: str):
+        self.calls.append(("run", sql, trace_id))
+        outcome = self.runs.pop(0)
+        if isinstance(outcome, Exception):
+            raise outcome
+        return outcome

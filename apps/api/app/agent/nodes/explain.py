@@ -8,6 +8,7 @@ from typing import Protocol
 
 from app.agent.errors import AgentError
 from app.data.clickhouse import QueryError
+from app.agent.state import AgentDeps, AgentState, record_error
 
 NODE = "explain"
 
@@ -23,3 +24,8 @@ def explain(runner: Explainer, sql: str, trace_id: str) -> AgentError | None:
     except QueryError as error:
         return AgentError(error.category, NODE, error.message)
     return None
+
+
+def explain_node(state: AgentState, deps: AgentDeps) -> dict:
+    error = explain(deps.runner, state["sql"], state["trace_id"])
+    return record_error(state, error) if error is not None else {}

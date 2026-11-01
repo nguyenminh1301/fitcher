@@ -22,6 +22,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 WORKDIR /app
 COPY --from=build /app/.venv ./.venv
 COPY apps/api/app ./app
+COPY apps/api/prompts ./prompts
 COPY jobs ./jobs
 COPY dbt ./dbt
 COPY packs ./packs
