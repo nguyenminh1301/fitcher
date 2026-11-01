@@ -4,6 +4,7 @@
 
 ### Added
 
+- Compare an eval answer with its reference result by column values: key and measure columns match whatever their names or positions, extra answer columns are allowed, rows align by key and keep their order only for ranked cases, and numbers match within a relative tolerance of 1e-6 and an absolute one of 1e-9.
 - Let eval cases give their reference result as inline `expected_rows` instead of `expected_sql` (never both), and the eval set a fixed `reference_date`; `app.eval.cases` loads the approved cases, reports cases for unbuilt branches as inactive and rejects an active case that is not an answered `data_query` with a reference result.
 - Answer `data_query` questions from the command line with `jobs/ask.py`: a LangGraph flow extracts terms and period descriptors through `fast`, resolves periods, retrieves pack context from the six indices, maps terms to metrics, columns and values with the pack's conventions and a coverage check, generates SQL through `sql-gen` with up to three repairs (the third through `sql-gen-hard`), guards and runs it as the read-only user, types the result from the compiled catalog and summarizes the rows in the question's language; questions with no measure or period, or an ambiguous measure, are refused before any SQL is generated.
 - Fail CI when a dataset id, column name or metric id of any pack appears in `apps/api`, tests included, except the names of the synthetic fixture pack.
