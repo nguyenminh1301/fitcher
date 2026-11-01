@@ -4,6 +4,7 @@
 
 ### Added
 
+- Add the Fitcher brand kit in `docs/brand/`: a symbol of table cells forming an F with an answer dot, a custom outlined wordmark, horizontal and stacked lockups, light and dark GitHub README banners, favicon and app icons, and a usage guide with the black, white and grey palette.
 - Answer `data_query` questions from the command line with `jobs/ask.py`: a LangGraph flow extracts terms and period descriptors through `fast`, resolves periods, retrieves pack context from the six indices, maps terms to metrics, columns and values with the pack's conventions and a coverage check, generates SQL through `sql-gen` with up to three repairs (the third through `sql-gen-hard`), guards and runs it as the read-only user, types the result from the compiled catalog and summarizes the rows in the question's language; questions with no measure or period, or an ambiguous measure, are refused before any SQL is generated.
 - Fail CI when a dataset id, column name or metric id of any pack appears in `apps/api`, tests included, except the names of the synthetic fixture pack.
 - Run agent SQL on ClickHouse as a read-only `agent_readonly` user granted only `marts`, whose profile caps the per-query time, row and memory limits; every query carries `log_comment = trace_id` and a generated `query_id`, runs `EXPLAIN` first, and its errors are classified as `sql`, `runtime` or `policy` for the retry loop.
