@@ -2,9 +2,10 @@
 
 The engine must stay industry-neutral (DECISIONS §13): every dataset id,
 column name and metric id of every pack in packs/ is forbidden anywhere in
-apps/api, tests included, as a whole word. Names that the synthetic fixture
-packs under apps/api/tests/fixtures/packs also use are exempt, because the
-engine tests need them.
+apps/api, tests included, as a whole word. Inside apps/api/tests, names that the
+synthetic fixture packs under apps/api/tests/fixtures/packs also use are
+exempt, because the engine tests need them; engine code gets no exemption.
+Pack files are read with the pack loader's YAML rules.
 
 Run with ``uv run --project apps/api python scripts/check_pack_isolation.py``.
 """
@@ -13,11 +14,13 @@ from pathlib import Path
 import re
 import sys
 
-import yaml
-
 ROOT = Path(__file__).resolve().parents[1]
 PACKS = ROOT / "packs"
 ENGINE = ROOT / "apps" / "api"
+TESTS = ENGINE / "tests"
+sys.path.insert(0, str(ENGINE))
+
+from app.packs.loader import read_yaml  # noqa: E402 - needs apps/api on the path
 FIXTURE_PACKS = ENGINE / "tests" / "fixtures" / "packs"
 SKIPPED_DIRS = {".venv", "__pycache__", ".pytest_cache", ".ruff_cache"}
 SKIPPED_FILES = {"uv.lock"}
@@ -26,11 +29,11 @@ TEXT_SUFFIXES = {".py", ".md", ".txt", ".json", ".yaml", ".yml", ".toml", ".cfg"
 
 def pack_names(pack_dir: Path) -> set[str]:
     names: set[str] = set()
-    datasets = yaml.safe_load((pack_dir / "datasets.yaml").read_text(encoding="utf-8"))["datasets"]
+    datasets = read_yaml(pack_dir / "datasets.yaml")["datasets"]
     for dataset in datasets:
         names.add(dataset["id"])
         names.update(column["name"] for column in dataset["columns"])
-    metrics = yaml.safe_load((pack_dir / "metrics.yaml").read_text(encoding="utf-8"))["metrics"]
+    metrics = read_yaml(pack_dir / "metrics.yaml")["metrics"]
     names.update(metric["id"] for metric in metrics)
     return names
 
@@ -53,18 +56,30 @@ def engine_files() -> list[Path]:
     return sorted(files)
 
 
+def name_pattern(names: set[str]) -> re.Pattern[str] | None:
+    if not names:
+        return None
+    alternatives = "|".join(sorted(map(re.escape, names), key=len, reverse=True))
+    return re.compile(rf"(?<![A-Za-z0-9_])({alternatives})(?![A-Za-z0-9_])")
+
+
 def main() -> int:
     forbidden: set[str] = set()
     for pack in pack_dirs(PACKS):
         forbidden |= pack_names(pack)
+    fixture_names: set[str] = set()
     for fixture in pack_dirs(FIXTURE_PACKS):
-        forbidden -= pack_names(fixture)
+        fixture_names |= pack_names(fixture)
     if not forbidden:
         print("No pack names to check.")
         return 0
-    pattern = re.compile(r"(?<![A-Za-z0-9_])(" + "|".join(sorted(map(re.escape, forbidden), key=len, reverse=True)) + r")(?![A-Za-z0-9_])")
+    engine_pattern = name_pattern(forbidden)
+    test_pattern = name_pattern(forbidden - fixture_names)
     failures = []
     for path in engine_files():
+        pattern = test_pattern if path.is_relative_to(TESTS) else engine_pattern
+        if pattern is None:
+            continue
         for number, line in enumerate(path.read_text(encoding="utf-8", errors="replace").splitlines(), start=1):
             for match in pattern.finditer(line):
                 failures.append(f"{path.relative_to(ROOT).as_posix()}:{number}: pack name '{match.group(1)}'")
