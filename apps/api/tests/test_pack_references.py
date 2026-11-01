@@ -55,6 +55,7 @@ BROKEN_REFERENCES = [
     ("eval.yaml", _set(("cases", 0, "expected", "dataset"), "nope"), "eval.yaml", "cases[0].expected.dataset", "unknown dataset 'nope'"),
     ("eval.yaml", _set(("cases", 0, "expected", "columns"), ["refund_total"]), "eval.yaml", "cases[0].expected.columns[0]", "unknown column 'refund_total' in dataset 'widget_sales'"),
     ("eval.yaml", _set(("cases", 0, "expected_rows"), [{"widget_name": "A"}]), "eval.yaml", "cases[0].expected_rows", "set either expected_sql or expected_rows, not both"),
+    ("eval.yaml", _set(("cases", 0, "expected_rows"), [{"widget_name": "A", "total": 1}, {"widget_name": "B"}]), "eval.yaml", "cases[0].expected_rows[1]", "must name the columns of the first row: total, widget_name"),
 ]
 
 
