@@ -17,6 +17,7 @@ round dot is the answer. Data in, answer out, in one small grid.
 | GitHub README banner (1280×320, PNG at 2×) | `banner/fitcher-banner-light.png`, `banner/fitcher-banner-dark.png` |
 | Favicon, app and PWA icons | `web/` (with `head-snippet.html` and `site.webmanifest`) |
 | Raster masters | `png/` |
+| Mascot: the finch (illustration, not a logo) | `mascot/fitcher-finch.svg`, `mascot/fitcher-finch-white.svg`, 1024 px PNGs |
 
 All logo SVGs are pure filled shapes: no live text, strokes, filters or raster images.
 The banner SVGs use live text for the tagline (system sans-serif). Use the PNG banners so the type renders the same everywhere.

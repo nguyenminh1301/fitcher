@@ -4,6 +4,7 @@
 
 ### Added
 
+- Add the Fitcher finch mascot in `docs/brand/mascot/`: a geometric bird with a left-leaning chest point, in black and white SVG and 1024 px PNG, listed in the brand guide as an illustration rather than a logo.
 - Add the Fitcher brand kit in `docs/brand/`: a symbol of table cells forming an F with an answer dot, a custom outlined wordmark, horizontal and stacked lockups, light and dark GitHub README banners, favicon and app icons, and a usage guide with the black, white and grey palette.
 - Answer `data_query` questions from the command line with `jobs/ask.py`: a LangGraph flow extracts terms and period descriptors through `fast`, resolves periods, retrieves pack context from the six indices, maps terms to metrics, columns and values with the pack's conventions and a coverage check, generates SQL through `sql-gen` with up to three repairs (the third through `sql-gen-hard`), guards and runs it as the read-only user, types the result from the compiled catalog and summarizes the rows in the question's language; questions with no measure or period, or an ambiguous measure, are refused before any SQL is generated.
 - Fail CI when a dataset id, column name or metric id of any pack appears in `apps/api`, tests included, except the names of the synthetic fixture pack.
