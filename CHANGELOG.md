@@ -67,6 +67,7 @@
 
 ### Fixed
 
+- Report an eval set whose `reference_date` is not a real calendar date as an eval-set error instead of an unhandled `ValueError`.
 - Reject a key repeated within one mapping of a Domain Pack YAML file instead of silently keeping its last value.
 - Correct the translated SQL retry rule and branch-specific SSE sequences, and make the phase plans define atomic index publication, a no-partial-data refresh requirement, permission revocation, trace completeness, credential-free realms and redaction of feedback proposals.
 - Publish downloads without overwriting concurrent outputs, validate the winning file, and fail safely on filesystems without atomic hard-link support.

@@ -60,4 +60,10 @@ def load_eval_set(pack: Pack, only: Sequence[str] | None = None) -> EvalSet:
     for case in cases:
         if is_active(case):
             _check_active(case)
-    return EvalSet(reference_date=date.fromisoformat(pack.eval.reference_date), cases=cases)
+    try:
+        reference_date = date.fromisoformat(pack.eval.reference_date)
+    except ValueError as error:
+        raise EvalSetError(
+            f"eval.yaml of pack {pack.name} has an invalid reference_date {pack.eval.reference_date}"
+        ) from error
+    return EvalSet(reference_date=reference_date, cases=cases)

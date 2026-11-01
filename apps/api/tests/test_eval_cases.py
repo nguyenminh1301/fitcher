@@ -38,6 +38,11 @@ def test_missing_reference_date_is_an_error():
         load_eval_set(_pack(reference_date=None))
 
 
+def test_calendar_invalid_reference_date_is_an_eval_set_error():
+    with pytest.raises(EvalSetError, match="2026-13-45"):
+        load_eval_set(_pack(reference_date="2026-13-45"))
+
+
 def test_only_filters_and_unknown_id_is_an_error():
     pack = _pack([_case("first"), _case("second")])
 
