@@ -41,6 +41,7 @@
 
 ### Changed
 
+- Settle the Phase 4 eval decisions: result sets match columns by value and allow extra columns, a pack needs execution match of at least 80% of active eval cases, eval runs request temperature 0, and a regression is a drop of more than one case per layer over the cases both runs scored.
 - Plan company documents as runtime content: reviewers upload PDF, DOCX, Markdown, text and XLSX files on a Documents page and delete them at any time, with stored originals, a `data_meta.documents` registry, role-scoped `kb_docs` chunks and compiles that carry documents into each index generation.
 - Take the user's time zone from the browser with each request (UTC for clients that send none) and answer in the language of the question, instead of fixing both in the pack's business profile.
 - Limit CodeRabbit to code by excluding agent instructions and documentation from its review, and let PRs that change only those files merge on passing checks without a CodeRabbit review.

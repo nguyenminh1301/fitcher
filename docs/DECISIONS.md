@@ -350,3 +350,4 @@ Tables (MergeTree, 90-day TTL, ordered by `(trace_id, ts)` or `(user_id, ts)`):
 - Chart library: ECharts. Can switch to Plotly by rewriting the adapter.
 - Ambiguous "best-selling": use the default convention in `business_profile.yaml` if present; otherwise clarify.
 - Embedding model: the latest OpenAI embedding model available on LiteLLM. Changing the model requires a full reindex.
+- Pack eval threshold (§11): execution match >= 80% of the active eval cases; below it `eval.py` exits 1.
