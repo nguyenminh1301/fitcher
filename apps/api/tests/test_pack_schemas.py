@@ -57,6 +57,8 @@ INVALID_FILES = [
     ("eval.yaml", _delete(("cases", 0, "expected", "intent")), "cases[0].expected.intent", "required field is missing"),
     ("eval.yaml", _set(("cases", 0, "expected", "colour"), "red"), "cases[0].expected.colour", "unknown field"),
     ("eval.yaml", _set(("cases", 0, "category"), "trivia"), "cases[0].category", "is not one of"),
+    ("eval.yaml", _set(("reference_date",), "15/01/2026"), "reference_date", "does not match"),
+    ("eval.yaml", _set(("cases", 0, "expected_rows"), [{"widget_name": ["A"]}]), "cases[0].expected_rows[0].widget_name", "is not of type"),
 ]
 
 
@@ -83,6 +85,17 @@ def test_schema_rejects_invalid_item(pack_dir, edit_pack, file_name, change, ite
     lines = [line.strip() for line in str(error.value).splitlines() if line.strip().startswith(prefix)]
     assert len(lines) == 1
     assert message in lines[0]
+
+
+def test_eval_expected_rows_accept_scalars_and_null(pack_dir, edit_pack):
+    rows = [{"widget_name": "Widget 0", "widget_revenue": 10.5, "units": 3, "active": True, "note": None}]
+    edit_pack("eval.yaml", _delete(("cases", 0, "expected_sql")))
+    edit_pack("eval.yaml", _set(("cases", 0, "expected_rows"), rows))
+
+    pack = load_pack(pack_dir, schema_dir=SCHEMA_DIR)
+
+    assert pack.eval.cases[0].expected_rows == rows
+    assert pack.eval.reference_date == "2026-01-15"
 
 
 def test_duplicate_key_is_reported(pack_dir: Path):
