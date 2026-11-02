@@ -4,6 +4,7 @@
 
 ### Added
 
+- Record every LiteLLM proxy call in `agent_logs.llm_calls` through a custom callback mounted into the proxy: alias, resolved model, call id, tokens, cost, latency, status and error, tagged with the trace id and graph node the api sends as request metadata.
 - Log node events and SQL attempts for every run of `jobs/ask.py` and `jobs/eval.py`: each graph node writes its start, end, status and state update as JSON capped at 16 KB with result rows reduced to counts, and each executed query writes its SQL, attempt number, `query_id`, row count and error to `sql_runs`; the api service gets the log writer password and `LOG_*` settings.
 - Trace every agent run with OpenTelemetry: the run's 32-hex trace id replaces the generated UUID in graph state, `log_comment` and eval case scores; LLM and embedding requests inside a run carry its trace id and current node as LiteLLM metadata and are counted; with a log writer, `run_question` writes a `running` row before the graph and a final row with status, latency, LLM call count, lost records and `log_complete` after flushing the run's records.
 - Write `agent_logs` records from the api with `app.observability.log_writer`: run rows insert synchronously, other records go through a bounded queue that a background thread flushes in per-table batches at `LOG_BATCH_SIZE`, every `LOG_FLUSH_INTERVAL_MS` and on request, retrying a failed batch with the same insert deduplication token, and counting each trace's records as written or lost (full queue, failed batch or flush timeout) without ever failing the run.

@@ -22,6 +22,9 @@ model_list:
 # receives the request without it instead of failing.
 litellm_settings:
   drop_params: true
+  # One agent_logs.llm_calls row per call (callbacks/clickhouse_logger.py,
+  # mounted next to this file).
+  callbacks: clickhouse_logger.proxy_handler_instance
 
 general_settings:
   master_key: os.environ/LITELLM_MASTER_KEY
