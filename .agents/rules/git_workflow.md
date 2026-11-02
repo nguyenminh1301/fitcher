@@ -229,7 +229,7 @@ python scripts/check_git.py --title "chore(common): update project setup"
 ```
 
 For workflow changes, also run `go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.12` or report that local workflow lint is unavailable and inspect the CI result.
-Application checks already exist: `uv run --project apps/api pytest -c apps/api/pyproject.toml`, `npm --prefix apps/web run typecheck` and `npm --prefix apps/web run build`.
+Application checks already exist: `uv run --project apps/api pytest -c apps/api/pyproject.toml`, `npm --prefix apps/web run typecheck`, `npm --prefix apps/web run test` and `npm --prefix apps/web run build`.
 Follow the changed-area verification table in `base.md`, including frozen dependency setup and container/database checks when relevant.
 Documentation-only changes do not require application builds or live LLM calls.
 CI covers repository governance, workflow lint, Linux API tests and web checks. Security jobs audit application dependencies and secrets and rebuild/scan runtime images; review full reports including advisories without fixes.

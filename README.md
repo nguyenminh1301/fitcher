@@ -131,11 +131,13 @@ In another terminal:
 ```bash
 npm --prefix apps/web ci
 npm --prefix apps/web run typecheck
+npm --prefix apps/web run test
 npm --prefix apps/web run build
 npm --prefix apps/web run dev
 ```
 
 Host and Docker services use the same ports; stop the Compose services before starting host servers.
+`npm --prefix apps/web run test` runs the web unit tests (Vitest). In development, `/dev/components` shows the shared components of the design system in both languages and themes. After replacing `apps/web/app/styles/tokens.json` with a new export of the design tokens, run `npm --prefix apps/web run tokens` to regenerate `tokens.css`.
 Commit dependency changes with the corresponding `apps/api/uv.lock` or `apps/web/package-lock.json`.
 
 ## Repository workflow

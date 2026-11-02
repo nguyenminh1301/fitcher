@@ -81,10 +81,11 @@ jobs:
           node-version-file: apps/web/.nvmrc
           cache: npm
           cache-dependency-path: apps/web/package-lock.json
-      - name: Install frozen dependencies, check types and build
+      - name: Install frozen dependencies, check types, test and build
         env:
           NEXT_TELEMETRY_DISABLED: "1"
         run: |
           npm --prefix apps/web ci
           npm --prefix apps/web run typecheck
+          npm --prefix apps/web run test
           npm --prefix apps/web run build

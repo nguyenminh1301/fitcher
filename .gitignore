@@ -36,3 +36,6 @@ dbt/logs/
 
 # Compiled Domain Packs
 build/
+
+# Written by `next dev` on every start; the repository keeps agent instructions in AGENTS.md and .agents/ only.
+apps/web/AGENTS.md
