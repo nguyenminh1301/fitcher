@@ -57,7 +57,7 @@ infra/litellm/callbacks/clickhouse_logger.py   # or built-in integration, see op
 
 ```bash
 uv run --project apps/api pytest -c apps/api/pyproject.toml
-docker compose run --rm api python -m jobs.apply_log_schema
+docker compose run --rm jobs python -m jobs.apply_log_schema
 docker compose run --rm api python -m jobs.ask "<acceptance question>"
 docker compose exec clickhouse clickhouse-client --query "<trace query with the printed trace_id>"
 docker compose run --rm api python -m jobs.eval --pack ecommerce_twin --baseline packs/ecommerce_twin/eval_baseline.json
@@ -75,7 +75,7 @@ docker compose run --rm api python -m jobs.eval --pack ecommerce_twin --baseline
 1. **LiteLLM callback mechanism.** Default: use a custom callback module mounted into the LiteLLM container if the built-in ClickHouse logger does not match the `llm_calls` schema; verify against the pinned LiteLLM version.
 2. **query_log delay.** `system.query_log` flushes periodically (seconds); trace queries run immediately after a run may miss rows. Document and, in tests, call `SYSTEM FLUSH LOGS` as admin.
 3. **Payload size and privacy.** Default: payloads are truncated to 16 KB; result rows are not logged, only counts.
-4. **Eval report storage.** DECISIONS §10 lists seven tables while §12 stores eval reports in `agent_logs`. Default: an eighth table `eval_reports`; DECISIONS §10 is updated in the same PR if the owner agrees.
+4. **Eval report storage.** Settled: DECISIONS §10 lists `eval_reports` and `example_proposals` beside the seven original tables.
 5. **Existing volumes.** `initdb` runs only on fresh volumes, so `apply_log_schema` is mandatory for existing ones.
 
 ## Branch and PR split

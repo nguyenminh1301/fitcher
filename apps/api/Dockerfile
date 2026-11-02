@@ -26,6 +26,8 @@ COPY apps/api/prompts ./prompts
 COPY jobs ./jobs
 COPY dbt ./dbt
 COPY packs ./packs
+# jobs.apply_log_schema applies the same DDL that initdb runs on a fresh volume.
+COPY infra/clickhouse/initdb ./infra/clickhouse/initdb
 # Compiled packs live in a named volume mounted here; Docker copies this
 # directory's owner into a new volume, so the app user can write to it.
 RUN useradd --create-home --uid 10001 app     && mkdir -p /app/build/packs     && chown app /app/build/packs
