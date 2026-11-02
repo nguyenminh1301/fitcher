@@ -4,6 +4,7 @@
 
 ### Added
 
+- Run an eval set through the agent graph one case at a time with `app.eval.runner`: each active case first gets its reference result from `expected_sql` on the read-only ClickHouse user or from `expected_rows`, then asks its question under its own trace id and a per-case time limit; a failing reference query, an exception or a timeout fails that case without stopping the run.
 - Reject an eval case whose `expected_rows` do not all name the same columns as the first row.
 - Score an eval case per layer from the final graph state: extraction matches the resolved periods, `top_n` and `rank_by` exactly, retrieval reports the recall of the labelled dataset and columns among the retrieved hits, execution compares the answer with the reference result, intent waits for the router, and cases of unbuilt branches are reported as not yet scored.
 - Compare an eval answer with its reference result by column values: key and measure columns match whatever their names or positions, extra answer columns are allowed, rows align by key and keep their order only for ranked cases, and numbers match within a relative tolerance of 1e-6 and an absolute one of 1e-9.
