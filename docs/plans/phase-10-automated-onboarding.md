@@ -10,6 +10,7 @@ Generate a Domain Pack for a new company with human review: profile the loaded m
 - Review UI and its API endpoints (step 5).
 - Documents API and page: upload, list and delete company documents at runtime (DECISIONS §5).
 - Compile after review (step 6) reusing Phase 2 and Phase 6.
+- The workspace console shell and its Knowledge sections Review, Documents and Datasets (DECISIONS §15).
 
 ## Out of scope
 
@@ -34,8 +35,11 @@ apps/api/app/onboarding/
 apps/api/prompts/draft_datasets.v1.md draft_glossary.v1.md draft_metrics.v1.md draft_examples.v1.md
 apps/api/app/api/review.py          # list, edit, approve, delete, test-run metric
 apps/api/app/api/documents.py       # upload, list, delete documents
-apps/web/app/(review)/              # Review UI pages
-apps/web/app/(review)/documents/    # Documents page
+apps/api/app/api/datasets.py        # read-only datasets of the compiled pack
+apps/web/app/(console)/layout.tsx   # ConsoleLayout: role-based navigation for every console section
+apps/web/app/(console)/review/      # Review UI pages
+apps/web/app/(console)/documents/   # Documents page
+apps/web/app/(console)/datasets/    # Datasets page
 infra/clickhouse/                   # data_meta.documents and its writer user, fresh-volume init plus apply path
 compose.yaml                        # documents volume on api
 ```
@@ -52,6 +56,8 @@ compose.yaml                        # documents volume on api
 8. **Regeneration experiment.** Copy the hand-written pack to `packs/ecommerce_twin_regen/`, remove the descriptions there and mark those items `status: draft`, so the drafter may fill them without touching approved items. Review, compile and evaluate the copy against the untouched hand-written pack's baseline.
 9. **Documents API (test first).** `POST /documents` (multipart), `GET /documents`, `DELETE /documents/{id}`, restricted to `pack_reviewer`. Upload checks the type from the file content, a size cap (default 20 MB), that `allowed_roles` is a non-empty subset of the pack's roles and that the SHA-256 is new for the pack (409 otherwise), then stores, parses, embeds and indexes as in task 2 and records the registry row. Delete removes the chunks by document id, the stored file and marks the row deleted. Both return 409 while the pack compiles. Tests use a fake embedding client and cover every rejection, a failed parse leaving no chunks, and delete removing every chunk.
 10. **Documents page and propagation.** Upload with role selection, list with status and error, delete with confirmation, and a billable "draft from this document" action that runs the drafter on that document only. The Review UI flags pack items whose evidence cites a deleted document. The compiler fills each new `kb_docs` generation from the registry (DECISIONS §5); a test compiles after an upload and after a delete.
+11. **Console shell (test first for the navigation rule).** `ConsoleLayout` from the design: top bar with the pack, grouped navigation (Knowledge, Quality, Observe, Administration) showing only the sections the user's roles allow, a drawer below 768px, page skeletons, lists of 20 rows that become cards below 640px, and detail pages with a back button, header actions and two panes. The Chat app's account menu links to it for console roles.
+12. **Datasets page.** `GET /datasets` (`pack_reviewer`) returns the compiled pack's datasets with columns, types, roles, descriptions and the pack roles allowed to read each; the page lists them read-only.
 
 ## Contracts
 
@@ -95,4 +101,5 @@ docker compose run --rm api python -m jobs.eval --pack ecommerce_twin --baseline
 - `feat/agent/draft-pack-items`: tasks 3-4.
 - `feat/web/review-drafted-pack-items`: tasks 5-7.
 - `feat/web/manage-company-documents`: tasks 9-10.
+- `feat/web/build-the-console-shell`: tasks 11-12, before the Review UI pages.
 - Task 8 results ride with `feat/web/review-drafted-pack-items`.
