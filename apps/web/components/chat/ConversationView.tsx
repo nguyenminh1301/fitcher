@@ -15,7 +15,7 @@ import { MessageBubble } from "./MessageBubble";
 /** One conversation: its turns, newest at the bottom, and the composer docked below. */
 export function ConversationView({ id }: { id: string }) {
   const { t } = useI18n();
-  const { threads, loadThread, ask, stop, busy, pack } = useChat();
+  const { api, threads, loadThread, ask, stop, busy, pack } = useChat();
   const [missing, setMissing] = useState(false);
   const scroll = useRef<HTMLDivElement>(null);
   const thread = threads[id];
@@ -55,6 +55,7 @@ export function ConversationView({ id }: { id: string }) {
                       onStop={stop}
                       onRetry={running ? undefined : () => void ask(turn.question, { conversationId: id, retryOf: turn.turn })}
                       onFollowUp={(text) => void ask(text, { conversationId: id })}
+                      onFeedback={(input) => void api.feedback.send(input)}
                     />
                   </div>
                 </div>

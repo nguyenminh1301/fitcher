@@ -1,44 +1,93 @@
 "use client";
 
-import type { AskEvent, Turn } from "@/lib/api/provisional";
-import { stepFor } from "@/lib/steps";
-import { useI18n } from "@/lib/i18n/react";
+// One assistant turn, built from its streamed /ask events (DECISIONS §6): live steps while streaming,
+// then the answer card, a clarifying question or a notice. Never a guessed result.
 
-import { Button } from "@/components/ui/controls";
+import { useState } from "react";
 
-type Props = { turn: Turn; streaming: boolean; onStop: () => void; onRetry?: () => void; onFollowUp: (text: string) => void };
+import { WarningBanner } from "@/components/ui/feedback";
+import type { AskEvent, ChartType, FeedbackInput, Turn } from "@/lib/api/provisional";
+import { stepFor, type StepId } from "@/lib/steps";
 
-function find<K extends AskEvent["event"]>(events: AskEvent[], kind: K): Extract<AskEvent, { event: K }> | undefined {
-  return events.find((event) => event.event === kind) as Extract<AskEvent, { event: K }> | undefined;
+import { ChartCard } from "./ChartCard";
+import { ClarifyOptions, FeedbackBar, NoticeCard, ProgressSteps, Summary, type Step } from "./answer-parts";
+import { DataTable } from "./DataTable";
+import { SqlView } from "./SqlView";
+
+type Props = {
+  turn: Turn;
+  streaming: boolean;
+  onStop: () => void;
+  onRetry?: () => void;
+  onFollowUp: (text: string) => void;
+  onFeedback?: (input: FeedbackInput) => void;
+};
+
+function only<K extends AskEvent["event"]>(events: AskEvent[], kind: K): Extract<AskEvent, { event: K }> | undefined {
+  return [...events].reverse().find((event) => event.event === kind) as Extract<AskEvent, { event: K }> | undefined;
 }
 
-/** The assistant's answer to one turn, built from its streamed events. */
-export function AssistantTurn({ turn, streaming, onStop, onFollowUp }: Props) {
-  const { t } = useI18n();
+/** The design's steps in the order the graph reached them; the last one is active while streaming. */
+export function stepsOf(events: AskEvent[], streaming: boolean, failed: boolean, denied: boolean): Step[] {
+  const steps: Step[] = [];
+  for (const event of events) {
+    if (event.event !== "status") continue;
+    const id = stepFor(event.node, event.attempt) as StepId | undefined;
+    if (!id) continue;
+    const previous = steps.at(-1);
+    if (previous && previous.id === id && previous.attempt === event.attempt) continue;
+    steps.push({ id, attempt: event.attempt, status: "done" });
+  }
+  const last = steps.at(-1);
+  if (last && streaming) last.status = "active";
+  else if (last && failed) last.status = "failed";
+  else if (last && denied) last.status = "denied";
+  return steps;
+}
+
+export function AssistantTurn({ turn, streaming, onStop, onRetry, onFollowUp, onFeedback }: Props) {
   const events = turn.events;
-  const last = [...events].reverse().find((event) => event.event === "status") as Extract<AskEvent, { event: "status" }> | undefined;
-  const summary = find(events, "summary");
-  const deny = find(events, "deny");
-  const clarify = find(events, "clarify");
-  const error = find(events, "error");
+  const result = only(events, "result")?.result;
+  const spec = only(events, "chart_spec")?.spec;
+  const summary = only(events, "summary");
+  const sql = only(events, "sql")?.sql;
+  const deny = only(events, "deny");
+  const clarify = only(events, "clarify");
+  const error = only(events, "error");
+  const traceId = events[0]?.trace_id ?? "";
+  const [type, setType] = useState<ChartType>(spec?.type ?? "table");
+  const [orientation, setOrientation] = useState<"vertical" | "horizontal">(spec?.orientation ?? "horizontal");
+  const steps = stepsOf(events, streaming, error?.kind === "failed", !!deny);
+  const feedback = (rating: "like" | "dislike", note?: string) => onFeedback?.({ trace_id: traceId, rating, ...(note ? { note } : {}) });
+
+  if (streaming) return <article className="fc-answer"><ProgressSteps steps={steps} live onStop={onStop} /></article>;
+  const lang = summary?.lang ?? deny?.lang ?? clarify?.lang ?? turn.question_lang;
 
   return (
-    <div className="fc-stack" style={{ minWidth: 0, flex: 1 }}>
-      {streaming ? (
-        <div className="fc-row">
-          <span className="fc-muted">{last ? t(`ui.step_${stepFor(last.node, last.attempt) ?? "understand"}`, { n: last.attempt ?? 2 }) : t("ui.working")}</span>
-          <Button size="sm" icon="stop" onClick={onStop}>{t("ui.stop")}</Button>
-        </div>
+    <article className="fc-answer">
+      {steps.length ? <ProgressSteps steps={steps} live={false} /> : null}
+      {deny ? <NoticeCard kind="denied" lang={deny.lang} text={deny.message} blocked={deny.blocked} /> : null}
+      {clarify ? <ClarifyOptions question={clarify.question} options={clarify.options} lang={clarify.lang} onPick={onFollowUp} /> : null}
+      {error ? (
+        <NoticeCard
+          kind={error.kind === "failed" ? "failed" : error.kind === "stopped" ? "stopped" : "network"}
+          lang={lang}
+          sql={error.sql}
+          error={error.error}
+          onRetry={error.kind === "failed" ? undefined : onRetry}
+        />
       ) : null}
-      {summary ? <p lang={summary.lang} style={{ margin: 0 }}>{summary.text}</p> : null}
-      {deny ? <p lang={deny.lang} style={{ margin: 0 }}>{deny.message}</p> : null}
-      {clarify ? (
-        <div className="fc-stack" lang={clarify.lang}>
-          <p style={{ margin: 0 }}>{clarify.question}</p>
-          <div className="fc-row">{clarify.options.map((option) => <Button key={option.id} onClick={() => onFollowUp(option.label)}>{option.label}</Button>)}</div>
-        </div>
+      {summary ? <Summary text={summary.text} lang={summary.lang} /> : null}
+      {summary?.warnings.map((warning) => (
+        <WarningBanner key={warning} tone="warning"><span lang={summary.lang}>{warning}</span></WarningBanner>
+      ))}
+      {result && result.row_count === 0 ? <NoticeCard kind="empty" lang={lang} sql={sql} /> : null}
+      {result && result.row_count > 0 && spec ? (
+        <ChartCard spec={spec} result={result} type={type} onType={setType} orientation={orientation} onOrientation={setOrientation} />
       ) : null}
-      {error ? <p className="fc-muted" style={{ margin: 0 }}>{error.kind === "stopped" ? t("ui.stoppedText") : error.message}</p> : null}
-    </div>
+      {result && result.row_count > 0 && type !== "table" ? <DataTable result={result} /> : null}
+      {sql && result && result.row_count > 0 ? <SqlView sql={sql} /> : null}
+      {summary || result ? <FeedbackBar onSubmit={feedback} onCopy={() => summary?.text.replace(/\*\*/g, "") ?? ""} onRetry={onRetry} /> : null}
+    </article>
   );
 }
