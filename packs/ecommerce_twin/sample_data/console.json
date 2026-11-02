@@ -1,0 +1,1740 @@
+{
+  "pack": {
+    "name": "ecommerce_twin",
+    "display_name": "E-commerce twin"
+  },
+  "pack_roles": [
+    "analyst",
+    "marketing",
+    "northwest_sales",
+    "category_partner"
+  ],
+  "identities": [
+    {
+      "user_id": "lab.analyst",
+      "display_name": "Lab Analyst",
+      "roles": [
+        "analyst"
+      ]
+    },
+    {
+      "user_id": "lab.marketing",
+      "display_name": "Lab Marketing",
+      "roles": [
+        "marketing"
+      ]
+    },
+    {
+      "user_id": "lab.northwest",
+      "display_name": "Lab Northwest",
+      "roles": [
+        "northwest_sales"
+      ]
+    },
+    {
+      "user_id": "lab.partner",
+      "display_name": "Lab Partner",
+      "roles": [
+        "category_partner"
+      ]
+    },
+    {
+      "user_id": "lab.reviewer",
+      "display_name": "Lab Reviewer",
+      "roles": [
+        "pack_reviewer",
+        "analyst"
+      ]
+    },
+    {
+      "user_id": "lab.admin",
+      "display_name": "Lab Admin",
+      "roles": [
+        "admin",
+        "analyst"
+      ]
+    }
+  ],
+  "conversations": [
+    {
+      "conversation": {
+        "id": "c-demo-1",
+        "title": "Doanh thu thuần theo danh mục năm 2025",
+        "pinned": true,
+        "group_id": null,
+        "updated_at": "2026-11-02T08:15:00Z"
+      },
+      "turns": [
+        {
+          "turn": 1,
+          "revision": 1,
+          "question": "Doanh thu thuần theo danh mục năm 2025",
+          "question_lang": "vi",
+          "events": [
+            {
+              "event": "status",
+              "node": "extract",
+              "phase": "end",
+              "trace_id": "5b1d0c2e9a4f4e7d8c3b2a1f0e9d8c7b"
+            },
+            {
+              "event": "status",
+              "node": "resolve_time",
+              "phase": "end",
+              "trace_id": "5b1d0c2e9a4f4e7d8c3b2a1f0e9d8c7b"
+            },
+            {
+              "event": "status",
+              "node": "retrieve",
+              "phase": "end",
+              "trace_id": "5b1d0c2e9a4f4e7d8c3b2a1f0e9d8c7b"
+            },
+            {
+              "event": "status",
+              "node": "build_spec",
+              "phase": "end",
+              "trace_id": "5b1d0c2e9a4f4e7d8c3b2a1f0e9d8c7b"
+            },
+            {
+              "event": "status",
+              "node": "gate",
+              "phase": "end",
+              "trace_id": "5b1d0c2e9a4f4e7d8c3b2a1f0e9d8c7b"
+            },
+            {
+              "event": "status",
+              "node": "generate_sql",
+              "phase": "end",
+              "trace_id": "5b1d0c2e9a4f4e7d8c3b2a1f0e9d8c7b"
+            },
+            {
+              "event": "sql",
+              "sql": "SELECT product_category, sumIf(line_amount, order_status != 'cancelled') AS net_sales\nFROM marts.sales_lines\nWHERE order_date >= toDate('2025-01-01') AND order_date < toDate('2026-01-01')\nGROUP BY product_category\nORDER BY net_sales DESC, product_category",
+              "attempt": 1,
+              "trace_id": "5b1d0c2e9a4f4e7d8c3b2a1f0e9d8c7b"
+            },
+            {
+              "event": "status",
+              "node": "guard",
+              "phase": "end",
+              "trace_id": "5b1d0c2e9a4f4e7d8c3b2a1f0e9d8c7b"
+            },
+            {
+              "event": "status",
+              "node": "explain",
+              "phase": "end",
+              "trace_id": "5b1d0c2e9a4f4e7d8c3b2a1f0e9d8c7b"
+            },
+            {
+              "event": "status",
+              "node": "execute",
+              "phase": "end",
+              "trace_id": "5b1d0c2e9a4f4e7d8c3b2a1f0e9d8c7b"
+            },
+            {
+              "event": "status",
+              "node": "check",
+              "phase": "end",
+              "trace_id": "5b1d0c2e9a4f4e7d8c3b2a1f0e9d8c7b"
+            },
+            {
+              "event": "status",
+              "node": "shape_result",
+              "phase": "end",
+              "trace_id": "5b1d0c2e9a4f4e7d8c3b2a1f0e9d8c7b"
+            },
+            {
+              "event": "status",
+              "node": "chart_recommender",
+              "phase": "end",
+              "trace_id": "5b1d0c2e9a4f4e7d8c3b2a1f0e9d8c7b"
+            },
+            {
+              "event": "status",
+              "node": "summarize",
+              "phase": "end",
+              "trace_id": "5b1d0c2e9a4f4e7d8c3b2a1f0e9d8c7b"
+            },
+            {
+              "event": "result",
+              "result": {
+                "columns": [
+                  {
+                    "name": "product_category",
+                    "type": "string",
+                    "role": "dimension"
+                  },
+                  {
+                    "name": "net_sales",
+                    "type": "number",
+                    "role": "measure",
+                    "format": "currency"
+                  }
+                ],
+                "rows": [
+                  [
+                    "Electronics",
+                    6045934.26
+                  ],
+                  [
+                    "Home & Kitchen",
+                    4210388.1
+                  ],
+                  [
+                    "Apparel",
+                    3398120.0
+                  ],
+                  [
+                    "Beauty",
+                    2104476.55
+                  ],
+                  [
+                    "Sports",
+                    1890233.4
+                  ],
+                  [
+                    "Toys",
+                    1203118.75
+                  ]
+                ],
+                "row_count": 6
+              },
+              "trace_id": "5b1d0c2e9a4f4e7d8c3b2a1f0e9d8c7b"
+            },
+            {
+              "event": "chart_spec",
+              "spec": {
+                "type": "bar",
+                "x": "product_category",
+                "y": [
+                  "net_sales"
+                ],
+                "sort": "desc",
+                "format": "currency",
+                "orientation": "horizontal",
+                "allowed_types": [
+                  "bar",
+                  "pie",
+                  "table"
+                ]
+              },
+              "trace_id": "5b1d0c2e9a4f4e7d8c3b2a1f0e9d8c7b"
+            },
+            {
+              "event": "summary",
+              "text": "Năm 2025, Electronics dẫn đầu với **6.045.934,26 US$** doanh thu thuần, tiếp theo là Home & Kitchen (**4.210.388,10 US$**). Toys thấp nhất với **1.203.118,75 US$**.",
+              "lang": "vi",
+              "warnings": [],
+              "trace_id": "5b1d0c2e9a4f4e7d8c3b2a1f0e9d8c7b"
+            },
+            {
+              "event": "done",
+              "trace_id": "5b1d0c2e9a4f4e7d8c3b2a1f0e9d8c7b"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation": {
+        "id": "c-demo-2",
+        "title": "Monthly conversion rate in 2025",
+        "pinned": false,
+        "group_id": null,
+        "updated_at": "2026-10-30T14:02:00Z"
+      },
+      "turns": [
+        {
+          "turn": 1,
+          "revision": 1,
+          "question": "Monthly conversion rate in 2025",
+          "question_lang": "en",
+          "events": [
+            {
+              "event": "status",
+              "node": "extract",
+              "phase": "end",
+              "trace_id": "7c2e1d3f4a5b6c7d8e9f0a1b2c3d4e5f"
+            },
+            {
+              "event": "status",
+              "node": "resolve_time",
+              "phase": "end",
+              "trace_id": "7c2e1d3f4a5b6c7d8e9f0a1b2c3d4e5f"
+            },
+            {
+              "event": "status",
+              "node": "retrieve",
+              "phase": "end",
+              "trace_id": "7c2e1d3f4a5b6c7d8e9f0a1b2c3d4e5f"
+            },
+            {
+              "event": "status",
+              "node": "build_spec",
+              "phase": "end",
+              "trace_id": "7c2e1d3f4a5b6c7d8e9f0a1b2c3d4e5f"
+            },
+            {
+              "event": "status",
+              "node": "gate",
+              "phase": "end",
+              "trace_id": "7c2e1d3f4a5b6c7d8e9f0a1b2c3d4e5f"
+            },
+            {
+              "event": "status",
+              "node": "generate_sql",
+              "phase": "end",
+              "trace_id": "7c2e1d3f4a5b6c7d8e9f0a1b2c3d4e5f"
+            },
+            {
+              "event": "sql",
+              "sql": "SELECT toStartOfMonth(session_date) AS month, sum(converted_sessions) / nullIf(sum(sessions), 0) * 100 AS conversion_rate\nFROM marts.sessions_daily\nWHERE session_date >= toDate('2025-01-01') AND session_date < toDate('2026-01-01')\nGROUP BY month\nORDER BY month",
+              "attempt": 1,
+              "trace_id": "7c2e1d3f4a5b6c7d8e9f0a1b2c3d4e5f"
+            },
+            {
+              "event": "status",
+              "node": "guard",
+              "phase": "end",
+              "trace_id": "7c2e1d3f4a5b6c7d8e9f0a1b2c3d4e5f"
+            },
+            {
+              "event": "status",
+              "node": "explain",
+              "phase": "end",
+              "trace_id": "7c2e1d3f4a5b6c7d8e9f0a1b2c3d4e5f"
+            },
+            {
+              "event": "status",
+              "node": "execute",
+              "phase": "end",
+              "trace_id": "7c2e1d3f4a5b6c7d8e9f0a1b2c3d4e5f"
+            },
+            {
+              "event": "status",
+              "node": "check",
+              "phase": "end",
+              "trace_id": "7c2e1d3f4a5b6c7d8e9f0a1b2c3d4e5f"
+            },
+            {
+              "event": "status",
+              "node": "shape_result",
+              "phase": "end",
+              "trace_id": "7c2e1d3f4a5b6c7d8e9f0a1b2c3d4e5f"
+            },
+            {
+              "event": "status",
+              "node": "chart_recommender",
+              "phase": "end",
+              "trace_id": "7c2e1d3f4a5b6c7d8e9f0a1b2c3d4e5f"
+            },
+            {
+              "event": "status",
+              "node": "summarize",
+              "phase": "end",
+              "trace_id": "7c2e1d3f4a5b6c7d8e9f0a1b2c3d4e5f"
+            },
+            {
+              "event": "result",
+              "result": {
+                "columns": [
+                  {
+                    "name": "month",
+                    "type": "date",
+                    "role": "time"
+                  },
+                  {
+                    "name": "conversion_rate",
+                    "type": "number",
+                    "role": "measure",
+                    "format": "percent"
+                  }
+                ],
+                "rows": [
+                  [
+                    "2025-01-01",
+                    2.81
+                  ],
+                  [
+                    "2025-02-01",
+                    2.74
+                  ],
+                  [
+                    "2025-03-01",
+                    2.96
+                  ],
+                  [
+                    "2025-04-01",
+                    3.02
+                  ],
+                  [
+                    "2025-05-01",
+                    3.11
+                  ],
+                  [
+                    "2025-06-01",
+                    2.88
+                  ],
+                  [
+                    "2025-07-01",
+                    2.79
+                  ],
+                  [
+                    "2025-08-01",
+                    2.93
+                  ],
+                  [
+                    "2025-09-01",
+                    3.05
+                  ],
+                  [
+                    "2025-10-01",
+                    3.18
+                  ],
+                  [
+                    "2025-11-01",
+                    3.64
+                  ],
+                  [
+                    "2025-12-01",
+                    3.92
+                  ]
+                ],
+                "row_count": 12
+              },
+              "trace_id": "7c2e1d3f4a5b6c7d8e9f0a1b2c3d4e5f"
+            },
+            {
+              "event": "chart_spec",
+              "spec": {
+                "type": "line",
+                "x": "month",
+                "y": [
+                  "conversion_rate"
+                ],
+                "format": "percent",
+                "allowed_types": [
+                  "line",
+                  "bar",
+                  "table"
+                ]
+              },
+              "trace_id": "7c2e1d3f4a5b6c7d8e9f0a1b2c3d4e5f"
+            },
+            {
+              "event": "summary",
+              "text": "Conversion stayed between **2.74%** and **3.18%** from January to October 2025, then rose to **3.64%** in November and **3.92%** in December.",
+              "lang": "en",
+              "warnings": [],
+              "trace_id": "7c2e1d3f4a5b6c7d8e9f0a1b2c3d4e5f"
+            },
+            {
+              "event": "done",
+              "trace_id": "7c2e1d3f4a5b6c7d8e9f0a1b2c3d4e5f"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "conversation": {
+        "id": "c-demo-3",
+        "title": "Top 5 brands by net sales in Q1 2025 compared with Q1 2024",
+        "pinned": false,
+        "group_id": null,
+        "updated_at": "2026-10-12T09:40:00Z"
+      },
+      "turns": [
+        {
+          "turn": 1,
+          "revision": 1,
+          "question": "Top 5 brands by net sales in Q1 2025 compared with Q1 2024",
+          "question_lang": "en",
+          "events": [
+            {
+              "event": "status",
+              "node": "extract",
+              "phase": "end",
+              "trace_id": "9e8d7c6b5a4f3e2d1c0b9a8f7e6d5c4b"
+            },
+            {
+              "event": "status",
+              "node": "resolve_time",
+              "phase": "end",
+              "trace_id": "9e8d7c6b5a4f3e2d1c0b9a8f7e6d5c4b"
+            },
+            {
+              "event": "status",
+              "node": "retrieve",
+              "phase": "end",
+              "trace_id": "9e8d7c6b5a4f3e2d1c0b9a8f7e6d5c4b"
+            },
+            {
+              "event": "status",
+              "node": "build_spec",
+              "phase": "end",
+              "trace_id": "9e8d7c6b5a4f3e2d1c0b9a8f7e6d5c4b"
+            },
+            {
+              "event": "status",
+              "node": "gate",
+              "phase": "end",
+              "trace_id": "9e8d7c6b5a4f3e2d1c0b9a8f7e6d5c4b"
+            },
+            {
+              "event": "status",
+              "node": "generate_sql",
+              "phase": "end",
+              "trace_id": "9e8d7c6b5a4f3e2d1c0b9a8f7e6d5c4b"
+            },
+            {
+              "event": "sql",
+              "sql": "SELECT product_brand,\n  sumIf(line_amount, order_status != 'cancelled' AND order_date >= toDate('2025-01-01') AND order_date < toDate('2025-04-01')) AS net_sales_q1_2025,\n  sumIf(line_amount, order_status != 'cancelled' AND order_date >= toDate('2024-01-01') AND order_date < toDate('2024-04-01')) AS net_sales_q1_2024,\n  round(100 * toFloat64(net_sales_q1_2025 - net_sales_q1_2024) / toFloat64(net_sales_q1_2024), 2) AS net_sales_change_pct\nFROM marts.sales_lines\nWHERE order_date >= toDate('2024-01-01') AND order_date < toDate('2025-04-01')\nGROUP BY product_brand\nORDER BY net_sales_q1_2025 DESC, product_brand\nLIMIT 5",
+              "attempt": 1,
+              "trace_id": "9e8d7c6b5a4f3e2d1c0b9a8f7e6d5c4b"
+            },
+            {
+              "event": "status",
+              "node": "guard",
+              "phase": "end",
+              "trace_id": "9e8d7c6b5a4f3e2d1c0b9a8f7e6d5c4b"
+            },
+            {
+              "event": "status",
+              "node": "explain",
+              "phase": "end",
+              "trace_id": "9e8d7c6b5a4f3e2d1c0b9a8f7e6d5c4b"
+            },
+            {
+              "event": "status",
+              "node": "execute",
+              "phase": "end",
+              "trace_id": "9e8d7c6b5a4f3e2d1c0b9a8f7e6d5c4b"
+            },
+            {
+              "event": "status",
+              "node": "check",
+              "phase": "end",
+              "trace_id": "9e8d7c6b5a4f3e2d1c0b9a8f7e6d5c4b"
+            },
+            {
+              "event": "status",
+              "node": "shape_result",
+              "phase": "end",
+              "trace_id": "9e8d7c6b5a4f3e2d1c0b9a8f7e6d5c4b"
+            },
+            {
+              "event": "status",
+              "node": "chart_recommender",
+              "phase": "end",
+              "trace_id": "9e8d7c6b5a4f3e2d1c0b9a8f7e6d5c4b"
+            },
+            {
+              "event": "status",
+              "node": "summarize",
+              "phase": "end",
+              "trace_id": "9e8d7c6b5a4f3e2d1c0b9a8f7e6d5c4b"
+            },
+            {
+              "event": "result",
+              "result": {
+                "columns": [
+                  {
+                    "name": "product_brand",
+                    "type": "string",
+                    "role": "dimension"
+                  },
+                  {
+                    "name": "net_sales_q1_2025",
+                    "type": "number",
+                    "role": "measure",
+                    "format": "currency"
+                  },
+                  {
+                    "name": "net_sales_q1_2024",
+                    "type": "number",
+                    "role": "measure",
+                    "format": "currency"
+                  },
+                  {
+                    "name": "net_sales_change_pct",
+                    "type": "number",
+                    "role": "measure",
+                    "format": "percent"
+                  }
+                ],
+                "rows": [
+                  [
+                    "Northwind",
+                    1843200.5,
+                    1610420.0,
+                    14.45
+                  ],
+                  [
+                    "Contoso",
+                    1520330.25,
+                    1588900.1,
+                    -4.32
+                  ],
+                  [
+                    "Fabrikam",
+                    1311050.0,
+                    1102340.75,
+                    18.93
+                  ],
+                  [
+                    "Tailspin",
+                    998420.4,
+                    1004110.0,
+                    -0.57
+                  ],
+                  [
+                    "Litware",
+                    874310.9,
+                    701220.3,
+                    24.68
+                  ]
+                ],
+                "row_count": 5
+              },
+              "trace_id": "9e8d7c6b5a4f3e2d1c0b9a8f7e6d5c4b"
+            },
+            {
+              "event": "chart_spec",
+              "spec": {
+                "type": "grouped_bar",
+                "x": "product_brand",
+                "y": [
+                  "net_sales_q1_2025",
+                  "net_sales_q1_2024"
+                ],
+                "sort": "desc",
+                "format": "currency",
+                "allowed_types": [
+                  "grouped_bar",
+                  "bar",
+                  "table"
+                ]
+              },
+              "trace_id": "9e8d7c6b5a4f3e2d1c0b9a8f7e6d5c4b"
+            },
+            {
+              "event": "summary",
+              "text": "Northwind led Q1 2025 with $1,843,200.50 in net sales, up 14.45% on Q1 2024. Litware grew fastest (+24.68%), while Contoso fell 4.32%.",
+              "lang": "en",
+              "warnings": [],
+              "trace_id": "9e8d7c6b5a4f3e2d1c0b9a8f7e6d5c4b"
+            },
+            {
+              "event": "done",
+              "trace_id": "9e8d7c6b5a4f3e2d1c0b9a8f7e6d5c4b"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "datasets": [
+    {
+      "id": "sales_lines",
+      "description": "Order lines with their order, product and customer attributes. Net sales excludes cancelled orders; returns are not netted, see returns_fact. The source has no discounts and no order times.",
+      "grain": "one row per order line",
+      "time_column": "order_date",
+      "readable_roles": [
+        "analyst",
+        "northwest_sales",
+        "category_partner"
+      ],
+      "columns": [
+        {
+          "name": "order_item_id",
+          "type": "string",
+          "role": "dimension",
+          "description": "Order line key."
+        },
+        {
+          "name": "order_id",
+          "type": "string",
+          "role": "dimension",
+          "description": "Order the line belongs to."
+        },
+        {
+          "name": "order_date",
+          "type": "date",
+          "role": "time",
+          "description": "Date the order was placed."
+        },
+        {
+          "name": "order_status",
+          "type": "string",
+          "role": "dimension",
+          "description": "Order status: delivered, shipped, returned or cancelled."
+        },
+        {
+          "name": "payment_method",
+          "type": "string",
+          "role": "dimension",
+          "description": "Payment method of the order."
+        },
+        {
+          "name": "customer_id",
+          "type": "string",
+          "role": "dimension",
+          "description": "Customer who placed the order."
+        },
+        {
+          "name": "customer_region",
+          "type": "string",
+          "role": "dimension",
+          "description": "Customer region."
+        },
+        {
+          "name": "customer_segment",
+          "type": "string",
+          "role": "dimension",
+          "description": "Customer segment: new, casual, loyal or vip."
+        },
+        {
+          "name": "customer_signup_date",
+          "type": "date",
+          "role": "time",
+          "description": "Date the customer signed up."
+        },
+        {
+          "name": "product_id",
+          "type": "string",
+          "role": "dimension",
+          "description": "Product SKU sold on the line; the source has no product names."
+        },
+        {
+          "name": "product_category",
+          "type": "string",
+          "role": "dimension",
+          "description": "Product category."
+        },
+        {
+          "name": "product_subcategory",
+          "type": "string",
+          "role": "dimension",
+          "description": "Product subcategory."
+        },
+        {
+          "name": "product_brand",
+          "type": "string",
+          "role": "dimension",
+          "description": "Product brand."
+        },
+        {
+          "name": "product_list_price",
+          "type": "number",
+          "role": "measure",
+          "description": "Current list price of the product."
+        },
+        {
+          "name": "product_unit_cost",
+          "type": "number",
+          "role": "measure",
+          "description": "Current unit cost of the product."
+        },
+        {
+          "name": "quantity",
+          "type": "number",
+          "role": "measure",
+          "description": "Units sold on the line."
+        },
+        {
+          "name": "unit_price",
+          "type": "number",
+          "role": "measure",
+          "description": "Price per unit on the line."
+        },
+        {
+          "name": "line_amount",
+          "type": "number",
+          "role": "measure",
+          "description": "quantity * unit_price for the line."
+        },
+        {
+          "name": "is_returned",
+          "type": "boolean",
+          "role": "dimension",
+          "description": "Whether the line was returned."
+        }
+      ]
+    },
+    {
+      "id": "returns_fact",
+      "description": "Returned order lines with the attributes of the original sale.",
+      "grain": "one row per return",
+      "time_column": "return_date",
+      "readable_roles": [
+        "analyst",
+        "northwest_sales"
+      ],
+      "columns": [
+        {
+          "name": "return_id",
+          "type": "string",
+          "role": "dimension",
+          "description": "Return key."
+        },
+        {
+          "name": "return_date",
+          "type": "date",
+          "role": "time",
+          "description": "Date the return was recorded."
+        },
+        {
+          "name": "return_reason",
+          "type": "string",
+          "role": "dimension",
+          "description": "Reason given for the return."
+        },
+        {
+          "name": "refund_amount",
+          "type": "number",
+          "role": "measure",
+          "description": "Amount refunded."
+        },
+        {
+          "name": "order_item_id",
+          "type": "string",
+          "role": "dimension",
+          "description": "Returned order line."
+        },
+        {
+          "name": "order_id",
+          "type": "string",
+          "role": "dimension",
+          "description": "Order of the returned line."
+        },
+        {
+          "name": "order_date",
+          "type": "date",
+          "role": "time",
+          "description": "Date of the original order."
+        },
+        {
+          "name": "order_status",
+          "type": "string",
+          "role": "dimension",
+          "description": "Status of the original order."
+        },
+        {
+          "name": "product_id",
+          "type": "string",
+          "role": "dimension",
+          "description": "Returned product SKU."
+        },
+        {
+          "name": "product_category",
+          "type": "string",
+          "role": "dimension",
+          "description": "Product category."
+        },
+        {
+          "name": "product_subcategory",
+          "type": "string",
+          "role": "dimension",
+          "description": "Product subcategory."
+        },
+        {
+          "name": "product_brand",
+          "type": "string",
+          "role": "dimension",
+          "description": "Product brand."
+        },
+        {
+          "name": "customer_id",
+          "type": "string",
+          "role": "dimension",
+          "description": "Customer of the original order."
+        },
+        {
+          "name": "customer_region",
+          "type": "string",
+          "role": "dimension",
+          "description": "Customer region."
+        },
+        {
+          "name": "customer_segment",
+          "type": "string",
+          "role": "dimension",
+          "description": "Customer segment."
+        },
+        {
+          "name": "quantity",
+          "type": "number",
+          "role": "measure",
+          "description": "Units on the original line."
+        },
+        {
+          "name": "line_amount",
+          "type": "number",
+          "role": "measure",
+          "description": "Amount of the original line."
+        },
+        {
+          "name": "days_to_return",
+          "type": "number",
+          "role": "measure",
+          "description": "Days between the order date and the return date."
+        }
+      ]
+    },
+    {
+      "id": "sessions_daily",
+      "description": "Daily session and conversion counts by device, channel and customer group.",
+      "grain": "one row per day, device, channel, customer region and customer segment",
+      "time_column": "session_date",
+      "readable_roles": [
+        "analyst",
+        "marketing"
+      ],
+      "columns": [
+        {
+          "name": "session_date",
+          "type": "date",
+          "role": "time",
+          "description": "Day the sessions started."
+        },
+        {
+          "name": "device",
+          "type": "string",
+          "role": "dimension",
+          "description": "Device: desktop, mobile or tablet."
+        },
+        {
+          "name": "channel",
+          "type": "string",
+          "role": "dimension",
+          "description": "Traffic channel."
+        },
+        {
+          "name": "customer_region",
+          "type": "string",
+          "role": "dimension",
+          "description": "Region of the session's customer."
+        },
+        {
+          "name": "customer_segment",
+          "type": "string",
+          "role": "dimension",
+          "description": "Segment of the session's customer."
+        },
+        {
+          "name": "sessions",
+          "type": "number",
+          "role": "measure",
+          "description": "Number of sessions."
+        },
+        {
+          "name": "converted_sessions",
+          "type": "number",
+          "role": "measure",
+          "description": "Sessions that converted into an order."
+        },
+        {
+          "name": "pages_viewed",
+          "type": "number",
+          "role": "measure",
+          "description": "Total pages viewed in the sessions."
+        }
+      ]
+    }
+  ],
+  "review_items": [
+    {
+      "id": "metric-gross-margin",
+      "file": "metrics.yaml",
+      "name": "gross_margin",
+      "kind": "item",
+      "status": "draft",
+      "confidence": 0.82,
+      "body": "Net sales minus the unit cost of the products sold, for orders that were not cancelled.",
+      "formula": "sumIf(line_amount - quantity * product_unit_cost, order_status != 'cancelled')",
+      "evidence": {
+        "source": "Pricing handbook.pdf, page 4",
+        "quote": "Gross margin is revenue after cancellations minus the cost of goods sold."
+      },
+      "test_result": {
+        "columns": [
+          {
+            "name": "gross_margin",
+            "type": "number",
+            "role": "measure",
+            "format": "currency"
+          }
+        ],
+        "rows": [
+          [
+            6823410.12
+          ]
+        ],
+        "row_count": 1
+      }
+    },
+    {
+      "id": "glossary-aov",
+      "file": "glossary.yaml",
+      "name": "average order value",
+      "kind": "item",
+      "status": "approved",
+      "confidence": 0.95,
+      "body": "Net sales divided by the number of orders that were not cancelled.",
+      "evidence": {
+        "source": "Profile of sales_lines",
+        "quote": "order_id repeats once per order line"
+      }
+    },
+    {
+      "id": "glossary-vip",
+      "file": "glossary.yaml",
+      "name": "VIP customers",
+      "kind": "item",
+      "status": "draft",
+      "confidence": 0.58,
+      "body": "Customers in the VIP segment.",
+      "evidence": {
+        "source": "Loyalty programme.docx",
+        "quote": "VIP members get free returns.",
+        "deleted": true
+      }
+    },
+    {
+      "id": "dataset-sessions",
+      "file": "datasets.yaml",
+      "name": "sessions_daily",
+      "kind": "item",
+      "status": "approved",
+      "confidence": 0.91,
+      "body": "One row per day, device, channel, region and segment with sessions and conversions.",
+      "evidence": {
+        "source": "Profile of sessions_daily"
+      }
+    },
+    {
+      "id": "proposal-returns-by-reason",
+      "file": "examples.yaml",
+      "name": "Refunds by return reason",
+      "kind": "proposal",
+      "status": "draft",
+      "confidence": 0.64,
+      "body": "Which return reasons cost us the most in [MASKED_PERIOD]?",
+      "formula": "SELECT return_reason, sum(refund_amount) AS refund_total FROM marts.returns_fact GROUP BY return_reason ORDER BY refund_total DESC",
+      "evidence": {
+        "source": "Disliked chat 3f2a…",
+        "quote": "the totals looked too high"
+      }
+    }
+  ],
+  "documents": [
+    {
+      "id": "doc-1",
+      "name": "Pricing handbook.pdf",
+      "size": 1843200,
+      "status": "indexed",
+      "roles": [
+        "analyst",
+        "category_partner"
+      ],
+      "uploaded_at": "2026-10-28T10:12:00Z"
+    },
+    {
+      "id": "doc-2",
+      "name": "Returns policy.docx",
+      "size": 228100,
+      "status": "indexed",
+      "roles": [
+        "analyst",
+        "northwest_sales"
+      ],
+      "uploaded_at": "2026-10-28T10:15:00Z"
+    },
+    {
+      "id": "doc-3",
+      "name": "Campaign calendar 2025.xlsx",
+      "size": 96400,
+      "status": "processing",
+      "roles": [
+        "marketing"
+      ],
+      "uploaded_at": "2026-11-02T07:58:00Z"
+    },
+    {
+      "id": "doc-4",
+      "name": "Old price list.pdf",
+      "size": 5300000,
+      "status": "failed",
+      "error": "The PDF has no text layer; scanned pages are not supported.",
+      "roles": [
+        "analyst"
+      ],
+      "uploaded_at": "2026-10-20T16:30:00Z"
+    }
+  ],
+  "feedback": [
+    {
+      "trace_id": "5b1d0c2e9a4f4e7d8c3b2a1f0e9d8c7b",
+      "ts": "2026-11-02T08:16:10Z",
+      "user_id": "lab.analyst",
+      "rating": "like",
+      "question": "Doanh thu thuần theo danh mục năm 2025",
+      "run_status": "succeeded"
+    },
+    {
+      "trace_id": "3f2a1b0c9d8e7f6a5b4c3d2e1f0a9b8c",
+      "ts": "2026-10-29T11:22:00Z",
+      "user_id": "lab.analyst",
+      "rating": "dislike",
+      "question": "Net sales by warehouse in 2025",
+      "note": "We don't track warehouses in this pack, it should have told me.",
+      "run_status": "failed"
+    },
+    {
+      "trace_id": "a1b2c3d4e5f60718293a4b5c6d7e8f90",
+      "ts": "2026-11-02T08:04:30Z",
+      "user_id": "lab.analyst",
+      "rating": "dislike",
+      "question": "Average order value by region in 2025",
+      "note": "The totals looked too high",
+      "run_status": "succeeded",
+      "proposal": "proposed"
+    },
+    {
+      "trace_id": "7c2e1d3f4a5b6c7d8e9f0a1b2c3d4e5f",
+      "ts": "2026-10-30T14:03:00Z",
+      "user_id": "lab.marketing",
+      "rating": "like",
+      "question": "Monthly conversion rate in 2025",
+      "run_status": "succeeded"
+    },
+    {
+      "trace_id": "9e8d7c6b5a4f3e2d1c0b9a8f7e6d5c4b",
+      "ts": "2026-10-12T09:41:00Z",
+      "user_id": "lab.northwest",
+      "rating": "like",
+      "question": "Top 5 brands by net sales in Q1 2025 compared with Q1 2024",
+      "run_status": "succeeded"
+    }
+  ],
+  "eval_reports": [
+    {
+      "id": "eval-2026-11-02",
+      "ts": "2026-11-02T13:40:00Z",
+      "passed": true,
+      "threshold": 0.8,
+      "layers": {
+        "intent": {
+          "passed": 0,
+          "failed": 0,
+          "not_scored": 31
+        },
+        "extraction": {
+          "passed": 20,
+          "failed": 2,
+          "not_scored": 9
+        },
+        "retrieval": {
+          "passed": 22,
+          "failed": 0,
+          "not_scored": 9
+        },
+        "execution": {
+          "passed": 21,
+          "failed": 4,
+          "not_scored": 6
+        }
+      },
+      "categories": {
+        "two_period_compare": "4/5",
+        "top_n": "5/6",
+        "string_filter": "6/6",
+        "monthly_trend": "4/5",
+        "unauthorized": "2/3"
+      },
+      "failed_cases": [
+        {
+          "case_id": "monthly_return_rate_jan_to_jun_2025",
+          "category": "monthly_trend",
+          "reason": "periods: expected one range, got two months"
+        },
+        {
+          "case_id": "top_customers_by_net_sales_q2_2025",
+          "category": "top_n",
+          "reason": "expected 10 rows, got 4"
+        },
+        {
+          "case_id": "marketing_asks_for_top_customers",
+          "category": "unauthorized",
+          "reason": "expected a denial, but the question was rejected"
+        }
+      ]
+    },
+    {
+      "id": "eval-2026-10-31",
+      "ts": "2026-10-31T09:10:00Z",
+      "passed": true,
+      "threshold": 0.8,
+      "layers": {
+        "intent": {
+          "passed": 0,
+          "failed": 0,
+          "not_scored": 31
+        },
+        "extraction": {
+          "passed": 20,
+          "failed": 2,
+          "not_scored": 9
+        },
+        "retrieval": {
+          "passed": 22,
+          "failed": 0,
+          "not_scored": 9
+        },
+        "execution": {
+          "passed": 19,
+          "failed": 3,
+          "not_scored": 6
+        }
+      },
+      "categories": {
+        "two_period_compare": "4/5",
+        "top_n": "5/6",
+        "string_filter": "6/6",
+        "monthly_trend": "4/5",
+        "unauthorized": "2/3"
+      },
+      "failed_cases": [
+        {
+          "case_id": "monthly_return_rate_jan_to_jun_2025",
+          "category": "monthly_trend",
+          "reason": "periods: expected one range, got two months"
+        },
+        {
+          "case_id": "top_customers_by_net_sales_q2_2025",
+          "category": "top_n",
+          "reason": "expected 10 rows, got 4"
+        },
+        {
+          "case_id": "marketing_asks_for_top_customers",
+          "category": "unauthorized",
+          "reason": "expected a denial, but the question was rejected"
+        }
+      ]
+    }
+  ],
+  "runs": [
+    {
+      "trace_id": "5b1d0c2e9a4f4e7d8c3b2a1f0e9d8c7b",
+      "ts": "2026-11-02T08:15:00Z",
+      "user_id": "lab.analyst",
+      "role": "analyst",
+      "question": "Doanh thu thuần theo danh mục năm 2025",
+      "status": "succeeded",
+      "latency_ms": 6420,
+      "cost_usd": 0.0042
+    },
+    {
+      "trace_id": "a1b2c3d4e5f60718293a4b5c6d7e8f90",
+      "ts": "2026-11-02T08:03:00Z",
+      "user_id": "lab.analyst",
+      "role": "analyst",
+      "question": "Average order value by region in 2025",
+      "status": "succeeded",
+      "latency_ms": 9810,
+      "cost_usd": 0.0071
+    },
+    {
+      "trace_id": "0f1e2d3c4b5a69788796a5b4c3d2e1f0",
+      "ts": "2026-11-02T07:51:00Z",
+      "user_id": "lab.marketing",
+      "role": "marketing",
+      "question": "Tổng tiền hoàn trả năm 2025 là bao nhiêu?",
+      "status": "denied",
+      "latency_ms": 2110,
+      "cost_usd": 0.0009
+    },
+    {
+      "trace_id": "7c2e1d3f4a5b6c7d8e9f0a1b2c3d4e5f",
+      "ts": "2026-10-30T14:02:00Z",
+      "user_id": "lab.marketing",
+      "role": "marketing",
+      "question": "Monthly conversion rate in 2025",
+      "status": "succeeded",
+      "latency_ms": 5870,
+      "cost_usd": 0.0038
+    },
+    {
+      "trace_id": "3f2a1b0c9d8e7f6a5b4c3d2e1f0a9b8c",
+      "ts": "2026-10-29T11:20:00Z",
+      "user_id": "lab.analyst",
+      "role": "analyst",
+      "question": "Net sales by warehouse in 2025",
+      "status": "failed",
+      "latency_ms": 18230,
+      "cost_usd": 0.0154
+    },
+    {
+      "trace_id": "9e8d7c6b5a4f3e2d1c0b9a8f7e6d5c4b",
+      "ts": "2026-10-12T09:40:00Z",
+      "user_id": "lab.northwest",
+      "role": "northwest_sales",
+      "question": "Top 5 brands by net sales in Q1 2025 compared with Q1 2024",
+      "status": "succeeded",
+      "latency_ms": 7340,
+      "cost_usd": 0.0051
+    },
+    {
+      "trace_id": "b7a6c5d4e3f2019a8b7c6d5e4f3a2b1c",
+      "ts": "2026-10-11T15:05:00Z",
+      "user_id": "lab.partner",
+      "role": "category_partner",
+      "question": "Net sales by brand in 2025",
+      "status": "denied",
+      "latency_ms": 1980,
+      "cost_usd": 0.0008
+    },
+    {
+      "trace_id": "c9d8e7f6a5b4c3d2e1f0a9b8c7d6e5f4",
+      "ts": "2026-10-10T10:12:00Z",
+      "user_id": "lab.analyst",
+      "role": "analyst",
+      "question": "How did we do last quarter?",
+      "status": "rejected",
+      "latency_ms": 1620,
+      "cost_usd": 0.0006
+    }
+  ],
+  "traces": {
+    "a1b2c3d4e5f60718293a4b5c6d7e8f90": [
+      {
+        "name": "extract",
+        "kind": "llm",
+        "status": "ok",
+        "ms": 1210,
+        "meta": [
+          "fast",
+          "412 + 96 tokens",
+          "$0.0004"
+        ]
+      },
+      {
+        "name": "resolve_time",
+        "status": "ok",
+        "ms": 3
+      },
+      {
+        "name": "retrieve",
+        "kind": "search",
+        "status": "ok",
+        "ms": 380,
+        "meta": [
+          "5 indices",
+          "hybrid"
+        ]
+      },
+      {
+        "name": "build_spec",
+        "status": "ok",
+        "ms": 6
+      },
+      {
+        "name": "gate",
+        "kind": "access",
+        "status": "ok",
+        "ms": 2,
+        "meta": [
+          "analyst",
+          "ALLOW"
+        ]
+      },
+      {
+        "name": "generate_sql (attempt 1)",
+        "kind": "llm",
+        "status": "ok",
+        "ms": 2410,
+        "meta": [
+          "sql-gen",
+          "2,840 + 188 tokens",
+          "$0.0031"
+        ]
+      },
+      {
+        "name": "explain (attempt 1)",
+        "kind": "sql",
+        "status": "err",
+        "ms": 41,
+        "sql": "SELECT region, sumIf(line_amount, order_status != 'cancelled') / uniqExactIf(order_id, order_status != 'cancelled') AS average_order_value\nFROM marts.sales_lines\nGROUP BY region",
+        "error": "Code: 47. DB::Exception: Unknown expression identifier `region` in scope SELECT region ..."
+      },
+      {
+        "name": "generate_sql (attempt 2)",
+        "kind": "llm",
+        "status": "ok",
+        "ms": 2650,
+        "meta": [
+          "sql-gen",
+          "3,120 + 201 tokens",
+          "$0.0034"
+        ]
+      },
+      {
+        "name": "execute (attempt 2)",
+        "kind": "sql",
+        "status": "ok",
+        "ms": 820,
+        "sql": "SELECT customer_region, sumIf(line_amount, order_status != 'cancelled') / nullIf(uniqExactIf(order_id, order_status != 'cancelled'), 0) AS average_order_value\nFROM marts.sales_lines\nWHERE order_date >= toDate('2025-01-01') AND order_date < toDate('2026-01-01')\nGROUP BY customer_region\nORDER BY average_order_value DESC, customer_region",
+        "meta": [
+          "6 rows"
+        ]
+      },
+      {
+        "name": "summarize",
+        "kind": "llm",
+        "status": "ok",
+        "ms": 1290,
+        "meta": [
+          "fast",
+          "388 + 74 tokens",
+          "$0.0002"
+        ]
+      }
+    ],
+    "0f1e2d3c4b5a69788796a5b4c3d2e1f0": [
+      {
+        "name": "extract",
+        "kind": "llm",
+        "status": "ok",
+        "ms": 1180,
+        "meta": [
+          "fast",
+          "398 + 88 tokens",
+          "$0.0004"
+        ]
+      },
+      {
+        "name": "retrieve",
+        "kind": "search",
+        "status": "ok",
+        "ms": 350
+      },
+      {
+        "name": "build_spec",
+        "status": "ok",
+        "ms": 5
+      },
+      {
+        "name": "gate",
+        "kind": "access",
+        "status": "deny",
+        "ms": 2,
+        "meta": [
+          "marketing",
+          "DENY returns_fact"
+        ]
+      }
+    ]
+  },
+  "audit": [
+    {
+      "ts": "2026-11-02T08:15:04Z",
+      "trace_id": "5b1d0c2e9a4f4e7d8c3b2a1f0e9d8c7b",
+      "user_id": "lab.analyst",
+      "role": "analyst",
+      "decision": "ALLOW",
+      "dataset": "sales_lines",
+      "blocked_tables": [],
+      "reason": "gate and guard: SQL attempt 1 allowed"
+    },
+    {
+      "ts": "2026-11-02T08:03:05Z",
+      "trace_id": "a1b2c3d4e5f60718293a4b5c6d7e8f90",
+      "user_id": "lab.analyst",
+      "role": "analyst",
+      "decision": "ALLOW",
+      "dataset": "sales_lines",
+      "blocked_tables": [],
+      "reason": "gate and guard: SQL attempt 2 allowed"
+    },
+    {
+      "ts": "2026-11-02T07:51:02Z",
+      "trace_id": "0f1e2d3c4b5a69788796a5b4c3d2e1f0",
+      "user_id": "lab.marketing",
+      "role": "marketing",
+      "decision": "DENY",
+      "dataset": "returns_fact",
+      "blocked_tables": [
+        "returns_fact"
+      ],
+      "reason": "gate: role marketing may not read returns_fact"
+    },
+    {
+      "ts": "2026-10-30T14:02:03Z",
+      "trace_id": "7c2e1d3f4a5b6c7d8e9f0a1b2c3d4e5f",
+      "user_id": "lab.marketing",
+      "role": "marketing",
+      "decision": "ALLOW",
+      "dataset": "sessions_daily",
+      "blocked_tables": [],
+      "reason": "gate and guard: SQL attempt 1 allowed"
+    },
+    {
+      "ts": "2026-10-11T15:05:01Z",
+      "trace_id": "b7a6c5d4e3f2019a8b7c6d5e4f3a2b1c",
+      "user_id": "lab.partner",
+      "role": "category_partner",
+      "decision": "DENY",
+      "dataset": "sales_lines",
+      "blocked_tables": [
+        "sales_lines.product_brand"
+      ],
+      "reason": "gate: role category_partner may not read sales_lines.product_brand"
+    },
+    {
+      "ts": "2026-10-09T09:30:00Z",
+      "trace_id": "d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6",
+      "user_id": "lab.northwest",
+      "role": "northwest_sales",
+      "decision": "DENY",
+      "dataset": "sessions_daily",
+      "blocked_tables": [],
+      "reason": "clickhouse: Code: 497. ACCESS_DENIED"
+    }
+  ],
+  "costs": [
+    {
+      "day": "2026-10-20",
+      "alias": "sql-gen",
+      "model": "gpt-5.1",
+      "calls": 45,
+      "cost_usd": 0.14
+    },
+    {
+      "day": "2026-10-20",
+      "alias": "fast",
+      "model": "gpt-5.1-mini",
+      "calls": 80,
+      "cost_usd": 0.025
+    },
+    {
+      "day": "2026-10-21",
+      "alias": "sql-gen",
+      "model": "gpt-5.1",
+      "calls": 52,
+      "cost_usd": 0.1
+    },
+    {
+      "day": "2026-10-21",
+      "alias": "fast",
+      "model": "gpt-5.1-mini",
+      "calls": 91,
+      "cost_usd": 0.023
+    },
+    {
+      "day": "2026-10-22",
+      "alias": "sql-gen",
+      "model": "gpt-5.1",
+      "calls": 34,
+      "cost_usd": 0.23
+    },
+    {
+      "day": "2026-10-22",
+      "alias": "fast",
+      "model": "gpt-5.1-mini",
+      "calls": 62,
+      "cost_usd": 0.021
+    },
+    {
+      "day": "2026-10-23",
+      "alias": "sql-gen",
+      "model": "gpt-5.1",
+      "calls": 41,
+      "cost_usd": 0.19
+    },
+    {
+      "day": "2026-10-23",
+      "alias": "fast",
+      "model": "gpt-5.1-mini",
+      "calls": 73,
+      "cost_usd": 0.028
+    },
+    {
+      "day": "2026-10-24",
+      "alias": "sql-gen",
+      "model": "gpt-5.1",
+      "calls": 48,
+      "cost_usd": 0.15
+    },
+    {
+      "day": "2026-10-24",
+      "alias": "fast",
+      "model": "gpt-5.1-mini",
+      "calls": 84,
+      "cost_usd": 0.026
+    },
+    {
+      "day": "2026-10-25",
+      "alias": "sql-gen",
+      "model": "gpt-5.1",
+      "calls": 30,
+      "cost_usd": 0.11
+    },
+    {
+      "day": "2026-10-25",
+      "alias": "fast",
+      "model": "gpt-5.1-mini",
+      "calls": 95,
+      "cost_usd": 0.024
+    },
+    {
+      "day": "2026-10-26",
+      "alias": "sql-gen",
+      "model": "gpt-5.1",
+      "calls": 37,
+      "cost_usd": 0.24
+    },
+    {
+      "day": "2026-10-26",
+      "alias": "fast",
+      "model": "gpt-5.1-mini",
+      "calls": 66,
+      "cost_usd": 0.022
+    },
+    {
+      "day": "2026-10-27",
+      "alias": "sql-gen",
+      "model": "gpt-5.1",
+      "calls": 44,
+      "cost_usd": 0.2
+    },
+    {
+      "day": "2026-10-27",
+      "alias": "fast",
+      "model": "gpt-5.1-mini",
+      "calls": 77,
+      "cost_usd": 0.02
+    },
+    {
+      "day": "2026-10-28",
+      "alias": "sql-gen",
+      "model": "gpt-5.1",
+      "calls": 51,
+      "cost_usd": 0.16
+    },
+    {
+      "day": "2026-10-28",
+      "alias": "fast",
+      "model": "gpt-5.1-mini",
+      "calls": 88,
+      "cost_usd": 0.027
+    },
+    {
+      "day": "2026-10-29",
+      "alias": "sql-gen",
+      "model": "gpt-5.1",
+      "calls": 33,
+      "cost_usd": 0.12
+    },
+    {
+      "day": "2026-10-29",
+      "alias": "fast",
+      "model": "gpt-5.1-mini",
+      "calls": 99,
+      "cost_usd": 0.025
+    },
+    {
+      "day": "2026-10-30",
+      "alias": "sql-gen",
+      "model": "gpt-5.1",
+      "calls": 40,
+      "cost_usd": 0.25
+    },
+    {
+      "day": "2026-10-30",
+      "alias": "fast",
+      "model": "gpt-5.1-mini",
+      "calls": 70,
+      "cost_usd": 0.023
+    },
+    {
+      "day": "2026-10-31",
+      "alias": "sql-gen",
+      "model": "gpt-5.1",
+      "calls": 47,
+      "cost_usd": 0.21
+    },
+    {
+      "day": "2026-10-31",
+      "alias": "fast",
+      "model": "gpt-5.1-mini",
+      "calls": 81,
+      "cost_usd": 0.021
+    },
+    {
+      "day": "2026-10-28",
+      "alias": "embed",
+      "model": "text-embedding-3-large",
+      "calls": 4,
+      "cost_usd": 0.0031
+    }
+  ],
+  "users": [
+    {
+      "id": "lab.analyst",
+      "username": "lab.analyst",
+      "display_name": "Lab Analyst",
+      "roles": [
+        "analyst"
+      ],
+      "enabled": true
+    },
+    {
+      "id": "lab.marketing",
+      "username": "lab.marketing",
+      "display_name": "Lab Marketing",
+      "roles": [
+        "marketing"
+      ],
+      "enabled": true
+    },
+    {
+      "id": "lab.northwest",
+      "username": "lab.northwest",
+      "display_name": "Lab Northwest",
+      "roles": [
+        "northwest_sales"
+      ],
+      "enabled": true
+    },
+    {
+      "id": "lab.partner",
+      "username": "lab.partner",
+      "display_name": "Lab Partner",
+      "roles": [
+        "category_partner"
+      ],
+      "enabled": true
+    },
+    {
+      "id": "lab.reviewer",
+      "username": "lab.reviewer",
+      "display_name": "Lab Reviewer",
+      "roles": [
+        "pack_reviewer",
+        "analyst"
+      ],
+      "enabled": true
+    },
+    {
+      "id": "lab.admin",
+      "username": "lab.admin",
+      "display_name": "Lab Admin",
+      "roles": [
+        "admin",
+        "analyst"
+      ],
+      "enabled": true
+    }
+  ]
+}

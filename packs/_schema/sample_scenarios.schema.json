@@ -1,0 +1,121 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "sample_data/scenarios.json",
+  "description": "Sample answers the web app streams before the chat is connected to the api (DECISIONS §15). Hand-written; never copied or derived from a licensed dataset.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["suggestions", "scenarios"],
+  "$defs": {
+    "lang": {"type": "string", "pattern": "^[a-z]{2}$"},
+    "text": {"type": "string", "minLength": 1},
+    "cell": {"type": ["string", "number", "boolean", "null"]},
+    "result": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["columns", "rows", "row_count"],
+      "properties": {
+        "columns": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["name", "type", "role"],
+            "properties": {
+              "name": {"$ref": "#/$defs/text"},
+              "type": {"enum": ["string", "number", "date", "datetime", "boolean"]},
+              "role": {"enum": ["dimension", "measure", "time"]},
+              "format": {"enum": ["currency", "count", "ratio", "percent", "days", "number", null]}
+            }
+          }
+        },
+        "rows": {"type": "array", "items": {"type": "array", "items": {"$ref": "#/$defs/cell"}}},
+        "row_count": {"type": "integer", "minimum": 0},
+        "truncated": {"type": "boolean"}
+      }
+    },
+    "chartType": {"enum": ["bar", "line", "pie", "scatter", "kpi", "table", "grouped_bar"]},
+    "chartSpec": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "x", "y", "allowed_types"],
+      "properties": {
+        "type": {"$ref": "#/$defs/chartType"},
+        "x": {"type": "string"},
+        "y": {"type": "array", "items": {"type": "string"}},
+        "series": {"type": ["string", "null"]},
+        "sort": {"enum": ["asc", "desc", null]},
+        "format": {"type": ["string", "null"]},
+        "orientation": {"enum": ["vertical", "horizontal"]},
+        "allowed_types": {"type": "array", "items": {"$ref": "#/$defs/chartType"}}
+      }
+    }
+  },
+  "properties": {
+    "suggestions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["text", "lang"],
+        "properties": {"text": {"$ref": "#/$defs/text"}, "lang": {"$ref": "#/$defs/lang"}}
+      }
+    },
+    "scenarios": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "lang", "match", "allowed_roles", "kind", "question", "deny_message", "blocked"],
+        "properties": {
+          "id": {"type": "string", "pattern": "^[a-z][a-z0-9_]*$"},
+          "lang": {"$ref": "#/$defs/lang"},
+          "match": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["any"],
+            "properties": {
+              "any": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/text"}},
+              "all": {"type": "array", "items": {"$ref": "#/$defs/text"}}
+            }
+          },
+          "allowed_roles": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+          "kind": {"enum": ["answer", "clarify", "failed", "empty"]},
+          "question": {"$ref": "#/$defs/text"},
+          "sql": {"$ref": "#/$defs/text"},
+          "repair": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["sql", "error"],
+            "properties": {"sql": {"$ref": "#/$defs/text"}, "error": {"$ref": "#/$defs/text"}}
+          },
+          "result": {"$ref": "#/$defs/result"},
+          "chart_spec": {"$ref": "#/$defs/chartSpec"},
+          "summary": {"$ref": "#/$defs/text"},
+          "warnings": {"type": "array", "items": {"$ref": "#/$defs/text"}},
+          "clarify": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["question", "options"],
+            "properties": {
+              "question": {"$ref": "#/$defs/text"},
+              "options": {
+                "type": "array",
+                "minItems": 2,
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["id", "label"],
+                  "properties": {"id": {"type": "string"}, "label": {"$ref": "#/$defs/text"}}
+                }
+              }
+            }
+          },
+          "error": {"$ref": "#/$defs/text"},
+          "deny_message": {"$ref": "#/$defs/text"},
+          "blocked": {"type": "array", "items": {"type": "string"}}
+        }
+      }
+    }
+  }
+}

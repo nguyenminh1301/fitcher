@@ -63,5 +63,7 @@ def test_model_matches_schema(file_name):
 def test_every_pack_file_has_a_schema():
     names = {name.replace(".yaml", ".schema.json") for name in PACK_FILES}
 
-    assert names == {path.name for path in SCHEMA_DIR.glob("*.schema.json")} - {"common.schema.json"}
+    # sample_*.schema.json describe a pack's sample_data/ files for the web app, not pack YAML files.
+    pack_schemas = {path.name for path in SCHEMA_DIR.glob("*.schema.json") if not path.name.startswith("sample_")}
+    assert names == pack_schemas - {"common.schema.json"}
     assert len(PACK_FILES) == 8

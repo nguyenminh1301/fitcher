@@ -187,8 +187,14 @@ services:
   web:
     build:
       context: ./apps/web
+    environment:
+      # Features still on sample data read packs/<ACTIVE_PACK>/sample_data (DECISIONS §15).
+      ACTIVE_PACK: ${ACTIVE_PACK:?set ACTIVE_PACK in .env}
+      PACKS_DIR: /packs
     ports:
       - "127.0.0.1:3000:3000"
+    volumes:
+      - ./packs:/packs:ro
     depends_on:
       api:
         condition: service_healthy

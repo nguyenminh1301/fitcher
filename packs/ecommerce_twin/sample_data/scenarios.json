@@ -1,0 +1,541 @@
+{
+  "suggestions": [
+    {
+      "text": "Top 5 brands by net sales in Q1 2025 compared with Q1 2024",
+      "lang": "en"
+    },
+    {
+      "text": "Doanh thu thuần theo danh mục năm 2025",
+      "lang": "vi"
+    },
+    {
+      "text": "Monthly conversion rate in 2025",
+      "lang": "en"
+    },
+    {
+      "text": "Tổng tiền hoàn trả năm 2025 là bao nhiêu?",
+      "lang": "vi"
+    },
+    {
+      "text": "How did we do last quarter?",
+      "lang": "en"
+    },
+    {
+      "text": "Average order value by region in 2025",
+      "lang": "en"
+    }
+  ],
+  "scenarios": [
+    {
+      "id": "top_brands_q1",
+      "lang": "en",
+      "match": {
+        "any": [
+          "brand",
+          "brands"
+        ]
+      },
+      "allowed_roles": [
+        "analyst",
+        "northwest_sales"
+      ],
+      "kind": "answer",
+      "question": "Top 5 brands by net sales in Q1 2025 compared with Q1 2024",
+      "sql": "SELECT product_brand,\n  sumIf(line_amount, order_status != 'cancelled' AND order_date >= toDate('2025-01-01') AND order_date < toDate('2025-04-01')) AS net_sales_q1_2025,\n  sumIf(line_amount, order_status != 'cancelled' AND order_date >= toDate('2024-01-01') AND order_date < toDate('2024-04-01')) AS net_sales_q1_2024,\n  round(100 * toFloat64(net_sales_q1_2025 - net_sales_q1_2024) / toFloat64(net_sales_q1_2024), 2) AS net_sales_change_pct\nFROM marts.sales_lines\nWHERE order_date >= toDate('2024-01-01') AND order_date < toDate('2025-04-01')\nGROUP BY product_brand\nORDER BY net_sales_q1_2025 DESC, product_brand\nLIMIT 5",
+      "result": {
+        "columns": [
+          {
+            "name": "product_brand",
+            "type": "string",
+            "role": "dimension"
+          },
+          {
+            "name": "net_sales_q1_2025",
+            "type": "number",
+            "role": "measure",
+            "format": "currency"
+          },
+          {
+            "name": "net_sales_q1_2024",
+            "type": "number",
+            "role": "measure",
+            "format": "currency"
+          },
+          {
+            "name": "net_sales_change_pct",
+            "type": "number",
+            "role": "measure",
+            "format": "percent"
+          }
+        ],
+        "rows": [
+          [
+            "Northwind",
+            1843200.5,
+            1610420.0,
+            14.45
+          ],
+          [
+            "Contoso",
+            1520330.25,
+            1588900.1,
+            -4.32
+          ],
+          [
+            "Fabrikam",
+            1311050.0,
+            1102340.75,
+            18.93
+          ],
+          [
+            "Tailspin",
+            998420.4,
+            1004110.0,
+            -0.57
+          ],
+          [
+            "Litware",
+            874310.9,
+            701220.3,
+            24.68
+          ]
+        ],
+        "row_count": 5
+      },
+      "chart_spec": {
+        "type": "grouped_bar",
+        "x": "product_brand",
+        "y": [
+          "net_sales_q1_2025",
+          "net_sales_q1_2024"
+        ],
+        "sort": "desc",
+        "format": "currency",
+        "allowed_types": [
+          "grouped_bar",
+          "bar",
+          "table"
+        ]
+      },
+      "summary": "Northwind led Q1 2025 with $1,843,200.50 in net sales, up 14.45% on Q1 2024. Litware grew fastest (+24.68%), while Contoso fell 4.32%.",
+      "warnings": [],
+      "deny_message": "Your role can't read order lines, so nothing was queried.",
+      "blocked": [
+        "sales_lines"
+      ]
+    },
+    {
+      "id": "net_sales_by_category",
+      "lang": "vi",
+      "match": {
+        "any": [
+          "danh muc",
+          "category",
+          "categories"
+        ]
+      },
+      "allowed_roles": [
+        "analyst",
+        "northwest_sales",
+        "category_partner"
+      ],
+      "kind": "answer",
+      "question": "Doanh thu thuần theo danh mục năm 2025",
+      "sql": "SELECT product_category, sumIf(line_amount, order_status != 'cancelled') AS net_sales\nFROM marts.sales_lines\nWHERE order_date >= toDate('2025-01-01') AND order_date < toDate('2026-01-01')\nGROUP BY product_category\nORDER BY net_sales DESC, product_category",
+      "result": {
+        "columns": [
+          {
+            "name": "product_category",
+            "type": "string",
+            "role": "dimension"
+          },
+          {
+            "name": "net_sales",
+            "type": "number",
+            "role": "measure",
+            "format": "currency"
+          }
+        ],
+        "rows": [
+          [
+            "Electronics",
+            6045934.26
+          ],
+          [
+            "Home & Kitchen",
+            4210388.1
+          ],
+          [
+            "Apparel",
+            3398120.0
+          ],
+          [
+            "Beauty",
+            2104476.55
+          ],
+          [
+            "Sports",
+            1890233.4
+          ],
+          [
+            "Toys",
+            1203118.75
+          ]
+        ],
+        "row_count": 6
+      },
+      "chart_spec": {
+        "type": "bar",
+        "x": "product_category",
+        "y": [
+          "net_sales"
+        ],
+        "sort": "desc",
+        "format": "currency",
+        "orientation": "horizontal",
+        "allowed_types": [
+          "bar",
+          "pie",
+          "table"
+        ]
+      },
+      "summary": "Năm 2025, Electronics dẫn đầu với **6.045.934,26 US$** doanh thu thuần, tiếp theo là Home & Kitchen (**4.210.388,10 US$**). Toys thấp nhất với **1.203.118,75 US$**.",
+      "warnings": [],
+      "deny_message": "Vai trò của bạn không được đọc dữ liệu bán hàng, nên chưa có truy vấn nào được chạy.",
+      "blocked": [
+        "sales_lines"
+      ]
+    },
+    {
+      "id": "monthly_conversion",
+      "lang": "en",
+      "match": {
+        "any": [
+          "conversion"
+        ]
+      },
+      "allowed_roles": [
+        "analyst",
+        "marketing"
+      ],
+      "kind": "answer",
+      "question": "Monthly conversion rate in 2025",
+      "sql": "SELECT toStartOfMonth(session_date) AS month, sum(converted_sessions) / nullIf(sum(sessions), 0) * 100 AS conversion_rate\nFROM marts.sessions_daily\nWHERE session_date >= toDate('2025-01-01') AND session_date < toDate('2026-01-01')\nGROUP BY month\nORDER BY month",
+      "result": {
+        "columns": [
+          {
+            "name": "month",
+            "type": "date",
+            "role": "time"
+          },
+          {
+            "name": "conversion_rate",
+            "type": "number",
+            "role": "measure",
+            "format": "percent"
+          }
+        ],
+        "rows": [
+          [
+            "2025-01-01",
+            2.81
+          ],
+          [
+            "2025-02-01",
+            2.74
+          ],
+          [
+            "2025-03-01",
+            2.96
+          ],
+          [
+            "2025-04-01",
+            3.02
+          ],
+          [
+            "2025-05-01",
+            3.11
+          ],
+          [
+            "2025-06-01",
+            2.88
+          ],
+          [
+            "2025-07-01",
+            2.79
+          ],
+          [
+            "2025-08-01",
+            2.93
+          ],
+          [
+            "2025-09-01",
+            3.05
+          ],
+          [
+            "2025-10-01",
+            3.18
+          ],
+          [
+            "2025-11-01",
+            3.64
+          ],
+          [
+            "2025-12-01",
+            3.92
+          ]
+        ],
+        "row_count": 12
+      },
+      "chart_spec": {
+        "type": "line",
+        "x": "month",
+        "y": [
+          "conversion_rate"
+        ],
+        "format": "percent",
+        "allowed_types": [
+          "line",
+          "bar",
+          "table"
+        ]
+      },
+      "summary": "Conversion stayed between **2.74%** and **3.18%** from January to October 2025, then rose to **3.64%** in November and **3.92%** in December.",
+      "warnings": [],
+      "deny_message": "Your role can't read site sessions, so nothing was queried.",
+      "blocked": [
+        "sessions_daily"
+      ]
+    },
+    {
+      "id": "refund_total_2025",
+      "lang": "vi",
+      "match": {
+        "any": [
+          "hoan tra",
+          "refund",
+          "refunds"
+        ]
+      },
+      "allowed_roles": [
+        "analyst",
+        "northwest_sales"
+      ],
+      "kind": "answer",
+      "question": "Tổng tiền hoàn trả năm 2025 là bao nhiêu?",
+      "sql": "SELECT sum(refund_amount) AS refund_total\nFROM marts.returns_fact\nWHERE return_date >= toDate('2025-01-01') AND return_date < toDate('2026-01-01')",
+      "result": {
+        "columns": [
+          {
+            "name": "refund_total",
+            "type": "number",
+            "role": "measure",
+            "format": "currency"
+          }
+        ],
+        "rows": [
+          [
+            1284510.35
+          ]
+        ],
+        "row_count": 1
+      },
+      "chart_spec": {
+        "type": "kpi",
+        "x": "",
+        "y": [
+          "refund_total"
+        ],
+        "format": "currency",
+        "allowed_types": [
+          "kpi",
+          "table"
+        ]
+      },
+      "summary": "Tổng tiền hoàn trả năm 2025 là **1.284.510,35 US$**.",
+      "warnings": [],
+      "deny_message": "Vai trò của bạn không được đọc dữ liệu hoàn trả (returns_fact), nên chưa có truy vấn nào được chạy.",
+      "blocked": [
+        "returns_fact"
+      ]
+    },
+    {
+      "id": "last_quarter_vague",
+      "lang": "en",
+      "match": {
+        "any": [
+          "how did we do",
+          "last quarter",
+          "perform"
+        ]
+      },
+      "allowed_roles": [
+        "analyst",
+        "marketing",
+        "northwest_sales",
+        "category_partner"
+      ],
+      "kind": "clarify",
+      "question": "How did we do last quarter?",
+      "clarify": {
+        "question": "Which measure should I report for last quarter?",
+        "options": [
+          {
+            "id": "net_sales",
+            "label": "Net sales"
+          },
+          {
+            "id": "order_count",
+            "label": "Number of orders"
+          },
+          {
+            "id": "conversion_rate",
+            "label": "Conversion rate"
+          }
+        ]
+      },
+      "deny_message": "Your role can't read this data, so nothing was queried.",
+      "blocked": []
+    },
+    {
+      "id": "aov_by_region",
+      "lang": "en",
+      "match": {
+        "any": [
+          "average order",
+          "aov",
+          "region"
+        ]
+      },
+      "allowed_roles": [
+        "analyst"
+      ],
+      "kind": "answer",
+      "question": "Average order value by region in 2025",
+      "repair": {
+        "sql": "SELECT region, sumIf(line_amount, order_status != 'cancelled') / uniqExactIf(order_id, order_status != 'cancelled') AS average_order_value\nFROM marts.sales_lines\nGROUP BY region",
+        "error": "Code: 47. DB::Exception: Unknown expression identifier `region` in scope SELECT region ..."
+      },
+      "sql": "SELECT customer_region, sumIf(line_amount, order_status != 'cancelled') / nullIf(uniqExactIf(order_id, order_status != 'cancelled'), 0) AS average_order_value\nFROM marts.sales_lines\nWHERE order_date >= toDate('2025-01-01') AND order_date < toDate('2026-01-01')\nGROUP BY customer_region\nORDER BY average_order_value DESC, customer_region",
+      "result": {
+        "columns": [
+          {
+            "name": "customer_region",
+            "type": "string",
+            "role": "dimension"
+          },
+          {
+            "name": "average_order_value",
+            "type": "number",
+            "role": "measure",
+            "format": "currency"
+          }
+        ],
+        "rows": [
+          [
+            "West",
+            118.42
+          ],
+          [
+            "Northeast",
+            114.07
+          ],
+          [
+            "Northwest",
+            112.9
+          ],
+          [
+            "Southeast",
+            109.55
+          ],
+          [
+            "Midwest",
+            107.31
+          ],
+          [
+            "Southwest",
+            104.88
+          ]
+        ],
+        "row_count": 6
+      },
+      "chart_spec": {
+        "type": "bar",
+        "x": "customer_region",
+        "y": [
+          "average_order_value"
+        ],
+        "sort": "desc",
+        "format": "currency",
+        "allowed_types": [
+          "bar",
+          "pie",
+          "table"
+        ]
+      },
+      "summary": "In 2025 the West had the highest average order value at **$118.42**, and the Southwest the lowest at **$104.88**.",
+      "warnings": [],
+      "deny_message": "Your role can't read order lines, so nothing was queried.",
+      "blocked": [
+        "sales_lines"
+      ]
+    },
+    {
+      "id": "net_sales_by_warehouse",
+      "lang": "en",
+      "match": {
+        "any": [
+          "warehouse"
+        ]
+      },
+      "allowed_roles": [
+        "analyst"
+      ],
+      "kind": "failed",
+      "question": "Net sales by warehouse in 2025",
+      "sql": "SELECT warehouse_id, sumIf(line_amount, order_status != 'cancelled') AS net_sales\nFROM marts.sales_lines\nGROUP BY warehouse_id",
+      "error": "Code: 47. DB::Exception: Unknown expression identifier `warehouse_id` in scope SELECT warehouse_id ...",
+      "deny_message": "Your role can't read order lines, so nothing was queried.",
+      "blocked": [
+        "sales_lines"
+      ]
+    },
+    {
+      "id": "garden_march_2026",
+      "lang": "en",
+      "match": {
+        "any": [
+          "garden",
+          "march 2026"
+        ]
+      },
+      "allowed_roles": [
+        "analyst",
+        "northwest_sales"
+      ],
+      "kind": "empty",
+      "question": "Net sales of the Garden category in March 2026",
+      "sql": "SELECT sumIf(line_amount, order_status != 'cancelled') AS net_sales\nFROM marts.sales_lines\nWHERE product_category = 'Garden' AND order_date >= toDate('2026-03-01') AND order_date < toDate('2026-04-01')",
+      "result": {
+        "columns": [
+          {
+            "name": "net_sales",
+            "type": "number",
+            "role": "measure",
+            "format": "currency"
+          }
+        ],
+        "rows": [],
+        "row_count": 0
+      },
+      "summary": "No order lines match the Garden category in March 2026, so there is no net sales figure to report.",
+      "warnings": [
+        "The query returned no rows"
+      ],
+      "deny_message": "Your role can't read order lines, so nothing was queried.",
+      "blocked": [
+        "sales_lines"
+      ]
+    }
+  ]
+}

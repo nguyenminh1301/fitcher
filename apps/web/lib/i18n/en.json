@@ -16,7 +16,8 @@
   },
   "sample": {
     "badge": "Sample data",
-    "tooltip": "This part runs on sample data until its service is connected."
+    "tooltip": "This part runs on sample data until its service is connected.",
+    "unmatched": "I can only answer this demo's sample questions until the chat is connected to your data. Try one of the suggested questions."
   },
   "common": {
     "close": "Close",
