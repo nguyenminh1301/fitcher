@@ -61,6 +61,7 @@
 ### Changed
 
 - Plan conversation delete as hiding it from its owner only: an admin can still read every conversation, deleted or not, in the console until the 90-day log TTL removes it.
+- Merge pull requests into `develop` once every CI and Security check passes, without waiting for a CodeRabbit review; findings CodeRabbit has already posted are still verified and fixed or answered.
 - Bring the Fitcher web app design into the architecture: DECISIONS §15 and `docs/design/web-app.md` define the Chat app and workspace console, conversation management with personal groups, edit and retry of a turn, the English/Vietnamese interface and light and dark themes, and the Datasets, Feedback, Evaluation and Users console sections; §9 and §10 add Keycloak role management through a restricted service account, a minimum of 1 on every query limit and the `conversations`, `conversation_groups` and `admin_actions` tables; the Phase 6, 8, 9, 10 and 12 plans and the master plan carry the matching tasks.
 - Mark Phase 5 (logging and tracing) complete in the README and name Phase 6 (RBAC and auth) as the next step.
 - Name the reference row by its position instead of its key values when an eval answer misses a key combination or cannot pair its measures, so stored eval reports carry no result values.
