@@ -3,14 +3,20 @@
 Run with ``docker compose run --rm jobs python -m jobs.compile_pack --pack <name>``.
 Indexing embeds every glossary term, metric, dataset, column and example
 through the ``embed`` alias, which is a billable request; ``--skip-index``
-stops after validation and the metric test-run and calls neither LiteLLM nor
-OpenSearch.
+stops after validation, the metric test-run and the access policies and calls
+neither LiteLLM nor OpenSearch.
+
+The pack's policies are applied to ClickHouse as the admin user after the
+metric test-run: roles, column grants, row policies, aggregate-only views and
+one login user per role, whose passwords derive from
+``CLICKHOUSE_AGENT_PASSWORD``.
 
 ``--check-search "<query>"`` searches the live aliases of an already compiled
 pack instead of compiling, printing the best hits of each index.
 """
 
 import argparse
+import os
 from pathlib import Path
 import sys
 
@@ -38,6 +44,9 @@ class ClickHouseWarehouse:
     def query(self, sql: str, settings: dict | None = None):
         return self._client.query(sql, settings=settings).result_rows
 
+    def command(self, sql: str) -> None:
+        self._client.command(sql)
+
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
@@ -51,6 +60,8 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
 def print_summary(summary: CompileSummary) -> None:
     print(f"Pack {summary.pack}: {len(summary.metrics_tested)} metrics tested ({', '.join(summary.metrics_tested)})")
+    roles = summary.roles_applied
+    print(f"  access: {len(roles)} role{'' if len(roles) == 1 else 's'} reconciled ({', '.join(roles)})")
     for dataset, coverage in summary.coverage.items():
         print(f"  {dataset}: {coverage.rows} rows, {coverage.min_date} to {coverage.max_date}")
     if summary.generation is None:
@@ -97,9 +108,12 @@ def main(argv: list[str] | None = None) -> int:
             embeddings = LiteLLMEmbeddings(
                 settings.litellm_base_url, settings.litellm_master_key, settings.embedding_dimensions
             )
+        warehouse = ClickHouseWarehouse(admin_client())
         summary = compile_pack(
             args.packs_dir / args.pack,
-            warehouse=ClickHouseWarehouse(admin_client()),
+            warehouse=warehouse,
+            access=warehouse,
+            agent_secret=os.environ.get("CLICKHOUSE_AGENT_PASSWORD", ""),
             top_k=settings.column_values_top_k,
             search=search,
             embeddings=embeddings,
