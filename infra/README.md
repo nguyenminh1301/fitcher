@@ -12,6 +12,7 @@ See [DECISIONS §3](../docs/DECISIONS.md#3-docker-compose) and the [Phase 0 plan
 | `clickhouse/initdb/001-databases.sql` | Creates `raw`, `marts` and `data_meta` |
 | `clickhouse/initdb/010-agent-logs.sql` | Creates the `agent_logs` database and its run log tables |
 | `litellm/config.yaml` | Aliases `fast`, `sql-gen`, `sql-gen-hard` and `embed`, with models from `LITELLM_MODEL_*` |
+| `litellm/callbacks/clickhouse_logger.py` | Proxy callback writing one `agent_logs.llm_calls` row per call as `agent_logs_writer` |
 | `keycloak/realm-finch.json` | Realm `finch` with the public `finch-web` client and no users |
 | `opensearch/` | Host requirements; no custom JVM or plugin settings |
 
@@ -47,6 +48,7 @@ With the stack running, `AGENT_LOGS_LIVE_TEST=1` and the four passwords in the e
 
 Change a model by editing its `LITELLM_MODEL_*` value in `.env` and running `docker compose up -d --wait litellm`.
 The proxy requires `LITELLM_MASTER_KEY`; `OPENAI_API_KEY` reaches only this container.
+Every call, successful or failed, is written to `agent_logs.llm_calls` with its alias, resolved model, tokens, cost, latency and error; the api's `trace_id` and graph node arrive as request `metadata`, and calls outside a traced run have an empty trace id. A failed write is printed to the proxy log and never affects the reply.
 
 ## Keycloak
 

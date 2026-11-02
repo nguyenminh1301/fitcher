@@ -4,6 +4,9 @@
 
 ### Added
 
+- Read a whole agent run with one query: the `agent_logs.trace_query_log` view exposes `system.query_log` rows by trace id to the trace reader, `infra/clickhouse/queries/trace.sql` lists the run row, node events, LLM calls, SQL attempts and query-log entries of a trace in time order with incomplete runs marked `INCOMPLETE`, LLM calls sent compared with those logged and the start of each query-log entry's SQL, and `docs/tracing.md` explains how to read it.
+- Store every eval run's JSON report in `agent_logs.eval_reports` with its pack, execution match rate and whether that rate met the pack threshold; a failed write is reported on stderr and leaves the exit code unchanged.
+- Record every LiteLLM proxy call in `agent_logs.llm_calls` through a custom callback mounted into the proxy: alias, resolved model, call id, tokens, cost, latency, status and error, tagged with the trace id and graph node the api sends as request metadata.
 - Log node events and SQL attempts for every run of `jobs/ask.py` and `jobs/eval.py`: each graph node writes its start, end, status and state update as JSON capped at 16 KB with result rows reduced to counts, and each executed query writes its SQL, attempt number, `query_id`, row count and error to `sql_runs`; the api service gets the log writer password and `LOG_*` settings.
 - Trace every agent run with OpenTelemetry: the run's 32-hex trace id replaces the generated UUID in graph state, `log_comment` and eval case scores; LLM and embedding requests inside a run carry its trace id and current node as LiteLLM metadata and are counted; with a log writer, `run_question` writes a `running` row before the graph and a final row with status, latency, LLM call count, lost records and `log_complete` after flushing the run's records.
 - Write `agent_logs` records from the api with `app.observability.log_writer`: run rows insert synchronously, other records go through a bounded queue that a background thread flushes in per-table batches at `LOG_BATCH_SIZE`, every `LOG_FLUSH_INTERVAL_MS` and on request, retrying a failed batch with the same insert deduplication token, and counting each trace's records as written or lost (full queue, failed batch or flush timeout) without ever failing the run.
@@ -57,6 +60,7 @@
 
 ### Changed
 
+- Name the reference row by its position instead of its key values when an eval answer misses a key combination or cannot pair its measures, so stored eval reports carry no result values.
 - Raise the `ecommerce_twin` eval baseline to 20 of 22 execution matches (91%, above the 80% pack threshold) after the ranking and extraction fixes, with the remaining failures listed in `docs/eval/ecommerce_twin-baseline.md`.
 - Let the LLM client send a fixed `temperature` with every call, and have the LiteLLM proxy drop request parameters a model rejects (`drop_params`), so eval runs can ask for temperature 0 on any model.
 - Settle the Phase 4 eval decisions: result sets match columns by value and allow extra columns, a pack needs execution match of at least 80% of active eval cases, eval runs request temperature 0, and a regression is a drop of more than one case per layer over the cases both runs scored.

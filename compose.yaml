@@ -67,12 +67,16 @@ services:
       LITELLM_MODEL_SQL_GEN: ${LITELLM_MODEL_SQL_GEN:?set LITELLM_MODEL_SQL_GEN in .env}
       LITELLM_MODEL_SQL_GEN_HARD: ${LITELLM_MODEL_SQL_GEN_HARD:?set LITELLM_MODEL_SQL_GEN_HARD in .env}
       LITELLM_MODEL_EMBED: ${LITELLM_MODEL_EMBED:?set LITELLM_MODEL_EMBED in .env}
+      # callbacks/clickhouse_logger.py writes agent_logs.llm_calls as the log writer.
+      CLICKHOUSE_HOST: clickhouse
+      CLICKHOUSE_LOGS_WRITER_PASSWORD: ${CLICKHOUSE_LOGS_WRITER_PASSWORD:?set CLICKHOUSE_LOGS_WRITER_PASSWORD in .env}
       # The OpenAI key is passed to this service only.
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
     ports:
       - "127.0.0.1:4000:4000"
     volumes:
       - ./infra/litellm/config.yaml:/app/config.yaml:ro
+      - ./infra/litellm/callbacks/clickhouse_logger.py:/app/clickhouse_logger.py:ro
     healthcheck:
       # Liveliness only checks the proxy process; it never calls OpenAI.
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:4000/health/liveliness', timeout=2)"]

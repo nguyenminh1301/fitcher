@@ -9,7 +9,8 @@
         agent_logs_writer        api log writer, LiteLLM callback and eval
                                  reports; insert only, no reads.
         agent_logs_trace_reader  trace queries: run, node, LLM, SQL, audit
-                                 and eval tables plus system.query_log.
+                                 and eval tables, the trace_query_log view
+                                 and the system.query_log it reads.
         agent_logs_review_reader pack_reviewer and admin paths: proposed
                                  examples, feedback and chat messages.
 
@@ -59,6 +60,7 @@
                 <query>GRANT SELECT ON agent_logs.sql_runs</query>
                 <query>GRANT SELECT ON agent_logs.audit</query>
                 <query>GRANT SELECT ON agent_logs.eval_reports</query>
+                <query>GRANT SELECT ON agent_logs.trace_query_log</query>
                 <query>GRANT SELECT ON system.query_log</query>
             </grants>
         </agent_logs_trace_reader>
