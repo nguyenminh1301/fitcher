@@ -105,6 +105,7 @@
 
 ### Fixed
 
+- Keep small chart axis values distinct: value ticks round to three significant digits instead of one decimal, so a cost axis reads 0.05, 0.1, 0.15 rather than repeating 0.1 and 0.2.
 - Fill the browser window with the chat app and the workspace console: the page body now has a definite height, so the layouts no longer stop at their 600px minimum on taller windows.
 - Resolve a question's metric, dimension and value terms across the whole pack, so a term the asking role may not read is denied by the gate instead of being answered with the closest metric the role can read; only the examples given to SQL generation stay filtered by role.
 - Send a query whose result repeats a column name (`SELECT a, a`) back to SQL generation as a repairable error naming the column, instead of failing the whole run when the result is typed.
