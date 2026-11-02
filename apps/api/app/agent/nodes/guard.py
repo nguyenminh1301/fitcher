@@ -28,25 +28,11 @@ from app.agent.errors import AgentError
 from app.agent.state import AgentDeps, AgentState, record_error
 from app.contracts.result import MAX_RESULT_ROWS
 from app.data.clickhouse import MARTS_DATABASE
+from app.data.forbidden_functions import forbidden_function, function_name
 
 NODE = "guard"
 # system tables a query may read; none are needed yet.
 SYSTEM_TABLE_WHITELIST: frozenset[str] = frozenset()
-FORBIDDEN_FUNCTIONS = frozenset(name.lower() for name in (
-    # table functions and external access
-    "file", "url", "urlCluster", "remote", "remoteSecure", "s3", "s3Cluster", "gcs", "azureBlobStorage",
-    "azureBlobStorageCluster", "hdfs", "hdfsCluster", "mysql", "postgresql", "mongodb", "redis", "sqlite",
-    "jdbc", "odbc", "executable", "input", "cluster", "clusterAllReplicas", "merge", "view", "dictionary",
-    "generateRandom", "numbers", "numbers_mt", "zeros", "zeros_mt", "values", "format", "null", "iceberg",
-    "deltaLake", "hudi", "loop", "fuzzJSON",
-    # column matchers that bypass the column allowlist
-    "columns",
-    # reads outside the query's tables
-    "joinGet", "joinGetOrNull",
-    # deliberate stalls
-    "sleep", "sleepEachRow",
-))
-FORBIDDEN_PREFIXES = ("dictget", "dicthas", "dictis")
 
 
 @dataclass(frozen=True)
@@ -70,15 +56,9 @@ def _policy(message: str) -> GuardResult:
     return GuardResult(error=AgentError("policy", NODE, message))
 
 
-def _function_name(node: exp.Func) -> str:
-    return (node.name if isinstance(node, exp.Anonymous) else node.sql_name()).lower()
-
-
 def _check_functions(tree: exp.Expression) -> None:
-    for node in tree.find_all(exp.Func):
-        name = _function_name(node)
-        if name in FORBIDDEN_FUNCTIONS or name.startswith(FORBIDDEN_PREFIXES):
-            raise _Rejected(f"function {name}() is not allowed")
+    if name := forbidden_function(tree):
+        raise _Rejected(f"function {name}() is not allowed")
 
 
 def _base_tables(scopes: list[Scope]) -> list[exp.Table]:
@@ -96,7 +76,7 @@ def _check_tables(tree: exp.Expression, allowlist: Allowlist, scopes: list[Scope
     tables: set[str] = set()
     for table in tree.find_all(exp.Table):
         if not isinstance(table.this, exp.Identifier):
-            name = _function_name(table.this) if isinstance(table.this, exp.Func) else table.this.sql()
+            name = function_name(table.this) if isinstance(table.this, exp.Func) else table.this.sql()
             raise _Rejected(f"table function {name}() is not allowed")
         if table.catalog:
             raise _Rejected(f"table {table.sql(dialect='clickhouse')} is not allowed")
