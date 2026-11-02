@@ -20,7 +20,7 @@ The design makes one promise visible everywhere: every number comes from a query
 ### Sidebar and conversations
 
 - Order: New chat, Search, then Pinned, Groups, Recent (Today, Past week, Past month), and the account menu at the bottom.
-- Each conversation has a menu: Pin, Rename, Move to group, Remove from group, Delete (with a confirmation dialog). Groups can be created, renamed and deleted; deleting a group returns its conversations to Recent.
+- Each conversation has a menu: Pin, Rename, Move to group, Remove from group, Delete (with a confirmation dialog; it hides the conversation from the user, and an admin can still read it). Groups can be created, renamed and deleted; deleting a group returns its conversations to Recent.
 - Search opens `SearchDialog` (also Ctrl K): filters as the user types, arrow keys and Enter open a result; full screen on phones.
 - The sidebar can be resized from 220 to 440px (drag, arrow keys on the handle, double-click resets) and collapsed on desktop.
 - The top bar shows the conversation title and its group; it opens the same menu. The active pack is a small label inside the composer.
@@ -61,7 +61,7 @@ The user's own `MessageBubble` offers copy and edit; editing replaces that quest
 | Knowledge | Datasets | `pack_reviewer` | Read-only datasets of the compiled pack: columns, types, roles, readable roles |
 | Knowledge | Feedback | `pack_reviewer` | Likes and dislikes with question, note and trace; "Propose example" sends one run to Proposals |
 | Quality | Evaluation | `pack_reviewer`, `admin` | Per-layer rates, the 80% threshold, required categories, failed cases; `admin` can run the eval set (paid AI, confirmation) |
-| Observe | Runs and trace | `admin` | Paginated runs filtered by user, dates and status; `TraceTimeline` with step durations, LLM calls (alias, tokens, estimated cost), SQL attempts with errors and the access decision |
+| Observe | Runs and trace | `admin` | Paginated runs filtered by user, dates and status; `TraceTimeline` with step durations, LLM calls (alias, tokens, estimated cost), SQL attempts with errors and the access decision; any user's conversations, including deleted ones, marked as such |
 | Observe | Audit | `admin` | Allow and deny decisions with role, blocked tables and time |
 | Observe | Costs | `admin` | Estimated LLM cost by day, alias and model in the chat's chart card style |
 | Administration | Users | `admin` | Users with their pack roles and status; change roles, disable and enable; a role overview |

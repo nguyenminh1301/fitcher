@@ -36,7 +36,7 @@ infra/clickhouse/                  # agent_logs.admin_actions, fresh-volume init
 
 ## Tasks
 
-1. **Admin API (test first).** Paginated runs filtered by user, date range and status; trace detail combining `events`, `llm_calls`, `sql_runs`, `audit` and the query-log view; denied audit rows; cost by day, alias and model. Restricted to an `admin` role; queries use the logs read user.
+1. **Admin API (test first).** Paginated runs filtered by user, date range and status; trace detail combining `events`, `llm_calls`, `sql_runs`, `audit` and the query-log view; denied audit rows; cost by day, alias and model; `GET /admin/conversations?user=` and `GET /admin/conversations/{id}` list and read any user's conversations with their messages and trace ids, including conversations their owner deleted, which are marked as deleted. Restricted to an `admin` role; queries use the logs read user.
 2. **Admin UI.** Run list with filters, trace timeline, audit table, cost chart rendered through the existing ChartSpec adapter.
 3. **Proposals (test first).** Eligible runs are disliked or failed `data_query` runs that produced both a QuerySpec and SQL; clarify, deny and policy-rejected runs are excluded. For each, the job stores a proposal in `agent_logs.example_proposals` (90-day TTL, readable only by `pack_reviewer` and `admin`): proposal `id`, `pack`, question, final QuerySpec and SQL, nullable error (absent for disliked successful runs), nullable feedback note and `trace_id`. Before storage, every user-derived value passes a redaction step that masks emails, phone numbers and long digit sequences: question, feedback note, QuerySpec filter values, SQL string literals and echoed error text. Duplicates by `(pack, normalized question)` are skipped.
 4. **Review hand-off.** Proposals appear in the Review UI next to pack drafts. Approving one writes only fields the Phase 2 `examples.yaml` schema supports (`id`, kept from the proposal, question, SQL, `status`, `evidence: [{kind: trace, ref: <trace_id>}]`, `confidence`), with `status: approved`, after the reviewer edits the question, replaces every masked SQL literal with a valid non-personal value, test-runs the SQL through the Review API and confirms that neither contains personal data; feedback notes, errors and QuerySpecs never enter Git. Approval also offers adding an `eval.yaml` case for the question.
@@ -67,6 +67,7 @@ docker compose run --rm api python -m jobs.eval --pack ecommerce_twin --baseline
 | Disliked question -> proposal -> approved -> passes in the next eval | Loop test transcript with trace id, review action and eval result |
 | An admin changes a user's role and the user's next token carries it | Users test plus a manual check recorded in the PR |
 | Each console section shows only to its roles | Navigation and endpoint tests per role |
+| An admin reads a conversation its owner deleted; the owner no longer sees it | Endpoint test across the owner and admin views |
 
 ## Risks and open questions
 
