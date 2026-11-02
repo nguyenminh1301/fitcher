@@ -4,6 +4,7 @@
 
 ### Added
 
+- Add the `ecommerce_twin` sample data the web app shows before each feature has its api (`packs/<pack>/sample_data/`, with JSON Schemas), serve the active pack's files from the web server's `/api/sample/{file}` route, mount `packs` read-only into the `web` service, and extend the pack isolation check to `apps/web`.
 - Add the web app's api client: one interface for every feature with a sample and a real implementation chosen per feature in `lib/api/sources.ts`, a Sample data badge on every feature still on sample data, a sample chat that streams the DECISIONS §6 event sequences per scenario (answer, SQL repair, clarify, denial by role, failure, stop) and demo conversations with pins, groups, renames and search kept in the browser per demo identity.
 - Generate the web app's TypeScript types for QuerySpec and Result from the backend Pydantic models (`scripts/generate_contract_types.py`, then `npm run contracts:generate`); tests on both sides fail when a committed schema or type drifts.
 - Add the web app's visual system from the fitcher design: generated design tokens for light and dark themes with a WCAG AA contrast test, the design's component stylesheet, Inter with its Vietnamese subset, the brand Logo, Finch and icons, the shared buttons, fields, chips, tabs, segmented controls, status pills, banners, toasts, tooltips, dialogs, menus, empty states and skeletons, and the English/Vietnamese interface switch and theme choice kept per browser; web unit tests run with `npm run test` locally and in CI.

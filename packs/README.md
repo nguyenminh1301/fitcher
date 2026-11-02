@@ -24,6 +24,17 @@ The API tests load every pack here against the column lists of the dbt mart sche
 
 [`ecommerce_twin/`](ecommerce_twin/) describes the `sales_lines`, `returns_fact` and `sessions_daily` marts of the e-commerce lab dataset.
 
+## Sample data for the web app
+
+`sample_data/` holds what the web app shows for every feature that is not connected to the api yet (DECISIONS §15), each marked with a Sample data badge:
+
+| File | Contents | Schema |
+|---|---|---|
+| `scenarios.json` | Suggested questions and sample answers the chat streams step by step: an answer with SQL, rows and a chart, a SQL repair, a clarifying question, a failure, an empty result; a role outside a scenario's `allowed_roles` gets its `deny_message` | `_schema/sample_scenarios.schema.json` |
+| `console.json` | Demo identities (the Keycloak lab users), seeded conversations and the console rows: datasets, review items, documents, feedback, eval reports, runs and traces, audit, costs and users | `_schema/sample_console.schema.json` |
+
+Sample data is hand-written with plausible numbers and is never copied or derived from a licensed dataset. It names only the pack's own roles plus `pack_reviewer` and `admin`; a test checks both files against their schemas. Keeping it here, not in `apps/web`, lets the engine stay free of pack names. A pack without `sample_data/` still runs: the web app shows empty states that say sample data is missing.
+
 ## Compiling a pack
 
 ```bash
