@@ -39,7 +39,7 @@ export function ListPage({ section, actions, loading, failed, skeleton = "list",
           <h1>{t(`ui.nav_${section}`)}</h1>
           {feature ? <SampleDataBadge feature={feature} /> : null}
         </div>
-        {actions ?? null}
+        {loading || failed ? null : actions ?? null}
       </div>
       <p className="fc-page-desc">{t(`ui.desc_${section}`)}</p>
       {body}
@@ -85,7 +85,7 @@ export function RecordTable<T>({ rows, columns, rowKey, title, label }: {
           <table className="fc-table fc-stackable">
             <thead>
               <tr>
-                {columns.map((column) => <th key={column.key} scope="col" className={column.numeric ? "fc-r" : undefined}>{column.label}</th>)}
+                {columns.map((column) => <th key={column.key} scope="col" className={column.numeric ? "fc-r" : undefined}><span className="fc-th-label">{column.label}</span></th>)}
               </tr>
             </thead>
             <tbody>

@@ -388,6 +388,7 @@
     "proposedName": "Sent to Proposals: {question}",
     "rolesOf": "Roles of {name}",
     "you": "you",
-    "trace": "Trace"
+    "trace": "Trace",
+    "reason": "Reason"
   }
 }

@@ -388,6 +388,7 @@
     "proposedName": "Đã gửi sang Đề xuất: {question}",
     "rolesOf": "Vai trò của {name}",
     "you": "bạn",
-    "trace": "Vết chạy"
+    "trace": "Vết chạy",
+    "reason": "Lý do"
   }
 }

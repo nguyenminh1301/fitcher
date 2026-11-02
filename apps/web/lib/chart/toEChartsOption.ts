@@ -36,10 +36,10 @@ export function formatCell(value: unknown, column: Pick<ColumnInfo, "type" | "fo
   }
 }
 
-/** An axis tick: compact (2.1M) and without cents; percentages and ratios keep their % sign. */
+/** An axis tick: compact (2.1M) to three significant digits, so small values (0.25) stay distinct; percentages and ratios keep their % sign. */
 export function formatTick(value: number, column: Pick<ColumnInfo, "type" | "format"> | undefined, locale: Locale): string {
   if (column?.format === "percent" || column?.format === "ratio") return formatCell(value, column, locale);
-  return formatNumber(value, locale, { notation: "compact", maximumFractionDigits: 1 });
+  return formatNumber(value, locale, { notation: "compact", maximumSignificantDigits: 3 });
 }
 
 // The comparison series is grey with a 45° hatch, so the pair differs in lightness and texture.
