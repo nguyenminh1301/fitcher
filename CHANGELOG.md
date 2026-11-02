@@ -4,6 +4,7 @@
 
 ### Added
 
+- Record the `ecommerce_twin` eval baseline in `packs/ecommerce_twin/eval_baseline.json` and `docs/eval/ecommerce_twin-baseline.md`: execution matches 10 of 22 scored cases (45%), below the 80% pack threshold, with the agent behaviors behind the failing cases listed for the phases that fix them.
 - Grow the `ecommerce_twin` eval set to 31 labelled questions, at least three per DECISIONS §12 category: 22 answered `data_query` cases with reference SQL checked against the marts as the read-only agent user, and 9 clarify, deny and out-of-scope cases kept for the phases that build those branches; retrieval labels name only the columns retrieval must find, not the time column the agent takes from the dataset definition.
 - Score a pack's eval set from the command line with `jobs/eval.py --pack <name>`: it runs the approved cases against the compiled pack named by `--pack` at temperature 0, prints the Markdown report, writes Markdown and JSON with `--output-dir`, compares with `--baseline`, and exits 0, 1 on a regression or below the 80% execution threshold, or 2 on a setup or reference-query error.
 - Render an eval run as Markdown (per-layer and per-category rates, a per-case table with the failure reason, reference errors) and JSON with `app.eval.report`, and compare it with a baseline run: a layer regresses when its pass count over the cases both runs scored drops by more than one, and the pack meets its threshold when the execution match rate reaches it.
