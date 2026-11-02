@@ -5,7 +5,7 @@ from fakes import FakeEmbeddings, FakeRunner
 import pytest
 
 from app.agent.graph import run_question
-from app.data.clickhouse import QueryError
+from app.data.clickhouse import QueryError, QueryOutput
 from app.llm.embeddings import EmbeddingError
 from app.search.opensearch import SearchError
 
@@ -83,6 +83,19 @@ def test_access_denied_at_execution_is_a_policy_stop():
 
     assert len(state["attempts"]) == 1
     assert state["attempts"][0].error.node == "execute"
+
+
+def test_result_with_two_columns_of_one_name_is_repaired():
+    twice = QueryOutput(query_id="qid-twice", columns=["widget_name", "widget_name"], types=["String", "String"], rows=[("A", "A")])
+    agent = deps([extraction_reply(), GOOD_SQL, GOOD_SQL, SUMMARY], FakeRunner(runs=[twice, good_output()]))
+
+    state = run_question(QUESTION, agent)
+
+    assert state["result"].row_count == 2
+    first = state["attempts"][0]
+    assert (first.error.category, first.error.node, first.query_id) == ("sql", "execute", "qid-twice")
+    assert "widget_name" in first.error.message
+    assert "widget_name" in agent.llm.calls[2].prompt
 
 
 def test_zero_rows_pass_with_a_warning():
