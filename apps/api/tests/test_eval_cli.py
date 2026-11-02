@@ -1,12 +1,14 @@
 """The ``jobs/eval.py`` command: scoring a pack's eval set, writing reports and choosing the exit code."""
 
+from dataclasses import replace
 from datetime import date
+import json
 from pathlib import Path
 import shutil
 
 from agent_fixtures import GOOD_SQL, deps, extraction_reply, good_output
 from conftest import FIXTURE_PACK, SCHEMA_DIR
-from fakes import FakeRunner
+from fakes import FakeLogWriter, FakeRunner
 import pytest
 import yaml
 
@@ -36,11 +38,11 @@ def _answers(cases: int) -> list:
     return [extraction_reply(top_n=5), GOOD_SQL, "Blue led."] * cases
 
 
-def _factory(runner: FakeRunner, cases: int = 1, seen: list | None = None):
+def _factory(runner: FakeRunner, cases: int = 1, seen: list | None = None, logs=None):
     def build(pack: str, reference: date):
         if seen is not None:
             seen.append((pack, reference))
-        return deps(_answers(cases), runner=runner)
+        return replace(deps(_answers(cases), runner=runner), logs=logs)
 
     return build
 
@@ -128,3 +130,24 @@ def test_pack_argument_selects_the_compiled_pack(packs_dir, monkeypatch):
     _main(packs_dir, factory=_factory(_matching(), seen=seen))
 
     assert seen == [("minimal", date(2026, 1, 15))]
+
+
+def test_run_report_is_stored_in_agent_logs(packs_dir):
+    logs = FakeLogWriter()
+    assert _main(packs_dir, factory=_factory(_matching(), logs=logs)) == 0
+    (stored,) = [record for record in logs.written if record.TABLE == "eval_reports"]
+    assert (stored.pack, stored.execution_rate, stored.passed) == ("minimal", 1.0, True)
+    assert len(stored.report_id) == 32
+    assert json.loads(stored.report)["cases"][0]["case_id"] == CASE_ID
+
+
+def test_failing_run_is_stored_as_not_passed(packs_dir):
+    logs = FakeLogWriter()
+    assert _main(packs_dir, factory=_factory(_mismatching(), logs=logs)) == 1
+    (stored,) = [record for record in logs.written if record.TABLE == "eval_reports"]
+    assert (stored.execution_rate, stored.passed) == (0.0, False)
+
+
+def test_a_failed_report_write_keeps_the_exit_code(packs_dir):
+    logs = FakeLogWriter(write_results=[False])
+    assert _main(packs_dir, factory=_factory(_matching(), logs=logs)) == 0

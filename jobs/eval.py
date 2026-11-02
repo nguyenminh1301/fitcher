@@ -6,7 +6,8 @@ requests to the LiteLLM aliases at temperature 0 and runs every reference query
 as the read-only ClickHouse user. The cases come from ``packs/<name>/eval.yaml``,
 so editing them needs no recompile; the agent answers from the compiled pack
 named by ``--pack``, whatever ``ACTIVE_PACK`` says. Every case's agent run is
-written to ClickHouse ``agent_logs`` under the trace id kept in its JSON score.
+written to ClickHouse ``agent_logs`` under the trace id kept in its JSON score,
+and the JSON report itself to ``agent_logs.eval_reports``.
 
 Exit codes: 0 when no layer regressed against ``--baseline`` and the execution
 match rate meets ``--threshold``; 1 on a regression or below the threshold; 2
@@ -18,6 +19,7 @@ from collections.abc import Callable
 from datetime import date
 from pathlib import Path
 import sys
+from uuid import uuid4
 
 from pydantic import ValidationError
 
@@ -25,10 +27,11 @@ from app.agent.state import AgentDeps
 from app.config import SettingsError, load_settings
 from app.data.clickhouse import ClickHouseRunner, QueryLimits, agent_client
 from app.eval.cases import EvalSetError, load_eval_set
-from app.eval.report import BaselineDiff, diff_baseline, meets_threshold, render_markdown
+from app.eval.report import BaselineDiff, diff_baseline, layer_totals, meets_threshold, render_markdown
 from app.eval.runner import EvalRun, run_eval
 from app.llm.client import LiteLLMClient
 from app.llm.embeddings import LiteLLMEmbeddings
+from app.observability.events import EvalReportRecord, utc_now
 from app.observability.log_writer import start_log_writer
 from app.packs.compiler import CompileError, load_compiled
 from app.packs.loader import PackValidationError, load_pack
@@ -81,6 +84,20 @@ def exit_code(run: EvalRun, diff: BaselineDiff | None) -> int:
     return 0
 
 
+def store_report(deps: AgentDeps, run: EvalRun, code: int) -> None:
+    """Write the JSON report to ``agent_logs.eval_reports``; a failed write is reported and changes nothing else."""
+    if deps.logs is None:
+        return
+    report_id = uuid4().hex
+    record = EvalReportRecord(
+        pack=run.pack, ts=utc_now(), report_id=report_id,
+        execution_rate=layer_totals(run.cases)["execution"].rate or 0.0, passed=code == 0,
+        report=run.model_dump_json(),
+    )
+    if deps.logs.write_now(record):
+        print(f"Stored report {report_id} in agent_logs.eval_reports.", file=sys.stderr)
+
+
 def main(argv: list[str] | None = None, deps_factory: Callable[[str, date], AgentDeps] = build_deps) -> int:
     args = parse_args(argv)
     try:
@@ -104,7 +121,9 @@ def main(argv: list[str] | None = None, deps_factory: Callable[[str, date], Agen
         (args.output_dir / f"{args.pack}-eval.json").write_text(
             run.model_dump_json(indent=2) + "\n", encoding="utf-8", newline="\n"
         )
-    return exit_code(run, diff)
+    code = exit_code(run, diff)
+    store_report(deps, run, code)
+    return code
 
 
 if __name__ == "__main__":

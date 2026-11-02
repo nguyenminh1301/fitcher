@@ -38,7 +38,7 @@ def test_schema_only_creates_objects_that_do_not_exist():
     statements = schema_statements()
     assert statements[0] == "CREATE DATABASE IF NOT EXISTS agent_logs"
     for statement in statements:
-        assert re.match(r"CREATE (DATABASE|TABLE|VIEW) IF NOT EXISTS ", statement), statement
+        assert re.match(r"CREATE (DATABASE|TABLE|VIEW) IF NOT EXISTS |SYSTEM FLUSH LOGS$", statement), statement
 
 
 @pytest.mark.parametrize("table", TABLES)
@@ -64,6 +64,28 @@ def test_every_table_expires_after_90_days_and_accepts_dedup_tokens(table):
 )
 def test_table_sort_keys(table, order_by):
     assert f"\n{order_by}\n" in table_statement(table)
+
+
+def test_trace_view_reads_agent_queries_from_query_log():
+    views = [s for s in schema_statements() if s.startswith("CREATE VIEW IF NOT EXISTS agent_logs.trace_query_log")]
+    assert len(views) == 1
+    assert "FROM system.query_log" in views[0]
+    assert "log_comment AS trace_id" in views[0]
+
+
+def test_query_log_exists_before_the_view_reads_it():
+    # A fresh server creates system.query_log at its first log flush; the view cannot be created before.
+    statements = schema_statements()
+    view = next(i for i, s in enumerate(statements) if s.startswith("CREATE VIEW"))
+    assert statements[view - 1] == "SYSTEM FLUSH LOGS"
+
+
+def test_trace_query_reads_every_trace_source_for_one_parameter():
+    sql = (apply_log_schema.SCHEMA_FILE.parents[1] / "queries" / "trace.sql").read_text(encoding="utf-8")
+    for source in ("runs FINAL", "events", "llm_calls", "sql_runs", "trace_query_log"):
+        assert f"agent_logs.{source}" in sql
+    assert sql.count("{trace_id:String}") >= 5
+    assert "INCOMPLETE" in sql
 
 
 def test_runs_keeps_the_latest_row_per_trace():

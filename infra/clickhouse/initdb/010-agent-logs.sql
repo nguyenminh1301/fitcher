@@ -167,3 +167,27 @@ ENGINE = MergeTree
 ORDER BY (pack, ts)
 TTL toDateTime(ts) + INTERVAL 90 DAY
 SETTINGS non_replicated_deduplication_window = 10000;
+
+-- ClickHouse's own record of every agent query, keyed by the trace id the api
+-- sets as log_comment. No copy is kept: the view reads system.query_log, which
+-- flushes every few seconds, so a trace read right after its run may miss the
+-- last queries (run SYSTEM FLUSH LOGS as admin first). Readers need SELECT on
+-- both the view and system.query_log.
+--
+-- A fresh server creates system.query_log at its first log flush, and a view
+-- cannot be created over a table that does not exist yet, so flush first.
+SYSTEM FLUSH LOGS;
+
+CREATE VIEW IF NOT EXISTS agent_logs.trace_query_log AS
+SELECT
+    log_comment AS trace_id,
+    event_time_microseconds AS ts,
+    query_id,
+    type,
+    query_duration_ms,
+    read_rows,
+    result_rows,
+    exception,
+    query
+FROM system.query_log
+WHERE log_comment != '' AND type != 'QueryStart';

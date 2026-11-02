@@ -182,5 +182,8 @@ class FakeLogWriter:
         count = sum(1 for record in self.queued if getattr(record, "trace_id", "") == trace_id)
         return FlushResult(written=count - self.lost, lost=self.lost)
 
+    def close(self, timeout: float = 5.0) -> None:
+        self.closed = True
+
     def runs(self) -> list:
         return [record for record in self.written if record.TABLE == "runs"]

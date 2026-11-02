@@ -4,6 +4,8 @@
 
 ### Added
 
+- Read a whole agent run with one query: the `agent_logs.trace_query_log` view exposes `system.query_log` rows by trace id to the trace reader, `infra/clickhouse/queries/trace.sql` lists the run row, node events, LLM calls, SQL attempts and query-log entries of a trace in time order with incomplete runs marked `INCOMPLETE` and LLM calls sent compared with those logged, and `docs/tracing.md` explains how to read it.
+- Store every eval run's JSON report in `agent_logs.eval_reports` with its pack, execution match rate and whether it passed; a failed write is reported on stderr and leaves the exit code unchanged.
 - Record every LiteLLM proxy call in `agent_logs.llm_calls` through a custom callback mounted into the proxy: alias, resolved model, call id, tokens, cost, latency, status and error, tagged with the trace id and graph node the api sends as request metadata.
 - Log node events and SQL attempts for every run of `jobs/ask.py` and `jobs/eval.py`: each graph node writes its start, end, status and state update as JSON capped at 16 KB with result rows reduced to counts, and each executed query writes its SQL, attempt number, `query_id`, row count and error to `sql_runs`; the api service gets the log writer password and `LOG_*` settings.
 - Trace every agent run with OpenTelemetry: the run's 32-hex trace id replaces the generated UUID in graph state, `log_comment` and eval case scores; LLM and embedding requests inside a run carry its trace id and current node as LiteLLM metadata and are counted; with a log writer, `run_question` writes a `running` row before the graph and a final row with status, latency, LLM call count, lost records and `log_complete` after flushing the run's records.

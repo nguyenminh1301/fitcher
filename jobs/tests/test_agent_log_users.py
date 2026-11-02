@@ -12,7 +12,7 @@ import xml.etree.ElementTree as ElementTree
 import pytest
 
 USERS_DIR = Path(__file__).resolve().parents[2] / "infra" / "clickhouse" / "users.d"
-TRACE_TABLES = ["runs", "events", "llm_calls", "sql_runs", "audit", "eval_reports"]
+TRACE_TABLES = ["runs", "events", "llm_calls", "sql_runs", "audit", "eval_reports", "trace_query_log"]
 REVIEW_TABLES = ["example_proposals", "feedback", "chat_messages"]
 
 
@@ -82,6 +82,7 @@ def test_trace_reader_cannot_select_example_proposals():
     client = connect("agent_logs_trace_reader", "CLICKHOUSE_TRACE_READER_PASSWORD")
     client.query("SELECT count() FROM agent_logs.runs")
     client.query("SELECT count() FROM system.query_log")
+    client.query("SELECT count() FROM agent_logs.trace_query_log")
     assert_denied(client, "SELECT count() FROM agent_logs.example_proposals")
 
 
