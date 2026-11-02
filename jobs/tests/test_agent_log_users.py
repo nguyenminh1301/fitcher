@@ -51,6 +51,14 @@ def test_log_passwords_come_from_the_environment():
     }
 
 
+def test_reader_limits_cannot_be_changed_by_a_query():
+    root = ElementTree.parse(USERS_DIR / "agent_logs.xml").getroot()
+    profile = root.find("profiles/agent_logs_reader")
+    assert profile.find("readonly").text == "2"
+    for setting in ("readonly", "max_execution_time", "max_result_rows"):
+        assert profile.find(f"constraints/{setting}/const") is not None, setting
+
+
 live = pytest.mark.skipif(os.environ.get("AGENT_LOGS_LIVE_TEST") != "1", reason="needs a running ClickHouse")
 
 
@@ -75,6 +83,15 @@ def test_trace_reader_cannot_select_example_proposals():
     client.query("SELECT count() FROM agent_logs.runs")
     client.query("SELECT count() FROM system.query_log")
     assert_denied(client, "SELECT count() FROM agent_logs.example_proposals")
+
+
+@live
+@pytest.mark.parametrize("setting", ["max_execution_time", "max_result_rows"])
+def test_reader_query_cannot_lift_its_limits(setting):
+    client = connect("agent_logs_trace_reader", "CLICKHOUSE_TRACE_READER_PASSWORD")
+    # clickhouse-connect refuses a const setting before sending; the server would answer SETTING_CONSTRAINT_VIOLATION.
+    with pytest.raises(Exception, match="SETTING_CONSTRAINT_VIOLATION|is readonly"):
+        client.query("SELECT 1", settings={setting: 0})
 
 
 @live

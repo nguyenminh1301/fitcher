@@ -16,12 +16,18 @@
         The agent's read-only user (agent_readonly.xml) gets no access here.
     -->
     <profiles>
+        <!--
+            readonly=2 lets clients send their usual settings, so the limits
+            are const: a query cannot raise them or lift them with 0.
+        -->
         <agent_logs_reader>
             <readonly>2</readonly>
             <max_execution_time>30</max_execution_time>
             <max_result_rows>100000</max_result_rows>
             <constraints>
                 <readonly><const/></readonly>
+                <max_execution_time><const/></max_execution_time>
+                <max_result_rows><const/></max_result_rows>
             </constraints>
         </agent_logs_reader>
     </profiles>
