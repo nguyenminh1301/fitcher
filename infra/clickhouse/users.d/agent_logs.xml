@@ -14,7 +14,7 @@
         agent_logs_review_reader pack_reviewer and admin paths: proposed
                                  examples, feedback and chat messages.
 
-        The agent's read-only user (agent_readonly.xml) gets no access here.
+        The agent's per-role users, which compile_pack creates, get no access here.
     -->
     <profiles>
         <!--

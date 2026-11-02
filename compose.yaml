@@ -9,8 +9,6 @@ services:
       CLICKHOUSE_USER: ${CLICKHOUSE_ADMIN_USER:?set CLICKHOUSE_ADMIN_USER in .env}
       CLICKHOUSE_PASSWORD: ${CLICKHOUSE_ADMIN_PASSWORD:?set CLICKHOUSE_ADMIN_PASSWORD in .env}
       CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: "1"
-      # Read by users.d/agent_readonly.xml for the agent's read-only user.
-      CLICKHOUSE_AGENT_PASSWORD: ${CLICKHOUSE_AGENT_PASSWORD:?set CLICKHOUSE_AGENT_PASSWORD in .env}
       # Read by users.d/agent_logs.xml for the agent_logs users.
       CLICKHOUSE_LOGS_WRITER_PASSWORD: ${CLICKHOUSE_LOGS_WRITER_PASSWORD:?set CLICKHOUSE_LOGS_WRITER_PASSWORD in .env}
       CLICKHOUSE_TRACE_READER_PASSWORD: ${CLICKHOUSE_TRACE_READER_PASSWORD:?set CLICKHOUSE_TRACE_READER_PASSWORD in .env}
@@ -22,7 +20,6 @@ services:
       - clickhouse-data:/var/lib/clickhouse
       - ./infra/clickhouse/config.d/listen.xml:/etc/clickhouse-server/config.d/listen.xml:ro
       - ./infra/clickhouse/users.d/users.xml:/etc/clickhouse-server/users.d/users.xml:ro
-      - ./infra/clickhouse/users.d/agent_readonly.xml:/etc/clickhouse-server/users.d/agent_readonly.xml:ro
       - ./infra/clickhouse/users.d/agent_logs.xml:/etc/clickhouse-server/users.d/agent_logs.xml:ro
       - ./infra/clickhouse/initdb:/docker-entrypoint-initdb.d:ro
     ulimits:
@@ -116,10 +113,10 @@ services:
     environment:
       LITELLM_BASE_URL: http://litellm:4000
       LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY:?set LITELLM_MASTER_KEY in .env}
-      # Agent queries run as the read-only agent user; run logs are written
-      # as the insert-only agent_logs_writer.
+      # Agent queries run as the asking role's ClickHouse user, whose password
+      # derives from CLICKHOUSE_AGENT_PASSWORD; run logs are written as the
+      # insert-only agent_logs_writer.
       CLICKHOUSE_HOST: clickhouse
-      CLICKHOUSE_AGENT_USER: agent_readonly
       CLICKHOUSE_AGENT_PASSWORD: ${CLICKHOUSE_AGENT_PASSWORD:?set CLICKHOUSE_AGENT_PASSWORD in .env}
       CLICKHOUSE_LOGS_WRITER_PASSWORD: ${CLICKHOUSE_LOGS_WRITER_PASSWORD:?set CLICKHOUSE_LOGS_WRITER_PASSWORD in .env}
       LOG_BATCH_SIZE: ${LOG_BATCH_SIZE:-100}

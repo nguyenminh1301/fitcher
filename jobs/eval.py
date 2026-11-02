@@ -3,7 +3,7 @@
 Run with ``docker compose run --rm -v ./build/eval:/app/build/eval api python -m
 jobs.eval --pack <name> --output-dir build/eval``. Each run sends billable
 requests to the LiteLLM aliases at temperature 0 and runs every reference query
-as the read-only ClickHouse user. The cases come from ``packs/<name>/eval.yaml``,
+as the ClickHouse user of its case's role. The cases come from ``packs/<name>/eval.yaml``,
 so editing them needs no recompile; the agent answers from the compiled pack
 named by ``--pack``, whatever ``ACTIVE_PACK`` says. Every case's agent run is
 written to ClickHouse ``agent_logs`` under the trace id kept in its JSON score,
@@ -23,7 +23,7 @@ from uuid import uuid4
 
 from pydantic import ValidationError
 
-from app.agent.state import AgentDeps
+from app.agent.state import AgentDeps, QueryRunner
 from app.config import SettingsError, load_settings
 from app.data.clickhouse import ClickHouseRunner, QueryLimits, agent_client
 from app.eval.cases import EvalSetError, load_eval_set
@@ -58,12 +58,26 @@ def build_deps(pack: str, reference: date) -> AgentDeps:
         search=OpenSearch(settings.opensearch_url),
         # Query vectors must match the indexed ones, so the compiled size wins over the environment.
         embeddings=LiteLLMEmbeddings(settings.litellm_base_url, settings.litellm_master_key, compiled.embedding_dimensions),
-        runner=ClickHouseRunner(agent_client(), QueryLimits.from_env()),
+        # Each case replaces it with its role's runner (role_runners).
+        runner=ClickHouseRunner(agent_client(pack, compiled.pack.policies.roles[0].id), QueryLimits.from_env()),
         compiled=compiled,
         today=reference,
         logs=start_log_writer(settings),
         user_id="eval",
     )
+
+
+def role_runners(pack: str) -> Callable[[str], QueryRunner]:
+    """One runner per role, connected as that role's ClickHouse user and reused across its cases."""
+    limits = QueryLimits.from_env()
+    runners: dict[str, QueryRunner] = {}
+
+    def runner_for(role: str) -> QueryRunner:
+        if role not in runners:
+            runners[role] = ClickHouseRunner(agent_client(pack, role), limits)
+        return runners[role]
+
+    return runner_for
 
 
 def load_baseline(path: Path, pack: str) -> EvalRun:
@@ -98,7 +112,11 @@ def store_report(deps: AgentDeps, run: EvalRun) -> None:
         print(f"Stored report {report_id} in agent_logs.eval_reports.", file=sys.stderr)
 
 
-def main(argv: list[str] | None = None, deps_factory: Callable[[str, date], AgentDeps] = build_deps) -> int:
+def main(
+    argv: list[str] | None = None,
+    deps_factory: Callable[[str, date], AgentDeps] = build_deps,
+    runners_factory: Callable[[str], Callable[[str], QueryRunner]] | None = None,
+) -> int:
     args = parse_args(argv)
     try:
         eval_set = load_eval_set(load_pack(args.packs_dir / args.pack), args.only)
@@ -108,7 +126,8 @@ def main(argv: list[str] | None = None, deps_factory: Callable[[str, date], Agen
         print(error, file=sys.stderr)
         return 2
     try:
-        run = run_eval(args.pack, eval_set, deps, timeout=args.timeout, threshold=args.threshold)
+        runner_for = runners_factory(args.pack) if runners_factory is not None else None
+        run = run_eval(args.pack, eval_set, deps, timeout=args.timeout, threshold=args.threshold, runner_for=runner_for)
     finally:
         if deps.logs is not None:
             deps.logs.close()
@@ -127,4 +146,4 @@ def main(argv: list[str] | None = None, deps_factory: Callable[[str, date], Agen
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    sys.exit(main(runners_factory=role_runners))

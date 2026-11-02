@@ -3,8 +3,8 @@
 All query texts are embedded in one ``embed`` call. Metric terms search the
 glossary and metrics, dimension terms the glossary and dataset columns,
 filter values the column values, and the whole question the examples and
-datasets. Every query filters by role; until per-role access arrives, the
-agent searches as every role of the pack.
+datasets. Every query filters by the asking role, so the agent only sees the
+pack items that role may read (a noise filter; ClickHouse enforces access).
 """
 
 from pydantic import BaseModel, ConfigDict
@@ -46,7 +46,7 @@ def retrieve(state: AgentState, deps: AgentDeps) -> dict:
 def _retrieve(state: AgentState, deps: AgentDeps) -> "Retrieval":
     extraction = state["extraction"]
     pack = deps.compiled.pack
-    roles = [role.id for role in pack.policies.roles]
+    roles = [deps.role]
     metric_terms = list(dict.fromkeys([*extraction.metric_terms, *([extraction.rank_term] if extraction.rank_term else [])]))
     dimension_terms = list(dict.fromkeys(
         [*extraction.dimension_terms, *(f.column_term for f in extraction.filters if f.column_term)]

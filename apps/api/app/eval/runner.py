@@ -2,12 +2,15 @@
 
 Each active case first obtains its reference result, from ``expected_sql``
 run on the read-only ClickHouse user or from inline ``expected_rows``, then
-asks its question with its own trace id and a time limit. A failing reference
+asks its question with its own trace id and a time limit. Every case runs as
+its ``role``: retrieval, the guard and, through ``runner_for``, the ClickHouse
+user are that role's, and so is its reference query. A failing reference
 query, an exception or a timeout fails that case and the run continues;
 inactive cases are reported without running.
 """
 
 from collections.abc import Callable
+from dataclasses import replace
 from datetime import date
 import threading
 import time
@@ -17,7 +20,7 @@ from pydantic import BaseModel
 
 from app.agent.graph import run_question
 from app.agent.nodes.shape_result import describe_column, to_result
-from app.agent.state import AgentDeps
+from app.agent.state import AgentDeps, QueryRunner
 from app.contracts.result import Result
 from app.data.clickhouse import QueryError
 from app.eval.cases import EvalSet, is_active
@@ -131,7 +134,9 @@ def run_eval(
     timeout: float,
     threshold: float,
     clock: Callable[[], float] = time.monotonic,
+    runner_for: Callable[[str], QueryRunner] | None = None,
 ) -> EvalRun:
+    """Run ``eval_set``; ``runner_for(role)`` gives each case's query runner, ``deps.runner`` when None."""
     scores: list[CaseScore] = []
     reference_errors: list[str] = []
     for case in eval_set.cases:
@@ -139,7 +144,8 @@ def run_eval(
             scores.append(score_case(case, {}, None, active=False))
             continue
         started = clock()
-        score = _run_case(case, deps, timeout, reference_errors)
+        runner = runner_for(case.role) if runner_for is not None else deps.runner
+        score = _run_case(case, replace(deps, role=case.role, runner=runner), timeout, reference_errors)
         scores.append(score.model_copy(update={"seconds": round(clock() - started, 3)}))
     return EvalRun(
         pack=pack, reference_date=eval_set.reference_date, threshold=threshold, cases=scores,

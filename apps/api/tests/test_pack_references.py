@@ -120,3 +120,25 @@ def test_schema_errors_are_reported_before_references(pack_dir, edit_pack):
         load_pack(pack_dir, schema_dir=SCHEMA_DIR)
 
     assert [issue.path for issue in error.value.issues] == ["metrics[0].unit"]
+
+
+@pytest.mark.parametrize("sql_expr", ["avg(sale_amount)", "sum(sale_amount) / nullIf(count(), 0)", "uniqExact(sale_ref)"])
+def test_aggregate_only_metric_must_add_up_across_groups(pack_dir, edit_pack, sql_expr):
+    edit_pack("metrics.yaml", _set(("metrics", 0, "sql_expr"), sql_expr))
+    edit_pack("policies.yaml", _set(("roles", 0, "datasets", 0, "aggregate_only"), {"metrics": ["widget_revenue"], "min_group_size": 5}))
+
+    with pytest.raises(PackValidationError) as error:
+        load_pack(pack_dir, schema_dir=SCHEMA_DIR)
+
+    assert (
+        "policies.yaml: roles[0].datasets[0].aggregate_only.metrics[0]: metric 'widget_revenue' must be one sum or "
+        "count, so that its values add up across the view's groups"
+    ) in [str(issue) for issue in error.value.issues]
+
+
+@pytest.mark.parametrize("sql_expr", ["sum(sale_amount)", "sumIf(sale_amount, widget_name != 'x')", "count()", "countIf(sale_amount > 0)"])
+def test_aggregate_only_metric_that_adds_up_is_accepted(pack_dir, edit_pack, sql_expr):
+    edit_pack("metrics.yaml", _set(("metrics", 0, "sql_expr"), sql_expr))
+    edit_pack("policies.yaml", _set(("roles", 0, "datasets", 0, "aggregate_only"), {"metrics": ["widget_revenue"], "min_group_size": 5}))
+
+    load_pack(pack_dir, schema_dir=SCHEMA_DIR)

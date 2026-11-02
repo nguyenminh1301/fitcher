@@ -56,6 +56,9 @@ class AgentDeps:
     logs: LogWriter | None = None
     # Who asked; written to the run row.
     user_id: str = ""
+    # The pack role the question is asked as: it filters retrieval, picks the guard's allowlist
+    # and names the ClickHouse user that ``runner`` connects as.
+    role: str = ""
 
 
 class Attempt(BaseModel):

@@ -2,7 +2,7 @@
 
 import pytest
 
-from app.agent.nodes.guard import Allowlist, guard_sql
+from app.agent.nodes.guard import Allowlist, allowlist_for, guard_sql
 
 ALLOWLIST = Allowlist({
     "widget_sales": frozenset({"sale_ref", "sold_on", "widget_name", "sale_amount"}),
@@ -213,3 +213,29 @@ def test_subquery_reading_a_forbidden_table_is_rejected():
 
 def test_unqualified_allowlisted_table_is_accepted():
     accepted("SELECT widget_name FROM widget_sales LIMIT 1")
+
+
+def _pack_with_refunds_clerk():
+    from agent_fixtures import compiled_fixture
+
+    pack = compiled_fixture().pack
+    viewer = pack.policies.roles[0]
+    clerk = viewer.model_copy(update={"id": "refunds_clerk", "datasets": viewer.datasets[1:]})
+    return pack.model_copy(update={"policies": pack.policies.model_copy(update={"roles": [viewer, clerk]})})
+
+
+def test_allowlist_is_the_asking_roles_grants():
+    allowlist = allowlist_for(_pack_with_refunds_clerk(), "refunds_clerk")
+
+    assert allowlist.tables == {"widget_refunds": frozenset({"refund_ref", "refunded_on", "sale_ref", "refund_total"})}
+
+
+def test_role_without_the_table_is_rejected_by_the_guard():
+    error = guard_sql("SELECT widget_name FROM marts.widget_sales", allowlist_for(_pack_with_refunds_clerk(), "refunds_clerk"), MAX_ROWS).error
+
+    assert error.category == "policy"
+    assert "not an approved dataset" in error.message
+
+
+def test_unknown_role_reads_nothing():
+    assert allowlist_for(_pack_with_refunds_clerk(), "nobody").tables == {}

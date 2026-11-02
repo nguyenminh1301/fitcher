@@ -20,7 +20,7 @@ import yaml
 from yaml.constructor import ConstructorError
 
 from app.packs.models import PACK_FILES, Pack
-from app.packs.policy_compiler import ROW_COUNT_COLUMN, check_row_filter
+from app.packs.policy_compiler import ROW_COUNT_COLUMN, adds_up, check_row_filter
 
 
 @dataclass(frozen=True)
@@ -158,14 +158,20 @@ class _References:
 
     def aggregate_only(self, path: list[str | int], dataset_id: str, columns: list[str], metrics: list[str]) -> None:
         """Check an aggregate-only grant: its metrics belong to the dataset and its view's column names are unique."""
-        metric_datasets = {metric.id: metric.dataset for metric in self.pack.metrics.metrics}
+        defined = {metric.id: metric for metric in self.pack.metrics.metrics}
         for number, metric_id in enumerate(metrics):
-            if metric_id not in metric_datasets:
+            metric = defined.get(metric_id)
+            if metric is None:
                 self.add("policies.yaml", [*path, "metrics", number], f"unknown metric '{metric_id}'")
-            elif metric_datasets[metric_id] != dataset_id:
+            elif metric.dataset != dataset_id:
                 self.add(
                     "policies.yaml", [*path, "metrics", number],
-                    f"metric '{metric_id}' is computed from dataset '{metric_datasets[metric_id]}', not '{dataset_id}'",
+                    f"metric '{metric_id}' is computed from dataset '{metric.dataset}', not '{dataset_id}'",
+                )
+            elif not adds_up(metric.sql_expr):
+                self.add(
+                    "policies.yaml", [*path, "metrics", number],
+                    f"metric '{metric_id}' must be one sum or count, so that its values add up across the view's groups",
                 )
         names = [*columns, *metrics, ROW_COUNT_COLUMN]
         if repeated := sorted({name for name in names if names.count(name) > 1}):

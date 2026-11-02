@@ -162,3 +162,18 @@ def test_stored_passed_is_the_threshold_result_not_the_exit_code(packs_dir, monk
     assert _main(packs_dir, factory=_factory(_matching(), logs=logs)) == 1
     (stored,) = [record for record in logs.written if record.TABLE == "eval_reports"]
     assert stored.passed is True
+
+
+def test_cases_run_through_the_role_runners(packs_dir):
+    requested: list[tuple[str, str]] = []
+
+    def runners(pack: str):
+        def runner_for(role: str):
+            requested.append((pack, role))
+            return _matching()
+        return runner_for
+
+    code = main(["--pack", "minimal", "--packs-dir", str(packs_dir)], deps_factory=_factory(FakeRunner()), runners_factory=runners)
+
+    assert code == 0
+    assert requested and all(item == ("minimal", "viewer") for item in requested)

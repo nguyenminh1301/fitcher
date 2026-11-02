@@ -1,4 +1,4 @@
-"""Run agent queries on ClickHouse as the read-only agent user.
+"""Run agent queries on ClickHouse as the ClickHouse user of the asking role.
 
 Every query carries the resource limits, ``log_comment = trace_id`` (so
 ``system.query_log`` joins the run's trace) and a generated ``query_id``.
@@ -17,8 +17,8 @@ import clickhouse_connect
 
 from app.agent.errors import ErrorCategory
 from app.config import positive_int
+from app.packs.policy_compiler import Names, agent_password
 
-DEFAULT_AGENT_USER = "agent_readonly"
 # The only database the agent reads (DECISIONS §4); also its connection default.
 MARTS_DATABASE = "marts"
 
@@ -153,17 +153,21 @@ class ClickHouseRunner:
         )
 
 
-def agent_client(env: Mapping[str, str] | None = None):
-    """Client for the read-only agent user; the admin credentials are never used here."""
+def agent_client(pack: str, role: str, env: Mapping[str, str] | None = None):
+    """Client for the role's read-only user that compile_pack created; the admin credentials are never used here.
+
+    The password is derived from ``CLICKHOUSE_AGENT_PASSWORD`` the way compile_pack derived it.
+    """
     env = os.environ if env is None else env
-    password = env.get("CLICKHOUSE_AGENT_PASSWORD", "")
-    if not password:
+    secret = env.get("CLICKHOUSE_AGENT_PASSWORD", "")
+    if not secret:
         raise RuntimeError("CLICKHOUSE_AGENT_PASSWORD must be set")
+    user = Names(pack).user(role)
     return clickhouse_connect.get_client(
         host=env.get("CLICKHOUSE_HOST", "clickhouse"),
         port=int(env.get("CLICKHOUSE_HTTP_PORT", "8123")),
-        username=env.get("CLICKHOUSE_AGENT_USER") or DEFAULT_AGENT_USER,
-        password=password,
+        username=user,
+        password=agent_password(secret, user),
         database=MARTS_DATABASE,
         # Every setting travels with its query, so no session is needed; one would let a query that
         # outlives its caller (a timed-out eval case) lock the client for the next query.
