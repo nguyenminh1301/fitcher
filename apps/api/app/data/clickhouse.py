@@ -16,6 +16,7 @@ from uuid import uuid4
 import clickhouse_connect
 
 from app.agent.errors import ErrorCategory
+from app.config import positive_int
 
 DEFAULT_AGENT_USER = "agent_readonly"
 # The only database the agent reads (DECISIONS §4); also its connection default.
@@ -53,12 +54,13 @@ class QueryLimits:
 
     @classmethod
     def from_env(cls, env: Mapping[str, str] | None = None) -> "QueryLimits":
+        """Limits from ``QUERY_MAX_*``; each must be positive, since 0 would mean unlimited."""
         env = os.environ if env is None else env
         defaults = cls()
         return cls(
-            max_execution_time=int(env.get("QUERY_MAX_EXECUTION_TIME") or defaults.max_execution_time),
-            max_result_rows=int(env.get("QUERY_MAX_RESULT_ROWS") or defaults.max_result_rows),
-            max_memory_usage=int(env.get("QUERY_MAX_MEMORY_USAGE") or defaults.max_memory_usage),
+            max_execution_time=positive_int(env, "QUERY_MAX_EXECUTION_TIME", defaults.max_execution_time),
+            max_result_rows=positive_int(env, "QUERY_MAX_RESULT_ROWS", defaults.max_result_rows),
+            max_memory_usage=positive_int(env, "QUERY_MAX_MEMORY_USAGE", defaults.max_memory_usage),
         )
 
 
@@ -107,20 +109,20 @@ class ClickHouseRunner:
         self._limits = limits
         self._new_query_id = new_query_id
 
-    def _settings(self, trace_id: str, query_id: str, max_result_rows: int | None) -> dict:
+    def _settings(self, trace_id: str, query_id: str) -> dict:
         return {
             "max_execution_time": self._limits.max_execution_time,
-            "max_result_rows": self._limits.max_result_rows if max_result_rows is None else max_result_rows,
+            "max_result_rows": self._limits.max_result_rows,
             "max_memory_usage": self._limits.max_memory_usage,
             "log_comment": trace_id,
             "query_id": query_id,
         }
 
-    def _query(self, sql: str, trace_id: str, max_result_rows: int | None = None) -> QueryOutput:
+    def _query(self, sql: str, trace_id: str) -> QueryOutput:
         """Run one query and read its whole result; any failure, including while reading rows, is a QueryError."""
         query_id = self._new_query_id()
         try:
-            result = self._client.query(sql, settings=self._settings(trace_id, query_id, max_result_rows))
+            result = self._client.query(sql, settings=self._settings(trace_id, query_id))
             return QueryOutput(
                 query_id=query_id,
                 columns=list(result.column_names),
@@ -140,8 +142,9 @@ class ClickHouseRunner:
         if output.columns:
             return output
         # An empty result arrives without column metadata; DESCRIBE reads it without running the query.
-        # The newline ends a trailing line comment, and 0 lifts the row limit for the column list.
-        described = self._query(f"DESCRIBE TABLE (\n{sql}\n)", trace_id, max_result_rows=0)
+        # The newline ends a trailing line comment. The column list has one row per column, far below
+        # the row limit, which the agent user cannot lift anyway.
+        described = self._query(f"DESCRIBE TABLE (\n{sql}\n)", trace_id)
         return QueryOutput(
             query_id=output.query_id,
             columns=[row[0] for row in described.rows],

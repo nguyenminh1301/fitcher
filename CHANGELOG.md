@@ -101,6 +101,7 @@
 
 ### Security
 
+- Stop agent queries from lifting their limits with 0, which ClickHouse reads as unlimited: the `agent_readonly` profile now requires `max_execution_time`, `max_result_rows` and `max_memory_usage` of at least 1, the runner no longer sends `max_result_rows = 0` when it describes an empty result, and `QUERY_MAX_*` values must be positive integers.
 - Record the pyasn1, pypdf and py3-pip-wheel advisories published after the LiteLLM v1.106.6 pin as expiring image exceptions, because no newer stable LiteLLM release fixes them.
 - Scan the four pinned third-party service images in the image audit with the same fixable High/Critical gate and complete reports, with per-image expiring exceptions for advisories only an upstream release can fix, and validate the Compose file in CI.
 
