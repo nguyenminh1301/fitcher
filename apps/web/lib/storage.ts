@@ -16,3 +16,14 @@ export function writeStored(key: string, value: string): void {
     // Not stored: the preference lasts until the page reloads.
   }
 }
+
+/** Whether browser storage works here (it can be missing or blocked). */
+export function storageAvailable(): boolean {
+  try {
+    window.localStorage.setItem("fitcher.storage-check", "1");
+    window.localStorage.removeItem("fitcher.storage-check");
+    return true;
+  } catch {
+    return false;
+  }
+}

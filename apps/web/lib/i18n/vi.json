@@ -16,7 +16,8 @@
   },
   "sample": {
     "badge": "Dữ liệu mẫu",
-    "tooltip": "Phần này đang chạy trên dữ liệu mẫu cho đến khi dịch vụ của nó được kết nối."
+    "tooltip": "Phần này đang chạy trên dữ liệu mẫu cho đến khi dịch vụ của nó được kết nối.",
+    "unmatched": "Bản demo này chỉ trả lời các câu hỏi mẫu cho đến khi phần trò chuyện được kết nối với dữ liệu của bạn. Hãy thử một câu hỏi gợi ý."
   },
   "common": {
     "close": "Đóng",
