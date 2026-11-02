@@ -1,0 +1,203 @@
+{
+  "$defs": {
+    "Filter": {
+      "additionalProperties": false,
+      "properties": {
+        "column": {
+          "minLength": 1,
+          "title": "Column",
+          "type": "string"
+        },
+        "op": {
+          "enum": [
+            "=",
+            "!=",
+            "<",
+            "<=",
+            ">",
+            ">=",
+            "in",
+            "not in"
+          ],
+          "title": "Op",
+          "type": "string"
+        },
+        "value": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "integer"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "boolean"
+            },
+            {
+              "items": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "boolean"
+                  }
+                ]
+              },
+              "type": "array"
+            }
+          ],
+          "title": "Value"
+        }
+      },
+      "required": [
+        "column",
+        "op",
+        "value"
+      ],
+      "title": "Filter",
+      "type": "object"
+    },
+    "Period": {
+      "additionalProperties": false,
+      "description": "A labelled half-open date range ``[start, end)``.",
+      "properties": {
+        "label": {
+          "minLength": 1,
+          "title": "Label",
+          "type": "string"
+        },
+        "start": {
+          "format": "date",
+          "title": "Start",
+          "type": "string"
+        },
+        "end": {
+          "format": "date",
+          "title": "End",
+          "type": "string"
+        }
+      },
+      "required": [
+        "label",
+        "start",
+        "end"
+      ],
+      "title": "Period",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "intent": {
+      "const": "data_query",
+      "default": "data_query",
+      "title": "Intent",
+      "type": "string"
+    },
+    "metric_ids": {
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "Metric Ids",
+      "type": "array"
+    },
+    "dimensions": {
+      "default": [],
+      "items": {
+        "type": "string"
+      },
+      "title": "Dimensions",
+      "type": "array"
+    },
+    "periods": {
+      "items": {
+        "$ref": "#/$defs/Period"
+      },
+      "minItems": 1,
+      "title": "Periods",
+      "type": "array"
+    },
+    "filters": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/Filter"
+      },
+      "title": "Filters",
+      "type": "array"
+    },
+    "top_n": {
+      "anyOf": [
+        {
+          "maximum": 1000,
+          "minimum": 1,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Top N"
+    },
+    "rank_by": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Rank By"
+    },
+    "rank_period": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Rank Period"
+    },
+    "compare": {
+      "default": false,
+      "title": "Compare",
+      "type": "boolean"
+    },
+    "dataset": {
+      "minLength": 1,
+      "title": "Dataset",
+      "type": "string"
+    },
+    "warnings": {
+      "default": [],
+      "items": {
+        "type": "string"
+      },
+      "title": "Warnings",
+      "type": "array"
+    }
+  },
+  "required": [
+    "metric_ids",
+    "periods",
+    "dataset"
+  ],
+  "title": "QuerySpec",
+  "type": "object"
+}
