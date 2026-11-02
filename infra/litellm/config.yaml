@@ -18,5 +18,10 @@ model_list:
       model: os.environ/LITELLM_MODEL_EMBED
       api_key: os.environ/OPENAI_API_KEY
 
+# A model that rejects a request parameter, such as a fixed temperature,
+# receives the request without it instead of failing.
+litellm_settings:
+  drop_params: true
+
 general_settings:
   master_key: os.environ/LITELLM_MASTER_KEY

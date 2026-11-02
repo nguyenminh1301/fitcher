@@ -101,3 +101,26 @@ def test_fake_client_records_calls_and_checks_aliases():
     ]
     with pytest.raises(ValueError):
         fake.text("gpt-5.4", "p3")
+
+
+def _sent_payload(llm_factory) -> dict:
+    sent: list[dict] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        sent.append(json.loads(request.content))
+        return reply("SELECT 1")
+
+    llm_factory(handler).text("sql-gen", "Write SQL")
+    return sent[0]
+
+
+def test_temperature_is_sent_when_set():
+    def with_temperature(handler) -> LiteLLMClient:
+        transport = httpx.Client(transport=httpx.MockTransport(handler))
+        return LiteLLMClient("http://litellm:4000/", "sk-test", http=transport, temperature=0)
+
+    assert _sent_payload(with_temperature)["temperature"] == 0
+
+
+def test_temperature_is_omitted_by_default():
+    assert "temperature" not in _sent_payload(client)

@@ -162,4 +162,7 @@ def agent_client(env: Mapping[str, str] | None = None):
         username=env.get("CLICKHOUSE_AGENT_USER") or DEFAULT_AGENT_USER,
         password=password,
         database=MARTS_DATABASE,
+        # Every setting travels with its query, so no session is needed; one would let a query that
+        # outlives its caller (a timed-out eval case) lock the client for the next query.
+        autogenerate_session_id=False,
     )

@@ -10,7 +10,7 @@ Docker Compose starts ClickHouse, OpenSearch, LiteLLM, Keycloak, the FastAPI ske
 `jobs/` loads the e-commerce lab dataset into ClickHouse `raw` and refreshes it, and [dbt/](dbt/README.md) builds the `sales_lines`, `returns_fact` and `sessions_daily` marts; [packs/](packs/README.md) holds the Domain Pack schemas and the hand-written `ecommerce_twin` pack, which `jobs/compile_pack.py` validates, test-runs and indexes into OpenSearch; `jobs/ask.py` runs the LangGraph agent in `apps/api/app/agent` over the compiled pack, with its prompts in `apps/api/prompts/`.
 
 The architecture is settled in [DECISIONS.md](docs/DECISIONS.md) and delivered in the order of the [master plan](docs/MASTER_PLAN.md), with one [detailed plan per phase](docs/plans/README.md).
-Phases 1 (lab dataset and dbt marts), 2 (hand-written Domain Pack and compiler) and 3 (core agent on the CLI) are complete; Phase 4 (eval harness) is next.
+Phases 1 (lab dataset and dbt marts), 2 (hand-written Domain Pack and compiler) and 3 (core agent on the CLI) are complete; in Phase 4 (eval harness) `jobs/eval.py` scores a pack's eval set per layer, and the 30-case `ecommerce_twin` eval set with its recorded baseline is next.
 
 ## Architecture
 
@@ -79,6 +79,16 @@ docker compose run --rm api python -m jobs.ask "Top 10 best-selling products in 
 The agent extracts the question, resolves its periods, retrieves pack context, builds a QuerySpec, generates SQL through `sql-gen`, guards it, runs `EXPLAIN` and the query as the read-only `agent_readonly` ClickHouse user, repairs failing SQL up to three times (the third through `sql-gen-hard`) and summarizes the rows in the question's language.
 Each run sends billable requests to the LiteLLM aliases. Pass `--timezone <IANA name>` for relative periods (UTC by default) and `--inject-sql-fault` to watch a broken first query being repaired.
 Without the router and clarify branch of later phases, a question that names no measure or period, or whose measure is ambiguous, exits with code 2 and the reason; a query that cannot be repaired exits with code 1 after printing the last SQL and error.
+
+### Score a pack's eval set
+
+```bash
+docker compose run --rm -v ./build/eval:/app/build/eval api python -m jobs.eval --pack ecommerce_twin --output-dir build/eval
+```
+
+Each active case in `packs/<pack>/eval.yaml` runs through the agent at temperature 0 with the eval set's `reference_date` as today, and is scored on extraction, retrieval and execution against its reference result; cases for branches of later phases are reported as not yet scored.
+The run prints a Markdown report and, with `--output-dir`, also writes `<pack>-eval.md` and `<pack>-eval.json`; `--baseline <json>` compares the run with an earlier one, `--only <ids>` runs selected cases.
+It exits with code 0 when the execution match rate reaches the pack threshold (80% by default) and no layer regressed, 1 otherwise, and 2 when the run cannot start or a reference query fails. Each run sends billable requests to the LiteLLM aliases.
 
 | Service | Host address | Health check |
 | --- | --- | --- |

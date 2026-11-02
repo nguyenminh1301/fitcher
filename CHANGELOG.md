@@ -4,6 +4,9 @@
 
 ### Added
 
+- Score a pack's eval set from the command line with `jobs/eval.py --pack <name>`: it runs the approved cases against the compiled pack named by `--pack` at temperature 0, prints the Markdown report, writes Markdown and JSON with `--output-dir`, compares with `--baseline`, and exits 0, 1 on a regression or below the 80% execution threshold, or 2 on a setup or reference-query error.
+- Render an eval run as Markdown (per-layer and per-category rates, a per-case table with the failure reason, reference errors) and JSON with `app.eval.report`, and compare it with a baseline run: a layer regresses when its pass count over the cases both runs scored drops by more than one, and the pack meets its threshold when the execution match rate reaches it.
+- Run an eval set through the agent graph one case at a time with `app.eval.runner`: each active case first gets its reference result from `expected_sql` on the read-only ClickHouse user or from `expected_rows`, then asks its question under its own trace id and a per-case time limit; a failing reference query, an exception or a timeout fails that case without stopping the run.
 - Reject an eval case whose `expected_rows` do not all name the same columns as the first row.
 - Score an eval case per layer from the final graph state: extraction matches the resolved periods, `top_n` and `rank_by` exactly, retrieval reports the recall of the labelled dataset and columns among the retrieved hits, execution compares the answer with the reference result, intent waits for the router, and cases of unbuilt branches are reported as not yet scored.
 - Compare an eval answer with its reference result by column values: key and measure columns match whatever their names or positions, extra answer columns are allowed, rows align by key and keep their order only for ranked cases, and numbers match within a relative tolerance of 1e-6 and an absolute one of 1e-9.
@@ -47,6 +50,7 @@
 
 ### Changed
 
+- Let the LLM client send a fixed `temperature` with every call, and have the LiteLLM proxy drop request parameters a model rejects (`drop_params`), so eval runs can ask for temperature 0 on any model.
 - Settle the Phase 4 eval decisions: result sets match columns by value and allow extra columns, a pack needs execution match of at least 80% of active eval cases, eval runs request temperature 0, and a regression is a drop of more than one case per layer over the cases both runs scored.
 - Plan company documents as runtime content: reviewers upload PDF, DOCX, Markdown, text and XLSX files on a Documents page and delete them at any time, with stored originals, a `data_meta.documents` registry, role-scoped `kb_docs` chunks and compiles that carry documents into each index generation.
 - Take the user's time zone from the browser with each request (UTC for clients that send none) and answer in the language of the question, instead of fixing both in the pack's business profile.
@@ -69,6 +73,7 @@
 
 ### Fixed
 
+- Open the read-only agent ClickHouse client without a session, so a query left running by a timed-out eval case cannot lock the client for the next case.
 - Pair eval result rows that share a key by their mapped measure values, so reordered measure columns no longer fail a matching unordered result.
 - Report an eval set whose `reference_date` is not a real calendar date as an eval-set error instead of an unhandled `ValueError`.
 - Reject a key repeated within one mapping of a Domain Pack YAML file instead of silently keeping its last value.
