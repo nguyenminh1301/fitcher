@@ -1021,10 +1021,48 @@
       "status": "draft",
       "confidence": 0.64,
       "body": "Which return reasons cost us the most in [MASKED_PERIOD]?",
-      "formula": "SELECT return_reason, sum(refund_amount) AS refund_total FROM marts.returns_fact GROUP BY return_reason ORDER BY refund_total DESC",
+      "formula": "SELECT return_reason, sum(refund_amount) AS refund_total\nFROM marts.returns_fact\nWHERE toString(toYear(order_date)) = '[MASKED_PERIOD]'\nGROUP BY return_reason\nORDER BY refund_total DESC",
       "evidence": {
         "source": "Disliked chat 3f2a…",
         "quote": "the totals looked too high"
+      },
+      "test_result": {
+        "columns": [
+          {
+            "name": "return_reason",
+            "type": "string",
+            "role": "dimension"
+          },
+          {
+            "name": "refund_total",
+            "type": "number",
+            "role": "measure",
+            "format": "currency"
+          }
+        ],
+        "rows": [
+          [
+            "Damaged in transit",
+            48210.4
+          ],
+          [
+            "Wrong size",
+            36985.0
+          ],
+          [
+            "Not as described",
+            21470.75
+          ],
+          [
+            "Changed mind",
+            12840.2
+          ],
+          [
+            "Arrived late",
+            6315.6
+          ]
+        ],
+        "row_count": 5
       }
     }
   ],

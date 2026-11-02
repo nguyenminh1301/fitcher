@@ -369,6 +369,25 @@
     "roleChanged": "{name} is now {role}",
     "userDisabled": "{name} disabled",
     "userEnabled": "{name} enabled",
-    "pageSize": "{n} per page"
+    "pageSize": "{n} per page",
+    "succeeded": "Succeeded",
+    "rejected": "Rejected",
+    "error": "Error",
+    "paidConfirmTitle": "This uses paid AI",
+    "draftConfirmText": "Drafting pack items from {name} sends the document to the model gateway, which bills each call. Drafted items wait in Review until someone approves them.",
+    "evalConfirmText": "Running the evaluation set asks every case through the model gateway, which bills each call. Cases run one at a time, so it can take several minutes.",
+    "continue": "Continue",
+    "notScored": "Not scored yet",
+    "reports": "Reports",
+    "notFound": "This item doesn't exist or was deleted.",
+    "loadFailed": "This section couldn't load. Try again in a moment.",
+    "drafting": "Drafting pack items from {name}",
+    "uploaded": "{name} uploaded",
+    "deletedName": "{name} deleted",
+    "approvedName": "{name} approved",
+    "proposedName": "Sent to Proposals: {question}",
+    "rolesOf": "Roles of {name}",
+    "you": "you",
+    "trace": "Trace"
   }
 }
