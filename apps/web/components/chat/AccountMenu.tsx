@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type MouseEvent } from "react";
 
 import { Icon } from "@/components/brand/Icon";
 import { StatusPill } from "@/components/ui/feedback";
@@ -14,9 +14,10 @@ export function initials(name: string): string {
   return name.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]?.toUpperCase()).join("");
 }
 
-/** Who is signed in, the interface language and theme, the console entry for console roles, and sign out.
- *  While sign-in runs on sample data it also offers the pack's demo identities. */
-export function AccountMenu({ onConsole, onSignOut }: { onConsole?: () => void; onSignOut?: () => void }) {
+/** Who is signed in, the interface language and theme, the console entry for console roles (or the
+ *  chat app's, inside the console), and sign out. While sign-in runs on sample data it also offers the
+ *  pack's demo identities. */
+export function AccountMenu({ onConsole, onChat, onSignOut, compact }: { onConsole?: () => void; onChat?: () => void; onSignOut?: () => void; compact?: boolean }) {
   const { t, locale, setLocale } = useI18n();
   const { theme, setTheme } = useTheme();
   const { identity, identities, sources, switchIdentity } = useChat();
@@ -35,7 +36,8 @@ export function AccountMenu({ onConsole, onSignOut }: { onConsole?: () => void; 
     }
   }
   items.push({ separator: true });
-  if (hasConsole(roles) && onConsole) items.push({ icon: "layout", label: t("ui.console"), onSelect: onConsole });
+  if (onChat) items.push({ icon: "message", label: t("ui.chatApp"), onSelect: onChat });
+  else if (hasConsole(roles) && onConsole) items.push({ icon: "layout", label: t("ui.console"), onSelect: onConsole });
   items.push({ icon: "logout", label: t("ui.signOut"), onSelect: onSignOut });
 
   const header = (
@@ -49,21 +51,29 @@ export function AccountMenu({ onConsole, onSignOut }: { onConsole?: () => void; 
     </>
   );
 
+  const label = `${t("ui.account")}: ${identity.display_name}`;
+  const toggle = (event: MouseEvent<HTMLElement>) => setAnchor(anchor ? null : event.currentTarget);
   return (
     <>
-      <button
-        type="button"
-        className="fc-acct"
-        aria-label={`${t("ui.account")}: ${identity.display_name}`}
-        aria-haspopup="menu"
-        aria-expanded={!!anchor}
-        onClick={(event) => setAnchor(anchor ? null : event.currentTarget)}
-      >
-        <span className="fc-avatar" aria-hidden>{initials(identity.display_name)}</span>
-        <span className="fc-acct-text">{identity.display_name}<small>{roles.join(", ")}</small></span>
-        <Icon name="chevronsUpDown" />
-      </button>
-      <Menu anchor={anchor} align="start" width={280} label={t("ui.account")} header={header} items={items} onClose={() => setAnchor(null)} />
+      {compact ? (
+        <button type="button" className="fc-avatar" aria-label={label} aria-haspopup="menu" aria-expanded={!!anchor} onClick={toggle}>
+          {initials(identity.display_name)}
+        </button>
+      ) : (
+        <button
+          type="button"
+          className="fc-acct"
+          aria-label={label}
+          aria-haspopup="menu"
+          aria-expanded={!!anchor}
+          onClick={toggle}
+        >
+          <span className="fc-avatar" aria-hidden>{initials(identity.display_name)}</span>
+          <span className="fc-acct-text">{identity.display_name}<small>{roles.join(", ")}</small></span>
+          <Icon name="chevronsUpDown" />
+        </button>
+      )}
+      <Menu anchor={anchor} align={compact ? "end" : "start"} width={280} label={t("ui.account")} header={header} items={items} onClose={() => setAnchor(null)} />
     </>
   );
 }
