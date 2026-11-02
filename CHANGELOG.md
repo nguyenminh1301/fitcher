@@ -60,6 +60,7 @@
 
 ### Changed
 
+- Mark Phase 5 (logging and tracing) complete in the README and name Phase 6 (RBAC and auth) as the next step.
 - Name the reference row by its position instead of its key values when an eval answer misses a key combination or cannot pair its measures, so stored eval reports carry no result values.
 - Raise the `ecommerce_twin` eval baseline to 20 of 22 execution matches (91%, above the 80% pack threshold) after the ranking and extraction fixes, with the remaining failures listed in `docs/eval/ecommerce_twin-baseline.md`.
 - Let the LLM client send a fixed `temperature` with every call, and have the LiteLLM proxy drop request parameters a model rejects (`drop_params`), so eval runs can ask for temperature 0 on any model.
