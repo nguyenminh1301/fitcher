@@ -52,6 +52,7 @@
 
 ### Changed
 
+- Raise the `ecommerce_twin` eval baseline to 20 of 22 execution matches (91%, above the 80% pack threshold) after the ranking and extraction fixes, with the remaining failures listed in `docs/eval/ecommerce_twin-baseline.md`.
 - Let the LLM client send a fixed `temperature` with every call, and have the LiteLLM proxy drop request parameters a model rejects (`drop_params`), so eval runs can ask for temperature 0 on any model.
 - Settle the Phase 4 eval decisions: result sets match columns by value and allow extra columns, a pack needs execution match of at least 80% of active eval cases, eval runs request temperature 0, and a regression is a drop of more than one case per layer over the cases both runs scored.
 - Plan company documents as runtime content: reviewers upload PDF, DOCX, Markdown, text and XLSX files on a Documents page and delete them at any time, with stored originals, a `data_meta.documents` registry, role-scoped `kb_docs` chunks and compiles that carry documents into each index generation.
@@ -75,6 +76,8 @@
 
 ### Fixed
 
+- Extract questions with `extract.v2`: a term naming a specific value ("premium members", "nhóm hàng Furniture") is a filter rather than a breakdown, naming or comparing periods no longer sets a time grain, offsets for a period named relative to another one count from the current unit, and a ranking word is left empty when the question names its measure.
+- Rank a "top N" question by the measure it names ("Top 5 brands by units sold", "doanh thu cao nhất") instead of refusing the vague ranking word; a ranking word with no measure is still refused.
 - Open the read-only agent ClickHouse client without a session, so a query left running by a timed-out eval case cannot lock the client for the next case.
 - Pair eval result rows that share a key by their mapped measure values, so reordered measure columns no longer fail a matching unordered result.
 - Report an eval set whose `reference_date` is not a real calendar date as an eval-set error instead of an unhandled `ValueError`.

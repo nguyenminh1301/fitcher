@@ -4,7 +4,8 @@ Resolution is deterministic. A term first matches a glossary term or alias,
 a metric id or name, or a column name exactly, ignoring case, diacritics,
 punctuation and a plural "s"; otherwise the retrieval hits decide. A ranking
 term ("best-selling") must match exactly or through a business-profile
-convention, so a vague "best" is never guessed. Without a clarify branch yet,
+convention, so a vague "best" alone is never guessed; next to a named measure
+("top 5 brands by units sold") it ranks by that measure. Without a clarify branch yet,
 a measure whose two best candidates score almost alike is refused, as are
 metrics from different datasets and terms that match nothing.
 
@@ -210,7 +211,16 @@ def make_spec(state: AgentState, compiled: CompiledPack) -> QuerySpec:
     catalog = _Catalog(compiled)
 
     metric_ids = [_resolve_metric(term, catalog, retrieval) for term in extraction.metric_terms]
-    rank_by = _resolve_rank_metric(extraction.rank_term, catalog) if extraction.rank_term else None
+    rank_by = None
+    if extraction.rank_term:
+        try:
+            rank_by = _resolve_rank_metric(extraction.rank_term, catalog)
+        except SpecRejected:
+            # A vague ranking word ("top", "cao nhất") next to a named measure ranks by that measure;
+            # alone it is still refused rather than guessed.
+            if not metric_ids:
+                raise
+            rank_by = metric_ids[0]
     if rank_by is not None and rank_by not in metric_ids:
         metric_ids.append(rank_by)
     metric_ids = list(dict.fromkeys(metric_ids))
