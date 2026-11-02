@@ -3,8 +3,12 @@
 All query texts are embedded in one ``embed`` call. Metric terms search the
 glossary and metrics, dimension terms the glossary and dataset columns,
 filter values the column values, and the whole question the examples and
-datasets. Every query filters by the asking role, so the agent only sees the
-pack items that role may read (a noise filter; ClickHouse enforces access).
+datasets. The candidates for the question's own terms (metrics, dimensions and
+filter values) are searched across every role of the pack, so a term is
+resolved to what it means and the gate can deny it, instead of being replaced
+by the closest item the asking role may read. The context shown to the SQL
+generator (examples) and the dataset hits are filtered by the asking role.
+Retrieval is a noise filter; the gate, the guard and ClickHouse enforce access.
 """
 
 from pydantic import BaseModel, ConfigDict
@@ -46,7 +50,8 @@ def retrieve(state: AgentState, deps: AgentDeps) -> dict:
 def _retrieve(state: AgentState, deps: AgentDeps) -> "Retrieval":
     extraction = state["extraction"]
     pack = deps.compiled.pack
-    roles = [deps.role]
+    every_role = [role.id for role in pack.policies.roles]
+    asking_role = [deps.role]
     metric_terms = list(dict.fromkeys([*extraction.metric_terms, *([extraction.rank_term] if extraction.rank_term else [])]))
     dimension_terms = list(dict.fromkeys(
         [*extraction.dimension_terms, *(f.column_term for f in extraction.filters if f.column_term)]
@@ -55,20 +60,23 @@ def _retrieve(state: AgentState, deps: AgentDeps) -> "Retrieval":
     texts = list(dict.fromkeys([state["question"], *metric_terms, *dimension_terms]))
     vectors = dict(zip(texts, deps.embeddings.embed(texts), strict=True))
 
-    def semantic(index: str, text: str) -> list[Hit]:
+    def semantic(index: str, text: str, roles: list[str]) -> list[Hit]:
         hits = deps.search.search(
             alias_name(pack.name, index), hybrid_query(text, vectors[text], roles, HITS_PER_QUERY), pipeline=HYBRID_PIPELINE
         )
         return [Hit(index=index, **hit) for hit in hits]
 
     def lexical(text: str) -> list[Hit]:
-        hits = deps.search.search(alias_name(pack.name, "column_values"), value_query(text, roles, HITS_PER_QUERY))
+        hits = deps.search.search(alias_name(pack.name, "column_values"), value_query(text, every_role, HITS_PER_QUERY))
         return [Hit(index="column_values", **hit) for hit in hits]
 
+    def term(index: str, text: str) -> list[Hit]:
+        return semantic("glossary_terms", text, every_role) + semantic(index, text, every_role)
+
     return Retrieval(
-        metric_terms={term: semantic("glossary_terms", term) + semantic("metrics", term) for term in metric_terms},
-        dimension_terms={term: semantic("glossary_terms", term) + semantic("datasets", term) for term in dimension_terms},
+        metric_terms={text: term("metrics", text) for text in metric_terms},
+        dimension_terms={text: term("datasets", text) for text in dimension_terms},
         values={value: lexical(value) for value in values},
-        examples=semantic("examples", state["question"]),
-        datasets=semantic("datasets", state["question"]),
+        examples=semantic("examples", state["question"], asking_role),
+        datasets=semantic("datasets", state["question"], asking_role),
     )

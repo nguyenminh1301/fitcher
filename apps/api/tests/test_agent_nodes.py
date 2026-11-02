@@ -104,18 +104,24 @@ def test_retrieve_embeds_once_and_searches_each_term():
         assert '"allowed_roles": ["viewer"]' in str(body).replace("'", '"')
 
 
-def test_retrieve_searches_as_the_asking_role_only():
+def test_term_candidates_come_from_the_whole_pack_and_context_from_the_asking_role():
     agent = deps([])
     pack = agent.compiled.pack
     clerk = pack.policies.roles[0].model_copy(update={"id": "refunds_clerk"})
     policies = pack.policies.model_copy(update={"roles": [*pack.policies.roles, clerk]})
     compiled = agent.compiled.model_copy(update={"pack": pack.model_copy(update={"policies": policies})})
     agent = replace(agent, compiled=compiled, role="refunds_clerk")
+    extraction = extraction_reply(metric_terms=["revenue"], filters=[{"column_term": "widget", "op": "=", "values": ["Blue"]}])
 
-    retrieve(state_for(extraction_reply(metric_terms=["revenue"])), agent)
+    retrieve(state_for(extraction, question="Revenue of Blue"), agent)
 
-    filters = [str(body).replace("'", '"') for _, body, _ in agent.search.searches]
-    assert filters and all('"allowed_roles": ["refunds_clerk"]' in body for body in filters)
+    roles_by_index = {}
+    for index, body, _ in agent.search.searches:
+        text = str(body)
+        roles_by_index.setdefault(index, set()).update(r for r in ("viewer", "refunds_clerk") if f"'{r}'" in text)
+    assert roles_by_index["minimal_metrics"] == {"viewer", "refunds_clerk"}
+    assert roles_by_index["minimal_column_values"] == {"viewer", "refunds_clerk"}
+    assert roles_by_index["minimal_examples"] == {"refunds_clerk"}
 
 
 # build_spec
