@@ -11,10 +11,13 @@ They share the `api` image, which copies this directory to `/app/jobs`, and run 
 | `refresh_data.py` | `docker compose run --rm jobs python -m jobs.refresh_data --source <name>` | Loads the source, then runs `dbt build --select +tag:<dbt_tag>`; records the generation in `data_meta.refresh_log` |
 | `ask.py` | `docker compose run --rm api python -m jobs.ask "<question>"` | Runs the `data_query` agent as the read-only ClickHouse user and prints the SQL attempts, result table, warnings and summary; billable LiteLLM calls; `--timezone`, `--reference-date`, `--inject-sql-fault` |
 | `compile_pack.py` | `docker compose run --rm jobs python -m jobs.compile_pack --pack <name>` | Validates the pack, test-runs its metrics and publishes a new generation of its search indices; billable embeddings unless `--skip-index`; `--check-search "<query>"` searches the live pack |
+| `eval.py` | `docker compose run --rm -v ./build/eval:/app/build/eval api python -m jobs.eval --pack <name> --output-dir build/eval` | Scores the pack's approved eval cases per layer at temperature 0 and prints a Markdown report; writes `<pack>-eval.md` and `<pack>-eval.json` with `--output-dir`; `--only <ids>`, `--baseline <json>`, `--timeout`, `--threshold`; billable LiteLLM calls; exits 0, 1 on a regression or below the threshold, 2 on a setup or reference-query error |
 
 A refresh records `started`, then `completed` only when the load and every dbt model and test succeed, or `failed` otherwise.
 Readers trust a source only when its latest `refresh_log` row is the same `completed` generation before and after their operation.
 A per-source lock table rejects concurrent refreshes; if a crashed refresh left it behind and no refresh is running, drop it with `DROP TABLE data_meta.refresh_lock_<source>`.
+
+On a Linux host, create `build/eval` before an eval run and make it writable by the container user (uid 10001), or omit `--output-dir` and keep the printed report.
 
 Jobs that need ClickHouse admin access run in the `jobs` Compose service (profile `jobs`); shared helpers live in `lib/` and tests in `tests/`.
 
