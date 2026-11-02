@@ -1,7 +1,9 @@
 """The data_query graph end to end with fake LLM, search and ClickHouse."""
 
+from dataclasses import replace
+
 from agent_fixtures import GOOD_SQL, deps, extraction_reply, good_output
-from fakes import FakeEmbeddings, FakeRunner
+from fakes import FakeEmbeddings, FakeLogWriter, FakeRunner
 import pytest
 
 from app.agent.graph import run_question
@@ -148,3 +150,63 @@ def test_vague_ranking_word_is_rejected_instead_of_guessed():
     state = run_question("Best widgets in 2024?", agent)
 
     assert state["rejection"] == "'best' does not say which measure to rank by"
+
+
+def _audits(logs) -> list:
+    return [record for record in logs.queued if record.TABLE == "audit"]
+
+
+def _clerk(agent):
+    """Deps asking as a role that may read only the refunds dataset."""
+    pack = agent.compiled.pack
+    viewer = pack.policies.roles[0]
+    clerk = viewer.model_copy(update={"id": "refunds_clerk", "datasets": viewer.datasets[1:]})
+    policies = pack.policies.model_copy(update={"roles": [viewer, clerk]})
+    compiled = agent.compiled.model_copy(update={"pack": pack.model_copy(update={"policies": policies})})
+    return replace(agent, compiled=compiled, role="refunds_clerk")
+
+
+def test_denied_question_ends_before_any_sql_with_a_deny_audit_row():
+    logs = FakeLogWriter()
+    agent = _clerk(replace(deps([extraction_reply()]), logs=logs))
+
+    state = run_question(QUESTION, agent)
+
+    assert state["denial"].blocked == ["widget_sales"]
+    assert state.get("attempts") == [] and agent.runner.calls == []
+    assert [call.alias for call in agent.llm.calls] == ["fast"]
+    assert [(a.decision, a.dataset) for a in _audits(logs)] == [("DENY", "widget_sales")]
+    run = [record for record in logs.written if record.TABLE == "runs"][-1]
+    assert run.status == "denied" and "nothing was queried" in run.error
+
+
+def test_permitted_sql_attempt_writes_an_allow_audit_row():
+    logs = FakeLogWriter()
+    agent = replace(deps([extraction_reply(), GOOD_SQL, SUMMARY]), logs=logs)
+
+    run_question(QUESTION, agent)
+
+    assert [(a.decision, a.role, a.dataset, a.blocked_tables) for a in _audits(logs)] == [
+        ("ALLOW", "viewer", "widget_sales", []),
+    ]
+
+
+def test_guard_rejection_writes_a_deny_audit_row():
+    logs = FakeLogWriter()
+    agent = replace(deps([extraction_reply(), "SELECT secret FROM marts.widget_sales"]), logs=logs)
+
+    run_question(QUESTION, agent)
+
+    [denied] = _audits(logs)
+    assert denied.decision == "DENY" and denied.reason.startswith("guard: ")
+
+
+def test_clickhouse_access_denied_writes_a_deny_audit_row_after_the_allow():
+    logs = FakeLogWriter()
+    runner = FakeRunner(runs=[QueryError("policy", "Code: 497. ACCESS_DENIED", "qid-x", 497)])
+    agent = replace(deps([extraction_reply(), GOOD_SQL], runner), logs=logs)
+
+    run_question(QUESTION, agent)
+
+    assert [a.decision for a in _audits(logs)] == ["ALLOW", "DENY"]
+    assert _audits(logs)[1].reason.startswith("clickhouse: ")

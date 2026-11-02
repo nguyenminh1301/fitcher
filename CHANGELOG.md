@@ -4,6 +4,7 @@
 
 ### Added
 
+- Deny a question the asking role may not read at the gate, before any SQL: the denial names the dataset or columns blocked, says nothing was queried, is written in the question's language, ends the run as `denied` and makes `jobs.ask` exit with code 3. Every access decision is written to `agent_logs.audit`: the gate's denials, the guard's ALLOW or DENY of each SQL attempt, and ClickHouse access-denied errors. The `unauthorized` eval cases are now scored on the denial, and a live role x dataset matrix test checks every role's grants on ClickHouse with the guard bypassed.
 - Reject an aggregate-only grant whose metric is not one sum or count, because the agent adds its per-group values up again.
 - Apply each pack's `policies.yaml` to ClickHouse in `compile_pack`: per-role roles with column grants, row policies, aggregate-only views that hide small groups, one login user per role with a password derived from `CLICKHOUSE_AGENT_PASSWORD`, and a shared read-only profile whose limits cannot be raised or set to 0; objects the policies no longer contain are revoked or dropped.
 - Let a policy grant a dataset as aggregates only (grouped columns, listed metrics, a minimum group size) and check each row filter as one boolean condition over the dataset's columns; the `ecommerce_twin` pack gains a row-filtered `northwest_sales` role and an aggregate-only `category_partner` role, and the search indices show an aggregate-only role its grouped columns and metrics but no examples.

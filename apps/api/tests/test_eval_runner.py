@@ -33,7 +33,7 @@ def _case(case_id: str, **updates) -> EvalCase:
 
 def _inactive(case_id: str) -> EvalCase:
     expected = EvalExpected(intent="out_of_scope", outcome="deny")
-    return _case(case_id, category="out_of_scope", expected=expected, expected_sql=None, active_from_phase=6)
+    return _case(case_id, category="out_of_scope", expected=expected, expected_sql=None, active_from_phase=8)
 
 
 def _set(*cases: EvalCase) -> EvalSet:
@@ -181,3 +181,15 @@ def test_each_case_runs_as_its_role_with_that_roles_runner():
 def body_roles(body: dict) -> list[str]:
     text = str(body)
     return [role for role in ("viewer", "auditor") if f"'{role}'" in text]
+
+
+def test_deny_case_runs_no_reference_query():
+    expected = EvalExpected(intent="data_query", outcome="deny", metrics=["widget_revenue"], dataset="widget_sales")
+    case = _case("blocked", category="unauthorized", role="nobody", expected=expected, expected_sql=None, active_from_phase=6)
+    agent = deps([extraction_reply()], runner=FakeRunner())
+
+    run = _run(_set(case), agent)
+
+    assert agent.runner.calls == []
+    assert run.cases[0].layers["execution"].status == "pass"
+    assert run.reference_errors == []

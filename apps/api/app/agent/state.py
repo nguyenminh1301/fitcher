@@ -90,6 +90,8 @@ class AgentState(TypedDict, total=False):
     summary: str | None
     # Why the CLI entry point refused the question before any SQL was generated.
     rejection: str | None
+    # The gate's denial: what the asking role may not read, and the message for the user.
+    denial: BaseModel | None
 
 
 def record_error(state: AgentState, error: AgentError, query_id: str | None = None) -> dict:

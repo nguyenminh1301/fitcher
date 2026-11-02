@@ -24,6 +24,7 @@ import sqlglot
 from sqlglot import exp
 from sqlglot.optimizer.scope import Scope, traverse_scope
 
+from app.agent.audit import audit
 from app.agent.errors import AgentError
 from app.agent.state import AgentDeps, AgentState, record_error
 from app.contracts.result import MAX_RESULT_ROWS
@@ -228,10 +229,17 @@ def allowlist_for(pack, role: str) -> Allowlist:
 
 
 def guard(state: AgentState, deps: AgentDeps) -> dict:
-    """Graph node. The cap is one row above the result limit, so shape_result can tell a result was cut."""
+    """Graph node. The cap is one row above the result limit, so shape_result can tell a result was cut.
+
+    A policy rejection writes a DENY audit row; SQL that passes writes the attempt's ALLOW row.
+    """
     result = guard_sql(state["sql"], allowlist_for(deps.compiled.pack, deps.role), MAX_RESULT_ROWS + 1)
+    dataset = state["spec"].dataset
     if result.error is not None:
+        if result.error.category == "policy":
+            audit(state, deps, "DENY", dataset, [], f"guard: {result.error.message}")
         return {**record_error(state, result.error), "sql": state["sql"]}
+    audit(state, deps, "ALLOW", dataset, [], f"gate and guard: SQL attempt {len(state['attempts'])} allowed")
     attempts = list(state["attempts"])
     attempts[-1] = attempts[-1].model_copy(update={"sql": result.sql})
     return {"sql": result.sql, "attempts": attempts}
