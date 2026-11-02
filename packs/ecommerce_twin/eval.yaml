@@ -1,6 +1,8 @@
 # Labelled questions covering every required category (DECISIONS §12), at
 # least three per category. active_from_phase marks cases whose branch a later
 # phase builds; they are reported as not yet scored until then.
+# expected.columns lists the columns retrieval must find; the time column is
+# not listed because the agent takes it from the dataset definition.
 # reference_date is "today" for every case, inside the data's 2022-2026 range.
 reference_date: "2026-01-15"
 cases:
@@ -19,7 +21,7 @@ cases:
       top_n: 10
       rank_by: net_sales
       dataset: sales_lines
-      columns: [product_id, order_date]
+      columns: [product_id]
     expected_sql: |-
       SELECT
           product_id,
@@ -50,7 +52,7 @@ cases:
       top_n: 5
       rank_by: units_sold
       dataset: sales_lines
-      columns: [product_brand, order_date]
+      columns: [product_brand]
     expected_sql: |-
       SELECT product_brand, sumIf(quantity, order_status != 'cancelled') AS units_sold
       FROM marts.sales_lines
@@ -74,7 +76,7 @@ cases:
       periods:
         - {label: "2024", start: "2024-01-01", end: "2025-01-01"}
       dataset: sales_lines
-      columns: [product_category, customer_region, order_date]
+      columns: [product_category, customer_region]
     expected_sql: |-
       SELECT sumIf(line_amount, order_status != 'cancelled') AS net_sales
       FROM marts.sales_lines
@@ -97,7 +99,6 @@ cases:
       periods:
         - {label: "2025", start: "2025-01-01", end: "2026-01-01"}
       dataset: sessions_daily
-      columns: [session_date]
     expected_sql: |-
       SELECT
           toStartOfMonth(session_date) AS month,
@@ -168,7 +169,7 @@ cases:
         - {label: "2024", start: "2024-01-01", end: "2025-01-01"}
         - {label: "2025", start: "2025-01-01", end: "2026-01-01"}
       dataset: sales_lines
-      columns: [customer_region, order_date]
+      columns: [customer_region]
     expected_sql: |-
       SELECT
           customer_region,
@@ -195,7 +196,6 @@ cases:
         - {label: Q4 2025, start: "2025-10-01", end: "2026-01-01"}
         - {label: Q4 2024, start: "2024-10-01", end: "2025-01-01"}
       dataset: sales_lines
-      columns: [order_date]
     expected_sql: |-
       SELECT
           uniqExactIf(order_id, order_status != 'cancelled' AND order_date >= toDate('2025-10-01') AND order_date < toDate('2026-01-01')) AS order_count_q4_2025,
@@ -219,7 +219,7 @@ cases:
         - {label: 2025-12, start: "2025-12-01", end: "2026-01-01"}
         - {label: 2024-12, start: "2024-12-01", end: "2025-01-01"}
       dataset: sessions_daily
-      columns: [device, session_date]
+      columns: [device]
     expected_sql: |-
       SELECT
           device,
@@ -248,7 +248,6 @@ cases:
         - {label: Q4 2025, start: "2025-10-01", end: "2026-01-01"}
         - {label: Q4 2024, start: "2024-10-01", end: "2025-01-01"}
       dataset: returns_fact
-      columns: [return_date]
     expected_sql: |-
       SELECT
           sumIf(refund_amount, return_date >= toDate('2025-10-01') AND return_date < toDate('2026-01-01')) AS refund_total_q4_2025,
@@ -275,7 +274,7 @@ cases:
       top_n: 3
       rank_by: net_sales
       dataset: sales_lines
-      columns: [product_category, order_date]
+      columns: [product_category]
     expected_sql: |-
       SELECT product_category, sumIf(line_amount, order_status != 'cancelled') AS net_sales
       FROM marts.sales_lines
@@ -301,7 +300,7 @@ cases:
       top_n: 5
       rank_by: units_sold
       dataset: sales_lines
-      columns: [product_subcategory, order_date]
+      columns: [product_subcategory]
     expected_sql: |-
       SELECT product_subcategory, sumIf(quantity, order_status != 'cancelled') AS units_sold
       FROM marts.sales_lines
@@ -327,7 +326,7 @@ cases:
       top_n: 3
       rank_by: session_count
       dataset: sessions_daily
-      columns: [channel, session_date]
+      columns: [channel]
     expected_sql: |-
       SELECT channel, sum(sessions) AS session_count
       FROM marts.sessions_daily
@@ -353,7 +352,7 @@ cases:
       top_n: 3
       rank_by: refund_total
       dataset: returns_fact
-      columns: [return_reason, return_date]
+      columns: [return_reason]
     expected_sql: |-
       SELECT return_reason, sum(refund_amount) AS refund_total
       FROM marts.returns_fact
@@ -379,7 +378,7 @@ cases:
       top_n: 10
       rank_by: net_sales
       dataset: sales_lines
-      columns: [customer_id, order_date]
+      columns: [customer_id]
     expected_sql: |-
       SELECT customer_id, sumIf(line_amount, order_status != 'cancelled') AS net_sales
       FROM marts.sales_lines
@@ -405,7 +404,7 @@ cases:
       periods:
         - {label: "2025", start: "2025-01-01", end: "2026-01-01"}
       dataset: sales_lines
-      columns: [customer_segment, order_date]
+      columns: [customer_segment]
     expected_sql: |-
       SELECT sumIf(line_amount, order_status != 'cancelled') AS net_sales
       FROM marts.sales_lines
@@ -427,7 +426,7 @@ cases:
       periods:
         - {label: Q3 2025, start: "2025-07-01", end: "2025-10-01"}
       dataset: sales_lines
-      columns: [payment_method, order_date]
+      columns: [payment_method]
     expected_sql: |-
       SELECT uniqExactIf(order_id, order_status != 'cancelled') AS order_count
       FROM marts.sales_lines
@@ -449,7 +448,7 @@ cases:
       periods:
         - {label: 2025-12, start: "2025-12-01", end: "2026-01-01"}
       dataset: sessions_daily
-      columns: [device, session_date]
+      columns: [device]
     expected_sql: |-
       SELECT sum(sessions) AS session_count
       FROM marts.sessions_daily
@@ -471,7 +470,7 @@ cases:
       periods:
         - {label: "2025", start: "2025-01-01", end: "2026-01-01"}
       dataset: returns_fact
-      columns: [return_reason, return_date]
+      columns: [return_reason]
     expected_sql: |-
       SELECT count() AS return_count
       FROM marts.returns_fact
@@ -493,7 +492,7 @@ cases:
       periods:
         - {label: "2024", start: "2024-01-01", end: "2025-01-01"}
       dataset: sales_lines
-      columns: [product_category, customer_region, order_date]
+      columns: [product_category, customer_region]
     expected_sql: |-
       SELECT
           sumIf(line_amount, order_status != 'cancelled')
@@ -520,7 +519,6 @@ cases:
       periods:
         - {label: "2024", start: "2024-01-01", end: "2025-01-01"}
       dataset: sales_lines
-      columns: [order_date]
     expected_sql: |-
       SELECT toStartOfMonth(order_date) AS month, uniqExactIf(order_id, order_status != 'cancelled') AS order_count
       FROM marts.sales_lines
@@ -543,7 +541,6 @@ cases:
       periods:
         - {label: "2025", start: "2025-01-01", end: "2026-01-01"}
       dataset: returns_fact
-      columns: [return_date]
     expected_sql: |-
       SELECT toStartOfMonth(return_date) AS month, sum(refund_amount) AS refund_total
       FROM marts.returns_fact
@@ -566,7 +563,6 @@ cases:
       periods:
         - {label: 2025-01-01 to 2025-06-30, start: "2025-01-01", end: "2025-07-01"}
       dataset: sales_lines
-      columns: [order_date]
     expected_sql: |-
       SELECT
           toStartOfMonth(order_date) AS month,
@@ -591,7 +587,7 @@ cases:
       periods:
         - {label: "2025", start: "2025-01-01", end: "2026-01-01"}
       dataset: sessions_daily
-      columns: [channel, session_date]
+      columns: [channel]
     expected_sql: |-
       SELECT toStartOfMonth(session_date) AS month, sum(sessions) AS session_count
       FROM marts.sessions_daily
