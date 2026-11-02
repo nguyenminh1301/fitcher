@@ -136,10 +136,16 @@ class ExamplesFile(PackModel):
     examples: list[Example]
 
 
+class AggregateOnly(PackModel):
+    metrics: list[str]
+    min_group_size: int
+
+
 class DatasetGrant(PackModel):
     dataset: str
     columns: list[str]
     row_filter: str | None = None
+    aggregate_only: AggregateOnly | None = None
 
 
 class Role(Draftable):

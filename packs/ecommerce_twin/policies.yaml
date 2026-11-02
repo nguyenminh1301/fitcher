@@ -1,4 +1,4 @@
-# Phase 6 compiles these roles into ClickHouse roles, grants and row policies.
+# compile_pack turns these roles into ClickHouse roles, column grants, row policies and aggregate-only views.
 roles:
   - id: analyst
     description: Reads every mart and column.
@@ -24,6 +24,35 @@ roles:
       - dataset: sessions_daily
         columns: [session_date, device, channel, customer_region, customer_segment, sessions, converted_sessions,
           pages_viewed]
+    status: approved
+    evidence: *owner
+    confidence: 1.0
+
+  - id: northwest_sales
+    description: Reads sales and returns of customers in the Northwest region only.
+    datasets:
+      - dataset: sales_lines
+        columns: [order_item_id, order_id, order_date, order_status, payment_method, customer_id, customer_region,
+          customer_segment, customer_signup_date, product_id, product_category, product_subcategory, product_brand,
+          product_list_price, product_unit_cost, quantity, unit_price, line_amount, is_returned]
+        row_filter: customer_region = 'Northwest'
+      - dataset: returns_fact
+        columns: [return_id, return_date, return_reason, refund_amount, order_item_id, order_id, order_date, order_status,
+          product_id, product_category, product_subcategory, product_brand, customer_id, customer_region, customer_segment,
+          quantity, line_amount, days_to_return]
+        row_filter: customer_region = 'Northwest'
+    status: approved
+    evidence: *owner
+    confidence: 1.0
+
+  - id: category_partner
+    description: Reads daily net sales and units by product category, never single orders or customers.
+    datasets:
+      - dataset: sales_lines
+        columns: [order_date, product_category]
+        aggregate_only:
+          metrics: [net_sales, units_sold]
+          min_group_size: 10
     status: approved
     evidence: *owner
     confidence: 1.0

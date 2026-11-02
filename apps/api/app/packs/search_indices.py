@@ -97,17 +97,28 @@ class ColumnValue:
 
 
 class _Roles:
-    """Roles allowed to see each dataset and column, from policies.yaml grants."""
+    """Roles allowed to see each dataset, column and metric, from policies.yaml grants.
+
+    An aggregate-only grant shows its grouped columns and listed metrics only,
+    and no examples, whose SQL reads the table that the role cannot read.
+    """
 
     def __init__(self, pack: Pack):
         self.all = sorted(role.id for role in pack.policies.roles)
         self.datasets: dict[str, set[str]] = {}
+        self.table_readers: dict[str, set[str]] = {}
         self.columns: dict[tuple[str, str], set[str]] = {}
+        self.aggregate_metrics: dict[str, set[str]] = {}
         for role in pack.policies.roles:
             for grant in role.datasets:
                 self.datasets.setdefault(grant.dataset, set()).add(role.id)
                 for column in grant.columns:
                     self.columns.setdefault((grant.dataset, column), set()).add(role.id)
+                if grant.aggregate_only is None:
+                    self.table_readers.setdefault(grant.dataset, set()).add(role.id)
+                else:
+                    for metric in grant.aggregate_only.metrics:
+                        self.aggregate_metrics.setdefault(metric, set()).add(role.id)
 
     def dataset(self, dataset: str) -> list[str]:
         return sorted(self.datasets.get(dataset, set()))
@@ -115,11 +126,14 @@ class _Roles:
     def column(self, dataset: str, column: str) -> list[str]:
         return sorted(self.columns.get((dataset, column), set()))
 
+    def metric(self, metric: str, dataset: str) -> list[str]:
+        return sorted(self.table_readers.get(dataset, set()) | self.aggregate_metrics.get(metric, set()))
+
     def every(self, datasets: Iterable[str]) -> list[str]:
-        """Roles granted every one of ``datasets``."""
+        """Roles that read every one of ``datasets`` as a table."""
         allowed = set(self.all)
         for dataset in datasets:
-            allowed &= self.datasets.get(dataset, set())
+            allowed &= self.table_readers.get(dataset, set())
         return sorted(allowed)
 
 
@@ -141,7 +155,7 @@ def build_documents(pack: Pack, column_values: Sequence[ColumnValue]) -> dict[st
         allowed: set[str] = set()
         for target in term.targets:
             if target.metric is not None:
-                allowed.update(roles.dataset(metric_dataset[target.metric]))
+                allowed.update(roles.metric(target.metric, metric_dataset[target.metric]))
             elif target.dataset is not None and target.column is not None:
                 allowed.update(roles.column(target.dataset, target.column))
         aliases = [*term.aliases.vi, *term.aliases.en]
@@ -155,7 +169,7 @@ def build_documents(pack: Pack, column_values: Sequence[ColumnValue]) -> dict[st
 
     for metric in pack.metrics.metrics:
         documents["metrics"].append(_document(
-            pack, "metric", metric.id, roles.dataset(metric.dataset), f"{metric.name} | {metric.id}", metric.description,
+            pack, "metric", metric.id, roles.metric(metric.id, metric.dataset), f"{metric.name} | {metric.id}", metric.description,
             dataset=metric.dataset,
             payload={"name": metric.name, "unit": metric.unit, "grain": metric.grain, "sql_expr": metric.sql_expr},
             embedding_text=f"{metric.name}. {metric.description}",
