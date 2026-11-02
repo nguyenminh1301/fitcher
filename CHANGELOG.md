@@ -4,6 +4,7 @@
 
 ### Added
 
+- Add the web app's visual system from the fitcher design: generated design tokens for light and dark themes with a WCAG AA contrast test, the design's component stylesheet, Inter with its Vietnamese subset, the brand Logo, Finch and icons, the shared buttons, fields, chips, tabs, segmented controls, status pills, banners, toasts, tooltips, dialogs, menus, empty states and skeletons, and the English/Vietnamese interface switch and theme choice kept per browser; web unit tests run with `npm run test` locally and in CI.
 - Import the pack's policy roles and the console roles `pack_reviewer` and `admin` into the Keycloak realm, with one lab user per role defined without credentials, verified `@fitcher.test` emails and roles in the `finch-web` access token; `jobs.set_lab_passwords` sets their password from `KEYCLOAK_LAB_USER_PASSWORD` in `.env`.
 - Deny a question the asking role may not read at the gate, before any SQL: the denial names the dataset or columns blocked, says nothing was queried, is written in the question's language, ends the run as `denied` and makes `jobs.ask` exit with code 3. Every access decision is written to `agent_logs.audit`: the gate's denials, the guard's ALLOW or DENY of each SQL attempt, and ClickHouse access-denied errors. The `unauthorized` eval cases are now scored on the denial, and a live role x dataset matrix test checks every role's grants on ClickHouse with the guard bypassed.
 - Reject an aggregate-only grant whose metric is not one sum or count, because the agent adds its per-group values up again.

@@ -38,7 +38,7 @@ Repository checks alone support Python 3.11 or newer.
 |--------------|-----------------------|
 | Documentation, rules and repository configuration | `python scripts/check_repository.py` and `python scripts/check_git.py --range origin/develop..HEAD` |
 | API or job Python source, tests or dependencies | `uv sync --project apps/api --frozen` and `uv run --project apps/api pytest -c apps/api/pyproject.toml` |
-| Web TypeScript/React source or dependencies | `npm --prefix apps/web ci`, `npm --prefix apps/web run typecheck` and `npm --prefix apps/web run build` |
+| Web TypeScript/React source or dependencies | `npm --prefix apps/web ci`, `npm --prefix apps/web run typecheck`, `npm --prefix apps/web run test` and `npm --prefix apps/web run build` |
 | Compose, Dockerfiles or service initialization | `docker compose config --quiet`, `docker compose up --build --wait` and checks for the affected health/readiness behavior |
 | ClickHouse, OpenSearch or Keycloak initialization | Verify behavior on a fresh volume and provide an idempotent apply path for existing volumes |
 | Domain Pack files or agent behavior (from Phase 4) | `eval.py --pack <pack>` with the baseline; scores must not regress |
