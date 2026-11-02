@@ -168,6 +168,11 @@ services:
       LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY:?set LITELLM_MASTER_KEY in .env}
       EMBEDDING_DIMENSIONS: ${EMBEDDING_DIMENSIONS:-1024}
       COLUMN_VALUES_TOP_K: ${COLUMN_VALUES_TOP_K:-10000}
+      # set_lab_passwords signs in as the Keycloak bootstrap administrator.
+      KEYCLOAK_URL: http://keycloak:8080
+      KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN:?set KEYCLOAK_ADMIN in .env}
+      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:?set KEYCLOAK_ADMIN_PASSWORD in .env}
+      KEYCLOAK_LAB_USER_PASSWORD: ${KEYCLOAK_LAB_USER_PASSWORD:-}
     volumes:
       - ./data:/app/data
       - compiled-packs:/app/build/packs

@@ -12,7 +12,7 @@ See [DECISIONS §3](../docs/DECISIONS.md#3-docker-compose) and the [Phase 0 plan
 | `clickhouse/initdb/010-agent-logs.sql` | Creates the `agent_logs` database and its run log tables |
 | `litellm/config.yaml` | Aliases `fast`, `sql-gen`, `sql-gen-hard` and `embed`, with models from `LITELLM_MODEL_*` |
 | `litellm/callbacks/clickhouse_logger.py` | Proxy callback writing one `agent_logs.llm_calls` row per call as `agent_logs_writer` |
-| `keycloak/realm-finch.json` | Realm `finch` with the public `finch-web` client and no users |
+| `keycloak/realm-finch.json` | Realm `finch`: the active pack's policy roles and the console roles `pack_reviewer` and `admin`, one lab user per role without credentials, and the public `finch-web` client whose access tokens carry the realm roles |
 | `opensearch/` | Host requirements; no custom JVM or plugin settings |
 
 ## ClickHouse users and databases
@@ -53,3 +53,13 @@ Every call, successful or failed, is written to `agent_logs.llm_calls` with its 
 
 Keycloak runs `start-dev` with its embedded development database and imports `realm-finch.json` when the realm does not exist.
 Edits to the realm file apply after `docker compose up -d --force-recreate --wait keycloak`, which starts from a new container.
+
+The realm roles equal the roles of the active pack's `policies.yaml` plus `pack_reviewer` and `admin`; a test fails when they drift, so a pack role change also edits this file.
+The lab users (`lab.analyst`, `lab.marketing`, `lab.northwest`, `lab.partner`, `lab.reviewer`, `lab.admin`) are tracked without passwords; after every import set them from `KEYCLOAK_LAB_USER_PASSWORD` in `.env`:
+
+```bash
+docker compose run --rm jobs python -m jobs.set_lab_passwords
+```
+
+Each user has a verified `@fitcher.test` email, so the first sign-in asks for no profile update.
+`finch-web` access tokens carry the user's roles under `realm_access.roles`.
