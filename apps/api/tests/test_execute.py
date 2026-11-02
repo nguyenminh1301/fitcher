@@ -159,6 +159,16 @@ def test_agent_client_connects_to_the_marts_database(monkeypatch):
     assert (seen["username"], seen["database"]) == ("agent_readonly", "marts")
 
 
+def test_agent_client_opens_no_session(monkeypatch):
+    # A query left running by a timed-out eval case would otherwise lock the session for the next case.
+    seen = {}
+    monkeypatch.setattr("app.data.clickhouse.clickhouse_connect.get_client", lambda **kwargs: seen.update(kwargs))
+
+    agent_client({"CLICKHOUSE_AGENT_PASSWORD": "pw"})
+
+    assert seen["autogenerate_session_id"] is False
+
+
 def test_agent_client_requires_its_password():
     with pytest.raises(RuntimeError, match="CLICKHOUSE_AGENT_PASSWORD"):
         agent_client({})
