@@ -282,7 +282,7 @@ Principles:
 
 ## 10. Logging (ClickHouse `agent_logs`)
 
-Tables (MergeTree, 90-day TTL, ordered by `(trace_id, ts)` or `(user_id, ts)`):
+Tables (MergeTree, 90-day TTL, ordered by `(trace_id, ts)`, `(user_id, ts)` or, for pack-level tables, `(pack, ts)`):
 
 | Table | Contents |
 |---|---|
@@ -293,6 +293,8 @@ Tables (MergeTree, 90-day TTL, ordered by `(trace_id, ts)` or `(user_id, ts)`):
 | `audit` | ALLOW/DENY, blocked tables, role |
 | `chat_messages` | conversation_id, role, content, QuerySpec |
 | `feedback` | like/dislike, notes |
+| `eval_reports` | pack, execution rate, threshold result, full JSON report from `eval.py` (§12) |
+| `example_proposals` | pack, question, SQL and source trace proposed from dislikes or failed runs (§11 step 8) |
 
 - Log writer: async batches inside the `api` process. `trace_id` comes from the OpenTelemetry context.
 - JOIN with `system.query_log` through `log_comment`; no syncer needed.
