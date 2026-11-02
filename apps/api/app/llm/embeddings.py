@@ -9,6 +9,8 @@ from typing import Protocol
 
 import httpx
 
+from app.observability.tracing import llm_metadata
+
 EMBED_ALIAS = "embed"
 BATCH_SIZE = 256
 TIMEOUT_SECONDS = 120
@@ -44,6 +46,8 @@ class LiteLLMEmbeddings:
 
     def _embed_batch(self, texts: list[str]) -> list[list[float]]:
         payload = {"model": EMBED_ALIAS, "input": texts, "dimensions": self.dimensions}
+        if metadata := llm_metadata():
+            payload["metadata"] = metadata
         try:
             response = self._http.post(self._url, json=payload, headers=self._headers)
         except httpx.HTTPError as error:

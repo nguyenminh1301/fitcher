@@ -9,7 +9,6 @@ the run before any SQL is generated.
 
 from collections.abc import Callable
 from functools import partial
-from uuid import uuid4
 
 from langgraph.graph import END, START, StateGraph
 
@@ -25,6 +24,8 @@ from app.agent.nodes.retrieve import retrieve
 from app.agent.nodes.shape_result import shape_result
 from app.agent.nodes.summarize import summarize
 from app.agent.state import AgentDeps, AgentState
+from app.observability.runs import RunLog
+from app.observability.tracing import run_span
 
 # Four generations of five nodes each plus the fixed nodes stay well inside this.
 RECURSION_LIMIT = 60
@@ -66,13 +67,38 @@ def build_graph(deps: AgentDeps):
     return graph.compile()
 
 
-def run_question(question: str, deps: AgentDeps, trace_id: str | None = None) -> AgentState:
-    initial: AgentState = {
-        "question": question,
-        "trace_id": trace_id or str(uuid4()),
-        "profile": deps.compiled.pack.business_profile,
-        "attempts": [],
-        "errors": [],
-        "warnings": [],
-    }
-    return build_graph(deps).invoke(initial, config={"recursion_limit": RECURSION_LIMIT})
+def _outcome(state: AgentState) -> tuple[str, str, str]:
+    """Status, intent and error of a finished run for its ``runs`` row."""
+    spec = state.get("spec")
+    intent = spec.intent if spec is not None else ""
+    if state.get("rejection"):
+        return "rejected", intent, state["rejection"]
+    if state.get("result") is not None:
+        return "succeeded", intent, ""
+    errors = state.get("errors", [])
+    return "failed", intent, str(errors[-1]) if errors else ""
+
+
+def run_question(question: str, deps: AgentDeps) -> AgentState:
+    """Run one question under its own trace; with ``deps.logs`` its run row brackets the graph."""
+    with run_span() as run:
+        initial: AgentState = {
+            "question": question,
+            "trace_id": run.trace_id,
+            "profile": deps.compiled.pack.business_profile,
+            "attempts": [],
+            "errors": [],
+            "warnings": [],
+        }
+        config = {"recursion_limit": RECURSION_LIMIT}
+        if deps.logs is None:
+            return build_graph(deps).invoke(initial, config=config)
+        log = RunLog(deps.logs, run, user_id=deps.user_id, pack=deps.compiled.pack.name, question=question)
+        try:
+            state = build_graph(deps).invoke(initial, config=config)
+        except Exception as error:
+            log.finish("error", intent="", error=f"{type(error).__name__}: {error}")
+            raise
+        status, intent, error = _outcome(state)
+        log.finish(status, intent=intent, error=error)
+        return state

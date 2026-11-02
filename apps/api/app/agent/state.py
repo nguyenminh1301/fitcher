@@ -16,6 +16,8 @@ from app.contracts.result import Result
 from app.data.clickhouse import QueryOutput
 from app.llm.client import LLMClient
 from app.llm.embeddings import EmbeddingClient
+from app.observability.events import LogRecord
+from app.observability.log_writer import FlushResult
 from app.packs.compiler import CompiledPack
 from app.packs.models import BusinessProfile
 
@@ -24,6 +26,14 @@ TimeGrain = Literal["day", "week", "month", "quarter", "year"]
 
 class SearchClient(Protocol):
     def search(self, index: str, body: dict, pipeline: str | None = None) -> list[dict]: ...
+
+
+class LogWriter(Protocol):
+    def write_now(self, record: LogRecord) -> bool: ...
+
+    def enqueue(self, record: LogRecord) -> bool: ...
+
+    def flush_trace(self, trace_id: str, timeout: float = 5.0) -> FlushResult: ...
 
 
 class QueryRunner(Protocol):
@@ -40,6 +50,10 @@ class AgentDeps:
     runner: QueryRunner
     compiled: CompiledPack
     today: date
+    # agent_logs writer; None runs the graph without logging (unit tests).
+    logs: LogWriter | None = None
+    # Who asked; written to the run row.
+    user_id: str = ""
 
 
 class Attempt(BaseModel):

@@ -58,10 +58,11 @@ def test_runs_active_cases_and_skips_inactive_ones():
 def test_reference_sql_runs_as_its_own_trace():
     agent = deps([extraction_reply(), GOOD_SQL, "Blue led."], runner=FakeRunner(runs=[good_output(), good_output()]))
 
-    _run(_set(_case("now")), agent)
+    run = _run(_set(_case("now")), agent)
 
     assert agent.runner.calls[0] == ("run", REFERENCE_SQL, "eval-reference-now")
-    assert all(call[2] == "eval-now" for call in agent.runner.calls[1:])
+    trace_ids = {call[2] for call in agent.runner.calls[1:]}
+    assert trace_ids == {run.cases[0].trace_id}
 
 
 def test_expected_rows_become_a_typed_reference():

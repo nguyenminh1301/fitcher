@@ -20,7 +20,7 @@ def sql_error(message: str = "Code: 47. DB::Exception: Unknown identifier") -> Q
 def test_question_flows_to_a_result_and_summary():
     agent = deps([extraction_reply(), GOOD_SQL, SUMMARY])
 
-    state = run_question(QUESTION, agent, trace_id="trace-1")
+    state = run_question(QUESTION, agent)
 
     assert state.get("rejection") is None
     spec = state["spec"]
@@ -33,7 +33,7 @@ def test_question_flows_to_a_result_and_summary():
     assert state["summary"] == SUMMARY
     assert [call.alias for call in agent.llm.calls] == ["fast", "sql-gen", "fast"]
     assert [call[0] for call in agent.runner.calls] == ["explain", "run"]
-    assert all(call[2] == "trace-1" for call in agent.runner.calls)
+    assert all(call[2] == state["trace_id"] for call in agent.runner.calls)
     assert state["attempts"][0].query_id == "qid-ok"
 
 
