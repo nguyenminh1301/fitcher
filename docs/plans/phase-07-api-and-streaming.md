@@ -42,7 +42,7 @@ apps/web/lib/contracts/             # generated .ts files, committed
 4. **SSE endpoint (test first).** Tests with a fake graph assert event order for success, deny, exhausted retries and internal errors (`error` is always last, nothing follows `done`). Graph node transitions emit `status` events.
 5. **Cancellation.** A client disconnect cancels the graph and issues `KILL QUERY WHERE query_id = ...` for a running ClickHouse query.
 6. **Rate limiting.** Per-user token bucket in process; limit exceeded -> 429 before the graph starts.
-7. **Type generation.** `scripts/generate_contract_types.py` writes JSON Schemas; an npm script converts them to TypeScript under `apps/web/lib/contracts/`. CI regenerates and fails on diff.
+7. **Type generation.** Done in Phase 6B for QuerySpec and Result (`scripts/generate_contract_types.py`, `npm run contracts:generate`, tests that fail on drift). This phase adds the event models and ChartSpec to the generator and deletes their provisional types from `apps/web/lib/api/provisional.ts`.
 
 ## Contracts
 
@@ -76,6 +76,15 @@ curl -N -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
 2. **SSE over POST.** Browsers' `EventSource` supports GET only. Default: keep `POST /ask` and parse the stream with `fetch` in the frontend.
 3. **TypeScript generator.** Default: `json-schema-to-typescript` as a web dev dependency, pinned.
 4. **Rate limits with several api workers.** In-process limits are per worker; the lab runs one worker.
+
+## Web wiring
+
+The Phase 6B web app runs every feature on the active pack's sample data until its backend exists ([phase-06b](phase-06b-web-app-on-sample-data.md)). `apps/web/lib/api/client.ts` defines each feature's methods, `lib/api/mock/` holds the sample implementation, `lib/api/http/` the real one, and `lib/api/sources.ts` chooses between them. This phase wires:
+
+| Feature | Mock to retire | Real endpoint | Contract | Done when |
+|---|---|---|---|---|
+| `auth` | `mock/index.ts` demo identities and the identity picker in the account menu | Keycloak OIDC authorization code with PKCE, session held server-side; `SignInScreen` action enabled | `FitcherApi.auth` | `sources.auth` is `http`, its Sample data badge is gone, the http client test passes and its provisional types are deleted |
+| `chat` | `mock/chat.ts` scenario stream | `POST /ask` as SSE through a server route carrying the access token; `lib/sse/parseStream.ts`; Stop aborts the request; the browser time zone is sent | generated event types, `FitcherApi.chat.ask` | `sources.chat` is `http`, its Sample data badge is gone, the http client test passes and its provisional types are deleted |
 
 ## Branch and PR split
 

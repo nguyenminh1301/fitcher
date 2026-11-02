@@ -42,6 +42,7 @@ Every phase plan has these sections:
 | 4 | [Eval harness](phase-04-eval-harness.md) |
 | 5 | [Logging and tracing](phase-05-logging-and-tracing.md) |
 | 6 | [RBAC and auth](phase-06-rbac-and-auth.md) |
+| 6B | [Web app on sample data](phase-06b-web-app-on-sample-data.md) |
 | 7 | [API and streaming](phase-07-api-and-streaming.md) |
 | 8 | [Conversation](phase-08-conversation.md) |
 | 9 | [Chat and chart frontend](phase-09-chat-and-charts-frontend.md) |

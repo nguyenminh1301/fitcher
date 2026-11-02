@@ -241,7 +241,7 @@ The `metadata_qa`, `chart_edit` and `out_of_scope` branches are added with the r
 }
 ```
 
-These schemas are defined in Pydantic on the backend and TypeScript types are generated from them for the frontend. They are never written by hand twice.
+These schemas are defined in Pydantic on the backend and TypeScript types are generated from them for the frontend. They are never written by hand twice. Until a contract has its Pydantic model, the web app's sample-data mode (§15) keeps its type in one provisional file, which the phase that adds the model deletes.
 
 ## 8. Charts
 
@@ -376,3 +376,4 @@ The interface follows the Fitcher web app design, summarized in [design/web-app.
 - **Evaluation page.** Reads `eval_reports`: per-layer rates, the threshold result, the required question categories and failed cases. An `admin` can start a run of the active pack's eval set: it is labelled as using paid AI, asks for confirmation, runs one at a time per pack inside `api`, and stores its report like `eval.py`.
 - **Users page.** Lists realm users with their pack roles and status; an `admin` changes roles and disables or enables users as set in §9.
 - **Costs page.** LLM cost by day, alias and model from `llm_calls`, always labelled as an estimate.
+- **Sample-data mode.** Each web feature reads either the real api or the active pack's `sample_data/`, chosen per feature in one place. A feature on sample data shows a Sample data badge, so a demo is never mistaken for a real answer. Sample data belongs to the pack, is hand-written and is never copied or derived from a licensed dataset; the engine code in `apps/web` stays free of pack names. Each phase plan's Web wiring section names the features it moves to the real api.

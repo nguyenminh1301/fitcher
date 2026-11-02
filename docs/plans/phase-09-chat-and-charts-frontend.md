@@ -21,6 +21,8 @@ Give end users the Chat app of the Fitcher web app design ([docs/design/web-app.
 
 ## Deliverables
 
+The web files listed here are created in Phase 6B on sample data; this phase adds the api side and changes them only to wire it (see Web wiring).
+
 ```text
 apps/api/app/agent/nodes/chart_recommender.py
 apps/api/app/api/feedback.py                     # POST /feedback
@@ -44,18 +46,18 @@ apps/web/
 ## Tasks
 
 1. **chart_recommender (test first).** Table-driven tests for every row of DECISIONS §8: KPI, line with at most 6 series, bar with horizontal switch for long labels, grouped bar, pie only for share with at most 6 non-negative groups, scatter, table fallback. `allowed_types` lists every type valid for the data; time series never allow pie. The backend decides bar orientation and records it in an optional ChartSpec field `orientation: vertical | horizontal` (open question 4), so the frontend never duplicates the rule. The `fast` tie-break runs only when two rules match equally.
-2. **Auth.** OIDC authorization code with PKCE against Keycloak; session held server-side; the api call carries the access token from the server.
-3. **SSE chat.** Stream parser (tests for split frames, multiple events per chunk, heartbeats); per-node status list; cancel button aborts the request. Every request sends the browser's IANA time zone from `Intl.DateTimeFormat().resolvedOptions().timeZone`.
-4. **Result panels.** TanStack Table with column formats from `Result.columns`; SQL view; warning banner; clarify options as buttons that send a follow-up turn.
-5. **Chart adapter (test first).** `toEChartsOption(spec, result)` pure function; tests for each chart type, series grouping by `series`, sort and number format.
-6. **Type switcher.** Changes only the local ChartSpec; types outside `allowed_types` are disabled with an explanation; no network request (asserted in a test).
-7. **Export.** PNG through the ECharts instance, CSV from `Result` rows.
+2. **Auth.** Wired in Phase 7 (see its Web wiring).
+3. **SSE chat.** Wired in Phase 7 (see its Web wiring).
+4. **Result panels.** Built in Phase 6B; this phase only wires it (see Web wiring).
+5. **Chart adapter.** Built in Phase 6B; this phase only wires it (see Web wiring).
+6. **Type switcher.** Built in Phase 6B; this phase only wires it (see Web wiring).
+7. **Export.** Built in Phase 6B; this phase only wires it (see Web wiring).
 8. **Feedback.** Like/dislike with optional note -> the `app/api/feedback` server route forwards it with the session's access token and `trace_id` -> `POST /feedback`, which rejects a `trace_id` whose run belongs to another user -> `agent_logs.feedback`. A negative test covers a foreign `trace_id`.
-9. **Visual system.** Tokens from the design as CSS variables for light and dark (system preference unless the user picks one, kept in local storage), Inter through `next/font` with the Vietnamese subset, Lucide icons, the brand `Logo` and `Finch` from `docs/brand`. Shared components follow the design's names; contrast checks for both themes run in a unit test over the token pairs.
-10. **Chat shell.** `ChatLayout` with New chat, Search (`SearchDialog`, Ctrl K), Pinned, Groups and Recent (today, past week, past month), the per-conversation menu (pin, rename, move to and remove from group, delete with confirmation), group management, a resizable and collapsible sidebar that becomes a drawer below 768px, the title menu and the account menu (language, theme, console entry for console roles, sign out), all over the Phase 8 conversation endpoints through server routes.
-11. **Answer anatomy and states.** `ProgressSteps` maps graph nodes to the design's steps (`lib/steps.ts`), shows the repair attempt, collapses into "How I got this"; `AnswerCard`, `ClarifyOptions`, `DefinitionAnswer` and `NoticeCard` (denied, out of scope, failed, empty, network, stopped); skeletons while a conversation opens and an answer streams. The type switcher labels `pie` as donut.
-12. **Message actions.** Copy, like, dislike with note and retry under answers; copy and edit under the user's messages; edit and retry call `/ask` with `edit_of_turn` or `retry_of_turn` and replace the later turns in the view.
-13. **Interface language.** An EN/VI switch over `lib/i18n` dictionaries, kept in local storage; number and date formats follow it. Content never changes language: every message, answer and pack text carries its own `lang` attribute. A test switches the language on a rendered answer and asserts the summary text is unchanged while labels change.
+9. **Visual system.** Built in Phase 6B; this phase only wires it (see Web wiring).
+10. **Chat shell.** Built in Phase 6B; this phase only wires it (see Web wiring).
+11. **Answer anatomy and states.** Built in Phase 6B; this phase only wires it (see Web wiring).
+12. **Message actions.** Built in Phase 6B; this phase only wires it (see Web wiring).
+13. **Interface language.** Built in Phase 6B; this phase only wires it (see Web wiring).
 
 ## Contracts
 
@@ -90,6 +92,15 @@ Plus a manual browser check of the acceptance question, recorded with screenshot
 2. **OIDC library.** Default: Auth.js with the Keycloak provider; alternative: a smaller OIDC client. Decide by compatibility with the pinned Next.js version.
 3. **Frontend test runner.** Default: Vitest with Testing Library; end-to-end browser tests are optional for this lab.
 4. **Bar orientation in ChartSpec.** DECISIONS §7 has no orientation field. Default: add optional `orientation` to the ChartSpec contract in DECISIONS §7, with the owner's approval, in this phase's first PR, which also updates the Pydantic `ChartSpec` model and regenerates the TypeScript types with the Phase 7 generator.
+
+## Web wiring
+
+The Phase 6B web app runs every feature on the active pack's sample data until its backend exists ([phase-06b](phase-06b-web-app-on-sample-data.md)). `apps/web/lib/api/client.ts` defines each feature's methods, `lib/api/mock/` holds the sample implementation, `lib/api/http/` the real one, and `lib/api/sources.ts` chooses between them. This phase wires:
+
+| Feature | Mock to retire | Real endpoint | Contract | Done when |
+|---|---|---|---|---|
+| `chat` | the `chart_spec` events of the sample scenarios | `chart_spec` from `chart_recommender` (task 1) in the `/ask` stream | generated ChartSpec type | `sources.chat` is `http`, its Sample data badge is gone, the http client test passes and its provisional types are deleted |
+| `feedback` | `mock` feedback that only updates the view | `POST /feedback` (task 8) through a server route | `FitcherApi.feedback` | `sources.feedback` is `http`, its Sample data badge is gone, the http client test passes and its provisional types are deleted |
 
 ## Branch and PR split
 

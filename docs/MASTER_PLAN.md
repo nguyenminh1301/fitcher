@@ -15,6 +15,7 @@ Phases are ordered to reach **one end-to-end flow as early as possible**. Each p
 | 4 | [Eval harness](plans/phase-04-eval-harness.md) |
 | 5 | [Logging and tracing](plans/phase-05-logging-and-tracing.md) |
 | 6 | [RBAC and auth](plans/phase-06-rbac-and-auth.md) |
+| 6B | [Web app on sample data](plans/phase-06b-web-app-on-sample-data.md) |
 | 7 | [API and streaming](plans/phase-07-api-and-streaming.md) |
 | 8 | [Conversation](plans/phase-08-conversation.md) |
 | 9 | [Chat and chart frontend](plans/phase-09-chat-and-charts-frontend.md) |
@@ -131,13 +132,29 @@ Phases are ordered to reach **one end-to-end flow as early as possible**. Each p
   - SQL that deliberately exceeds permissions is blocked by ClickHouse, even with the guard disabled
   - The eval set gains deny questions
 
+## Phase 6B: Web app on sample data
+
+- **Goal:** every screen of the Fitcher web app design, usable before the api phases: each feature runs on the active pack's sample data until its backend phase wires it.
+- **Deliverables:**
+  - The design's visual system and shared components, light and dark themes, English/Vietnamese interface switch
+  - Chat app: conversation sidebar with search and groups, streamed answers with steps, summary, warnings, chart, table, SQL, notices, clarify options and message actions
+  - ChartSpec -> ECharts adapter, local chart type switching, PNG and CSV export
+  - Workspace console with role-based navigation and every section
+  - Typed api client with a sample and a real implementation per feature; TypeScript types generated from QuerySpec and Result
+  - Pack-owned sample data with its schemas; the pack isolation check covers `apps/web`
+- **DoD:**
+  - Every screen of the design opens and works on sample data, in both languages and themes, at desktop and phone widths
+  - Every feature on sample data shows the Sample data badge
+  - No pack name appears in `apps/web`
+
 ## Phase 7: API and streaming
 
 - **Goal:** expose the agent through the API.
 - **Deliverables:**
   - FastAPI: JWT verification, role mapping, trace_id creation, in-process rate limiting
   - SSE endpoint `/ask`, following the event order in DECISIONS §6
-  - Pydantic schemas for QuerySpec, Result and ChartSpec; TypeScript types generated from them
+  - Pydantic schemas for ChartSpec and the stream events; TypeScript types generated from them (QuerySpec and Result since Phase 6B)
+  - Web wiring: Keycloak sign-in and the chat stream move from sample data to the api
 - **DoD:**
   - Calling with curl and a JWT returns the full event sequence
   - Invalid JWT -> 401
@@ -153,6 +170,7 @@ Phases are ordered to reach **one end-to-end flow as early as possible**. Each p
   - `metadata_qa` branch using glossary + `kb_docs`
   - `chart_edit` branch reusing the previous result
   - Conversation endpoints: list, search, pin, rename, personal groups, delete; edit and retry of a turn (DECISIONS §15)
+  - Web wiring: the conversation sidebar and edit/retry move from sample data to the api
 - **DoD:**
   - "What about last year?" uses the previous turn's QuerySpec
   - "Draw it as a line" generates no SQL
@@ -162,21 +180,11 @@ Phases are ordered to reach **one end-to-end flow as early as possible**. Each p
 
 ## Phase 9: Chat and chart frontend
 
-- **Goal:** the end-user interface: the Chat app of the Fitcher web app design (DECISIONS §15).
+- **Goal:** real charts and feedback behind the Chat app built in Phase 6B (DECISIONS §15).
 - **Deliverables:**
-  - The design's visual system and shared components, light and dark themes
-  - Next.js: OIDC login, conversation sidebar with search and groups, SSE chat, per-step status display
-  - Message actions: copy, like/dislike, retry, edit
-  - English/Vietnamese interface switch that never changes content
-  - Data table (TanStack)
-  - SQL view
-  - Warning display
-  - Clarify shown as buttons
-  - Chart rules on the backend
-  - ChartSpec -> ECharts adapter
-  - Chart type switcher (invalid types disabled)
-  - PNG and CSV export
-  - Like/dislike buttons writing to `feedback`
+  - Chart rules on the backend (`chart_recommender`) feeding `chart_spec` events
+  - `POST /feedback` writing likes and dislikes to `feedback`
+  - Web wiring: real ChartSpec and feedback move from sample data to the api
 - **DoD:**
   - The acceptance question shows a grouped bar
   - Switching between bar / table / line makes no API call
@@ -189,10 +197,9 @@ Phases are ordered to reach **one end-to-end flow as early as possible**. Each p
 - **Deliverables:**
   - `profile.py`
   - `ingest_docs.py`: parse, chunk, load into `kb_docs`
-  - Documents page in web: upload PDF/DOCX/MD/TXT/XLSX, list and delete company documents at runtime, each with its `allowed_roles`
+  - Documents API behind the Phase 6B Documents page: upload PDF/DOCX/MD/TXT/XLSX, list and delete company documents at runtime, each with its `allowed_roles`
   - `draft_pack.py`: drafts with `evidence` and `confidence`
-  - Workspace console shell with role-based navigation, and a read-only Datasets page
-  - Review UI in web: approve / edit / delete each item, test-run metrics, write approved YAML
+  - `GET /datasets` and the Review API behind the Phase 6B Datasets and Review pages: approve / edit / delete each item, test-run metrics, write approved YAML
   - Compile the pack after review
 - **DoD:**
   - After deleting the descriptions from the hand-written pack, letting the drafter regenerate them and reviewing them, the eval score is not significantly lower than the hand-written pack's
@@ -205,14 +212,14 @@ Phases are ordered to reach **one end-to-end flow as early as possible**. Each p
   - Onboard the second dataset (Iowa Liquor Sales or Maycee) using only the Phase 10 pipeline
   - A dedicated `eval.yaml` for this pack
 - **DoD:**
-  - The new pack runs with **0 changed lines** in `apps/api` and `apps/web`
+  - The new pack runs with **0 changed lines** in `apps/api` and `apps/web`, the web app included, on its own sample data
   - It reaches the configured eval threshold
 
 ## Phase 12: Admin, audit and feedback loop
 
 - **Goal:** observe the system and improve it over time.
 - **Deliverables:**
-  - Admin UI:
+  - Admin API behind the Phase 6B console sections:
     - run list by user / date / status
     - trace detail view
     - denied audit view
