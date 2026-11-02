@@ -1,5 +1,7 @@
 # Seed cases, one per required category (DECISIONS §12); the eval phase grows
 # the set. active_from_phase marks cases whose branch a later phase builds.
+# reference_date is "today" for every case, inside the data's 2022-2026 range.
+reference_date: "2026-01-15"
 cases:
   - id: top_products_q1_2024_vs_q1_2025
     question: Top 10 sản phẩm bán chạy nhất quý 1 năm 2024 so với quý 1 năm 2025

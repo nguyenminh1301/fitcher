@@ -4,6 +4,10 @@
 
 ### Added
 
+- Reject an eval case whose `expected_rows` do not all name the same columns as the first row.
+- Score an eval case per layer from the final graph state: extraction matches the resolved periods, `top_n` and `rank_by` exactly, retrieval reports the recall of the labelled dataset and columns among the retrieved hits, execution compares the answer with the reference result, intent waits for the router, and cases of unbuilt branches are reported as not yet scored.
+- Compare an eval answer with its reference result by column values: key and measure columns match whatever their names or positions, extra answer columns are allowed, rows align by key and keep their order only for ranked cases, and numbers match within a relative tolerance of 1e-6 and an absolute one of 1e-9.
+- Let eval cases give their reference result as inline `expected_rows` instead of `expected_sql` (never both), and the eval set a fixed `reference_date`; `app.eval.cases` loads the approved cases, reports cases for unbuilt branches as inactive and rejects an active case that is not an answered `data_query` with a reference result.
 - Add the Fitcher finch mascot in `docs/brand/mascot/`: a geometric bird with a left-leaning chest point, in black and white SVG and 1024 px PNG, listed in the brand guide as an illustration rather than a logo.
 - Add the Fitcher brand kit in `docs/brand/`: a symbol of table cells forming an F with an answer dot, a custom outlined wordmark, horizontal and stacked lockups, light and dark GitHub README banners, favicon and app icons, and a usage guide with the black, white and grey palette.
 - Answer `data_query` questions from the command line with `jobs/ask.py`: a LangGraph flow extracts terms and period descriptors through `fast`, resolves periods, retrieves pack context from the six indices, maps terms to metrics, columns and values with the pack's conventions and a coverage check, generates SQL through `sql-gen` with up to three repairs (the third through `sql-gen-hard`), guards and runs it as the read-only user, types the result from the compiled catalog and summarizes the rows in the question's language; questions with no measure or period, or an ambiguous measure, are refused before any SQL is generated.
@@ -43,6 +47,7 @@
 
 ### Changed
 
+- Settle the Phase 4 eval decisions: result sets match columns by value and allow extra columns, a pack needs execution match of at least 80% of active eval cases, eval runs request temperature 0, and a regression is a drop of more than one case per layer over the cases both runs scored.
 - Plan company documents as runtime content: reviewers upload PDF, DOCX, Markdown, text and XLSX files on a Documents page and delete them at any time, with stored originals, a `data_meta.documents` registry, role-scoped `kb_docs` chunks and compiles that carry documents into each index generation.
 - Take the user's time zone from the browser with each request (UTC for clients that send none) and answer in the language of the question, instead of fixing both in the pack's business profile.
 - Limit CodeRabbit to code by excluding agent instructions and documentation from its review, and let PRs that change only those files merge on passing checks without a CodeRabbit review.
@@ -64,6 +69,8 @@
 
 ### Fixed
 
+- Pair eval result rows that share a key by their mapped measure values, so reordered measure columns no longer fail a matching unordered result.
+- Report an eval set whose `reference_date` is not a real calendar date as an eval-set error instead of an unhandled `ValueError`.
 - Reject a key repeated within one mapping of a Domain Pack YAML file instead of silently keeping its last value.
 - Correct the translated SQL retry rule and branch-specific SSE sequences, and make the phase plans define atomic index publication, a no-partial-data refresh requirement, permission revocation, trace completeness, credential-free realms and redaction of feedback proposals.
 - Publish downloads without overwriting concurrent outputs, validate the winning file, and fail safely on filesystems without atomic hard-link support.

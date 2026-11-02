@@ -9,6 +9,8 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict
 
+from app.contracts.query_spec import Scalar
+
 
 class PackModel(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -177,10 +179,12 @@ class EvalCase(Draftable):
     role: str
     expected: EvalExpected
     expected_sql: str | None = None
+    expected_rows: list[dict[str, Scalar | None]] | None = None
     active_from_phase: int | None = None
 
 
 class EvalFile(PackModel):
+    reference_date: str | None = None
     cases: list[EvalCase]
 
 

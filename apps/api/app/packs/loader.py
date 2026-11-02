@@ -236,6 +236,16 @@ def check_references(pack: Pack, catalog: Catalog | None = None) -> list[PackIss
         if refs.dataset("eval.yaml", [*path, "expected", "dataset"], expected.dataset):
             for position, column in enumerate(expected.columns):
                 refs.column("eval.yaml", [*path, "expected", "columns", position], expected.dataset, column)
+        if case.expected_sql is not None and case.expected_rows is not None:
+            refs.add("eval.yaml", [*path, "expected_rows"], "set either expected_sql or expected_rows, not both")
+        if case.expected_rows:
+            columns = set(case.expected_rows[0])
+            for position, row in enumerate(case.expected_rows[1:], start=1):
+                if set(row) != columns:
+                    refs.add(
+                        "eval.yaml", [*path, "expected_rows", position],
+                        f"must name the columns of the first row: {', '.join(sorted(columns))}",
+                    )
 
     if catalog is not None:
         for index, dataset in enumerate(datasets):
