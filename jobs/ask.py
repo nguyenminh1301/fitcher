@@ -5,7 +5,10 @@ run sends billable requests to the LiteLLM aliases. This entry point answers
 ``data_query`` questions only: without the router and clarify branch it exits
 with code 2 and the reason when a question names no measure or period, or its
 measure is ambiguous. A run whose SQL could not be repaired, or that broke a
-policy, exits with code 1 and prints the last SQL and error.
+policy, exits with code 1 and prints the last SQL and error. The run, its
+node events and SQL attempts are written to ClickHouse ``agent_logs`` under
+the printed trace id; a failed log write is reported on stderr and never
+changes the answer or exit code.
 
 ``--inject-sql-fault`` corrupts the first generated query with a call to an
 unknown function, so a live run shows the repair loop at work.
@@ -27,6 +30,7 @@ from app.config import SettingsError, load_settings
 from app.data.clickhouse import ClickHouseRunner, QueryLimits, agent_client
 from app.llm.client import LiteLLMClient
 from app.llm.embeddings import LiteLLMEmbeddings
+from app.observability.log_writer import start_log_writer
 from app.packs.compiler import CompileError, load_compiled
 from app.search.opensearch import OpenSearch
 
@@ -132,11 +136,16 @@ def main(argv: list[str] | None = None) -> int:
             runner=ClickHouseRunner(agent_client(), QueryLimits.from_env()),
             compiled=compiled,
             today=args.reference_date or reference_date(args.timezone),
+            logs=start_log_writer(settings),
+            user_id="cli",
         )
     except (SettingsError, CompileError, TimeResolutionError, RuntimeError) as error:
         print(error, file=sys.stderr)
         return 1
-    return report(run_question(args.question, deps))
+    try:
+        return report(run_question(args.question, deps))
+    finally:
+        deps.logs.close()
 
 
 if __name__ == "__main__":

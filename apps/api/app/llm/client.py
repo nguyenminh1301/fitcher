@@ -3,7 +3,8 @@
 Engine code names an alias, never a model: LiteLLM maps ``fast``, ``sql-gen``
 and ``sql-gen-hard`` to models from its configuration. ``structured`` asks for
 JSON matching a Pydantic model and validates the reply; ``text`` returns plain
-text. Unit tests use a fake client, so no test sends a billable request.
+text. Inside a traced run each request carries the run's ``trace_id`` and node
+as LiteLLM metadata, which the proxy callback writes to ``llm_calls``. Unit tests use a fake client, so no test sends a billable request.
 """
 
 import json
@@ -11,6 +12,8 @@ from typing import Protocol, TypeVar
 
 import httpx
 from pydantic import BaseModel, ValidationError
+
+from app.observability.tracing import llm_metadata
 
 CHAT_ALIASES = frozenset({"fast", "sql-gen", "sql-gen-hard"})
 TIMEOUT_SECONDS = 120
@@ -73,6 +76,8 @@ class LiteLLMClient:
             payload["response_format"] = response_format
         if self._temperature is not None:
             payload["temperature"] = self._temperature
+        if metadata := llm_metadata():
+            payload["metadata"] = metadata
         try:
             response = self._http.post(self._url, json=payload, headers=self._headers)
         except httpx.HTTPError as error:

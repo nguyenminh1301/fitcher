@@ -111,12 +111,12 @@ def _run_case(case: EvalCase, deps: AgentDeps, timeout: float, reference_errors:
         reference_error = str(error).removeprefix(f"{case.id}: ")
         reference_errors.append(str(error))
     try:
-        state = call_with_timeout(lambda: run_question(case.question, deps, trace_id=f"eval-{case.id}"), timeout)
+        state = call_with_timeout(lambda: run_question(case.question, deps), timeout)
     except CaseTimeout as error:
         return _failed(case, reference, str(error))
     except Exception as error:  # noqa: BLE001 - one failing case never aborts the run
         return _failed(case, reference, f"{type(error).__name__}: {error}")
-    score = score_case(case, state, reference, active=True)
+    score = score_case(case, state, reference, active=True).model_copy(update={"trace_id": state["trace_id"]})
     if reference_error is not None:
         layers = {**score.layers, "execution": LayerScore(status="fail", reason=f"reference: {reference_error}")}
         score = score.model_copy(update={"layers": layers})

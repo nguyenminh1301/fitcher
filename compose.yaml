@@ -112,10 +112,15 @@ services:
     environment:
       LITELLM_BASE_URL: http://litellm:4000
       LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY:?set LITELLM_MASTER_KEY in .env}
-      # The api only ever connects as the read-only agent user.
+      # Agent queries run as the read-only agent user; run logs are written
+      # as the insert-only agent_logs_writer.
       CLICKHOUSE_HOST: clickhouse
       CLICKHOUSE_AGENT_USER: agent_readonly
       CLICKHOUSE_AGENT_PASSWORD: ${CLICKHOUSE_AGENT_PASSWORD:?set CLICKHOUSE_AGENT_PASSWORD in .env}
+      CLICKHOUSE_LOGS_WRITER_PASSWORD: ${CLICKHOUSE_LOGS_WRITER_PASSWORD:?set CLICKHOUSE_LOGS_WRITER_PASSWORD in .env}
+      LOG_BATCH_SIZE: ${LOG_BATCH_SIZE:-100}
+      LOG_FLUSH_INTERVAL_MS: ${LOG_FLUSH_INTERVAL_MS:-1000}
+      LOG_QUEUE_MAX: ${LOG_QUEUE_MAX:-10000}
       QUERY_MAX_EXECUTION_TIME: ${QUERY_MAX_EXECUTION_TIME:-30}
       QUERY_MAX_RESULT_ROWS: ${QUERY_MAX_RESULT_ROWS:-10000}
       QUERY_MAX_MEMORY_USAGE: ${QUERY_MAX_MEMORY_USAGE:-2000000000}

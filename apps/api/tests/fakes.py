@@ -155,3 +155,32 @@ class FakeRunner:
         if isinstance(outcome, Exception):
             raise outcome
         return outcome
+
+
+class FakeLogWriter:
+    """Collects agent log records; ``write_results`` scripts each ``write_now`` outcome and ``lost`` each flush's losses."""
+
+    def __init__(self, write_results: Sequence[bool] = (), lost: int = 0):
+        self.written: list = []
+        self.queued: list = []
+        self.flushed: list[str] = []
+        self.write_results = list(write_results)
+        self.lost = lost
+
+    def write_now(self, record) -> bool:
+        self.written.append(record)
+        return self.write_results.pop(0) if self.write_results else True
+
+    def enqueue(self, record) -> bool:
+        self.queued.append(record)
+        return True
+
+    def flush_trace(self, trace_id: str, timeout: float = 5.0):
+        from app.observability.log_writer import FlushResult
+
+        self.flushed.append(trace_id)
+        count = sum(1 for record in self.queued if getattr(record, "trace_id", "") == trace_id)
+        return FlushResult(written=count - self.lost, lost=self.lost)
+
+    def runs(self) -> list:
+        return [record for record in self.written if record.TABLE == "runs"]

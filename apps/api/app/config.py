@@ -22,6 +22,10 @@ class Settings:
     embedding_dimensions: int
     column_values_top_k: int
     compiled_pack_dir: str
+    # agent_logs writer: records per batch, flush interval and queue bound.
+    log_batch_size: int
+    log_flush_interval_ms: int
+    log_queue_max: int
 
 
 def _positive_int(env: Mapping[str, str], name: str, default: int) -> int:
@@ -45,4 +49,7 @@ def load_settings(env: Mapping[str, str] | None = None) -> Settings:
         embedding_dimensions=_positive_int(env, "EMBEDDING_DIMENSIONS", 1024),
         column_values_top_k=_positive_int(env, "COLUMN_VALUES_TOP_K", 10_000),
         compiled_pack_dir=env.get("COMPILED_PACK_DIR", "build/packs"),
+        log_batch_size=_positive_int(env, "LOG_BATCH_SIZE", 100),
+        log_flush_interval_ms=_positive_int(env, "LOG_FLUSH_INTERVAL_MS", 1000),
+        log_queue_max=_positive_int(env, "LOG_QUEUE_MAX", 10_000),
     )

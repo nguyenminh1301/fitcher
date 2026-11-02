@@ -9,6 +9,7 @@ dependencies = [
     "httpx==0.28.1",
     "jsonschema==4.26.0",
     "langgraph==1.2.16",
+    "opentelemetry-sdk==1.45.1",
     "pydantic==2.14.1",
     "pyyaml==6.0.3",
     "sqlglot==30.23.0",

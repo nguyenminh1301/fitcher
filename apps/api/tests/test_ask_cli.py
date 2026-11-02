@@ -8,13 +8,13 @@ from jobs.ask import FaultInjectingLLM, format_table, inject_fault, report
 
 
 def test_successful_run_prints_sql_table_warnings_and_summary(capsys):
-    state = run_question("Top widgets", deps([extraction_reply(), GOOD_SQL, "Blue led."]), trace_id="trace-7")
+    state = run_question("Top widgets", deps([extraction_reply(), GOOD_SQL, "Blue led."]))
 
     code = report(state)
 
     out = capsys.readouterr().out
     assert code == 0
-    assert "Trace: trace-7" in out
+    assert f"Trace: {state['trace_id']}" in out
     assert "SQL attempt 1 (sql-gen):\nSELECT widget_name" in out
     assert "Result (2 rows):" in out
     assert "Widget 0" in out and "10.5" in out
