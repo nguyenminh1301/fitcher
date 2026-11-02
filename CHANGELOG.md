@@ -52,6 +52,7 @@
 
 ### Changed
 
+- Raise the `ecommerce_twin` eval baseline to 20 of 22 execution matches (91%, above the 80% pack threshold) after the ranking and extraction fixes, with the remaining failures listed in `docs/eval/ecommerce_twin-baseline.md`.
 - Let the LLM client send a fixed `temperature` with every call, and have the LiteLLM proxy drop request parameters a model rejects (`drop_params`), so eval runs can ask for temperature 0 on any model.
 - Settle the Phase 4 eval decisions: result sets match columns by value and allow extra columns, a pack needs execution match of at least 80% of active eval cases, eval runs request temperature 0, and a regression is a drop of more than one case per layer over the cases both runs scored.
 - Plan company documents as runtime content: reviewers upload PDF, DOCX, Markdown, text and XLSX files on a Documents page and delete them at any time, with stored originals, a `data_meta.documents` registry, role-scoped `kb_docs` chunks and compiles that carry documents into each index generation.

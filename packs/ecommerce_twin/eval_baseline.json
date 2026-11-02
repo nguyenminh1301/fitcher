@@ -31,7 +31,7 @@
         }
       },
       "error": null,
-      "seconds": 8.374
+      "seconds": 8.643
     },
     {
       "case_id": "top_brands_by_units_2025",
@@ -45,8 +45,8 @@
           "recall": null
         },
         "extraction": {
-          "status": "fail",
-          "reason": "rank_by: expected units_sold, got None",
+          "status": "pass",
+          "reason": null,
           "recall": null
         },
         "retrieval": {
@@ -55,13 +55,13 @@
           "recall": 1.0
         },
         "execution": {
-          "status": "fail",
-          "reason": "rejected: 'Top' does not say which measure to rank by",
+          "status": "pass",
+          "reason": null,
           "recall": null
         }
       },
       "error": null,
-      "seconds": 2.229
+      "seconds": 5.163
     },
     {
       "case_id": "electronics_net_sales_west_2024",
@@ -91,7 +91,7 @@
         }
       },
       "error": null,
-      "seconds": 5.291
+      "seconds": 5.736
     },
     {
       "case_id": "monthly_conversion_rate_2025",
@@ -121,7 +121,7 @@
         }
       },
       "error": null,
-      "seconds": 4.637
+      "seconds": 4.427
     },
     {
       "case_id": "best_product_without_measure",
@@ -241,7 +241,7 @@
         }
       },
       "error": null,
-      "seconds": 6.243
+      "seconds": 6.943
     },
     {
       "case_id": "orders_q4_2025_vs_q4_2024",
@@ -265,13 +265,13 @@
           "recall": 1.0
         },
         "execution": {
-          "status": "fail",
-          "reason": "expected 1 rows, got 2",
+          "status": "pass",
+          "reason": null,
           "recall": null
         }
       },
       "error": null,
-      "seconds": 6.216
+      "seconds": 5.944
     },
     {
       "case_id": "conversion_rate_by_device_dec_2025_vs_dec_2024",
@@ -301,7 +301,7 @@
         }
       },
       "error": null,
-      "seconds": 10.579
+      "seconds": 10.272
     },
     {
       "case_id": "refunds_last_quarter_vs_same_quarter_last_year",
@@ -331,7 +331,7 @@
         }
       },
       "error": null,
-      "seconds": 5.353
+      "seconds": 5.821
     },
     {
       "case_id": "top_categories_by_net_sales_2025",
@@ -345,8 +345,8 @@
           "recall": null
         },
         "extraction": {
-          "status": "fail",
-          "reason": "rank_by: expected net_sales, got None",
+          "status": "pass",
+          "reason": null,
           "recall": null
         },
         "retrieval": {
@@ -355,13 +355,13 @@
           "recall": 1.0
         },
         "execution": {
-          "status": "fail",
-          "reason": "rejected: 'cao nhất' does not say which measure to rank by",
+          "status": "pass",
+          "reason": null,
           "recall": null
         }
       },
       "error": null,
-      "seconds": 1.848
+      "seconds": 5.679
     },
     {
       "case_id": "top_subcategories_by_units_last_month",
@@ -375,8 +375,8 @@
           "recall": null
         },
         "extraction": {
-          "status": "fail",
-          "reason": "rank_by: expected units_sold, got None",
+          "status": "pass",
+          "reason": null,
           "recall": null
         },
         "retrieval": {
@@ -385,13 +385,13 @@
           "recall": 1.0
         },
         "execution": {
-          "status": "fail",
-          "reason": "rejected: 'Top' does not say which measure to rank by",
+          "status": "pass",
+          "reason": null,
           "recall": null
         }
       },
       "error": null,
-      "seconds": 1.807
+      "seconds": 4.869
     },
     {
       "case_id": "top_channels_by_sessions_2025",
@@ -405,8 +405,8 @@
           "recall": null
         },
         "extraction": {
-          "status": "fail",
-          "reason": "rank_by: expected session_count, got None",
+          "status": "pass",
+          "reason": null,
           "recall": null
         },
         "retrieval": {
@@ -415,13 +415,13 @@
           "recall": 1.0
         },
         "execution": {
-          "status": "fail",
-          "reason": "rejected: 'Top' does not say which measure to rank by",
+          "status": "pass",
+          "reason": null,
           "recall": null
         }
       },
       "error": null,
-      "seconds": 1.925
+      "seconds": 4.083
     },
     {
       "case_id": "top_return_reasons_by_refunds_2025",
@@ -435,8 +435,8 @@
           "recall": null
         },
         "extraction": {
-          "status": "fail",
-          "reason": "rank_by: expected refund_total, got None",
+          "status": "pass",
+          "reason": null,
           "recall": null
         },
         "retrieval": {
@@ -445,13 +445,13 @@
           "recall": 1.0
         },
         "execution": {
-          "status": "fail",
-          "reason": "rejected: 'Top' does not say which measure to rank by",
+          "status": "pass",
+          "reason": null,
           "recall": null
         }
       },
       "error": null,
-      "seconds": 1.878
+      "seconds": 4.884
     },
     {
       "case_id": "top_customers_by_net_sales_q2_2025",
@@ -465,8 +465,8 @@
           "recall": null
         },
         "extraction": {
-          "status": "fail",
-          "reason": "rank_by: expected net_sales, got None",
+          "status": "pass",
+          "reason": null,
           "recall": null
         },
         "retrieval": {
@@ -476,12 +476,12 @@
         },
         "execution": {
           "status": "fail",
-          "reason": "rejected: 'Top' does not say which measure to rank by",
+          "reason": "expected 10 rows, got 4",
           "recall": null
         }
       },
       "error": null,
-      "seconds": 2.074
+      "seconds": 4.704
     },
     {
       "case_id": "vip_net_sales_2025",
@@ -505,13 +505,13 @@
           "recall": 1.0
         },
         "execution": {
-          "status": "fail",
-          "reason": "expected 1 rows, got 4",
+          "status": "pass",
+          "reason": null,
           "recall": null
         }
       },
       "error": null,
-      "seconds": 4.831
+      "seconds": 5.168
     },
     {
       "case_id": "paypal_orders_q3_2025",
@@ -541,7 +541,7 @@
         }
       },
       "error": null,
-      "seconds": 4.798
+      "seconds": 4.677
     },
     {
       "case_id": "mobile_sessions_last_month",
@@ -565,13 +565,13 @@
           "recall": 1.0
         },
         "execution": {
-          "status": "fail",
-          "reason": "expected 1 rows, got 3",
+          "status": "pass",
+          "reason": null,
           "recall": null
         }
       },
       "error": null,
-      "seconds": 4.59
+      "seconds": 4.225
     },
     {
       "case_id": "defective_returns_2025",
@@ -601,7 +601,7 @@
         }
       },
       "error": null,
-      "seconds": 4.419
+      "seconds": 4.502
     },
     {
       "case_id": "apparel_average_order_value_northeast_2024",
@@ -625,13 +625,13 @@
           "recall": 1.0
         },
         "execution": {
-          "status": "fail",
-          "reason": "expected 1 rows, got 36",
+          "status": "pass",
+          "reason": null,
           "recall": null
         }
       },
       "error": null,
-      "seconds": 5.06
+      "seconds": 4.887
     },
     {
       "case_id": "monthly_orders_2024",
@@ -661,7 +661,7 @@
         }
       },
       "error": null,
-      "seconds": 4.637
+      "seconds": 4.736
     },
     {
       "case_id": "monthly_refunds_2025",
@@ -691,7 +691,7 @@
         }
       },
       "error": null,
-      "seconds": 4.174
+      "seconds": 4.647
     },
     {
       "case_id": "monthly_return_rate_jan_to_jun_2025",
@@ -721,7 +721,7 @@
         }
       },
       "error": null,
-      "seconds": 4.968
+      "seconds": 4.881
     },
     {
       "case_id": "monthly_email_sessions_2025",
@@ -745,13 +745,13 @@
           "recall": 1.0
         },
         "execution": {
-          "status": "fail",
-          "reason": "expected 12 rows, got 60",
+          "status": "pass",
+          "reason": null,
           "recall": null
         }
       },
       "error": null,
-      "seconds": 5.005
+      "seconds": 4.977
     },
     {
       "case_id": "performance_last_quarter_without_measure",
