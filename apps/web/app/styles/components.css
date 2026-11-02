@@ -205,6 +205,8 @@ textarea.fc-input { height: auto; min-height: 80px; padding: var(--base-size-8) 
 .fc-th-btn.fc-mono { font-family: var(--font-mono); font-weight: 500; }
 .fc-table th.fc-r .fc-th-btn { justify-content: flex-end; }
 .fc-th-btn:hover { color: var(--fgColor-default); }
+/* A header that does not sort (console tables) keeps the sort button's spacing. */
+.fc-th-label { display: block; padding: 6px var(--base-size-16); font: 600 12px/20px var(--font-sans); }
 .fc-table td { padding: 8px var(--base-size-16); border-bottom: 1px solid var(--borderColor-muted); vertical-align: top; }
 .fc-table tbody tr:last-child td { border-bottom: 0; }
 .fc-table tbody tr:hover td { background: var(--control-transparent-bgColor-hover); }
