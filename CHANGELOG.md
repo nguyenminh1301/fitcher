@@ -4,6 +4,7 @@
 
 ### Added
 
+- Import the pack's policy roles and the console roles `pack_reviewer` and `admin` into the Keycloak realm, with one lab user per role defined without credentials, verified `@fitcher.test` emails and roles in the `finch-web` access token; `jobs.set_lab_passwords` sets their password from `KEYCLOAK_LAB_USER_PASSWORD` in `.env`.
 - Reject an aggregate-only grant whose metric is not one sum or count, because the agent adds its per-group values up again.
 - Apply each pack's `policies.yaml` to ClickHouse in `compile_pack`: per-role roles with column grants, row policies, aggregate-only views that hide small groups, one login user per role with a password derived from `CLICKHOUSE_AGENT_PASSWORD`, and a shared read-only profile whose limits cannot be raised or set to 0; objects the policies no longer contain are revoked or dropped.
 - Let a policy grant a dataset as aggregates only (grouped columns, listed metrics, a minimum group size) and check each row filter as one boolean condition over the dataset's columns; the `ecommerce_twin` pack gains a row-filtered `northwest_sales` role and an aggregate-only `category_partner` role, and the search indices show an aggregate-only role its grouped columns and metrics but no examples.

@@ -47,6 +47,7 @@ apps/api/tests/integration/test_role_matrix.py
 - `policies.yaml` schema; generated allowlist shape `{role: {dataset: [columns]}}`, where an aggregate-only grant lists its view instead of the table.
 - Aggregate-only grant: `aggregate_only: {metrics: [metric ids of the dataset], min_group_size: k >= 2}` next to `columns`, which become the view's grouping columns; a `row_filter` on such a grant becomes the view's `WHERE`.
 - Managed names (pack-scoped prefixes, discovered and reconciled by prefix): role `fitcher_role__<pack>__<role>`, user `fitcher_agent__<pack>__<role>`, settings profile `fitcher_agent__<pack>`, row policy `fitcher_row__<pack>__<role>` on `marts.<table>`, view `marts.fitcher_agg__<pack>__<role>__<dataset>` with the grouping columns, one column per metric named by its id and `row_count`.
+- Keycloak: realm roles are the active pack's policy roles plus `pack_reviewer` and `admin`; lab users `lab.<name>` with verified `@fitcher.test` emails and no credentials; `jobs/set_lab_passwords.py` sets `KEYCLOAK_LAB_USER_PASSWORD` for all of them; `finch-web` tokens carry `realm_access.roles`.
 - User passwords: HMAC-SHA256 of the user name keyed by `CLICKHOUSE_AGENT_PASSWORD`, sent to ClickHouse only as `sha256_hash`; the api derives the same password to connect, so no per-role secret is configured.
 - Audit row: `trace_id, ts, user_id, role, decision, reason, datasets, columns`.
 
