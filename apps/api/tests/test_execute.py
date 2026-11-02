@@ -6,6 +6,7 @@ import pytest
 
 from app.agent.nodes.execute import execute
 from app.agent.nodes.explain import explain
+from app.config import SettingsError
 from app.data.clickhouse import ClickHouseRunner, QueryLimits, agent_client, classify
 
 LIMITS = QueryLimits(max_execution_time=12, max_result_rows=345, max_memory_usage=678)
@@ -88,7 +89,7 @@ def test_empty_result_reads_its_columns_with_describe():
     assert result.output.columns == ["widget_name", "revenue"]
     assert result.output.types == ["String", "Float64"]
     assert client.calls[1][0] == "DESCRIBE TABLE (\nSELECT widget_name, revenue FROM marts.widget_sales WHERE 0\n)"
-    assert client.calls[1][1]["max_result_rows"] == 0
+    assert client.calls[1][1]["max_result_rows"] == 345
 
 
 def test_explain_prefixes_the_query_and_reports_success_as_none():
@@ -148,6 +149,12 @@ def test_limits_come_from_the_environment_with_defaults():
     assert QueryLimits.from_env({"QUERY_MAX_EXECUTION_TIME": "5", "QUERY_MAX_RESULT_ROWS": "50"}) == QueryLimits(
         5, 50, 2_000_000_000
     )
+
+
+@pytest.mark.parametrize("value", ["0", "-1", "ten"])
+def test_limits_from_the_environment_must_be_positive_integers(value):
+    with pytest.raises(SettingsError, match="QUERY_MAX_RESULT_ROWS"):
+        QueryLimits.from_env({"QUERY_MAX_RESULT_ROWS": value})
 
 
 def test_agent_client_connects_to_the_marts_database(monkeypatch):

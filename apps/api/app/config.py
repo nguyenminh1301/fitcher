@@ -28,7 +28,7 @@ class Settings:
     log_queue_max: int
 
 
-def _positive_int(env: Mapping[str, str], name: str, default: int) -> int:
+def positive_int(env: Mapping[str, str], name: str, default: int) -> int:
     raw = env.get(name) or str(default)
     try:
         value = int(raw)
@@ -46,10 +46,10 @@ def load_settings(env: Mapping[str, str] | None = None) -> Settings:
         opensearch_url=env.get("OPENSEARCH_URL", "http://opensearch:9200").rstrip("/"),
         litellm_base_url=env.get("LITELLM_BASE_URL", "http://litellm:4000").rstrip("/"),
         litellm_master_key=env.get("LITELLM_MASTER_KEY", ""),
-        embedding_dimensions=_positive_int(env, "EMBEDDING_DIMENSIONS", 1024),
-        column_values_top_k=_positive_int(env, "COLUMN_VALUES_TOP_K", 10_000),
+        embedding_dimensions=positive_int(env, "EMBEDDING_DIMENSIONS", 1024),
+        column_values_top_k=positive_int(env, "COLUMN_VALUES_TOP_K", 10_000),
         compiled_pack_dir=env.get("COMPILED_PACK_DIR", "build/packs"),
-        log_batch_size=_positive_int(env, "LOG_BATCH_SIZE", 100),
-        log_flush_interval_ms=_positive_int(env, "LOG_FLUSH_INTERVAL_MS", 1000),
-        log_queue_max=_positive_int(env, "LOG_QUEUE_MAX", 10_000),
+        log_batch_size=positive_int(env, "LOG_BATCH_SIZE", 100),
+        log_flush_interval_ms=positive_int(env, "LOG_FLUSH_INTERVAL_MS", 1000),
+        log_queue_max=positive_int(env, "LOG_QUEUE_MAX", 10_000),
     )

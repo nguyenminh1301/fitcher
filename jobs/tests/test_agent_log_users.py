@@ -59,6 +59,16 @@ def test_reader_limits_cannot_be_changed_by_a_query():
         assert profile.find(f"constraints/{setting}/const") is not None, setting
 
 
+AGENT_LIMITS = ("max_execution_time", "max_result_rows", "max_memory_usage")
+
+
+def test_agent_limits_cannot_be_lifted_with_zero():
+    # 0 means unlimited for these settings, so a maximum alone does not cap them.
+    profile = ElementTree.parse(USERS_DIR / "agent_readonly.xml").getroot().find("profiles/agent_readonly")
+    for setting in AGENT_LIMITS:
+        assert profile.find(f"constraints/{setting}/min").text == "1", setting
+        assert profile.find(f"constraints/{setting}/max") is not None, setting
+
 live = pytest.mark.skipif(os.environ.get("AGENT_LOGS_LIVE_TEST") != "1", reason="needs a running ClickHouse")
 
 
@@ -112,3 +122,12 @@ def test_writer_cannot_select():
 def test_agent_user_cannot_select_agent_logs():
     client = connect("agent_readonly", "CLICKHOUSE_AGENT_PASSWORD")
     assert_denied(client, "SELECT count() FROM agent_logs.runs")
+
+
+@live
+@pytest.mark.parametrize("setting", AGENT_LIMITS)
+def test_agent_query_cannot_lift_its_limits_with_zero(setting):
+    client = connect("agent_readonly", "CLICKHOUSE_AGENT_PASSWORD")
+    client.query("SELECT 1", settings={setting: {"max_memory_usage": 100_000_000}.get(setting, 5)})
+    with pytest.raises(Exception, match="SETTING_CONSTRAINT_VIOLATION"):
+        client.query("SELECT 1", settings={setting: 0})
