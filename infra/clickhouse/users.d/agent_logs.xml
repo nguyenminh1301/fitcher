@@ -1,0 +1,74 @@
+<clickhouse>
+    <!--
+        Users around the agent_logs database (DECISIONS §10). Passwords come
+        from the clickhouse container environment. Users are defined in
+        configuration, so they apply to new and existing volumes on every
+        server start; grants on tables that do not exist yet take effect
+        once jobs.apply_log_schema or initdb creates them.
+
+        agent_logs_writer        api log writer, LiteLLM callback and eval
+                                 reports; insert only, no reads.
+        agent_logs_trace_reader  trace queries: run, node, LLM, SQL, audit
+                                 and eval tables plus system.query_log.
+        agent_logs_review_reader pack_reviewer and admin paths: proposed
+                                 examples, feedback and chat messages.
+
+        The agent's read-only user (agent_readonly.xml) gets no access here.
+    -->
+    <profiles>
+        <agent_logs_reader>
+            <readonly>2</readonly>
+            <max_execution_time>30</max_execution_time>
+            <max_result_rows>100000</max_result_rows>
+            <constraints>
+                <readonly><const/></readonly>
+            </constraints>
+        </agent_logs_reader>
+    </profiles>
+
+    <users>
+        <agent_logs_writer>
+            <password from_env="CLICKHOUSE_LOGS_WRITER_PASSWORD"/>
+            <profile>default</profile>
+            <quota>default</quota>
+            <networks>
+                <ip>::/0</ip>
+            </networks>
+            <grants>
+                <query>GRANT INSERT ON agent_logs.*</query>
+            </grants>
+        </agent_logs_writer>
+
+        <agent_logs_trace_reader>
+            <password from_env="CLICKHOUSE_TRACE_READER_PASSWORD"/>
+            <profile>agent_logs_reader</profile>
+            <quota>default</quota>
+            <networks>
+                <ip>::/0</ip>
+            </networks>
+            <grants>
+                <query>GRANT SELECT ON agent_logs.runs</query>
+                <query>GRANT SELECT ON agent_logs.events</query>
+                <query>GRANT SELECT ON agent_logs.llm_calls</query>
+                <query>GRANT SELECT ON agent_logs.sql_runs</query>
+                <query>GRANT SELECT ON agent_logs.audit</query>
+                <query>GRANT SELECT ON agent_logs.eval_reports</query>
+                <query>GRANT SELECT ON system.query_log</query>
+            </grants>
+        </agent_logs_trace_reader>
+
+        <agent_logs_review_reader>
+            <password from_env="CLICKHOUSE_REVIEW_READER_PASSWORD"/>
+            <profile>agent_logs_reader</profile>
+            <quota>default</quota>
+            <networks>
+                <ip>::/0</ip>
+            </networks>
+            <grants>
+                <query>GRANT SELECT ON agent_logs.example_proposals</query>
+                <query>GRANT SELECT ON agent_logs.feedback</query>
+                <query>GRANT SELECT ON agent_logs.chat_messages</query>
+            </grants>
+        </agent_logs_review_reader>
+    </users>
+</clickhouse>
