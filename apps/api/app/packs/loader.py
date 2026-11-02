@@ -20,6 +20,7 @@ import yaml
 from yaml.constructor import ConstructorError
 
 from app.packs.models import PACK_FILES, Pack
+from app.packs.policy_compiler import ROW_COUNT_COLUMN, check_row_filter
 
 
 @dataclass(frozen=True)
@@ -148,6 +149,28 @@ class _References:
         if column is not None and column not in self.datasets[dataset_id]:
             self.add(file, path, f"unknown column '{column}' in dataset '{dataset_id}'")
 
+    def row_filter(self, path: list[str | int], dataset_id: str, text: str) -> None:
+        problem = check_row_filter(text, self.datasets[dataset_id])
+        if problem is not None and problem.startswith("unknown column"):
+            problem += f" in dataset '{dataset_id}'"
+        if problem is not None:
+            self.add("policies.yaml", path, problem)
+
+    def aggregate_only(self, path: list[str | int], dataset_id: str, columns: list[str], metrics: list[str]) -> None:
+        """Check an aggregate-only grant: its metrics belong to the dataset and its view's column names are unique."""
+        metric_datasets = {metric.id: metric.dataset for metric in self.pack.metrics.metrics}
+        for number, metric_id in enumerate(metrics):
+            if metric_id not in metric_datasets:
+                self.add("policies.yaml", [*path, "metrics", number], f"unknown metric '{metric_id}'")
+            elif metric_datasets[metric_id] != dataset_id:
+                self.add(
+                    "policies.yaml", [*path, "metrics", number],
+                    f"metric '{metric_id}' is computed from dataset '{metric_datasets[metric_id]}', not '{dataset_id}'",
+                )
+        names = [*columns, *metrics, ROW_COUNT_COLUMN]
+        if repeated := sorted({name for name in names if names.count(name) > 1}):
+            self.add("policies.yaml", path, f"the view would have more than one column named {', '.join(repeated)}")
+
     def unique_ids(self, file: str, key: str, items: Iterable[object]) -> None:
         seen: set[str] = set()
         for index, item in enumerate(items):
@@ -218,11 +241,20 @@ def check_references(pack: Pack, catalog: Catalog | None = None) -> list[PackIss
 
     refs.unique_ids("policies.yaml", "roles", pack.policies.roles)
     for index, role in enumerate(pack.policies.roles):
+        granted: set[str] = set()
         for position, grant in enumerate(role.datasets):
             path = ["roles", index, "datasets", position]
-            if refs.dataset("policies.yaml", [*path, "dataset"], grant.dataset):
-                for number, column in enumerate(grant.columns):
-                    refs.column("policies.yaml", [*path, "columns", number], grant.dataset, column)
+            if grant.dataset in granted:
+                refs.add("policies.yaml", [*path, "dataset"], f"dataset '{grant.dataset}' is granted to this role more than once")
+            granted.add(grant.dataset)
+            if not refs.dataset("policies.yaml", [*path, "dataset"], grant.dataset):
+                continue
+            for number, column in enumerate(grant.columns):
+                refs.column("policies.yaml", [*path, "columns", number], grant.dataset, column)
+            if grant.row_filter is not None:
+                refs.row_filter([*path, "row_filter"], grant.dataset, grant.row_filter)
+            if grant.aggregate_only is not None:
+                refs.aggregate_only([*path, "aggregate_only"], grant.dataset, grant.columns, grant.aggregate_only.metrics)
 
     refs.unique_ids("eval.yaml", "cases", pack.eval.cases)
     for index, case in enumerate(pack.eval.cases):

@@ -253,6 +253,35 @@ def test_skip_index_stops_after_the_metric_test_run(pack_dir, tmp_path):
     assert search.indices == {} and embeddings.calls == []
 
 
+def test_policies_are_applied_after_the_metric_test_run(pack_dir, tmp_path):
+    fake = warehouse()
+
+    summary = run(pack_dir, tmp_path, FakeSearch(), warehouse=fake, access=fake, agent_secret="lab-secret", skip_index=True)
+
+    assert summary.roles_applied == ["viewer"]
+    assert fake.commands[0].startswith("CREATE SETTINGS PROFILE OR REPLACE `fitcher_agent__minimal`")
+    last_metric_run = max(index for index, sql in enumerate(fake.log) if sql.endswith("LIMIT 1"))
+    assert fake.log.index(fake.commands[0]) > last_metric_run
+
+
+def test_failing_metric_applies_no_policy(pack_dir, tmp_path):
+    fake = warehouse(failures={"sum(sale_amount)": "Code: 47. Unknown identifier"})
+
+    with pytest.raises(CompileError):
+        run(pack_dir, tmp_path, FakeSearch(), warehouse=fake, access=fake, agent_secret="lab-secret")
+
+    assert fake.commands == []
+
+
+def test_applying_policies_needs_the_agent_password_secret(pack_dir, tmp_path):
+    fake = warehouse()
+
+    with pytest.raises(CompileError, match="CLICKHOUSE_AGENT_PASSWORD"):
+        run(pack_dir, tmp_path, FakeSearch(), warehouse=fake, access=fake, agent_secret="", skip_index=True)
+
+    assert fake.commands == []
+
+
 def test_draft_items_are_not_compiled(pack_dir, edit_pack):
     edit_pack("glossary.yaml", lambda data: data["terms"][1].update(status="draft"))
 

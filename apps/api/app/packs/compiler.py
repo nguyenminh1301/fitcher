@@ -2,8 +2,9 @@
 
 The order is fixed: load and validate the pack against its schemas, its own
 references and the warehouse catalog; keep approved items only; test-run every
-metric; read each dataset's date coverage and the top values of indexable
-columns; write a new generation of the six search indices; move all six
+metric; reconcile the ClickHouse roles, grants, row policies, views and users
+of the pack's policies; read each dataset's date coverage and the top values of
+indexable columns; write a new generation of the six search indices; move all six
 aliases in one request; write ``compiled.json``; and only then delete older
 generations. A failure before the alias move deletes the partial generation
 and leaves the live aliases untouched.
@@ -25,6 +26,7 @@ from app.data.forbidden_functions import forbidden_function
 from app.llm.embeddings import EmbeddingClient
 from app.packs.loader import check_references, load_pack
 from app.packs.models import Pack
+from app.packs.policy_compiler import AccessControl, apply_policies
 from app.packs.search_indices import (
     HYBRID_PIPELINE,
     HYBRID_PIPELINE_BODY,
@@ -102,6 +104,7 @@ class CompileSummary:
     pack: str
     metrics_tested: list[str]
     coverage: dict[str, DateCoverage]
+    roles_applied: list[str] = field(default_factory=list)
     generation: int | None = None
     documents: dict[str, int] = field(default_factory=dict)
     warnings: list[str] = field(default_factory=list)
@@ -307,12 +310,26 @@ def compile_pack(
     output_dir: Path | None = None,
     schema_dir: Path | None = None,
     skip_index: bool = False,
+    access: AccessControl | None = None,
+    agent_secret: str = "",
     clock: Callable[[], datetime] = lambda: datetime.now(UTC),
 ) -> CompileSummary:
-    """Compile ``pack_dir``; with ``skip_index`` stop after the metric test-run."""
+    """Compile ``pack_dir``; with ``skip_index`` stop after the metric test-run and the access policies.
+
+    With ``access``, the admin connection, the pack's policies are applied to
+    ClickHouse; its users' passwords derive from ``agent_secret``.
+    """
     pack = approved_pack(load_pack(pack_dir, schema_dir=schema_dir, catalog=WarehouseCatalog(warehouse)))
+    metrics_tested = test_metrics(pack, warehouse)
+    roles_applied: list[str] = []
+    if access is not None:
+        if not agent_secret:
+            raise CompileError("CLICKHOUSE_AGENT_PASSWORD must be set to apply the access policies")
+        apply_policies(pack, access, agent_secret)
+        roles_applied = [role.id for role in pack.policies.roles]
     summary = CompileSummary(
-        pack=pack.name, metrics_tested=test_metrics(pack, warehouse), coverage=read_coverage(pack, warehouse)
+        pack=pack.name, metrics_tested=metrics_tested, coverage=read_coverage(pack, warehouse),
+        roles_applied=roles_applied,
     )
     if skip_index:
         return summary

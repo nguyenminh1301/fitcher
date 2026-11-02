@@ -71,6 +71,32 @@ def test_documents_carry_the_roles_granted_their_dataset_or_column(pack_dir, edi
     }
 
 
+def test_aggregate_only_role_sees_grouped_columns_and_its_metrics_but_no_examples(pack_dir, edit_pack):
+    edit_pack("policies.yaml", lambda data: data["roles"].append({
+        **data["roles"][0], "id": "summary_reader", "datasets": [{
+            "dataset": "widget_sales", "columns": ["sold_on", "widget_name"],
+            "aggregate_only": {"metrics": ["widget_revenue"], "min_group_size": 5},
+        }],
+    }))
+    edit_pack("datasets.yaml", lambda data: data["datasets"][0]["allowed_roles"].append("summary_reader"))
+    edit_pack("metrics.yaml", lambda data: data["metrics"].append({
+        **data["metrics"][0], "id": "average_sale", "name": "Average sale", "sql_expr": "avg(sale_amount)",
+    }))
+    pack = load_pack(pack_dir, schema_dir=SCHEMA_DIR)
+
+    documents = build_documents(pack, [ColumnValue("widget_sales", "widget_name", "Blue Widget", 3)])
+
+    metrics = {doc["id"]: doc["allowed_roles"] for doc in documents["metrics"]}
+    columns = {doc["id"]: doc["allowed_roles"] for doc in documents["datasets"]}
+    assert metrics["widget_revenue"] == ["summary_reader", "viewer"]
+    assert metrics["average_sale"] == ["viewer"]
+    assert columns["widget_sales"] == ["summary_reader", "viewer"]
+    assert columns["widget_sales.widget_name"] == ["summary_reader", "viewer"]
+    assert columns["widget_sales.sale_amount"] == ["viewer"]
+    assert documents["column_values"][0]["allowed_roles"] == ["summary_reader", "viewer"]
+    assert documents["examples"][0]["allowed_roles"] == ["viewer"]
+
+
 def test_glossary_document_searches_term_and_both_alias_languages(pack_dir):
     pack = load_pack(pack_dir, schema_dir=SCHEMA_DIR)
 

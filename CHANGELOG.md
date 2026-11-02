@@ -4,6 +4,8 @@
 
 ### Added
 
+- Apply each pack's `policies.yaml` to ClickHouse in `compile_pack`: per-role roles with column grants, row policies, aggregate-only views that hide small groups, one login user per role with a password derived from `CLICKHOUSE_AGENT_PASSWORD`, and a shared read-only profile whose limits cannot be raised or set to 0; objects the policies no longer contain are revoked or dropped.
+- Let a policy grant a dataset as aggregates only (grouped columns, listed metrics, a minimum group size) and check each row filter as one boolean condition over the dataset's columns; the `ecommerce_twin` pack gains a row-filtered `northwest_sales` role and an aggregate-only `category_partner` role, and the search indices show an aggregate-only role its grouped columns and metrics but no examples.
 - Read a whole agent run with one query: the `agent_logs.trace_query_log` view exposes `system.query_log` rows by trace id to the trace reader, `infra/clickhouse/queries/trace.sql` lists the run row, node events, LLM calls, SQL attempts and query-log entries of a trace in time order with incomplete runs marked `INCOMPLETE`, LLM calls sent compared with those logged and the start of each query-log entry's SQL, and `docs/tracing.md` explains how to read it.
 - Store every eval run's JSON report in `agent_logs.eval_reports` with its pack, execution match rate and whether that rate met the pack threshold; a failed write is reported on stderr and leaves the exit code unchanged.
 - Record every LiteLLM proxy call in `agent_logs.llm_calls` through a custom callback mounted into the proxy: alias, resolved model, call id, tokens, cost, latency, status and error, tagged with the trace id and graph node the api sends as request metadata.

@@ -13,7 +13,7 @@ from app.search.opensearch import SearchError
 
 
 class FakeWarehouse:
-    """Answers the compiler's queries from a table -> columns mapping.
+    """Answers the compiler's queries from a table -> columns mapping; records access-control commands.
 
     ``coverage`` maps a table to ``(rows, min_date, max_date)``; ``values`` maps
     ``(table, column)`` to ``[(value, count)]``; ``failures`` maps a substring of
@@ -32,14 +32,24 @@ class FakeWarehouse:
         self.values = values or {}
         self.failures = failures or {}
         self.queries: list[tuple[str, dict | None]] = []
+        # Access-control DDL, and every query and command in the order they arrived.
+        self.commands: list[str] = []
+        self.log: list[str] = []
+
+    def command(self, sql: str) -> None:
+        self.commands.append(sql)
+        self.log.append(sql)
 
     def query(self, sql: str, settings: dict | None = None) -> list[tuple]:
         self.queries.append((sql, settings))
+        self.log.append(sql)
         for fragment, message in self.failures.items():
             if fragment in sql:
                 raise RuntimeError(message)
         if "system.columns" in sql:
             return [(table, column) for table, columns in self.tables.items() for column in sorted(columns)]
+        if "FROM system." in sql:
+            return []  # a cluster without managed access objects
         table = re.search(r"FROM `marts`\.`(\w+)`", sql).group(1)
         if sql.startswith("SELECT count(), min("):
             return [self.coverage.get(table, (0, date(1970, 1, 1), date(1970, 1, 1)))]

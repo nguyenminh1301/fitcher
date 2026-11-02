@@ -25,7 +25,17 @@
               "properties": {
                 "dataset": {"$ref": "common.schema.json#/$defs/id"},
                 "columns": {"type": "array", "minItems": 1, "items": {"$ref": "common.schema.json#/$defs/name"}},
-                "row_filter": {"$ref": "common.schema.json#/$defs/text", "description": "Boolean expression over the dataset columns."}
+                "row_filter": {"$ref": "common.schema.json#/$defs/text", "description": "Boolean expression over the dataset columns."},
+                "aggregate_only": {
+                  "description": "The role reads only a view grouped by the listed columns, with these metrics and groups of at least min_group_size rows.",
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["metrics", "min_group_size"],
+                  "properties": {
+                    "metrics": {"type": "array", "minItems": 1, "items": {"$ref": "common.schema.json#/$defs/id"}},
+                    "min_group_size": {"type": "integer", "minimum": 2}
+                  }
+                }
               }
             }
           },

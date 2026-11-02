@@ -32,6 +32,7 @@ def services(monkeypatch, tmp_path):
     )
     monkeypatch.setenv("COMPILED_PACK_DIR", str(tmp_path / "build"))
     monkeypatch.setenv("LITELLM_MASTER_KEY", "sk-test")
+    monkeypatch.setenv("CLICKHOUSE_AGENT_PASSWORD", "lab-secret")
     monkeypatch.setattr(cli, "admin_client", lambda: object())
     monkeypatch.setattr(cli, "ClickHouseWarehouse", lambda client: fake_warehouse)
     monkeypatch.setattr(cli, "OpenSearch", lambda url: search)
@@ -48,6 +49,22 @@ def test_compile_prints_the_live_generation(packs_dir, services, capsys):
     assert "widget_sales: 5 rows, 2024-01-01 to 2024-12-31" in out
     assert "generation v1 is live:" in out
     assert "column_values: 0 documents" in out
+
+
+def test_compile_reconciles_clickhouse_access_for_every_role(packs_dir, services, capsys):
+    code = cli.main(["--pack", "minimal", "--packs-dir", str(packs_dir), "--skip-index"])
+
+    assert code == 0
+    assert "access: 1 role reconciled (viewer)" in capsys.readouterr().out
+
+
+def test_missing_agent_password_secret_fails_before_touching_access(packs_dir, services, capsys, monkeypatch):
+    monkeypatch.delenv("CLICKHOUSE_AGENT_PASSWORD")
+
+    code = cli.main(["--pack", "minimal", "--packs-dir", str(packs_dir), "--skip-index"])
+
+    assert code == 1
+    assert "CLICKHOUSE_AGENT_PASSWORD" in capsys.readouterr().err
 
 
 def test_skip_index_touches_no_search_index(packs_dir, services, capsys):

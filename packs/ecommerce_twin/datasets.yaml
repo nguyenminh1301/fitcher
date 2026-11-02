@@ -6,7 +6,7 @@ datasets:
       source has no discounts and no order times.
     grain: one row per order line
     time_column: order_date
-    allowed_roles: [analyst]
+    allowed_roles: [analyst, northwest_sales, category_partner]
     status: approved
     evidence: &marts [{kind: manual, ref: dbt/models/ecommerce_twin/marts/schema.yml}]
     confidence: 1.0
@@ -35,7 +35,7 @@ datasets:
     description: Returned order lines with the attributes of the original sale.
     grain: one row per return
     time_column: return_date
-    allowed_roles: [analyst]
+    allowed_roles: [analyst, northwest_sales]
     status: approved
     evidence: *marts
     confidence: 1.0
