@@ -6,7 +6,8 @@ reading data, so a broken query is sent back for repair cheaply.
 
 from typing import Protocol
 
-from app.agent.errors import AgentError
+from app.agent.audit import audit
+from app.agent.errors import ACCESS_DENIED, AgentError
 from app.data.clickhouse import QueryError
 from app.agent.state import AgentDeps, AgentState, record_error
 
@@ -22,10 +23,14 @@ def explain(runner: Explainer, sql: str, trace_id: str) -> AgentError | None:
     try:
         runner.explain(sql, trace_id)
     except QueryError as error:
-        return AgentError(error.category, NODE, error.message)
+        return AgentError(error.category, NODE, error.message, error.code)
     return None
 
 
 def explain_node(state: AgentState, deps: AgentDeps) -> dict:
     error = explain(deps.runner, state["sql"], state["trace_id"])
-    return record_error(state, error) if error is not None else {}
+    if error is None:
+        return {}
+    if error.code == ACCESS_DENIED:
+        audit(state, deps, "DENY", state["spec"].dataset, [], f"clickhouse: {error.message}")
+    return record_error(state, error)

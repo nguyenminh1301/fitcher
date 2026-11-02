@@ -4,7 +4,8 @@ Run with ``docker compose run --rm api python -m jobs.ask "<question>"``. Each
 run sends billable requests to the LiteLLM aliases. This entry point answers
 ``data_query`` questions only: without the router and clarify branch it exits
 with code 2 and the reason when a question names no measure or period, or its
-measure is ambiguous. A run whose SQL could not be repaired, or that broke a
+measure is ambiguous. A question the role may not read exits with code 3 and
+the denial, before any SQL is generated. A run whose SQL could not be repaired, or that broke a
 policy, exits with code 1 and prints the last SQL and error. The run, its
 node events and SQL attempts are written to ClickHouse ``agent_logs`` under
 the printed trace id; a failed log write is reported on stderr and never
@@ -117,6 +118,9 @@ def report(state: AgentState) -> int:
     if state.get("rejection"):
         print(f"Rejected: {state['rejection']}", file=sys.stderr)
         return 2
+    if state.get("denial"):
+        print(f"Denied: {state['denial'].message}", file=sys.stderr)
+        return 3
     for number, attempt in enumerate(state.get("attempts", []), start=1):
         print(f"\nSQL attempt {number} ({attempt.alias}):\n{attempt.sql}")
         if attempt.error is not None:

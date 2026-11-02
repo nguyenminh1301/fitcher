@@ -2,8 +2,9 @@
 
 Only approved cases run. A case whose branch (router, clarify, deny) a later
 delivery phase builds carries ``active_from_phase`` and is reported as not
-yet scored; every active case must be an answered ``data_query`` with a
-reference result, either ``expected_sql`` or ``expected_rows``.
+yet scored. Every active case is a ``data_query``: one that expects an answer
+needs a reference result, either ``expected_sql`` or ``expected_rows``; one
+that expects a denial needs none.
 """
 
 from collections.abc import Sequence
@@ -14,7 +15,7 @@ from app.packs.models import EvalCase, Pack
 
 # The delivery phase the engine has reached; later phases raise it when they
 # build the router, deny or clarify branches their cases need.
-ENGINE_PHASE = 4
+ENGINE_PHASE = 6
 
 
 class EvalSetError(ValueError):
@@ -38,6 +39,8 @@ def ranks(case: EvalCase) -> bool:
 
 def _check_active(case: EvalCase) -> None:
     expected = case.expected
+    if expected.intent == "data_query" and expected.outcome == "deny":
+        return
     if expected.intent != "data_query" or expected.outcome != "answer":
         raise EvalSetError(
             f"case {case.id} expects {expected.intent}/{expected.outcome}, which this engine cannot answer yet; "

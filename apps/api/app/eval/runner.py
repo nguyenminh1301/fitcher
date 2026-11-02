@@ -109,7 +109,9 @@ def _failed(case: EvalCase, reference: Result | None, error: str) -> CaseScore:
 def _run_case(case: EvalCase, deps: AgentDeps, timeout: float, reference_errors: list[str]) -> CaseScore:
     reference, reference_error = None, None
     try:
-        reference = reference_result(case, deps)
+        # A case that expects a denial has no reference result to compare.
+        if case.expected.outcome == "answer":
+            reference = reference_result(case, deps)
     except ReferenceQueryError as error:
         reference_error = str(error).removeprefix(f"{case.id}: ")
         reference_errors.append(str(error))

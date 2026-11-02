@@ -78,7 +78,7 @@ docker compose run --rm api python -m jobs.ask "Top 10 best-selling products in 
 
 The agent extracts the question, resolves its periods, retrieves pack context, builds a QuerySpec, generates SQL through `sql-gen`, guards it, runs `EXPLAIN` and the query as the asking role's read-only ClickHouse user (`--role`, the pack's first role by default), repairs failing SQL up to three times (the third through `sql-gen-hard`) and summarizes the rows in the question's language.
 Each run sends billable requests to the LiteLLM aliases. Pass `--timezone <IANA name>` for relative periods (UTC by default) and `--inject-sql-fault` to watch a broken first query being repaired.
-Without the router and clarify branch of later phases, a question that names no measure or period, or whose measure is ambiguous, exits with code 2 and the reason; a query that cannot be repaired exits with code 1 after printing the last SQL and error.
+Without the router and clarify branch of later phases, a question that names no measure or period, or whose measure is ambiguous, exits with code 2 and the reason; a question the role may not read exits with code 3 and the denial, before any SQL is generated, and is written to `agent_logs.audit`; a query that cannot be repaired exits with code 1 after printing the last SQL and error.
 
 ### Score a pack's eval set
 

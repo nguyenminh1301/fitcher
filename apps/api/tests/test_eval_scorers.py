@@ -7,6 +7,7 @@ from app.agent.graph import run_question
 from app.agent.nodes.retrieve import Hit, Retrieval
 from app.agent.state import Attempt
 from app.contracts.result import ColumnInfo, Result
+from app.agent.nodes.gate import Denial
 from app.eval.scorers import (
     LAYERS, retrieved_candidates, score_case, score_execution, score_extraction, score_retrieval,
 )
@@ -168,3 +169,26 @@ def test_inactive_case_is_not_scored_on_any_layer():
 
     assert {layer.status for layer in score.layers.values()} == {"not_scored"}
     assert "active from phase 8" in score.layers["execution"].reason
+
+
+# deny cases
+
+def _deny_case():
+    expected = EvalExpected(intent="data_query", outcome="deny", metrics=["widget_revenue"], dataset="widget_sales")
+    return _case(category="unauthorized", expected=expected, expected_sql=None, active_from_phase=6)
+
+
+def test_deny_case_passes_when_the_run_was_denied():
+    denied = {"denial": Denial(dataset="widget_sales", blocked=["widget_sales"], message="Your role ...")}
+
+    score = score_case(_deny_case(), denied, None, active=True)
+
+    assert score.layers["execution"].status == "pass"
+    assert {score.layers[layer].status for layer in ("intent", "extraction", "retrieval")} == {"not_scored"}
+
+
+def test_deny_case_fails_when_the_run_answered():
+    score = score_case(_deny_case(), _answered_state(), None, active=True)
+
+    assert score.layers["execution"].status == "fail"
+    assert score.layers["execution"].reason == "expected a denial, but the question was answered"

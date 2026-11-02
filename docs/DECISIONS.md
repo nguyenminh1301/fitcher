@@ -151,7 +151,7 @@ Nodes in order:
 4. **extract** (`fast`, JSON schema): metric, dimensions, `periods[]`, filters, `top_n`, `rank_by`, `compare`.
 5. **resolve_time** (deterministic): convert periods to half-open date ranges `[start, end)` using the pack's fiscal calendar and the user's time zone. Supports multiple periods and relative phrases ("last quarter").
    The browser sends its IANA time zone with every request; clients without one (CLI, eval) pass it explicitly, otherwise UTC is used.
-6. **retrieve**: OpenSearch hybrid search over the 6 indices, filtered by role.
+6. **retrieve**: OpenSearch hybrid search over the 6 indices. Candidates for the question's own terms (metrics, dimensions, filter values) are searched across all of the pack's roles, so a term resolves to what it means and the gate can deny it rather than replace it with the nearest item the role may read; the context given to SQL generation (examples, dataset hits) is filtered by the asking role.
 7. **build_spec** -> `QuerySpec`, with a coverage check (dataset min/max dates versus the requested periods).
 8. **gate**:
    - ambiguous -> **clarify** (ask the user with options, or apply the pack's default convention if one exists)
@@ -273,7 +273,7 @@ Principles:
   - settings profiles
   - the guard allowlist
   - `allowed_roles` for the indices
-- **Layer 1, retrieval:** reduces noise. Not a security layer.
+- **Layer 1, retrieval:** reduces noise in the context given to SQL generation. Not a security layer: term resolution may see items the role cannot read, and the gate denies them.
 - **Layer 2, guard:** blocks early with an understandable message.
 - **Layer 3, ClickHouse:** the real security layer.
 - **Aggregate-only:** grant only on pre-aggregated views that also hide groups with fewer than k records. Never enforced by analysing SQL.
