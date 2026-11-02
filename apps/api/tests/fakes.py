@@ -158,17 +158,24 @@ class FakeRunner:
 
 
 class FakeLogWriter:
-    """Collects agent log records; ``write_results`` scripts each ``write_now`` outcome and ``lost`` each flush's losses."""
+    """Collects agent log records.
 
-    def __init__(self, write_results: Sequence[bool] = (), lost: int = 0):
+    ``write_results`` scripts each ``write_now`` outcome in order, ``fail_tables``
+    fails every ``write_now`` into those tables, and ``lost`` sets each flush's losses.
+    """
+
+    def __init__(self, write_results: Sequence[bool] = (), lost: int = 0, fail_tables: Iterable[str] = ()):
         self.written: list = []
         self.queued: list = []
         self.flushed: list[str] = []
         self.write_results = list(write_results)
         self.lost = lost
+        self.fail_tables = set(fail_tables)
 
     def write_now(self, record) -> bool:
         self.written.append(record)
+        if record.TABLE in self.fail_tables:
+            return False
         return self.write_results.pop(0) if self.write_results else True
 
     def enqueue(self, record) -> bool:

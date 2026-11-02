@@ -84,14 +84,14 @@ def exit_code(run: EvalRun, diff: BaselineDiff | None) -> int:
     return 0
 
 
-def store_report(deps: AgentDeps, run: EvalRun, code: int) -> None:
+def store_report(deps: AgentDeps, run: EvalRun) -> None:
     """Write the JSON report to ``agent_logs.eval_reports``; a failed write is reported and changes nothing else."""
     if deps.logs is None:
         return
     report_id = uuid4().hex
     record = EvalReportRecord(
         pack=run.pack, ts=utc_now(), report_id=report_id,
-        execution_rate=layer_totals(run.cases)["execution"].rate or 0.0, passed=code == 0,
+        execution_rate=layer_totals(run.cases)["execution"].rate or 0.0, passed=meets_threshold(run),
         report=run.model_dump_json(),
     )
     if deps.logs.write_now(record):
@@ -122,7 +122,7 @@ def main(argv: list[str] | None = None, deps_factory: Callable[[str, date], Agen
             run.model_dump_json(indent=2) + "\n", encoding="utf-8", newline="\n"
         )
     code = exit_code(run, diff)
-    store_report(deps, run, code)
+    store_report(deps, run)
     return code
 
 

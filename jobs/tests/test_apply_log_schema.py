@@ -86,6 +86,8 @@ def test_trace_query_reads_every_trace_source_for_one_parameter():
         assert f"agent_logs.{source}" in sql
     assert sql.count("{trace_id:String}") >= 5
     assert "INCOMPLETE" in sql
+    # query_log rows such as the runner's DESCRIBE of an empty result have no sql_runs row, so show their text.
+    assert "substring(query, 1, " in sql
 
 
 def test_runs_keeps_the_latest_row_per_trace():

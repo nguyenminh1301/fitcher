@@ -71,7 +71,8 @@ FROM
         toString(type),
         concat(
             'duration_ms=', toString(query_duration_ms), ' read_rows=', toString(read_rows),
-            ' result_rows=', toString(result_rows), if(exception = '', '', concat(' exception=', exception))
+            ' result_rows=', toString(result_rows), if(exception = '', '', concat(' exception=', exception)),
+            ' ', substring(query, 1, 300)
         )
     FROM agent_logs.trace_query_log
     WHERE trace_id = {trace_id:String}

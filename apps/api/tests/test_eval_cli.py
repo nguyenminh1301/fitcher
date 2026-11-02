@@ -148,6 +148,17 @@ def test_failing_run_is_stored_as_not_passed(packs_dir):
     assert (stored.execution_rate, stored.passed) == (0.0, False)
 
 
-def test_a_failed_report_write_keeps_the_exit_code(packs_dir):
-    logs = FakeLogWriter(write_results=[False])
+def test_a_failed_report_write_keeps_the_exit_code(packs_dir, capsys):
+    logs = FakeLogWriter(fail_tables={"eval_reports"})
     assert _main(packs_dir, factory=_factory(_matching(), logs=logs)) == 0
+    assert [record.TABLE for record in logs.written].count("eval_reports") == 1
+    assert "Stored report" not in capsys.readouterr().err
+
+
+def test_stored_passed_is_the_threshold_result_not_the_exit_code(packs_dir, monkeypatch):
+    # A baseline regression gives exit code 1 even when the execution rate meets the threshold.
+    monkeypatch.setattr("jobs.eval.exit_code", lambda run, diff: 1)
+    logs = FakeLogWriter()
+    assert _main(packs_dir, factory=_factory(_matching(), logs=logs)) == 1
+    (stored,) = [record for record in logs.written if record.TABLE == "eval_reports"]
+    assert stored.passed is True
