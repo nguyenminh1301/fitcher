@@ -74,6 +74,7 @@
 
 ### Changed
 
+- Mark Phase 6B (the web app on sample data) complete in the README, describe how to explore the chat app and the console with the lab identities, and name Phase 7 as the next step.
 - Mark Phase 6 (RBAC and auth) complete in the README and name Phase 6B (the web app on sample data) as the next step.
 - Run every question as one pack role: retrieval searches only that role's items, the SQL guard checks that role's tables and columns, the SQL prompt shows only its permitted schema (an aggregate-only role gets its view and sums its metric columns), queries run as that role's ClickHouse user, `jobs.ask` takes `--role` and each eval case runs as its own role; the shared `agent_readonly` user is removed.
 - Plan Phase 6B, which builds every screen of the web app design on pack-owned sample data before the api phases, and give phases 6-12 a Web wiring section naming the features each moves to the real api.
