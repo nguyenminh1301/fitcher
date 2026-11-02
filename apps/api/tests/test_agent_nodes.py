@@ -112,6 +112,15 @@ def test_default_convention_ranks_by_its_metric():
     assert spec.dimensions == ["widget_name"]
 
 
+@pytest.mark.parametrize("rank_term", ["Top", "cao nhất"])
+def test_vague_ranking_word_ranks_by_the_named_measure(rank_term):
+    extraction = extraction_reply(metric_terms=["revenue"], rank_term=rank_term, top_n=5)
+
+    spec = make_spec(state_for(extraction), compiled_fixture())
+
+    assert (spec.metric_ids, spec.rank_by, spec.top_n) == (["widget_revenue"], "widget_revenue", 5)
+
+
 def test_glossary_alias_in_vietnamese_resolves_the_metric():
     spec = make_spec(state_for(extraction_reply(metric_terms=["Doanh thu"], rank_term=None)), compiled_fixture())
 
