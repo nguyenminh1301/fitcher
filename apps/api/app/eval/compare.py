@@ -95,6 +95,8 @@ def compare_results(expected: Result, actual: Result, *, ordered: bool, toleranc
         return tuple(map(_order, key)), tuple(_order(_normalize(value)) for value in values)
 
     expected_rows, actual_rows = list(expected.rows), list(actual.rows)
+    # Reasons name reference rows by position, never by value: reports are stored in agent_logs.
+    reference_row = {id(row): position for position, row in enumerate(expected.rows)}
     if not ordered:
         expected_rows.sort(key=lambda row: sort_key(expected_key(row)))
         actual_rows.sort(key=lambda row: sort_key(actual_key(row)))
@@ -102,7 +104,8 @@ def compare_results(expected: Result, actual: Result, *, ordered: bool, toleranc
     actual_sequence = [actual_key(row) for row in actual_rows]
     missing = Counter(expected_sequence) - Counter(actual_sequence)
     if missing:
-        return Comparison(False, f"no row matches key {next(iter(missing))}")
+        first = next(row for row, key in zip(expected_rows, expected_sequence, strict=True) if key in missing)
+        return Comparison(False, f"no answer row matches the key of reference row {reference_row[id(first)]}")
     for position, (wanted, got) in enumerate(zip(expected_sequence, actual_sequence, strict=True)):
         if wanted != got:
             return Comparison(False, f"row order differs at row {position}")
@@ -145,5 +148,5 @@ def compare_results(expected: Result, actual: Result, *, ordered: bool, toleranc
         for want, have in zip(expected_group, actual_group, strict=True):
             for index in expected_measures:
                 if not values_match(want[index], have[measure_map[index]], tolerance):
-                    return Comparison(False, f"no row matches the measures of key {expected_key(want)}")
+                    return Comparison(False, f"no answer row matches the measures of reference row {reference_row[id(want)]}")
     return Comparison(True)

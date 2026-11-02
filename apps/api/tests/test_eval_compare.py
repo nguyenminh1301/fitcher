@@ -144,3 +144,23 @@ def test_duplicate_key_rows_with_recombined_measures_do_not_match():
     )
 
     assert compare_results(DUPLICATE_KEYS, actual, ordered=False).match is False
+
+
+def test_a_missing_key_combination_names_the_reference_row_not_its_values():
+    columns = [("product", "dimension"), ("region", "dimension"), ("revenue", "measure")]
+    expected = table(columns, [["Alice Nguyen", "West", 1.0], ["Bob Tran", "East", 2.0]])
+    actual = table(columns, [["Alice Nguyen", "East", 1.0], ["Bob Tran", "West", 2.0]])
+
+    reason = compare_results(expected, actual, ordered=False).reason
+
+    assert reason == "no answer row matches the key of reference row 0"
+
+
+def test_unpaired_measures_name_the_reference_row_not_its_values():
+    columns = [("product", "dimension"), ("units", "measure"), ("revenue", "measure")]
+    expected = table(columns, [["Alice Nguyen", 1.0, 10.0], ["Alice Nguyen", 2.0, 20.0]])
+    actual = table(columns, [["Alice Nguyen", 1.0, 20.0], ["Alice Nguyen", 2.0, 10.0]])
+
+    reason = compare_results(expected, actual, ordered=False).reason
+
+    assert reason == "no answer row matches the measures of reference row 0"
