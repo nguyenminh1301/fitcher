@@ -95,7 +95,7 @@ def test_result_with_two_columns_of_one_name_is_repaired():
     first = state["attempts"][0]
     assert (first.error.category, first.error.node, first.query_id) == ("sql", "execute", "qid-twice")
     assert "widget_name" in first.error.message
-    assert "widget_name" in agent.llm.calls[2].prompt
+    assert first.error.message in agent.llm.calls[2].prompt
 
 
 def test_zero_rows_pass_with_a_warning():
