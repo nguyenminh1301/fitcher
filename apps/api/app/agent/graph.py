@@ -8,6 +8,7 @@ the run before any SQL is generated.
 """
 
 from collections.abc import Callable
+from dataclasses import replace
 from functools import partial
 
 from langgraph.graph import END, START, StateGraph
@@ -24,6 +25,7 @@ from app.agent.nodes.retrieve import retrieve
 from app.agent.nodes.shape_result import shape_result
 from app.agent.nodes.summarize import summarize
 from app.agent.state import AgentDeps, AgentState
+from app.observability.instrument import LoggingRunner, instrument
 from app.observability.runs import RunLog
 from app.observability.tracing import run_span
 
@@ -48,7 +50,7 @@ def build_graph(deps: AgentDeps):
         "check": check, "shape_result": shape_result, "summarize": summarize,
     }
     for name, node in nodes.items():
-        graph.add_node(name, partial(node, deps=deps))
+        graph.add_node(name, partial(instrument(name, node), deps=deps))
 
     graph.add_edge(START, "extract")
     graph.add_conditional_edges("extract", _unless_rejected("resolve_time"), ["resolve_time", END])
@@ -94,6 +96,7 @@ def run_question(question: str, deps: AgentDeps) -> AgentState:
         if deps.logs is None:
             return build_graph(deps).invoke(initial, config=config)
         log = RunLog(deps.logs, run, user_id=deps.user_id, pack=deps.compiled.pack.name, question=question)
+        deps = replace(deps, runner=LoggingRunner(deps.runner, deps.logs))
         try:
             state = build_graph(deps).invoke(initial, config=config)
         except Exception as error:

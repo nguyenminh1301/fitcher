@@ -5,7 +5,8 @@ jobs.eval --pack <name> --output-dir build/eval``. Each run sends billable
 requests to the LiteLLM aliases at temperature 0 and runs every reference query
 as the read-only ClickHouse user. The cases come from ``packs/<name>/eval.yaml``,
 so editing them needs no recompile; the agent answers from the compiled pack
-named by ``--pack``, whatever ``ACTIVE_PACK`` says.
+named by ``--pack``, whatever ``ACTIVE_PACK`` says. Every case's agent run is
+written to ClickHouse ``agent_logs`` under the trace id kept in its JSON score.
 
 Exit codes: 0 when no layer regressed against ``--baseline`` and the execution
 match rate meets ``--threshold``; 1 on a regression or below the threshold; 2
@@ -28,6 +29,7 @@ from app.eval.report import BaselineDiff, diff_baseline, meets_threshold, render
 from app.eval.runner import EvalRun, run_eval
 from app.llm.client import LiteLLMClient
 from app.llm.embeddings import LiteLLMEmbeddings
+from app.observability.log_writer import start_log_writer
 from app.packs.compiler import CompileError, load_compiled
 from app.packs.loader import PackValidationError, load_pack
 from app.search.opensearch import OpenSearch
@@ -56,6 +58,8 @@ def build_deps(pack: str, reference: date) -> AgentDeps:
         runner=ClickHouseRunner(agent_client(), QueryLimits.from_env()),
         compiled=compiled,
         today=reference,
+        logs=start_log_writer(settings),
+        user_id="eval",
     )
 
 
@@ -86,7 +90,11 @@ def main(argv: list[str] | None = None, deps_factory: Callable[[str, date], Agen
     except (SettingsError, CompileError, PackValidationError, EvalSetError, RuntimeError) as error:
         print(error, file=sys.stderr)
         return 2
-    run = run_eval(args.pack, eval_set, deps, timeout=args.timeout, threshold=args.threshold)
+    try:
+        run = run_eval(args.pack, eval_set, deps, timeout=args.timeout, threshold=args.threshold)
+    finally:
+        if deps.logs is not None:
+            deps.logs.close()
     diff = diff_baseline(baseline, run) if baseline is not None else None
     markdown = render_markdown(run, diff)
     print(markdown)
