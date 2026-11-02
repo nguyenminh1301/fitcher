@@ -10,7 +10,7 @@ Docker Compose starts ClickHouse, OpenSearch, LiteLLM, Keycloak, the FastAPI ske
 `jobs/` loads the e-commerce lab dataset into ClickHouse `raw` and refreshes it, and [dbt/](dbt/README.md) builds the `sales_lines`, `returns_fact` and `sessions_daily` marts; [packs/](packs/README.md) holds the Domain Pack schemas and the hand-written `ecommerce_twin` pack, which `jobs/compile_pack.py` validates, test-runs and indexes into OpenSearch; `jobs/ask.py` runs the LangGraph agent in `apps/api/app/agent` over the compiled pack, with its prompts in `apps/api/prompts/`.
 
 The architecture is settled in [DECISIONS.md](docs/DECISIONS.md) and delivered in the order of the [master plan](docs/MASTER_PLAN.md), with one [detailed plan per phase](docs/plans/README.md).
-Phases 1 (lab dataset and dbt marts), 2 (hand-written Domain Pack and compiler), 3 (core agent on the CLI) and 4 (eval harness) are complete: `jobs/eval.py` scores a pack's eval set per layer, and the 31-case `ecommerce_twin` eval set has a recorded [baseline](docs/eval/ecommerce_twin-baseline.md). Phase 5 (logging and tracing) is complete as well: every `jobs.ask` and `jobs.eval` run writes its run row, node events, SQL attempts and LiteLLM calls to ClickHouse `agent_logs`, and [docs/tracing.md](docs/tracing.md) shows how to read one trace. Phase 6 (RBAC and auth) is next.
+Phases 1 (lab dataset and dbt marts), 2 (hand-written Domain Pack and compiler), 3 (core agent on the CLI) and 4 (eval harness) are complete: `jobs/eval.py` scores a pack's eval set per layer, and the 31-case `ecommerce_twin` eval set has a recorded [baseline](docs/eval/ecommerce_twin-baseline.md). Phase 5 (logging and tracing) is complete as well: every `jobs.ask` and `jobs.eval` run writes its run row, node events, SQL attempts and LiteLLM calls to ClickHouse `agent_logs`, and [docs/tracing.md](docs/tracing.md) shows how to read one trace. Phase 6 (RBAC and auth) is complete: `compile_pack` turns `policies.yaml` into per-role ClickHouse roles, column grants, row policies, aggregate-only views and users; every question runs as one pack role (`--role`), a question the role may not read is denied before any SQL and every access decision is written to `agent_logs.audit`; the Keycloak realm carries the pack roles and lab users. Phase 6B (the web app on sample data) is next.
 
 ## Architecture
 
@@ -187,7 +187,7 @@ The PR size labeler runs for branches within this repository; fork PRs do not re
 
 ## Next steps
 
-- Phase 6: Generate ClickHouse roles, grants, row policies and the guard allowlist from `policies.yaml`, and add the deny branch with audit records.
+- Phase 6B: Build every screen of the web app design on pack-owned sample data ([plan](docs/plans/phase-06b-web-app-on-sample-data.md)).
 - Later phases follow the [master plan](docs/MASTER_PLAN.md); each starts from its [phase plan](docs/plans/README.md).
 
 See [CHANGELOG.md](CHANGELOG.md) for repository changes and [SECURITY.md](SECURITY.md) for vulnerability reporting.
