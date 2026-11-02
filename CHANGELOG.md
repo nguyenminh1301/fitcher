@@ -5,6 +5,7 @@
 ### Added
 
 - Add the web app's visual system from the fitcher design: generated design tokens for light and dark themes with a WCAG AA contrast test, the design's component stylesheet, Inter with its Vietnamese subset, the brand Logo, Finch and icons, the shared buttons, fields, chips, tabs, segmented controls, status pills, banners, toasts, tooltips, dialogs, menus, empty states and skeletons, and the English/Vietnamese interface switch and theme choice kept per browser; web unit tests run with `npm run test` locally and in CI.
+- Import the pack's policy roles and the console roles `pack_reviewer` and `admin` into the Keycloak realm, with one lab user per role defined without credentials, verified `@fitcher.test` emails and roles in the `finch-web` access token; `jobs.set_lab_passwords` sets their password from `KEYCLOAK_LAB_USER_PASSWORD` in `.env`.
 - Deny a question the asking role may not read at the gate, before any SQL: the denial names the dataset or columns blocked, says nothing was queried, is written in the question's language, ends the run as `denied` and makes `jobs.ask` exit with code 3. Every access decision is written to `agent_logs.audit`: the gate's denials, the guard's ALLOW or DENY of each SQL attempt, and ClickHouse access-denied errors. The `unauthorized` eval cases are now scored on the denial, and a live role x dataset matrix test checks every role's grants on ClickHouse with the guard bypassed.
 - Reject an aggregate-only grant whose metric is not one sum or count, because the agent adds its per-group values up again.
 - Apply each pack's `policies.yaml` to ClickHouse in `compile_pack`: per-role roles with column grants, row policies, aggregate-only views that hide small groups, one login user per role with a password derived from `CLICKHOUSE_AGENT_PASSWORD`, and a shared read-only profile whose limits cannot be raised or set to 0; objects the policies no longer contain are revoked or dropped.
@@ -65,6 +66,7 @@
 
 ### Changed
 
+- Mark Phase 6 (RBAC and auth) complete in the README and name Phase 6B (the web app on sample data) as the next step.
 - Run every question as one pack role: retrieval searches only that role's items, the SQL guard checks that role's tables and columns, the SQL prompt shows only its permitted schema (an aggregate-only role gets its view and sums its metric columns), queries run as that role's ClickHouse user, `jobs.ask` takes `--role` and each eval case runs as its own role; the shared `agent_readonly` user is removed.
 - Plan Phase 6B, which builds every screen of the web app design on pack-owned sample data before the api phases, and give phases 6-12 a Web wiring section naming the features each moves to the real api.
 - Plan conversation delete as hiding it from its owner only: an admin can still read every conversation, deleted or not, in the console until the 90-day log TTL removes it.
