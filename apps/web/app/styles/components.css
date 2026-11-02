@@ -364,7 +364,7 @@ textarea.fc-input { height: auto; min-height: 80px; padding: var(--base-size-8) 
 /* Document row */
 .fc-docs { container-type: inline-size; border: 1px solid var(--borderColor-default); border-radius: var(--borderRadius-medium); background: var(--bgColor-default); }
 .fc-docs-head { display: flex; align-items: center; gap: var(--base-size-8); min-height: 44px; padding: 0 var(--base-size-16); background: var(--bgColor-muted); border-bottom: 1px solid var(--borderColor-default); border-radius: var(--borderRadius-medium) var(--borderRadius-medium) 0 0; font-size: 14px; font-weight: 600; }
-.fc-doc { display: grid; grid-template-columns: minmax(0, 2.2fr) minmax(0, 1.6fr) minmax(0, 1fr) auto; gap: var(--base-size-12); align-items: center; padding: var(--base-size-12) var(--base-size-16); border-bottom: 1px solid var(--borderColor-muted); font-size: 14px; line-height: 20px; }
+.fc-doc { display: grid; grid-template-columns: minmax(0, 2.2fr) minmax(0, 1.6fr) auto auto; gap: var(--base-size-12); align-items: center; padding: var(--base-size-12) var(--base-size-16); border-bottom: 1px solid var(--borderColor-muted); font-size: 14px; line-height: 20px; }
 .fc-doc:last-child { border-bottom: 0; }
 .fc-doc-file { display: flex; gap: var(--base-size-12); align-items: center; min-width: 0; }
 .fc-doc-file > .fc-icon { color: var(--fgColor-muted); }

@@ -369,6 +369,25 @@
     "roleChanged": "{name} giờ là {role}",
     "userDisabled": "Đã vô hiệu hóa {name}",
     "userEnabled": "Đã kích hoạt {name}",
-    "pageSize": "{n} mỗi trang"
+    "pageSize": "{n} mỗi trang",
+    "succeeded": "Thành công",
+    "rejected": "Không trả lời",
+    "error": "Lỗi",
+    "paidConfirmTitle": "Thao tác này tốn phí AI",
+    "draftConfirmText": "Soạn mục cho gói từ {name} sẽ gửi tài liệu qua cổng mô hình và mỗi lần gọi đều tính phí. Các mục soạn ra nằm ở Duyệt cho đến khi có người phê duyệt.",
+    "evalConfirmText": "Chạy bộ đánh giá sẽ hỏi từng câu qua cổng mô hình và mỗi lần gọi đều tính phí. Các câu chạy lần lượt nên có thể mất vài phút.",
+    "continue": "Tiếp tục",
+    "notScored": "Chưa chấm",
+    "reports": "Các lần chạy",
+    "notFound": "Mục này không tồn tại hoặc đã bị xoá.",
+    "loadFailed": "Không tải được mục này. Hãy thử lại sau.",
+    "drafting": "Đang soạn mục cho gói từ {name}",
+    "uploaded": "Đã tải lên {name}",
+    "deletedName": "Đã xoá {name}",
+    "approvedName": "Đã duyệt {name}",
+    "proposedName": "Đã gửi sang Đề xuất: {question}",
+    "rolesOf": "Vai trò của {name}",
+    "you": "bạn",
+    "trace": "Vết chạy"
   }
 }
