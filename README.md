@@ -10,7 +10,7 @@ Docker Compose starts ClickHouse, OpenSearch, LiteLLM, Keycloak, the FastAPI ske
 `jobs/` loads the e-commerce lab dataset into ClickHouse `raw` and refreshes it, and [dbt/](dbt/README.md) builds the `sales_lines`, `returns_fact` and `sessions_daily` marts; [packs/](packs/README.md) holds the Domain Pack schemas and the hand-written `ecommerce_twin` pack, which `jobs/compile_pack.py` validates, test-runs and indexes into OpenSearch; `jobs/ask.py` runs the LangGraph agent in `apps/api/app/agent` over the compiled pack, with its prompts in `apps/api/prompts/`.
 
 The architecture is settled in [DECISIONS.md](docs/DECISIONS.md) and delivered in the order of the [master plan](docs/MASTER_PLAN.md), with one [detailed plan per phase](docs/plans/README.md).
-Phases 1 (lab dataset and dbt marts), 2 (hand-written Domain Pack and compiler) and 3 (core agent on the CLI) are complete; in Phase 4 (eval harness) `jobs/eval.py` scores a pack's eval set per layer, and the 30-case `ecommerce_twin` eval set with its recorded baseline is next.
+Phases 1 (lab dataset and dbt marts), 2 (hand-written Domain Pack and compiler), 3 (core agent on the CLI) and 4 (eval harness) are complete: `jobs/eval.py` scores a pack's eval set per layer, and the 31-case `ecommerce_twin` eval set has a recorded [baseline](docs/eval/ecommerce_twin-baseline.md). Phase 5 (logging and tracing) is next.
 
 ## Architecture
 
