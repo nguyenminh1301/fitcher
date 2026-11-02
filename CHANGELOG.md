@@ -75,6 +75,7 @@
 
 ### Fixed
 
+- Extract questions with `extract.v2`: a term naming a specific value ("premium members", "nhóm hàng Furniture") is a filter rather than a breakdown, naming or comparing periods no longer sets a time grain, offsets for a period named relative to another one count from the current unit, and a ranking word is left empty when the question names its measure.
 - Rank a "top N" question by the measure it names ("Top 5 brands by units sold", "doanh thu cao nhất") instead of refusing the vague ranking word; a ranking word with no measure is still refused.
 - Open the read-only agent ClickHouse client without a session, so a query left running by a timed-out eval case cannot lock the client for the next case.
 - Pair eval result rows that share a key by their mapped measure values, so reordered measure columns no longer fail a matching unordered result.

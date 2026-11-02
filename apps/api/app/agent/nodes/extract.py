@@ -17,7 +17,7 @@ from app.contracts.query_spec import FilterOp, Scalar
 from app.llm.client import LLMError
 
 ALIAS = "fast"
-PROMPT = "extract.v1"
+PROMPT = "extract.v2"
 
 
 class ExtractedFilter(BaseModel):
