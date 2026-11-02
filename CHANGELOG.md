@@ -106,6 +106,7 @@
 
 ### Fixed
 
+- Show the Sample data badge on every console detail page (review item, proposal, dataset, evaluation report and run trace), and decide every console badge from the same feature sources as the rest of the app.
 - Keep small chart axis values distinct: value ticks round to three significant digits instead of one decimal, so a cost axis reads 0.05, 0.1, 0.15 rather than repeating 0.1 and 0.2.
 - Fill the browser window with the chat app and the workspace console: the page body now has a definite height, so the layouts no longer stop at their 600px minimum on taller windows.
 - Resolve a question's metric, dimension and value terms across the whole pack, so a term the asking role may not read is denied by the gate instead of being answered with the closest metric the role can read; only the examples given to SQL generation stay filtered by role.

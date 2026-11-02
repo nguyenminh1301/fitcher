@@ -7,10 +7,15 @@ import type { ReactNode } from "react";
 
 import { Button } from "@/components/ui/controls";
 import { EmptyState, Skeleton, StatusPill } from "@/components/ui/feedback";
+import { SampleDataBadge } from "@/components/ui/SampleDataBadge";
+import type { Feature } from "@/lib/api/client";
+import { useChat } from "@/lib/chat/ChatContext";
 import { cx } from "@/lib/cx";
 import { useI18n } from "@/lib/i18n/react";
 
 type Props = {
+  /** The api feature the page reads, which decides its Sample data badge. */
+  feature: Feature;
   title: ReactNode;
   mono?: boolean;
   titleLang?: string;
@@ -24,8 +29,9 @@ type Props = {
   children?: ReactNode;
 };
 
-export function DetailPage({ title, mono, titleLang, status, meta, backLabel, onBack, actions, loading, missing, children }: Props) {
+export function DetailPage({ feature, title, mono, titleLang, status, meta, backLabel, onBack, actions, loading, missing, children }: Props) {
   const { t } = useI18n();
+  const { sources } = useChat();
   const back = <Button variant="ghost" iconOnly icon="chevronLeft" label={backLabel ?? t("ui.back")} onClick={onBack} />;
   if (loading) return <div className="fc-page"><Skeleton variant="page" /></div>;
   if (missing)
@@ -41,6 +47,7 @@ export function DetailPage({ title, mono, titleLang, status, meta, backLabel, on
         {back}
         <h1 className={cx(mono && "fc-mono")} lang={titleLang}>{title}</h1>
         {status ? <StatusPill status={status} /> : null}
+        <SampleDataBadge feature={feature} sources={sources} />
         {meta ?? null}
         <span className="fc-spacer" />
         {actions ? <div className="fc-detail-actions">{actions}</div> : null}

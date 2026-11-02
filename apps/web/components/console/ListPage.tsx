@@ -10,6 +10,7 @@ import { Icon } from "@/components/brand/Icon";
 import { Button } from "@/components/ui/controls";
 import { EmptyState, Skeleton } from "@/components/ui/feedback";
 import { SampleDataBadge } from "@/components/ui/SampleDataBadge";
+import { useChat } from "@/lib/chat/ChatContext";
 import { SECTIONS } from "@/lib/console/sections";
 import { cx } from "@/lib/cx";
 import { useI18n } from "@/lib/i18n/react";
@@ -28,6 +29,7 @@ type ListPageProps = {
 
 export function ListPage({ section, actions, loading, failed, skeleton = "list", children }: ListPageProps) {
   const { t } = useI18n();
+  const { sources } = useChat();
   const feature = SECTIONS.find((item) => item.key === section)?.feature;
   let body: ReactNode = children;
   if (failed) body = <div className="fc-card"><EmptyState icon="alert" title={t("ui.loadFailed")} /></div>;
@@ -37,7 +39,7 @@ export function ListPage({ section, actions, loading, failed, skeleton = "list",
       <div className="fc-page-head">
         <div className="fc-row">
           <h1>{t(`ui.nav_${section}`)}</h1>
-          {feature ? <SampleDataBadge feature={feature} /> : null}
+          {feature ? <SampleDataBadge feature={feature} sources={sources} /> : null}
         </div>
         {loading || failed ? null : actions ?? null}
       </div>

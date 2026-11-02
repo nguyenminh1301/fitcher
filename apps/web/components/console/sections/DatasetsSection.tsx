@@ -50,7 +50,7 @@ export function DatasetsSection() {
 function DatasetDetail({ dataset, onBack }: { dataset?: DatasetView; onBack: () => void }) {
   const { t } = useI18n();
   return (
-    <DetailPage title={dataset?.id} mono onBack={onBack} loading={false} missing={!dataset}>
+    <DetailPage feature="datasets" title={dataset?.id} mono onBack={onBack} loading={false} missing={!dataset}>
       {dataset ? (
         <div className="fc-page">
           <dl className="fc-kv">
