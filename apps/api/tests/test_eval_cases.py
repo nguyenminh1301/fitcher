@@ -84,3 +84,14 @@ def test_ranks_for_top_n_and_monthly_trend():
     assert ranks(_case("top", expected=plain.model_copy(update={"top_n": 5}))) is True
     assert ranks(_case("trend", category="monthly_trend", expected=plain)) is True
     assert ranks(_case("filter", category="string_filter", expected=plain)) is False
+
+
+def test_engine_has_reached_the_deny_branch():
+    assert ENGINE_PHASE >= 6
+
+
+def test_active_deny_case_needs_no_reference():
+    deny = EvalExpected(intent="data_query", outcome="deny", metrics=["widget_revenue"], dataset="widget_sales")
+    case = _case("blocked", expected=deny, expected_sql=None, active_from_phase=6)
+
+    assert [item.id for item in load_eval_set(_pack([case])).cases] == ["blocked"]

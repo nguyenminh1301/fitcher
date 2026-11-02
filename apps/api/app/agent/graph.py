@@ -1,10 +1,11 @@
 """The ``data_query`` LangGraph flow (DECISIONS §6 steps 4-16, without router, gate and charts).
 
-extract -> resolve_time -> retrieve -> build_spec -> generate_sql -> guard ->
-explain -> execute -> check, where check loops back to generate_sql for
-repairable errors, stops on policy errors or exhausted retries, and otherwise
-continues to shape_result -> summarize. A node that sets ``rejection`` ends
-the run before any SQL is generated.
+extract -> resolve_time -> retrieve -> build_spec -> gate -> generate_sql ->
+guard -> explain -> execute -> check, where check loops back to generate_sql
+for repairable errors, stops on policy errors or exhausted retries, and
+otherwise continues to shape_result -> summarize. A node that sets
+``rejection``, or the gate's ``denial``, ends the run before any SQL is
+generated.
 """
 
 from collections.abc import Callable
@@ -18,6 +19,7 @@ from app.agent.nodes.check import check, route
 from app.agent.nodes.execute import execute_node
 from app.agent.nodes.explain import explain_node
 from app.agent.nodes.extract import extract
+from app.agent.nodes.gate import gate
 from app.agent.nodes.generate_sql import generate_sql
 from app.agent.nodes.guard import guard
 from app.agent.nodes.resolve_time import resolve_time
@@ -37,6 +39,10 @@ def _unless_rejected(next_node: str) -> Callable[[AgentState], str]:
     return lambda state: END if state.get("rejection") else next_node
 
 
+def _unless_denied(next_node: str) -> Callable[[AgentState], str]:
+    return lambda state: END if state.get("denial") else next_node
+
+
 def _unless_failed(next_node: str) -> Callable[[AgentState], str]:
     """Skip to check when the current attempt already failed."""
     return lambda state: "check" if state["attempts"][-1].error is not None else next_node
@@ -45,7 +51,7 @@ def _unless_failed(next_node: str) -> Callable[[AgentState], str]:
 def build_graph(deps: AgentDeps):
     graph = StateGraph(AgentState)
     nodes = {
-        "extract": extract, "resolve_time": resolve_time, "retrieve": retrieve, "build_spec": build_spec,
+        "extract": extract, "resolve_time": resolve_time, "retrieve": retrieve, "build_spec": build_spec, "gate": gate,
         "generate_sql": generate_sql, "guard": guard, "explain": explain_node, "execute": execute_node,
         "check": check, "shape_result": shape_result, "summarize": summarize,
     }
@@ -56,7 +62,8 @@ def build_graph(deps: AgentDeps):
     graph.add_conditional_edges("extract", _unless_rejected("resolve_time"), ["resolve_time", END])
     graph.add_conditional_edges("resolve_time", _unless_rejected("retrieve"), ["retrieve", END])
     graph.add_conditional_edges("retrieve", _unless_rejected("build_spec"), ["build_spec", END])
-    graph.add_conditional_edges("build_spec", _unless_rejected("generate_sql"), ["generate_sql", END])
+    graph.add_conditional_edges("build_spec", _unless_rejected("gate"), ["gate", END])
+    graph.add_conditional_edges("gate", _unless_denied("generate_sql"), ["generate_sql", END])
     graph.add_conditional_edges("generate_sql", _unless_failed("guard"), ["guard", "check"])
     graph.add_conditional_edges("guard", _unless_failed("explain"), ["explain", "check"])
     graph.add_conditional_edges("explain", _unless_failed("execute"), ["execute", "check"])
@@ -75,6 +82,8 @@ def _outcome(state: AgentState) -> tuple[str, str, str]:
     intent = spec.intent if spec is not None else ""
     if state.get("rejection"):
         return "rejected", intent, state["rejection"]
+    if state.get("denial"):
+        return "denied", intent, state["denial"].message
     if state.get("result") is not None:
         return "succeeded", intent, ""
     errors = state.get("errors", [])

@@ -3,7 +3,8 @@
 - intent: not scored until the router exists.
 - extraction: the resolved periods, ``top_n`` and ``rank_by`` match the labels exactly.
 - retrieval: recall of the labelled dataset and columns among the retrieved candidates.
-- execution: the answer's result set matches the reference result.
+- execution: the answer's result set matches the reference result; for a case
+  that expects a denial, the run was denied (its other layers are not scored).
 
 A case whose branch a later phase builds is not scored on any layer.
 """
@@ -127,7 +128,22 @@ def score_execution(
     return LayerScore(status="pass") if comparison.match else LayerScore(status="fail", reason=comparison.reason)
 
 
+def score_denial(state: AgentState) -> LayerScore:
+    if state.get("denial") is not None:
+        return LayerScore(status="pass")
+    if state.get("result") is not None:
+        return LayerScore(status="fail", reason="expected a denial, but the question was answered")
+    if state.get("rejection"):
+        return LayerScore(status="fail", reason=f"expected a denial, but the question was rejected: {state['rejection']}")
+    errors = [attempt.error for attempt in state.get("attempts", []) if attempt.error is not None]
+    return LayerScore(status="fail", reason=f"expected a denial, got {errors[-1] if errors else 'no decision'}")
+
+
 def score_case(case: EvalCase, state: AgentState, reference: Result | None, *, active: bool) -> CaseScore:
+    if active and case.expected.outcome == "deny":
+        decision_only = LayerScore(status="not_scored", reason="a denied question scores the decision only")
+        layers = {**dict.fromkeys(LAYERS, decision_only), "execution": score_denial(state)}
+        return CaseScore(case_id=case.id, category=case.category, question=case.question, active=active, layers=layers)
     if not active:
         skipped = LayerScore(status="not_scored", reason=f"not yet scored: active from phase {case.active_from_phase}")
         layers = dict.fromkeys(LAYERS, skipped)

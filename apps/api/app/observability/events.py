@@ -34,7 +34,7 @@ class RunRecord(LogRecord):
     pack: str
     question: str
     intent: str
-    # running, succeeded, failed, rejected or error
+    # running, succeeded, failed, rejected, denied or error
     status: str
     latency_ms: int
     error: str
@@ -69,6 +69,22 @@ class SqlRunRecord(LogRecord):
     query_id: str
     rows: int
     error: str
+
+
+class AuditRecord(LogRecord):
+    """One access decision: the gate's or guard's ALLOW of a SQL attempt, or a DENY from any layer."""
+
+    TABLE: ClassVar[str] = "audit"
+
+    trace_id: str
+    ts: datetime
+    user_id: str
+    role: str
+    # ALLOW or DENY
+    decision: str
+    dataset: str
+    blocked_tables: list[str]
+    reason: str
 
 
 class EvalReportRecord(LogRecord):

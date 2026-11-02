@@ -5,6 +5,7 @@
 ### Added
 
 - Import the pack's policy roles and the console roles `pack_reviewer` and `admin` into the Keycloak realm, with one lab user per role defined without credentials, verified `@fitcher.test` emails and roles in the `finch-web` access token; `jobs.set_lab_passwords` sets their password from `KEYCLOAK_LAB_USER_PASSWORD` in `.env`.
+- Deny a question the asking role may not read at the gate, before any SQL: the denial names the dataset or columns blocked, says nothing was queried, is written in the question's language, ends the run as `denied` and makes `jobs.ask` exit with code 3. Every access decision is written to `agent_logs.audit`: the gate's denials, the guard's ALLOW or DENY of each SQL attempt, and ClickHouse access-denied errors. The `unauthorized` eval cases are now scored on the denial, and a live role x dataset matrix test checks every role's grants on ClickHouse with the guard bypassed.
 - Reject an aggregate-only grant whose metric is not one sum or count, because the agent adds its per-group values up again.
 - Apply each pack's `policies.yaml` to ClickHouse in `compile_pack`: per-role roles with column grants, row policies, aggregate-only views that hide small groups, one login user per role with a password derived from `CLICKHOUSE_AGENT_PASSWORD`, and a shared read-only profile whose limits cannot be raised or set to 0; objects the policies no longer contain are revoked or dropped.
 - Let a policy grant a dataset as aggregates only (grouped columns, listed metrics, a minimum group size) and check each row filter as one boolean condition over the dataset's columns; the `ecommerce_twin` pack gains a row-filtered `northwest_sales` role and an aggregate-only `category_partner` role, and the search indices show an aggregate-only role its grouped columns and metrics but no examples.
@@ -95,6 +96,7 @@
 
 ### Fixed
 
+- Resolve a question's metric, dimension and value terms across the whole pack, so a term the asking role may not read is denied by the gate instead of being answered with the closest metric the role can read; only the examples given to SQL generation stay filtered by role.
 - Send a query whose result repeats a column name (`SELECT a, a`) back to SQL generation as a repairable error naming the column, instead of failing the whole run when the result is typed.
 - Extract questions with `extract.v2`: a term naming a specific value ("premium members", "nhóm hàng Furniture") is a filter rather than a breakdown, naming or comparing periods no longer sets a time grain, offsets for a period named relative to another one count from the current unit, and a ranking word is left empty when the question names its measure.
 - Rank a "top N" question by the measure it names ("Top 5 brands by units sold", "doanh thu cao nhất") instead of refusing the vague ranking word; a ranking word with no measure is still refused.

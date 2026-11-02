@@ -1,5 +1,7 @@
 """Printing a run from ``jobs/ask.py`` and its fault-injection wrapper."""
 
+from dataclasses import replace
+
 from agent_fixtures import GOOD_SQL, compiled_fixture, deps, extraction_reply
 from fake_llm import FakeLLMClient
 import pytest
@@ -87,3 +89,13 @@ def test_named_role_must_be_a_role_of_the_pack():
 def test_role_flag_is_parsed():
     assert parse_args(["Top widgets", "--role", "viewer"]).role == "viewer"
     assert parse_args(["Top widgets"]).role is None
+
+
+def test_denied_question_exits_with_code_3_and_the_message(capsys):
+    agent = deps([extraction_reply()])
+    agent = replace(agent, role="nobody")
+
+    state = run_question("Top widgets", agent)
+
+    assert report(state) == 3
+    assert "Denied: Your role nobody cannot read the dataset widget_sales" in capsys.readouterr().err

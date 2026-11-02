@@ -27,7 +27,7 @@ packs/ecommerce_twin/policies.yaml           # at least three roles, one row-fil
 apps/api/app/packs/policy_compiler.py        # policies -> ClickHouse DDL + allowlists
 infra/keycloak/realm-finch.json              # roles and sample lab users
 apps/api/app/agent/nodes/gate.py
-apps/api/tests/integration/test_role_matrix.py
+apps/api/tests/test_role_matrix.py           # live, POLICY_LIVE_TEST=1
 ```
 
 ## Tasks

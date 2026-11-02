@@ -14,11 +14,17 @@ from typing import Literal
 ErrorCategory = Literal["policy", "sql", "runtime"]
 
 
+# ClickHouse's error for a query the user's grants do not cover.
+ACCESS_DENIED = 497
+
+
 @dataclass(frozen=True)
 class AgentError:
     category: ErrorCategory
     node: str
     message: str
+    # ClickHouse error code, when ClickHouse raised the error.
+    code: int | None = None
 
     def __str__(self) -> str:
         return f"{self.category} error in {self.node}: {self.message}"
