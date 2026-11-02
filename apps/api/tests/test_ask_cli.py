@@ -1,10 +1,11 @@
 """Printing a run from ``jobs/ask.py`` and its fault-injection wrapper."""
 
-from agent_fixtures import GOOD_SQL, deps, extraction_reply
+from agent_fixtures import GOOD_SQL, compiled_fixture, deps, extraction_reply
 from fake_llm import FakeLLMClient
+import pytest
 
 from app.agent.graph import run_question
-from jobs.ask import FaultInjectingLLM, format_table, inject_fault, report
+from jobs.ask import FaultInjectingLLM, choose_role, format_table, inject_fault, parse_args, report
 
 
 def test_successful_run_prints_sql_table_warnings_and_summary(capsys):
@@ -71,3 +72,18 @@ def test_table_is_aligned_and_limited():
     table = format_table(["name", "n"], [["a", 1], ["bbb", None], ["c", 3]], limit=2)
 
     assert table.splitlines() == ["name | n", "-----+--", "a    | 1", "bbb  |  ", "... 1 more rows"]
+
+
+def test_role_defaults_to_the_first_policy_role():
+    assert choose_role(compiled_fixture().pack, None) == "viewer"
+
+
+def test_named_role_must_be_a_role_of_the_pack():
+    assert choose_role(compiled_fixture().pack, "viewer") == "viewer"
+    with pytest.raises(RuntimeError, match="'nobody' is not a role of pack minimal; roles: viewer"):
+        choose_role(compiled_fixture().pack, "nobody")
+
+
+def test_role_flag_is_parsed():
+    assert parse_args(["Top widgets", "--role", "viewer"]).role == "viewer"
+    assert parse_args(["Top widgets"]).role is None

@@ -8,6 +8,7 @@ from app.agent.nodes.execute import execute
 from app.agent.nodes.explain import explain
 from app.config import SettingsError
 from app.data.clickhouse import ClickHouseRunner, QueryLimits, agent_client, classify
+from app.packs.policy_compiler import agent_password
 
 LIMITS = QueryLimits(max_execution_time=12, max_result_rows=345, max_memory_usage=678)
 
@@ -157,13 +158,15 @@ def test_limits_from_the_environment_must_be_positive_integers(value):
         QueryLimits.from_env({"QUERY_MAX_RESULT_ROWS": value})
 
 
-def test_agent_client_connects_to_the_marts_database(monkeypatch):
+def test_agent_client_connects_as_the_roles_user_with_its_derived_password(monkeypatch):
     seen = {}
     monkeypatch.setattr("app.data.clickhouse.clickhouse_connect.get_client", lambda **kwargs: seen.update(kwargs))
 
-    agent_client({"CLICKHOUSE_AGENT_PASSWORD": "pw"})
+    agent_client("shop", "analyst", {"CLICKHOUSE_AGENT_PASSWORD": "pw"})
 
-    assert (seen["username"], seen["database"]) == ("agent_readonly", "marts")
+    assert seen["username"] == "fitcher_agent__shop__analyst"
+    assert seen["password"] == agent_password("pw", "fitcher_agent__shop__analyst")
+    assert seen["database"] == "marts"
 
 
 def test_agent_client_opens_no_session(monkeypatch):
@@ -171,11 +174,11 @@ def test_agent_client_opens_no_session(monkeypatch):
     seen = {}
     monkeypatch.setattr("app.data.clickhouse.clickhouse_connect.get_client", lambda **kwargs: seen.update(kwargs))
 
-    agent_client({"CLICKHOUSE_AGENT_PASSWORD": "pw"})
+    agent_client("shop", "analyst", {"CLICKHOUSE_AGENT_PASSWORD": "pw"})
 
     assert seen["autogenerate_session_id"] is False
 
 
 def test_agent_client_requires_its_password():
     with pytest.raises(RuntimeError, match="CLICKHOUSE_AGENT_PASSWORD"):
-        agent_client({})
+        agent_client("shop", "analyst", {})

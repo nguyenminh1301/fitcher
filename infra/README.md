@@ -7,7 +7,6 @@ See [DECISIONS §3](../docs/DECISIONS.md#3-docker-compose) and the [Phase 0 plan
 | --- | --- |
 | `clickhouse/config.d/listen.xml` | Listen on container interfaces; Compose publishes ports on host loopback only |
 | `clickhouse/users.d/users.xml` | Removes the passwordless `default` user |
-| `clickhouse/users.d/agent_readonly.xml` | Read-only `agent_readonly` user and profile the agent runs generated SQL as |
 | `clickhouse/users.d/agent_logs.xml` | Insert-only `agent_logs_writer`, trace reader and review reader users for `agent_logs` |
 | `clickhouse/initdb/001-databases.sql` | Creates `raw`, `marts` and `data_meta` |
 | `clickhouse/initdb/010-agent-logs.sql` | Creates the `agent_logs` database and its run log tables |
@@ -28,9 +27,9 @@ docker compose exec -T clickhouse sh -c 'clickhouse-client --user "$CLICKHOUSE_U
 
 Changing the admin password in `.env` after the first start also needs only a container recreate, because the entrypoint rewrites the user file on every start.
 
-The agent runs every generated query as `agent_readonly`, whose password is `CLICKHOUSE_AGENT_PASSWORD`.
-It holds only `SELECT` on `marts`; its profile sets `readonly = 2` (reads only, while each query may set its own limits) and constrains `max_execution_time`, `max_result_rows` and `max_memory_usage`.
-The user lives in server configuration, not in the data volume, so it applies to new and existing volumes alike; recreate the container after changing the file or the password: `docker compose up -d --wait clickhouse`.
+The agent runs every generated query as the ClickHouse user of the asking role, `fitcher_agent__<pack>__<role>`.
+`compile_pack` creates these users, their roles, column grants, row policies, aggregate-only views and the shared read-only profile from the pack's `policies.yaml` (see [packs/](../packs/README.md#compiling-a-pack)); they live in the data volume and are reconciled on every compile.
+Their passwords derive from `CLICKHOUSE_AGENT_PASSWORD`; after changing it, run `compile_pack` again.
 
 Run logs live in `agent_logs`. On a volume created before `010-agent-logs.sql` existed, create its tables with `docker compose run --rm jobs python -m jobs.apply_log_schema`.
 Three configuration users reach it, each with its own password:
@@ -41,7 +40,7 @@ Three configuration users reach it, each with its own password:
 | `agent_logs_trace_reader` | `CLICKHOUSE_TRACE_READER_PASSWORD` | `SELECT` on `runs`, `events`, `llm_calls`, `sql_runs`, `audit`, `eval_reports` and `system.query_log` |
 | `agent_logs_review_reader` | `CLICKHOUSE_REVIEW_READER_PASSWORD` | `SELECT` on `example_proposals`, `feedback` and `chat_messages` for the `pack_reviewer` and `admin` paths |
 
-`agent_readonly` has no access to `agent_logs`.
+The agent's role users have no access to `agent_logs`.
 With the stack running, `AGENT_LOGS_LIVE_TEST=1` and the four passwords in the environment, `jobs/tests/test_agent_log_users.py` checks these grants against the server.
 
 ## LiteLLM

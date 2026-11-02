@@ -78,4 +78,5 @@ def deps(llm_replies: list, runner: FakeRunner | None = None, search=default_sea
         runner=runner or FakeRunner(runs=[good_output()]),
         compiled=compiled_fixture(),
         today=TODAY,
+        role="viewer",
     )

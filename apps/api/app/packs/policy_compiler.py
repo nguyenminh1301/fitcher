@@ -127,6 +127,17 @@ def check_row_filter(text: str, columns: Iterable[str]) -> str | None:
     return None
 
 
+def adds_up(sql_expr: str) -> bool:
+    """Whether a metric is one sum or count, so the per-group values of an aggregate-only view sum to the total."""
+    try:
+        node = sqlglot.parse_one(sql_expr, read="clickhouse", into=exp.Condition).unnest()
+    except sqlglot.errors.ParseError:
+        return False
+    if isinstance(node, (exp.Sum, exp.Count, exp.CountIf)):
+        return True
+    return isinstance(node, exp.CombinedAggFunc) and node.name.lower() in ("sumif", "countif")
+
+
 def view_columns(grant: DatasetGrant) -> list[str]:
     """Columns of an aggregate-only grant's view: the grouped columns, one per metric and the row count."""
     assert grant.aggregate_only is not None

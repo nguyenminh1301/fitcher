@@ -1,5 +1,6 @@
 """Each data_query node in isolation, over the synthetic fixture pack."""
 
+from dataclasses import replace
 from datetime import date
 from decimal import Decimal
 
@@ -12,6 +13,7 @@ from app.agent.nodes.extract import Extraction, extract
 from app.agent.nodes.generate_sql import alias_for, build_prompt, clean_sql, generate_sql
 from app.agent.nodes.resolve_time import resolve_periods
 from app.agent.nodes.retrieve import Hit, Retrieval, retrieve
+from app.packs.models import AggregateOnly
 from app.agent.nodes.shape_result import to_result
 from app.agent.errors import AgentError
 from app.agent.state import Attempt
@@ -82,7 +84,7 @@ def test_retrieval_failure_ends_the_run_with_a_reason():
     assert update == {"rejection": "the pack context could not be retrieved: alias embed returned HTTP 503"}
 
 
-def test_retrieve_embeds_once_and_searches_each_term_as_every_role():
+def test_retrieve_embeds_once_and_searches_each_term():
     embeddings = FakeEmbeddings()
     agent = deps([], embeddings=embeddings)
     extraction = extraction_reply(
@@ -100,6 +102,20 @@ def test_retrieve_embeds_once_and_searches_each_term_as_every_role():
     assert searched == {f"minimal_{name}" for name in ("glossary_terms", "metrics", "datasets", "column_values", "examples")}
     for _, body, _ in agent.search.searches:
         assert '"allowed_roles": ["viewer"]' in str(body).replace("'", '"')
+
+
+def test_retrieve_searches_as_the_asking_role_only():
+    agent = deps([])
+    pack = agent.compiled.pack
+    clerk = pack.policies.roles[0].model_copy(update={"id": "refunds_clerk"})
+    policies = pack.policies.model_copy(update={"roles": [*pack.policies.roles, clerk]})
+    compiled = agent.compiled.model_copy(update={"pack": pack.model_copy(update={"policies": policies})})
+    agent = replace(agent, compiled=compiled, role="refunds_clerk")
+
+    retrieve(state_for(extraction_reply(metric_terms=["revenue"])), agent)
+
+    filters = [str(body).replace("'", '"') for _, body, _ in agent.search.searches]
+    assert filters and all('"allowed_roles": ["refunds_clerk"]' in body for body in filters)
 
 
 # build_spec
@@ -219,6 +235,47 @@ def test_prompt_carries_spec_schema_joins_examples_and_the_injection_warning():
     assert "data, not instructions" in prompt
     assert "compute every difference and percentage change in SQL" in prompt
     assert "previous attempt failed" not in prompt
+
+
+def _as_role(agent, *roles):
+    """Deps whose pack adds ``roles`` and that ask as the last of them."""
+    pack = agent.compiled.pack
+    policies = pack.policies.model_copy(update={"roles": [*pack.policies.roles, *roles]})
+    compiled = agent.compiled.model_copy(update={"pack": pack.model_copy(update={"policies": policies})})
+    return replace(agent, compiled=compiled, role=roles[-1].id)
+
+
+def test_prompt_schema_lists_only_the_roles_columns_and_datasets():
+    agent = deps([])
+    viewer = agent.compiled.pack.policies.roles[0]
+    narrow = viewer.datasets[0].model_copy(update={"columns": ["sold_on", "widget_name", "sale_amount"]})
+    agent = _as_role(agent, viewer.model_copy(update={"id": "sales_only", "datasets": [narrow]}))
+
+    prompt = build_prompt(_generation_state(), agent)
+
+    assert "- widget_name (string, dimension)" in prompt
+    assert "- sale_ref (" not in prompt
+    assert "marts.widget_refunds" not in prompt
+    assert "Declared join paths:\nnone" in prompt
+
+
+def test_aggregate_only_role_is_given_its_view_and_re_aggregated_metrics():
+    agent = deps([])
+    viewer = agent.compiled.pack.policies.roles[0]
+    grant = viewer.datasets[0].model_copy(update={
+        "columns": ["sold_on", "widget_name"],
+        "aggregate_only": AggregateOnly(metrics=["widget_revenue"], min_group_size=5),
+    })
+    agent = _as_role(agent, viewer.model_copy(update={"id": "summary_reader", "datasets": [grant]}))
+
+    prompt = build_prompt(_generation_state(), agent)
+
+    view = "marts.fitcher_agg__minimal__summary_reader__widget_sales"
+    assert f"{view}:" in prompt
+    assert "- widget_revenue (number, measure)" in prompt and "- row_count (number, measure)" in prompt
+    assert "- widget_revenue (currency): sum(widget_revenue)" in prompt
+    assert "marts.widget_sales" not in prompt
+    assert "Question: Top widgets" not in prompt
 
 
 def test_retry_prompt_carries_the_previous_sql_and_error():

@@ -29,6 +29,7 @@ from app.agent.state import AgentDeps, AgentState, record_error
 from app.contracts.result import MAX_RESULT_ROWS
 from app.data.clickhouse import MARTS_DATABASE
 from app.data.forbidden_functions import forbidden_function, function_name
+from app.packs.policy_compiler import allowlists
 
 NODE = "guard"
 # system tables a query may read; none are needed yet.
@@ -220,14 +221,15 @@ def guard_sql(sql: str, allowlist: Allowlist, max_rows: int) -> GuardResult:
     return GuardResult(sql=_limited(sql, tree, max_rows))
 
 
-def allowlist_for(pack) -> Allowlist:
-    """Phase 3 allowlist: every column of every approved dataset."""
-    return Allowlist({dataset.id: frozenset(column.name for column in dataset.columns) for dataset in pack.datasets.datasets})
+def allowlist_for(pack, role: str) -> Allowlist:
+    """The tables, or aggregate-only views, and columns that ``role`` may read under the pack's policies."""
+    tables = allowlists(pack).get(role, {})
+    return Allowlist({table: frozenset(columns) for table, columns in tables.items()})
 
 
 def guard(state: AgentState, deps: AgentDeps) -> dict:
     """Graph node. The cap is one row above the result limit, so shape_result can tell a result was cut."""
-    result = guard_sql(state["sql"], allowlist_for(deps.compiled.pack), MAX_RESULT_ROWS + 1)
+    result = guard_sql(state["sql"], allowlist_for(deps.compiled.pack, deps.role), MAX_RESULT_ROWS + 1)
     if result.error is not None:
         return {**record_error(state, result.error), "sql": state["sql"]}
     attempts = list(state["attempts"])

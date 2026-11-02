@@ -4,6 +4,7 @@
 
 ### Added
 
+- Reject an aggregate-only grant whose metric is not one sum or count, because the agent adds its per-group values up again.
 - Apply each pack's `policies.yaml` to ClickHouse in `compile_pack`: per-role roles with column grants, row policies, aggregate-only views that hide small groups, one login user per role with a password derived from `CLICKHOUSE_AGENT_PASSWORD`, and a shared read-only profile whose limits cannot be raised or set to 0; objects the policies no longer contain are revoked or dropped.
 - Let a policy grant a dataset as aggregates only (grouped columns, listed metrics, a minimum group size) and check each row filter as one boolean condition over the dataset's columns; the `ecommerce_twin` pack gains a row-filtered `northwest_sales` role and an aggregate-only `category_partner` role, and the search indices show an aggregate-only role its grouped columns and metrics but no examples.
 - Read a whole agent run with one query: the `agent_logs.trace_query_log` view exposes `system.query_log` rows by trace id to the trace reader, `infra/clickhouse/queries/trace.sql` lists the run row, node events, LLM calls, SQL attempts and query-log entries of a trace in time order with incomplete runs marked `INCOMPLETE`, LLM calls sent compared with those logged and the start of each query-log entry's SQL, and `docs/tracing.md` explains how to read it.
@@ -62,6 +63,7 @@
 
 ### Changed
 
+- Run every question as one pack role: retrieval searches only that role's items, the SQL guard checks that role's tables and columns, the SQL prompt shows only its permitted schema (an aggregate-only role gets its view and sums its metric columns), queries run as that role's ClickHouse user, `jobs.ask` takes `--role` and each eval case runs as its own role; the shared `agent_readonly` user is removed.
 - Plan Phase 6B, which builds every screen of the web app design on pack-owned sample data before the api phases, and give phases 6-12 a Web wiring section naming the features each moves to the real api.
 - Plan conversation delete as hiding it from its owner only: an admin can still read every conversation, deleted or not, in the console until the 90-day log TTL removes it.
 - Merge pull requests into `develop` once every CI and Security check passes, without waiting for a CodeRabbit review; findings CodeRabbit has already posted are still verified and fixed or answered.

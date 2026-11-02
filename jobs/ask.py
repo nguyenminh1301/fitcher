@@ -10,6 +10,10 @@ node events and SQL attempts are written to ClickHouse ``agent_logs`` under
 the printed trace id; a failed log write is reported on stderr and never
 changes the answer or exit code.
 
+``--role`` names the pack role to ask as (the first role of ``policies.yaml``
+by default): retrieval, the SQL guard and the ClickHouse user are that role's,
+so ClickHouse refuses anything the role may not read.
+
 ``--inject-sql-fault`` corrupts the first generated query with a call to an
 unknown function, so a live run shows the repair loop at work.
 """
@@ -32,6 +36,7 @@ from app.llm.client import LiteLLMClient
 from app.llm.embeddings import LiteLLMEmbeddings
 from app.observability.log_writer import start_log_writer
 from app.packs.compiler import CompileError, load_compiled
+from app.packs.models import Pack
 from app.search.opensearch import OpenSearch
 
 TABLE_ROWS = 50
@@ -77,7 +82,17 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--timezone", help="IANA time zone of the user; default UTC")
     parser.add_argument("--reference-date", type=date.fromisoformat, help="today's date for relative periods (YYYY-MM-DD)")
     parser.add_argument("--inject-sql-fault", action="store_true", help="break the first generated SQL to exercise repair")
+    parser.add_argument("--role", help="pack role to ask as; default: the first role of policies.yaml")
     return parser.parse_args(argv)
+
+
+def choose_role(pack: Pack, requested: str | None) -> str:
+    roles = [role.id for role in pack.policies.roles]
+    if requested is None and roles:
+        return roles[0]
+    if requested not in roles:
+        raise RuntimeError(f"'{requested}' is not a role of pack {pack.name}; roles: {', '.join(roles)}")
+    return requested
 
 
 def _cell(value: object) -> str:
@@ -127,17 +142,19 @@ def main(argv: list[str] | None = None) -> int:
             raise SettingsError("ACTIVE_PACK must be set")
         llm = LiteLLMClient(settings.litellm_base_url, settings.litellm_master_key)
         compiled = load_compiled(Path(settings.compiled_pack_dir), settings.active_pack)
+        role = choose_role(compiled.pack, args.role)
         # Query vectors must match the indexed ones, so the compiled size wins over the environment.
         embeddings = LiteLLMEmbeddings(settings.litellm_base_url, settings.litellm_master_key, compiled.embedding_dimensions)
         deps = AgentDeps(
             llm=FaultInjectingLLM(llm) if args.inject_sql_fault else llm,
             search=OpenSearch(settings.opensearch_url),
             embeddings=embeddings,
-            runner=ClickHouseRunner(agent_client(), QueryLimits.from_env()),
+            runner=ClickHouseRunner(agent_client(compiled.pack.name, role), QueryLimits.from_env()),
             compiled=compiled,
             today=args.reference_date or reference_date(args.timezone),
             logs=start_log_writer(settings),
             user_id="cli",
+            role=role,
         )
     except (SettingsError, CompileError, TimeResolutionError, RuntimeError) as error:
         print(error, file=sys.stderr)

@@ -1,5 +1,6 @@
 """Running an eval set through the graph, one case at a time."""
 
+from dataclasses import replace
 from datetime import date
 import time
 
@@ -152,3 +153,31 @@ def test_reference_sql_result_is_typed_by_the_pack():
     result = reference_result(_case("now"), agent)
 
     assert result.rows == [["Widget 0"]]
+
+
+def test_each_case_runs_as_its_role_with_that_roles_runner():
+    agent = deps([extraction_reply(), GOOD_SQL, "Blue led.", extraction_reply(), GOOD_SQL, "Blue led."], runner=None)
+    pack = agent.compiled.pack
+    auditor = pack.policies.roles[0].model_copy(update={"id": "auditor"})
+    policies = pack.policies.model_copy(update={"roles": [*pack.policies.roles, auditor]})
+    agent = replace(agent, compiled=agent.compiled.model_copy(update={"pack": pack.model_copy(update={"policies": policies})}))
+    runners: dict[str, FakeRunner] = {}
+
+    def runner_for(role: str) -> FakeRunner:
+        return runners.setdefault(role, FakeRunner(runs=[good_output(), good_output()]))
+
+    run = run_eval(
+        "minimal", _set(_case("first", role="viewer"), _case("second", role="auditor")), agent,
+        timeout=5.0, threshold=0.8, runner_for=runner_for,
+    )
+
+    assert set(runners) == {"viewer", "auditor"}
+    assert all(len(runner.calls) >= 2 for runner in runners.values())
+    roles_searched = {role for _, body, _ in agent.search.searches for role in body_roles(body)}
+    assert roles_searched == {"viewer", "auditor"}
+    assert len(run.cases) == 2
+
+
+def body_roles(body: dict) -> list[str]:
+    text = str(body)
+    return [role for role in ("viewer", "auditor") if f"'{role}'" in text]
