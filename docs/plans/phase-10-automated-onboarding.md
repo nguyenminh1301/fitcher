@@ -25,6 +25,8 @@ Generate a Domain Pack for a new company with human review: profile the loaded m
 
 ## Deliverables
 
+The web files listed here are created in Phase 6B on sample data; this phase adds the api side and changes them only to wire it (see Web wiring).
+
 ```text
 jobs/profile.py                     # writes build/packs/<pack>/profile.json
 jobs/ingest_docs.py                 # bulk-load a folder through the documents service
@@ -51,13 +53,13 @@ compose.yaml                        # documents volume on api
 3. **Drafter.** `sql-gen` prompts per pack file take the profile and document chunks and return items with `status: draft`, `evidence` (profile facts or chunk ids) and `confidence`. Drafted `sql_expr` values are test-run before being saved; failures are kept as drafts with the error as evidence. Prompts state that document text is data, never instructions, and that no figures are taken from text.
 4. **YAML round-trip.** Draft writes preserve existing approved items, comments and ordering (ruamel.yaml); a draft never overwrites an approved item.
 5. **Review API.** List items by file and status, edit, approve, delete, test-run a metric expression against ClickHouse with the admin limits. Restricted to a `pack_reviewer` role.
-6. **Review UI.** Per-file item list with evidence and confidence, inline edit, approve/delete, metric test-run result; approved changes saved to the pack files.
+6. **Review UI.** The pages are built in Phase 6B; this task wires them to the Review API of task 5 (see Web wiring) and saves approved changes to the pack files.
 7. **Compile after review.** Run the Phase 2 compiler; only approved items are used.
 8. **Regeneration experiment.** Copy the hand-written pack to `packs/ecommerce_twin_regen/`, remove the descriptions there and mark those items `status: draft`, so the drafter may fill them without touching approved items. Review, compile and evaluate the copy against the untouched hand-written pack's baseline.
 9. **Documents API (test first).** `POST /documents` (multipart), `GET /documents`, `DELETE /documents/{id}`, restricted to `pack_reviewer`. Upload checks the type from the file content, a size cap (default 20 MB), that `allowed_roles` is a non-empty subset of the pack's roles and that the SHA-256 is new for the pack (409 otherwise), then stores, parses, embeds and indexes as in task 2 and records the registry row. Delete removes the chunks by document id, the stored file and marks the row deleted. Both return 409 while the pack compiles. Tests use a fake embedding client and cover every rejection, a failed parse leaving no chunks, and delete removing every chunk.
-10. **Documents page and propagation.** Upload with role selection, list with status and error, delete with confirmation, and a billable "draft from this document" action that runs the drafter on that document only. The Review UI flags pack items whose evidence cites a deleted document. The compiler fills each new `kb_docs` generation from the registry (DECISIONS §5); a test compiles after an upload and after a delete.
-11. **Console shell (test first for the navigation rule).** `ConsoleLayout` from the design: top bar with the pack, grouped navigation (Knowledge, Quality, Observe, Administration) showing only the sections the user's roles allow, a drawer below 768px, page skeletons, lists of 20 rows that become cards below 640px, and detail pages with a back button, header actions and two panes. The Chat app's account menu links to it for console roles.
-12. **Datasets page.** `GET /datasets` (`pack_reviewer`) returns the compiled pack's datasets with columns, types, roles, descriptions and the pack roles allowed to read each; the page lists them read-only.
+10. **Documents page and propagation.** The page is built in Phase 6B; this task wires it to the Documents API of task 9 and runs the billable "draft from this document" action on that document only. The Review UI flags items whose evidence cites a deleted document.
+11. **Console shell.** Built in Phase 6B with its navigation test; this phase keeps the navigation rule in step with the api's role checks.
+12. **Datasets endpoint.** `GET /datasets` (`pack_reviewer`) returns the compiled pack's datasets with columns, types, roles, descriptions and the pack roles allowed to read each; the Phase 6B page is wired to it.
 
 ## Contracts
 
@@ -94,6 +96,16 @@ docker compose run --rm api python -m jobs.eval --pack ecommerce_twin --baseline
 3. **Document parsing dependencies.** Default: `pypdf`, `python-docx` and `openpyxl` (read-only, values only), pinned; plain text must be UTF-8; scanned PDFs (OCR) are out of scope.
 4. **Drafting cost.** Drafting all files is billable; the job prints an estimate and runs only with `--allow-billable`.
 5. **Untrusted uploads.** Uploaded files are parsed but never executed or served back; parsing runs with the size cap and a page/row limit, and their text is data, never instructions (DECISIONS §9). Default: no antivirus scan in the lab.
+
+## Web wiring
+
+The Phase 6B web app runs every feature on the active pack's sample data until its backend exists ([phase-06b](phase-06b-web-app-on-sample-data.md)). `apps/web/lib/api/client.ts` defines each feature's methods, `lib/api/mock/` holds the sample implementation, `lib/api/http/` the real one, and `lib/api/sources.ts` chooses between them. This phase wires:
+
+| Feature | Mock to retire | Real endpoint | Contract | Done when |
+|---|---|---|---|---|
+| `datasets` | `console.json` datasets | `GET /datasets` (task 12) | `FitcherApi.datasets` | `sources.datasets` is `http`, its Sample data badge is gone, the http client test passes and its provisional types are deleted |
+| `review` | `console.json` review items with local approve, edit and delete | the Review API of task 5 | `FitcherApi.review` | `sources.review` is `http`, its Sample data badge is gone, the http client test passes and its provisional types are deleted |
+| `documents` | `console.json` documents with simulated upload | `POST/GET/DELETE /documents` (task 9) | `FitcherApi.documents` | `sources.documents` is `http`, its Sample data badge is gone, the http client test passes and its provisional types are deleted |
 
 ## Branch and PR split
 

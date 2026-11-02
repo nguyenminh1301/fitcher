@@ -66,6 +66,10 @@ python scripts/check_pack_isolation.py
 2. **Active pack switching.** DECISIONS allows one active pack per run. Default: switch with `ACTIVE_PACK` and restart `api`; both packs coexist because Phase 2 indices and aliases are pack-scoped (`<pack>_<index>`), and compiling one pack never touches the other's indices.
 3. **dbt selection by pack.** Default: one dbt project with a folder and tag per pack, built with `--select tag:<pack>`.
 
+## Web wiring
+
+No feature is wired in this phase. The new pack ships its own `sample_data/` (Phase 6B), the web app runs on it with `ACTIVE_PACK` switched, and `git diff --stat <phase base>..HEAD -- apps/web` prints nothing.
+
 ## Branch and PR split
 
 - `feat/db/load-second-industry-dataset`: tasks 1-3.

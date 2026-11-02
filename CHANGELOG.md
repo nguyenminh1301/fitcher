@@ -60,6 +60,7 @@
 
 ### Changed
 
+- Plan Phase 6B, which builds every screen of the web app design on pack-owned sample data before the api phases, and give phases 6-12 a Web wiring section naming the features each moves to the real api.
 - Plan conversation delete as hiding it from its owner only: an admin can still read every conversation, deleted or not, in the console until the 90-day log TTL removes it.
 - Merge pull requests into `develop` once every CI and Security check passes, without waiting for a CodeRabbit review; findings CodeRabbit has already posted are still verified and fixed or answered.
 - Bring the Fitcher web app design into the architecture: DECISIONS §15 and `docs/design/web-app.md` define the Chat app and workspace console, conversation management with personal groups, edit and retry of a turn, the English/Vietnamese interface and light and dark themes, and the Datasets, Feedback, Evaluation and Users console sections; §9 and §10 add Keycloak role management through a restricted service account, a minimum of 1 on every query limit and the `conversations`, `conversation_groups` and `admin_actions` tables; the Phase 6, 8, 9, 10 and 12 plans and the master plan carry the matching tasks.

@@ -81,6 +81,16 @@ docker compose run --rm api python -m jobs.eval --pack ecommerce_twin --baseline
 4. **Search cost.** Search scans the user's rows by the `(user_id, …)` key with `positionCaseInsensitiveUTF8` over folded text. Default: enough for the lab; a search index is out of scope.
 5. **Existing `chat_messages` columns.** Phase 5 created the table without `turn`, `revision` and `result`. Default: the apply job adds them with `ALTER TABLE … ADD COLUMN IF NOT EXISTS`, and initdb creates them on a fresh volume.
 
+## Web wiring
+
+The Phase 6B web app runs every feature on the active pack's sample data until its backend exists ([phase-06b](phase-06b-web-app-on-sample-data.md)). `apps/web/lib/api/client.ts` defines each feature's methods, `lib/api/mock/` holds the sample implementation, `lib/api/http/` the real one, and `lib/api/sources.ts` chooses between them. This phase wires:
+
+| Feature | Mock to retire | Real endpoint | Contract | Done when |
+|---|---|---|---|---|
+| `conversations` | `mock/conversations.ts` browser storage | the conversation endpoints of task 11, and `edit_of_turn` / `retry_of_turn` on `/ask` (task 12) | `FitcherApi.conversations` | `sources.conversations` is `http`, its Sample data badge is gone, the http client test passes and its provisional types are deleted |
+
+Clarify options already send a follow-up turn in the web app; with this phase they reach the clarify branch.
+
 ## Branch and PR split
 
 - `feat/agent/route-intents-and-store-turns`: tasks 1-3, 8.

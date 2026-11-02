@@ -71,6 +71,10 @@ docker compose run --rm api python -m jobs.eval --pack ecommerce_twin --baseline
 3. **Aggregate-only granularity.** Default: one view per role and dataset with the dimensions listed in the policy.
 4. **Sample credentials.** Lab-user passwords are never committed; they come from the developer's `.env` and are never reused elsewhere.
 
+## Web wiring
+
+No web feature is wired in this phase. The demo identities in `packs/<pack>/sample_data/console.json` (Phase 6B) use the roles of `policies.yaml`; keep them in step when a role is added or removed.
+
 ## Branch and PR split
 
 - `feat/pack/compile-access-policies`: tasks 1-5.
