@@ -101,6 +101,7 @@
 - Reject incomplete taxi-zone lookups, including row-boundary truncation, and publish downloaded inputs with permissions readable by the Linux API container.
 - Include project source paths in CodeRabbit reviews alongside the workspace baseline exceptions.
 - Align contribution rules, review guidance and PR checklists with the implemented Python/Next.js stack and PostgreSQL initialization behavior.
+- Reject a metric `sql_expr` that calls a function the SQL guard forbids (`file`, `sleep`, `dictGet`, `joinGet` and the rest of the guard's list) when the pack compiles, before it is test-run as the ClickHouse admin; such a metric used to compile and then fail every query built on it.
 
 ### Security
 

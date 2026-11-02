@@ -206,6 +206,19 @@ def test_metric_expression_must_be_a_single_expression(sql_expr):
         check_metric_expression(sql_expr)
 
 
+@pytest.mark.parametrize("sql_expr", [
+    "sum(x) + length(file('a.txt'))",
+    "sum(x) + sleep(1)",
+    "dictGet('d', 'v', toUInt64(1))",
+    "sum(x) * joinGet('j', 'v', 1)",
+])
+def test_metric_expression_rejects_functions_the_sql_guard_forbids(sql_expr):
+    # Every query using the metric would be refused by the guard, and the
+    # compile test-run itself runs as the ClickHouse admin.
+    with pytest.raises(ValueError, match=r"function \w+\(\) is not allowed"):
+        check_metric_expression(sql_expr)
+
+
 @pytest.mark.parametrize("sql_expr", ["count()", "sumIf(a, b != 'x') / nullIf(uniqExactIf(c, b != 'x'), 0)"])
 def test_metric_expression_accepts_aggregates(sql_expr):
     check_metric_expression(sql_expr)

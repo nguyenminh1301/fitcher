@@ -21,6 +21,7 @@ from pydantic import BaseModel, ConfigDict
 import sqlglot
 from sqlglot import exp
 
+from app.data.forbidden_functions import forbidden_function
 from app.llm.embeddings import EmbeddingClient
 from app.packs.loader import check_references, load_pack
 from app.packs.models import Pack
@@ -147,7 +148,7 @@ def approved_pack(pack: Pack) -> Pack:
 
 
 def check_metric_expression(sql_expr: str) -> None:
-    """Raise ValueError unless ``sql_expr`` parses as exactly one scalar expression."""
+    """Raise ValueError unless ``sql_expr`` parses as exactly one scalar expression the SQL guard would accept."""
     # Parsing into a condition accepts expressions only: statements, a second
     # statement after ";" and trailing clauses such as FROM are parse errors.
     try:
@@ -156,6 +157,8 @@ def check_metric_expression(sql_expr: str) -> None:
         raise ValueError(f"does not parse as one expression: {_first_line(error)}") from None
     if node.find(exp.Query, exp.Subquery):
         raise ValueError("must not contain a subquery")
+    if name := forbidden_function(node):
+        raise ValueError(f"function {name}() is not allowed")
 
 
 def test_metrics(pack: Pack, warehouse: Warehouse) -> list[str]:
