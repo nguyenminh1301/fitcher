@@ -38,12 +38,16 @@ def check_alias(alias: str) -> None:
 class LiteLLMClient:
     """OpenAI-compatible ``/v1/chat/completions`` calls through the LiteLLM proxy."""
 
-    def __init__(self, base_url: str, api_key: str, http: httpx.Client | None = None):
+    def __init__(
+        self, base_url: str, api_key: str, http: httpx.Client | None = None, temperature: float | None = None
+    ):
+        """``temperature`` is sent with every call when set; the proxy drops it for models that reject it."""
         if not base_url or not api_key:
             raise LLMError("LITELLM_BASE_URL and LITELLM_MASTER_KEY must be set")
         self._url = f"{base_url.rstrip('/')}/v1/chat/completions"
         self._headers = {"Authorization": f"Bearer {api_key}"}
         self._http = http or httpx.Client(timeout=TIMEOUT_SECONDS)
+        self._temperature = temperature
 
     def structured(self, alias: str, prompt: str, schema: type[ModelT]) -> ModelT:
         response_format = {
@@ -67,6 +71,8 @@ class LiteLLMClient:
         payload: dict = {"model": alias, "messages": [{"role": "user", "content": prompt}]}
         if response_format is not None:
             payload["response_format"] = response_format
+        if self._temperature is not None:
+            payload["temperature"] = self._temperature
         try:
             response = self._http.post(self._url, json=payload, headers=self._headers)
         except httpx.HTTPError as error:
