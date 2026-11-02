@@ -60,6 +60,7 @@
 
 ### Changed
 
+- Bring the Fitcher web app design into the architecture: DECISIONS §15 and `docs/design/web-app.md` define the Chat app and workspace console, conversation management with personal groups, edit and retry of a turn, the English/Vietnamese interface and light and dark themes, and the Datasets, Feedback, Evaluation and Users console sections; §9 and §10 add Keycloak role management through a restricted service account, a minimum of 1 on every query limit and the `conversations`, `conversation_groups` and `admin_actions` tables; the Phase 6, 8, 9, 10 and 12 plans and the master plan carry the matching tasks.
 - Mark Phase 5 (logging and tracing) complete in the README and name Phase 6 (RBAC and auth) as the next step.
 - Name the reference row by its position instead of its key values when an eval answer misses a key combination or cannot pair its measures, so stored eval reports carry no result values.
 - Raise the `ecommerce_twin` eval baseline to 20 of 22 execution matches (91%, above the 80% pack threshold) after the ranking and extraction fixes, with the remaining failures listed in `docs/eval/ecommerce_twin-baseline.md`.

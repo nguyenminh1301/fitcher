@@ -27,7 +27,7 @@ The repository and package names remain `fitcher`; Finch-Lab names the architect
 
 | Component | Choice | Notes |
 |---|---|---|
-| Frontend | Next.js | Chat, tables, charts, SQL view, Review UI, Admin UI |
+| Frontend | Next.js | Chat app and workspace console (§15): chat, tables, charts, SQL view, Review, Documents and Admin pages; English/Vietnamese interface, light and dark themes |
 | Auth | Keycloak (OIDC) | JWT carries roles; realm imported from a file |
 | API | FastAPI | sync/async, SSE |
 | Orchestration | LangGraph | one graph; nodes deterministic where possible |
@@ -64,7 +64,7 @@ Long-running services:
 - `opensearch` (:9200)
 - `clickhouse` (:8123 / :9000)
 
-Jobs share the `api` image and run manually or from CI:
+Jobs share the `api` image and run manually or from CI; an admin can also start an eval run from the Evaluation page (§15), which runs the same code inside `api`:
 
 - `load_data.py`
 - `dbt run`
@@ -263,6 +263,7 @@ Principles:
 - Chart types invalid for the data are disabled in the UI.
 - The LLM never generates chart data.
 - PNG and CSV export are available.
+- The interface labels the `pie` type as a donut; the contract keeps `pie`.
 
 ## 9. RBAC
 
@@ -277,6 +278,8 @@ Principles:
 - **Layer 3, ClickHouse:** the real security layer.
 - **Aggregate-only:** grant only on pre-aggregated views that also hide groups with fewer than k records. Never enforced by analysing SQL.
 - Keycloak roles map 1:1 to ClickHouse users/roles. The API never gives credentials to the LLM.
+- Users still sign in only through Keycloak. An `admin` may change another user's pack roles and disable or enable that user on the Users page (§15); the api does this through the Keycloak Admin API with a dedicated confidential client whose service account holds only `view-users` and `manage-users`. The api never creates or deletes users, sets credentials or changes the acting admin's own account, and writes every change to `agent_logs.admin_actions`. A changed role takes effect when the user's access token is next refreshed.
+- Every per-query limit in a ClickHouse settings profile has a minimum of 1 as well as a maximum, because 0 means unlimited.
 - Every ALLOW/DENY decision is written to `agent_logs.audit`.
 - Retrieved content (documents, column values) is **data, not instructions**. Prompts must state this explicitly to resist prompt injection.
 
@@ -291,14 +294,18 @@ Tables (MergeTree, 90-day TTL, ordered by `(trace_id, ts)`, `(user_id, ts)` or, 
 | `llm_calls` | alias, model, tokens, cost, errors (written through a LiteLLM callback) |
 | `sql_runs` | SQL, ch_query_id, rows, errors, retry count |
 | `audit` | ALLOW/DENY, blocked tables, role |
-| `chat_messages` | conversation_id, role, content, QuerySpec |
+| `chat_messages` | conversation_id, turn, revision, role, content, QuerySpec, shaped Result (at most 5,000 rows) |
+| `conversations` | conversation_id, user, title, pinned, group, deleted flag, update time (§15) |
+| `conversation_groups` | group id, user, name, deleted flag, update time (§15) |
 | `feedback` | like/dislike, notes |
 | `eval_reports` | pack, execution rate, threshold result, full JSON report from `eval.py` (§12) |
 | `example_proposals` | pack, question, SQL and source trace proposed from dislikes or failed runs (§11 step 8) |
+| `admin_actions` | acting admin, action, target user, old and new value (§9) |
 
 - Log writer: async batches inside the `api` process. `trace_id` comes from the OpenTelemetry context.
 - JOIN with `system.query_log` through `log_comment`; no syncer needed.
-- Conversation state for follow-up questions is read back from `chat_messages`.
+- Conversation state for follow-up questions is read back from `chat_messages`: for each turn the latest revision, without the turns that an edit or retry of an earlier turn replaced (§15).
+- `conversations` and `conversation_groups` are `ReplacingMergeTree` tables keyed by user and id with the update time as version, so a rename, pin, move or delete is a new row; they expire 90 days after their last update, like the messages.
 
 ## 11. Onboarding a new company
 
@@ -313,7 +320,7 @@ Tables (MergeTree, 90-day TTL, ordered by `(trace_id, ts)`, `(user_id, ts)` or, 
    - index into OpenSearch
    - generate ClickHouse permissions
 7. **eval**: run `eval.yaml`, measured per layer (intent, dataset/columns, result). The pack is enabled only after reaching the threshold.
-8. **Feedback loop:** dislikes or failed runs in `agent_logs` -> propose new examples -> back to Review.
+8. **Feedback loop:** dislikes or failed runs in `agent_logs` -> propose new examples (in bulk with `propose_examples.py`, or for one run from the Feedback page) -> back to Review.
 
 ## 12. Eval
 
@@ -330,7 +337,7 @@ Tables (MergeTree, 90-day TTL, ordered by `(trace_id, ts)`, `(user_id, ts)` or, 
   - ambiguous question (must return clarify)
   - unauthorized question (must return deny)
   - out-of-scope question
-- Run with `eval.py --pack <company>`. Reports are stored in `agent_logs` and printed as Markdown.
+- Run with `eval.py --pack <company>`, or by an `admin` from the Evaluation page (§15). Reports are stored in `agent_logs` and printed as Markdown.
 
 ## 13. Code conventions
 
@@ -353,3 +360,19 @@ Tables (MergeTree, 90-day TTL, ordered by `(trace_id, ts)`, `(user_id, ts)` or, 
 - Ambiguous "best-selling": use the default convention in `business_profile.yaml` if present; otherwise clarify.
 - Embedding model: the latest OpenAI embedding model available on LiteLLM. Changing the model requires a full reindex.
 - Pack eval threshold (§11): execution match >= 80% of the active eval cases; below it `eval.py` exits 1.
+
+## 15. Web application
+
+The interface follows the Fitcher web app design, summarized in [design/web-app.md](design/web-app.md); its component names are the names used in `apps/web`.
+
+- **Two surfaces, one sign-in.** The Chat app is for every role. The workspace console is for console roles: `pack_reviewer` sees Review, Documents, Datasets, Feedback and Evaluation; `admin` sees Runs and trace, Audit, Costs, Evaluation and Users. Navigation lists only the sections the user's roles allow, and the api enforces the same rule on every endpoint. A console role reaches the console from the account menu.
+- **Conversations.** A user can start, list, search, pin, rename and delete their own conversations and sort them into personal groups. The sidebar shows Pinned, Groups and Recent (today, past week, past month). A group is a folder only: conversations never share context, and there is no sharing or collaboration. A conversation's title is its first question cut to 80 characters; no LLM call names it. Search matches titles and the user's own questions, inside the user's conversations only. Delete hides the conversation at once; its rows expire with the 90-day log TTL, after which history is gone.
+- **Messages.** Under an answer: copy, like, dislike with an optional note, and retry. Under the user's own message: copy and edit. Edit and retry write a new revision of that turn and answer it again; the turns after it in the older revision leave the conversation and its context.
+- **Language.** The English/Vietnamese switch translates the interface only: navigation, labels, step names, notices the app raises, chart axes and number and date formats. User messages, answers and pack content keep the language they were written in (§6). The choice is kept per browser.
+- **Theme.** Light and dark, following the system setting unless the user picks one; the choice is kept per browser.
+- **Visual system.** Primer-based colour, type and spacing tokens with the fitcher neutrals from `docs/brand`, the Inter font with its Vietnamese subset, Lucide icons; WCAG 2.2 AA in both themes.
+- **Datasets page.** A read-only view of the compiled pack's datasets: columns, types, roles and which pack roles may read each dataset.
+- **Feedback page.** Likes and dislikes with their notes, question and trace; a reviewer can propose an example from one disliked or failed run, which runs the same proposal code as `propose_examples.py` (§11 step 8).
+- **Evaluation page.** Reads `eval_reports`: per-layer rates, the threshold result, the required question categories and failed cases. An `admin` can start a run of the active pack's eval set: it is labelled as using paid AI, asks for confirmation, runs one at a time per pack inside `api`, and stores its report like `eval.py`.
+- **Users page.** Lists realm users with their pack roles and status; an `admin` changes roles and disables or enables users as set in §9.
+- **Costs page.** LLM cost by day, alias and model from `llm_calls`, always labelled as an estimate.

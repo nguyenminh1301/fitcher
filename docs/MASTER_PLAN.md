@@ -106,7 +106,7 @@ Phases are ordered to reach **one end-to-end flow as early as possible**. Each p
 
 - **Goal:** trace every step of a run.
 - **Deliverables:**
-  - Database `agent_logs` with 7 tables, a dedicated user and TTL
+  - Database `agent_logs` with the log tables of DECISIONS §10, dedicated users and TTL
   - Async batched log writer inside the api process
   - LiteLLM callback writing to `llm_calls`
   - `log_comment = trace_id` set on execute
@@ -152,17 +152,22 @@ Phases are ordered to reach **one end-to-end flow as early as possible**. Each p
   - `clarify` branch, supporting default conventions from `business_profile`
   - `metadata_qa` branch using glossary + `kb_docs`
   - `chart_edit` branch reusing the previous result
+  - Conversation endpoints: list, search, pin, rename, personal groups, delete; edit and retry of a turn (DECISIONS §15)
 - **DoD:**
   - "What about last year?" uses the previous turn's QuerySpec
   - "Draw it as a line" generates no SQL
   - An ambiguous question returns clarify
   - The eval set gains the corresponding question groups
+  - A user manages only their own conversations, and editing an earlier question replaces the turns after it
 
 ## Phase 9: Chat and chart frontend
 
-- **Goal:** the end-user interface.
+- **Goal:** the end-user interface: the Chat app of the Fitcher web app design (DECISIONS §15).
 - **Deliverables:**
-  - Next.js: OIDC login, SSE chat, per-step status display
+  - The design's visual system and shared components, light and dark themes
+  - Next.js: OIDC login, conversation sidebar with search and groups, SSE chat, per-step status display
+  - Message actions: copy, like/dislike, retry, edit
+  - English/Vietnamese interface switch that never changes content
   - Data table (TanStack)
   - SQL view
   - Warning display
@@ -176,6 +181,7 @@ Phases are ordered to reach **one end-to-end flow as early as possible**. Each p
   - The acceptance question shows a grouped bar
   - Switching between bar / table / line makes no API call
   - A pie chart is never shown for a time series
+  - Switching EN/VI changes the interface, not the answer
 
 ## Phase 10: Automated onboarding
 
@@ -185,6 +191,7 @@ Phases are ordered to reach **one end-to-end flow as early as possible**. Each p
   - `ingest_docs.py`: parse, chunk, load into `kb_docs`
   - Documents page in web: upload PDF/DOCX/MD/TXT/XLSX, list and delete company documents at runtime, each with its `allowed_roles`
   - `draft_pack.py`: drafts with `evidence` and `confidence`
+  - Workspace console shell with role-based navigation, and a read-only Datasets page
   - Review UI in web: approve / edit / delete each item, test-run metrics, write approved YAML
   - Compile the pack after review
 - **DoD:**
@@ -210,6 +217,9 @@ Phases are ordered to reach **one end-to-end flow as early as possible**. Each p
     - trace detail view
     - denied audit view
     - LLM cost view
+    - Feedback page proposing an example from one run
+    - Evaluation page over `eval_reports`, with an admin-started eval run
+    - Users page changing pack roles and disabling users through Keycloak
   - A job proposing new examples from disliked or failed runs -> into the Review UI
 - **DoD:**
   - A disliked question -> appears as a proposal -> is approved -> passes in the next eval run
