@@ -1,10 +1,12 @@
 """Score one eval case per layer from the graph's final state (DECISIONS §12).
 
-- intent: not scored until the router exists.
+- intent: the router chose the labelled intent.
 - extraction: the resolved periods, ``top_n`` and ``rank_by`` match the labels exactly.
 - retrieval: recall of the labelled dataset and columns among the retrieved candidates.
 - execution: the answer's result set matches the reference result; for a case
-  that expects a denial, the run was denied (its other layers are not scored).
+  that expects a denial, a clarifying question or an out-of-scope reply, the
+  run ended that way. A denial and an out-of-scope reply score no extraction
+  or retrieval.
 
 A case whose branch a later phase builds is not scored on any layer.
 """
@@ -139,19 +141,51 @@ def score_denial(state: AgentState) -> LayerScore:
     return LayerScore(status="fail", reason=f"expected a denial, got {errors[-1] if errors else 'no decision'}")
 
 
+def score_intent(expected: EvalExpected, state: AgentState) -> LayerScore:
+    got = state.get("intent")
+    if got == expected.intent:
+        return LayerScore(status="pass")
+    return LayerScore(status="fail", reason=f"expected {expected.intent}, got {got or 'no intent'}")
+
+
+def score_clarification(state: AgentState) -> LayerScore:
+    if state.get("clarification") is not None:
+        return LayerScore(status="pass")
+    if state.get("result") is not None:
+        return LayerScore(status="fail", reason="expected a clarifying question, but the question was answered")
+    if state.get("rejection"):
+        return LayerScore(status="fail", reason=f"expected a clarifying question, but the question was rejected: {state['rejection']}")
+    if state.get("denial") is not None:
+        return LayerScore(status="fail", reason="expected a clarifying question, but the question was denied")
+    return LayerScore(status="fail", reason="expected a clarifying question, got no decision")
+
+
+def score_reply(state: AgentState) -> LayerScore:
+    if state.get("attempts"):
+        return LayerScore(status="fail", reason="expected an out-of-scope reply, but SQL was generated")
+    if state.get("reply") is not None:
+        return LayerScore(status="pass")
+    return LayerScore(status="fail", reason="expected an out-of-scope reply, got none")
+
+
 def score_case(case: EvalCase, state: AgentState, reference: Result | None, *, active: bool) -> CaseScore:
-    if active and case.expected.outcome == "deny":
-        decision_only = LayerScore(status="not_scored", reason="a denied question scores the decision only")
-        layers = {**dict.fromkeys(LAYERS, decision_only), "execution": score_denial(state)}
-        return CaseScore(case_id=case.id, category=case.category, question=case.question, active=active, layers=layers)
+    expected = case.expected
+    decision_only = LayerScore(status="not_scored", reason="this case scores the decision only")
     if not active:
         skipped = LayerScore(status="not_scored", reason=f"not yet scored: active from phase {case.active_from_phase}")
         layers = dict.fromkeys(LAYERS, skipped)
+    elif expected.outcome == "deny":
+        layers = {"intent": score_intent(expected, state), "extraction": decision_only, "retrieval": decision_only,
+                  "execution": score_denial(state)}
+    elif expected.intent == "out_of_scope":
+        layers = {"intent": score_intent(expected, state), "extraction": decision_only, "retrieval": decision_only,
+                  "execution": score_reply(state)}
     else:
+        execution = score_clarification(state) if expected.outcome == "clarify" else score_execution(case, state, reference)
         layers = {
-            "intent": LayerScore(status="not_scored", reason="router not built"),
-            "extraction": score_extraction(case.expected, state),
-            "retrieval": score_retrieval(case.expected, state),
-            "execution": score_execution(case, state, reference),
+            "intent": score_intent(expected, state),
+            "extraction": score_extraction(expected, state),
+            "retrieval": score_retrieval(expected, state),
+            "execution": execution,
         }
     return CaseScore(case_id=case.id, category=case.category, question=case.question, active=active, layers=layers)

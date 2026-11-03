@@ -180,13 +180,16 @@ class EvalCase(Draftable):
     question: str
     language: str
     category: Literal[
-        "two_period_compare", "top_n", "string_filter", "monthly_trend", "ambiguous", "unauthorized", "out_of_scope"
+        "two_period_compare", "top_n", "string_filter", "monthly_trend", "ambiguous", "unauthorized", "out_of_scope",
+        "follow_up",
     ]
     role: str
     expected: EvalExpected
     expected_sql: str | None = None
     expected_rows: list[dict[str, Scalar | None]] | None = None
     active_from_phase: int | None = None
+    # Asked first in the same conversation; the case's question follows it up.
+    previous_question: str | None = None
 
 
 class EvalFile(PackModel):

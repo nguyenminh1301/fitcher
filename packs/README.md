@@ -12,7 +12,7 @@ Git is the source of truth for packs; the engine under `apps/` contains no pack-
 | `relationships.yaml` | The only join paths generated SQL may use |
 | `examples.yaml` | Questions with canonical SQL for few-shot prompts |
 | `policies.yaml` | Roles with the datasets, columns, optional row filter and optional aggregate-only grant each may read |
-| `eval.yaml` | Labelled questions covering every required category, with the expected intent, outcome, extraction, retrieval and reference SQL |
+| `eval.yaml` | Labelled questions covering every required category, with the expected intent, outcome, extraction, retrieval and reference SQL; a `follow_up` case also names the `previous_question` it continues |
 
 Every list item carries `status` (`draft` or `approved`), `evidence` (`[{kind, ref}]`, kind one of `manual`, `profile`, `doc`, `error`, `trace`) and `confidence`; only approved items are compiled.
 Shared definitions live in `_schema/common.schema.json`.

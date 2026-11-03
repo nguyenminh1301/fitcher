@@ -33,7 +33,7 @@ def _case(case_id: str, **updates) -> EvalCase:
 
 def _inactive(case_id: str) -> EvalCase:
     expected = EvalExpected(intent="out_of_scope", outcome="deny")
-    return _case(case_id, category="out_of_scope", expected=expected, expected_sql=None, active_from_phase=8)
+    return _case(case_id, category="out_of_scope", expected=expected, expected_sql=None, active_from_phase=9)
 
 
 def _set(*cases: EvalCase) -> EvalSet:
@@ -111,7 +111,7 @@ def test_exception_in_one_case_does_not_stop_the_run():
     assert crashed.error.startswith("KeyError")
     assert {crashed.layers[layer].status for layer in ("extraction", "retrieval", "execution")} == {"fail"}
     assert crashed.layers["execution"].reason == crashed.error
-    assert crashed.layers["intent"].status == "not_scored"
+    assert crashed.layers["intent"].status == "fail"
     assert survived.error is None
     assert survived.layers["execution"].status == "pass"
 
@@ -193,3 +193,39 @@ def test_deny_case_runs_no_reference_query():
     assert agent.runner.calls == []
     assert run.cases[0].layers["execution"].status == "pass"
     assert run.reference_errors == []
+
+
+def _follow_up_case(case_id: str = "last_year") -> EvalCase:
+    q1_2023 = EvalPeriod(label="Q1 2023", start="2023-01-01", end="2023-04-01")
+    expected = EvalExpected(
+        intent="data_query", outcome="answer", periods=[q1_2023, Q1_2024], top_n=10, rank_by="widget_revenue",
+        dataset="widget_sales", columns=["widget_name"],
+    )
+    return _case(
+        case_id, category="follow_up", question="What about last year?", expected=expected,
+        previous_question="Top 10 widgets in Q1 2024 vs Q1 2025",
+    )
+
+
+def test_follow_up_case_asks_its_previous_question_first():
+    follow_up = extraction_reply(periods=[], previous_periods={"unit": "year", "offset": -1})
+    agent = deps(
+        [routing_reply(), extraction_reply(), GOOD_SQL, "Blue led.", routing_reply(), follow_up, GOOD_SQL, "Blue led again."],
+        runner=FakeRunner(runs=[good_output(), good_output(), good_output()]),
+    )
+
+    [score] = _run(_set(_follow_up_case()), agent).cases
+
+    assert [score.layers[layer].status for layer in ("intent", "extraction", "execution")] == ["pass", "pass", "pass"]
+    prompts = [call.prompt for call in agent.llm.calls if call.schema is not None and call.schema.__name__ == "Extraction"]
+    assert "Earlier turns" not in prompts[0]
+    assert "Earlier turns" in prompts[1] and "Top 10 widgets in Q1 2024 vs Q1 2025" in prompts[1] and "Blue led." in prompts[1]
+
+
+def test_a_failed_previous_question_fails_the_case():
+    agent = deps([RuntimeError("gateway exploded")], runner=FakeRunner(runs=[good_output()]))
+
+    [score] = _run(_set(_follow_up_case()), agent).cases
+
+    assert score.error == "previous question: RuntimeError: gateway exploded"
+    assert score.layers["execution"].status == "fail"

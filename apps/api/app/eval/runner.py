@@ -2,8 +2,9 @@
 
 Each active case first obtains its reference result, from ``expected_sql``
 run on the read-only ClickHouse user or from inline ``expected_rows``, then
-asks its question with its own trace id and a time limit. Every case runs as
-its ``role``: retrieval, the guard and, through ``runner_for``, the ClickHouse
+asks its question with its own trace id and a time limit; a case with a
+``previous_question`` asks that first, and its question follows it up in the
+same conversation within the same time limit. Every case runs as its ``role``: retrieval, the guard and, through ``runner_for``, the ClickHouse
 user are that role's, and so is its reference query. A failing reference
 query, an exception or a timeout fails that case and the run continues;
 inactive cases are reported without running.
@@ -20,8 +21,9 @@ from pydantic import BaseModel
 
 from app.agent.graph import run_question
 from app.agent.nodes.shape_result import describe_column, to_result
-from app.agent.state import AgentDeps, QueryRunner
+from app.agent.state import AgentDeps, AgentState, QueryRunner
 from app.contracts.result import Result
+from app.conversation.store import Turn
 from app.data.clickhouse import QueryError
 from app.eval.cases import EvalSet, is_active
 from app.eval.scorers import CaseScore, LayerScore, score_case
@@ -36,6 +38,10 @@ class CaseTimeout(Exception):
 
 class ReferenceQueryError(Exception):
     """A case's reference result could not be obtained."""
+
+
+class PreviousQuestionError(Exception):
+    """The question a follow-up case follows could not be asked."""
 
 
 def call_with_timeout(fn: Callable[[], T], seconds: float) -> T:
@@ -106,6 +112,26 @@ def _failed(case: EvalCase, reference: Result | None, error: str) -> CaseScore:
     return score.model_copy(update={"layers": layers, "error": error})
 
 
+def _answer(state: AgentState) -> str:
+    clarification = state.get("clarification")
+    return state.get("summary") or state.get("reply") or (clarification.question if clarification else "")
+
+
+def ask_in_conversation(case: EvalCase, deps: AgentDeps) -> AgentState:
+    """Ask the case's question, after its previous question when it has one."""
+    if case.previous_question is None:
+        return run_question(case.question, deps)
+    try:
+        previous = run_question(case.previous_question, deps)
+    except Exception as error:  # noqa: BLE001 - reported as the case's error
+        raise PreviousQuestionError(f"previous question: {type(error).__name__}: {error}") from error
+    turn = Turn(
+        turn=1, revision=1, question=case.previous_question, answer=_answer(previous), query_spec=previous.get("spec"),
+        result=previous.get("result"), trace_id=previous["trace_id"],
+    )
+    return run_question(case.question, replace(deps, history=(turn,)))
+
+
 def _run_case(case: EvalCase, deps: AgentDeps, timeout: float, reference_errors: list[str]) -> CaseScore:
     reference, reference_error = None, None
     try:
@@ -116,8 +142,8 @@ def _run_case(case: EvalCase, deps: AgentDeps, timeout: float, reference_errors:
         reference_error = str(error).removeprefix(f"{case.id}: ")
         reference_errors.append(str(error))
     try:
-        state = call_with_timeout(lambda: run_question(case.question, deps), timeout)
-    except CaseTimeout as error:
+        state = call_with_timeout(lambda: ask_in_conversation(case, deps), timeout)
+    except (CaseTimeout, PreviousQuestionError) as error:
         return _failed(case, reference, str(error))
     except Exception as error:  # noqa: BLE001 - one failing case never aborts the run
         return _failed(case, reference, f"{type(error).__name__}: {error}")

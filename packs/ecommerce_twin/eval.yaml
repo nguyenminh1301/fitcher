@@ -1,5 +1,6 @@
 # Labelled questions covering every required category (DECISIONS §12), at
-# least three per category. active_from_phase marks cases whose branch a later
+# least three per category. previous_question is asked first in the same
+# conversation for a follow_up case. active_from_phase marks cases whose branch a later
 # phase builds; they are reported as not yet scored until then.
 # expected.columns lists the columns retrieval must find; the time column is
 # not listed because the agent takes it from the dataset definition.
@@ -121,7 +122,6 @@ cases:
       outcome: clarify
       periods:
         - {label: "2025", start: "2025-01-01", end: "2026-01-01"}
-    active_from_phase: 8
     status: approved
     evidence: *cases
     confidence: 1.0
@@ -149,7 +149,6 @@ cases:
     expected:
       intent: out_of_scope
       outcome: answer
-    active_from_phase: 8
     status: approved
     evidence: *cases
     confidence: 1.0
@@ -599,7 +598,7 @@ cases:
     evidence: *cases
     confidence: 1.0
 
-  # ambiguous: scored once the clarify branch exists (Phase 8)
+  # ambiguous: must return clarify
 
   - id: performance_last_quarter_without_measure
     question: How did we do last quarter?
@@ -611,7 +610,6 @@ cases:
       outcome: clarify
       periods:
         - {label: Q4 2025, start: "2025-10-01", end: "2026-01-01"}
-    active_from_phase: 8
     status: approved
     evidence: *cases
     confidence: 1.0
@@ -626,7 +624,6 @@ cases:
       outcome: clarify
       periods:
         - {label: "2025", start: "2025-01-01", end: "2026-01-01"}
-    active_from_phase: 8
     status: approved
     evidence: *cases
     confidence: 1.0
@@ -663,7 +660,7 @@ cases:
     evidence: *cases
     confidence: 1.0
 
-  # out_of_scope: scored once the router exists (Phase 8)
+  # out_of_scope: a short reply without SQL
 
   - id: poem_request
     question: Write a short poem about our store
@@ -673,7 +670,6 @@ cases:
     expected:
       intent: out_of_scope
       outcome: answer
-    active_from_phase: 8
     status: approved
     evidence: *cases
     confidence: 1.0
@@ -686,7 +682,92 @@ cases:
     expected:
       intent: out_of_scope
       outcome: answer
-    active_from_phase: 8
+    status: approved
+    evidence: *cases
+    confidence: 1.0
+
+  # follow_up: the question continues previous_question
+
+  - id: top_products_last_year_follow_up
+    previous_question: Top 10 best-selling products in Q1 2024 compared with Q1 2025
+    question: What about last year?
+    language: en
+    category: follow_up
+    role: analyst
+    expected:
+      intent: data_query
+      outcome: answer
+      metrics: [net_sales]
+      periods:
+        - {label: Q1 2023, start: "2023-01-01", end: "2023-04-01"}
+        - {label: Q1 2024, start: "2024-01-01", end: "2024-04-01"}
+      top_n: 10
+      rank_by: net_sales
+      dataset: sales_lines
+      columns: [product_id]
+    expected_sql: |-
+      SELECT
+          product_id,
+          sumIf(line_amount, order_date >= toDate('2024-01-01') AND order_date < toDate('2024-04-01')) AS net_sales_q1_2024,
+          sumIf(line_amount, order_date >= toDate('2023-01-01') AND order_date < toDate('2023-04-01')) AS net_sales_q1_2023
+      FROM marts.sales_lines
+      WHERE order_status != 'cancelled'
+        AND order_date >= toDate('2023-01-01')
+        AND order_date < toDate('2024-04-01')
+      GROUP BY product_id
+      ORDER BY net_sales_q1_2024 DESC, product_id
+      LIMIT 10
+    status: approved
+    evidence: *cases
+    confidence: 1.0
+
+  - id: net_sales_by_category_follow_up
+    previous_question: Net sales by region in 2024 compared with 2025
+    question: Còn theo danh mục sản phẩm thì sao?
+    language: vi
+    category: follow_up
+    role: analyst
+    expected:
+      intent: data_query
+      outcome: answer
+      metrics: [net_sales]
+      periods:
+        - {label: "2024", start: "2024-01-01", end: "2025-01-01"}
+        - {label: "2025", start: "2025-01-01", end: "2026-01-01"}
+      dataset: sales_lines
+      columns: [product_category]
+    expected_sql: |-
+      SELECT
+          product_category,
+          sumIf(line_amount, order_date >= toDate('2025-01-01') AND order_date < toDate('2026-01-01')) AS net_sales_2025,
+          sumIf(line_amount, order_date >= toDate('2024-01-01') AND order_date < toDate('2025-01-01')) AS net_sales_2024
+      FROM marts.sales_lines
+      WHERE order_status != 'cancelled'
+        AND order_date >= toDate('2024-01-01') AND order_date < toDate('2026-01-01')
+      GROUP BY product_category
+    status: approved
+    evidence: *cases
+    confidence: 1.0
+
+  - id: monthly_orders_next_year_follow_up
+    previous_question: Số đơn hàng theo tháng năm 2024
+    question: Và năm 2025?
+    language: vi
+    category: follow_up
+    role: analyst
+    expected:
+      intent: data_query
+      outcome: answer
+      metrics: [order_count]
+      periods:
+        - {label: "2025", start: "2025-01-01", end: "2026-01-01"}
+      dataset: sales_lines
+    expected_sql: |-
+      SELECT toStartOfMonth(order_date) AS month, uniqExactIf(order_id, order_status != 'cancelled') AS order_count
+      FROM marts.sales_lines
+      WHERE order_date >= toDate('2025-01-01') AND order_date < toDate('2026-01-01')
+      GROUP BY month
+      ORDER BY month
     status: approved
     evidence: *cases
     confidence: 1.0
