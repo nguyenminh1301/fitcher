@@ -30,6 +30,32 @@
       ],
       "default": null,
       "title": "Timezone"
+    },
+    "edit_of_turn": {
+      "anyOf": [
+        {
+          "minimum": 1,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Edit Of Turn"
+    },
+    "retry_of_turn": {
+      "anyOf": [
+        {
+          "minimum": 1,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Retry Of Turn"
     }
   },
   "required": [

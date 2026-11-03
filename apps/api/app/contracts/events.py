@@ -17,9 +17,9 @@ nothing follows ``done``. Events always carry every field, so their JSON
 Schema marks fields with defaults as required.
 """
 
-from typing import Annotated, Literal
+from typing import Annotated, Literal, Self
 
-from pydantic import BaseModel, ConfigDict, Field, RootModel
+from pydantic import BaseModel, ConfigDict, Field, RootModel, model_validator
 
 from app.contracts.chart_spec import ChartSpec
 from app.contracts.query_spec import ContractModel
@@ -32,6 +32,18 @@ class AskRequest(ContractModel):
     conversation_id: str | None = None
     # The browser's IANA time zone; UTC when null (DECISIONS §6 step 5).
     timezone: str | None = None
+    # Ask this question in place of that turn of the conversation, under a new revision; later turns leave the thread.
+    edit_of_turn: int | None = Field(default=None, ge=1)
+    # Ask that turn's stored question again under a new revision; ``question`` is not used.
+    retry_of_turn: int | None = Field(default=None, ge=1)
+
+    @model_validator(mode="after")
+    def _one_turn_of_a_conversation(self) -> Self:
+        if self.edit_of_turn is not None and self.retry_of_turn is not None:
+            raise ValueError("set edit_of_turn or retry_of_turn, not both")
+        if (self.edit_of_turn is not None or self.retry_of_turn is not None) and self.conversation_id is None:
+            raise ValueError("an edit or retry needs the conversation_id it belongs to")
+        return self
 
 
 class EventModel(BaseModel):
