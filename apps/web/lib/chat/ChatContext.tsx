@@ -7,6 +7,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 
 import type { FitcherApi } from "@/lib/api/client";
 import type { Conversation, ConversationGroup, ConversationThread, Identity, Turn } from "@/lib/api/provisional";
+import type { AskRequest } from "@/lib/contracts";
 import { sources as currentSources, type Sources } from "@/lib/api/sources";
 import { langOf } from "@/lib/text";
 
@@ -130,12 +131,11 @@ export function ChatProvider({ api, navigate, activeId, sources = currentSources
       setBusy(id);
       const abort = new AbortController();
       controller.current = abort;
-      const request = {
+      // Edit and retry replace the turn here; /ask learns of them with the conversation endpoints (Phase 8).
+      const request: AskRequest = {
         question: turn.question,
         conversation_id: id,
-        time_zone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-        ...(options.editOf !== undefined ? { edit_of_turn: options.editOf } : {}),
-        ...(options.retryOf !== undefined ? { retry_of_turn: options.retryOf } : {}),
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
       };
       void (async () => {
         try {
@@ -146,7 +146,7 @@ export function ChatProvider({ api, navigate, activeId, sources = currentSources
           }
         } catch (error) {
           const last = thread.turns.at(-1) as Turn;
-          const failure = { event: "error" as const, kind: "network" as const, message: String(error), trace_id: last.events.at(-1)?.trace_id ?? "" };
+          const failure = { event: "error" as const, kind: "network" as const, message: String(error), sql: null, error: null, trace_id: last.events.at(-1)?.trace_id ?? "" };
           thread = { ...thread, turns: [...thread.turns.slice(0, -1), { ...last, events: [...last.events, failure] }] };
           putThread(thread);
         } finally {

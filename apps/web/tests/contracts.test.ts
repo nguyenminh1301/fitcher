@@ -9,7 +9,9 @@ const schemas = readdirSync(join(CONTRACTS, "schemas")).filter((file) => file.en
 
 describe("generated contract types", () => {
   it("covers the backend contracts", () => {
-    expect(schemas.sort()).toEqual(["query_spec.schema.json", "result.schema.json"]);
+    expect(schemas.sort()).toEqual([
+      "ask_event.schema.json", "ask_request.schema.json", "chart_spec.schema.json", "query_spec.schema.json", "result.schema.json",
+    ]);
   });
 
   for (const file of schemas) {

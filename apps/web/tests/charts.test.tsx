@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { TypeSwitcher } from "@/components/chat/TypeSwitcher";
 import { DataTable } from "@/components/chat/DataTable";
-import type { ChartSpec } from "@/lib/api/provisional";
+import type { OrientedChartSpec } from "@/lib/api/provisional";
 import { formatTick, toCsv, toEChartsOption } from "@/lib/chart/toEChartsOption";
 import type { Result } from "@/lib/contracts";
 import { I18nProvider } from "@/lib/i18n/react";
@@ -18,11 +18,11 @@ const BRANDS: Result = {
   rows: [["B", 10, 8], ["A", 30, 20], ["C", 20, 25]],
   row_count: 3,
 };
-const spec = (overrides: Partial<ChartSpec>): ChartSpec => ({ type: "bar", x: "brand", y: ["sales_2025"], allowed_types: ["bar", "table"], ...overrides });
+const spec = (overrides: Partial<OrientedChartSpec>): OrientedChartSpec => ({ type: "bar", x: "brand", y: ["sales_2025"], allowed_types: ["bar", "table"], ...overrides });
 
 type Axis = { type: string; data?: unknown[] };
 type Option = { xAxis: Axis; yAxis: Axis; series: { type: string; data: unknown[]; radius?: string[]; itemStyle?: { color?: string; decal?: unknown }; lineStyle?: { type?: string }; symbol?: string }[] };
-const option = (chart: ChartSpec, result: Result = BRANDS) => toEChartsOption(chart, result, PALETTE, "en") as unknown as Option;
+const option = (chart: OrientedChartSpec, result: Result = BRANDS) => toEChartsOption(chart, result, PALETTE, "en") as unknown as Option;
 
 describe("chart adapter", () => {
   it("draws a vertical bar on a category x axis", () => {

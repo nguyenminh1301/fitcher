@@ -5,7 +5,8 @@ import { useRef } from "react";
 
 import { Icon } from "@/components/brand/Icon";
 import { Button } from "@/components/ui/controls";
-import type { ChartSpec, ChartType } from "@/lib/api/provisional";
+import type { OrientedChartSpec } from "@/lib/api/provisional";
+import type { ChartType } from "@/lib/contracts";
 import { download, toCsv } from "@/lib/chart/toEChartsOption";
 import type { Result } from "@/lib/contracts";
 import { useI18n } from "@/lib/i18n/react";
@@ -14,13 +15,13 @@ import { ChartView } from "./ChartView";
 import { DataTable } from "./DataTable";
 import { TypeSwitcher } from "./TypeSwitcher";
 
-type Props = { spec: ChartSpec; result: Result; type: ChartType; onType: (type: ChartType) => void; orientation: "vertical" | "horizontal"; onOrientation: (value: "vertical" | "horizontal") => void };
+type Props = { spec: OrientedChartSpec; result: Result; type: ChartType; onType: (type: ChartType) => void; orientation: "vertical" | "horizontal"; onOrientation: (value: "vertical" | "horizontal") => void };
 
 /** The chart of an answer with the type switcher and export; switching type or orientation is local. */
 export function ChartCard({ spec, result, type, onType, orientation, onOrientation }: Props) {
   const { t } = useI18n();
   const chart = useRef<EChartsInstance | null>(null);
-  const shown: ChartSpec = { ...spec, type, orientation: type === "bar" ? orientation : spec.orientation };
+  const shown: OrientedChartSpec = { ...spec, type, orientation: type === "bar" ? orientation : spec.orientation };
 
   function exportPng() {
     const instance = chart.current;

@@ -8,7 +8,8 @@ import { useCallback } from "react";
 import { ChartView } from "@/components/chat/ChartView";
 import { ListPage } from "@/components/console/ListPage";
 import { StatusPill, WarningBanner } from "@/components/ui/feedback";
-import type { ChartSpec, ChartType, CostRow } from "@/lib/api/provisional";
+import type { CostRow, OrientedChartSpec } from "@/lib/api/provisional";
+import type { ChartType } from "@/lib/contracts";
 import { useChat } from "@/lib/chat/ChatContext";
 import { useLoad } from "@/lib/console/useLoad";
 import type { Result } from "@/lib/contracts";
@@ -32,7 +33,7 @@ function costBy(rows: CostRow[], key: "day" | "alias" | "model", time: boolean):
 }
 
 function CostChart({ title, result, type }: { title: string; result: Result; type: ChartType }) {
-  const spec: ChartSpec = { type, x: result.columns[0].name, y: ["cost_usd"], allowed_types: [type] };
+  const spec: OrientedChartSpec = { type, x: result.columns[0].name, y: ["cost_usd"], allowed_types: [type] };
   return (
     <section className="fc-card" aria-label={title}>
       <div className="fc-card-head">

@@ -6,7 +6,9 @@
 import { useState } from "react";
 
 import { WarningBanner } from "@/components/ui/feedback";
-import type { AskEvent, ChartType, FeedbackInput, Turn } from "@/lib/api/provisional";
+import type { AskEvent } from "@/lib/api/events";
+import type { FeedbackInput, OrientedChartSpec, Turn } from "@/lib/api/provisional";
+import type { ChartType } from "@/lib/contracts";
 import { stepFor, type StepId } from "@/lib/steps";
 
 import { ChartCard } from "./ChartCard";
@@ -32,11 +34,12 @@ export function stepsOf(events: AskEvent[], streaming: boolean, failed: boolean,
   const steps: Step[] = [];
   for (const event of events) {
     if (event.event !== "status") continue;
-    const id = stepFor(event.node, event.attempt) as StepId | undefined;
+    const attempt = event.attempt ?? undefined;
+    const id = stepFor(event.node, attempt) as StepId | undefined;
     if (!id) continue;
     const previous = steps.at(-1);
-    if (previous && previous.id === id && previous.attempt === event.attempt) continue;
-    steps.push({ id, attempt: event.attempt, status: "done" });
+    if (previous && previous.id === id && previous.attempt === attempt) continue;
+    steps.push({ id, attempt, status: "done" });
   }
   const last = steps.at(-1);
   if (last && streaming) last.status = "active";
@@ -48,7 +51,8 @@ export function stepsOf(events: AskEvent[], streaming: boolean, failed: boolean,
 export function AssistantTurn({ turn, streaming, onStop, onRetry, onFollowUp, onFeedback }: Props) {
   const events = turn.events;
   const result = only(events, "result")?.result;
-  const spec = only(events, "chart_spec")?.spec;
+  // Sample scenarios carry a bar orientation the contract gains in Phase 9.
+  const spec = only(events, "chart_spec")?.spec as OrientedChartSpec | undefined;
   const summary = only(events, "summary");
   const sql = only(events, "sql")?.sql;
   const deny = only(events, "deny");
@@ -72,8 +76,8 @@ export function AssistantTurn({ turn, streaming, onStop, onRetry, onFollowUp, on
         <NoticeCard
           kind={error.kind === "failed" ? "failed" : error.kind === "stopped" ? "stopped" : "network"}
           lang={lang}
-          sql={error.sql}
-          error={error.error}
+          sql={error.sql ?? undefined}
+          error={error.error ?? undefined}
           onRetry={error.kind === "failed" ? undefined : onRetry}
         />
       ) : null}

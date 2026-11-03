@@ -1,7 +1,8 @@
 // ChartSpec + Result -> an ECharts option (DECISIONS §8). The only file that knows ECharts' option
 // shape, so switching chart library rewrites this adapter only. Pure: no DOM, no network.
 
-import type { ChartSpec, ChartType } from "@/lib/api/provisional";
+import type { OrientedChartSpec } from "@/lib/api/provisional";
+import type { ChartType } from "@/lib/contracts";
 import type { ColumnInfo, Result } from "@/lib/contracts";
 import { formatNumber, type Locale } from "@/lib/i18n";
 
@@ -53,7 +54,7 @@ function seriesStyle(index: number, palette: string[]) {
 }
 
 /** The ECharts option for ``spec`` over ``result``; null for a KPI or a table, which are not ECharts charts. */
-export function toEChartsOption(spec: ChartSpec, result: Result, palette: string[], locale: Locale, gridColor = "#ececee"): Record<string, unknown> | null {
+export function toEChartsOption(spec: OrientedChartSpec, result: Result, palette: string[], locale: Locale, gridColor = "#ececee"): Record<string, unknown> | null {
   if (spec.type === "kpi" || spec.type === "table") return null;
   const columns = Object.fromEntries(result.columns.map((column) => [column.name, column]));
   let rows = records(result);

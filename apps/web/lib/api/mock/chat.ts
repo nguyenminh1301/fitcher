@@ -5,7 +5,8 @@ import { DICTIONARIES, translate } from "@/lib/i18n";
 import { fold, langOf } from "@/lib/text";
 
 import type { FitcherApi } from "../client";
-import type { AskEvent, Identity, Scenario } from "../provisional";
+import type { AskEvent } from "../events";
+import type { Identity, Scenario } from "../provisional";
 import type { SampleData } from "./load";
 
 const BEFORE_SQL = ["extract", "resolve_time", "retrieve", "build_spec", "gate"];
@@ -36,7 +37,7 @@ function traceId(): string {
 }
 
 function plan(scenario: Scenario | null, question: string, identity: Identity | null): Untraced[] {
-  const status = (node: string, attempt?: number) => ({ event: "status" as const, node, phase: "end" as const, ...(attempt ? { attempt } : {}) });
+  const status = (node: string, attempt?: number) => ({ event: "status" as const, node, phase: "end" as const, attempt: attempt ?? null });
   if (scenario === null) {
     const lang = langOf(question);
     return [status("extract"), { event: "summary", text: translate(DICTIONARIES.en, DICTIONARIES[lang], "sample.unmatched"), lang, warnings: [] }, { event: "done" }];
@@ -56,7 +57,7 @@ function plan(scenario: Scenario | null, question: string, identity: Identity | 
     attempts.push(status("generate_sql", index + 1), { event: "sql", sql, attempt: index + 1 }, ...SQL_ATTEMPT.slice(1).map((node) => status(node)));
   });
   if (scenario.kind === "failed") {
-    return [...head, ...attempts, { event: "error", kind: "failed", message: scenario.error ?? "", sql: scenario.sql, error: scenario.error }];
+    return [...head, ...attempts, { event: "error", kind: "failed", message: scenario.error ?? "", sql: scenario.sql ?? null, error: scenario.error ?? null }];
   }
   const result = scenario.result ?? { columns: [{ name: "value", type: "number", role: "measure" }], rows: [], row_count: 0 };
   return [
@@ -97,12 +98,12 @@ export function createMockChat(
       for (const event of events) {
         await pause(event.event === "status" ? stepMs : stepMs / 2, signal);
         if (signal.aborted) {
-          yield { event: "error", kind: "stopped", message: "stopped", trace_id };
+          yield { event: "error", kind: "stopped", message: "stopped", sql: null, error: null, trace_id };
           return;
         }
         yield { ...event, trace_id } as AskEvent;
         if (signal.aborted && event.event !== "done") {
-          yield { event: "error", kind: "stopped", message: "stopped", trace_id };
+          yield { event: "error", kind: "stopped", message: "stopped", sql: null, error: null, trace_id };
           return;
         }
       }

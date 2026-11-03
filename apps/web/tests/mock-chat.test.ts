@@ -2,7 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import { createMockChat, matchScenario } from "@/lib/api/mock/chat";
 import { EMPTY_CONSOLE, type SampleData } from "@/lib/api/mock/load";
-import type { AskEvent, Identity, Scenario } from "@/lib/api/provisional";
+import type { AskEvent } from "@/lib/api/events";
+import type { Identity, Scenario } from "@/lib/api/provisional";
 import type { Result } from "@/lib/contracts";
 import { NODE_ORDER, stepFor } from "@/lib/steps";
 
@@ -34,7 +35,7 @@ function chat(roles = ["analyst"]) {
 async function collect(question: string, roles?: string[], abortAfter?: number) {
   const controller = new AbortController();
   const events: AskEvent[] = [];
-  for await (const event of chat(roles).ask({ question, time_zone: "UTC" }, controller.signal)) {
+  for await (const event of chat(roles).ask({ question, timezone: "UTC" }, controller.signal)) {
     events.push(event);
     if (abortAfter !== undefined && events.length === abortAfter) controller.abort();
   }
