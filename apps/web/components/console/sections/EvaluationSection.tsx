@@ -172,7 +172,7 @@ export function EvaluationReport({ id }: { id: string }) {
   const { data } = useReports();
   const report = data?.find((item) => item.id === id);
   return (
-    <DetailPage title={report ? formatDate(report.ts, { dateStyle: "medium", timeStyle: "short" }) : ""} status={report ? (report.passed ? "packEnabled" : "belowThreshold") : undefined}
+    <DetailPage feature="evaluation" title={report ? formatDate(report.ts, { dateStyle: "medium", timeStyle: "short" }) : ""} status={report ? (report.passed ? "packEnabled" : "belowThreshold") : undefined}
       onBack={() => navigate("/console/evaluation")} backLabel={t("ui.back")} loading={!data} missing={!report}>
       {report ? <div className="fc-page"><ReportBody report={report} /></div> : null}
     </DetailPage>

@@ -74,6 +74,7 @@
 
 ### Changed
 
+- Mark Phase 6B (the web app on sample data) complete in the README, describe how to explore the chat app and the console with the lab identities, and name Phase 7 as the next step.
 - Mark Phase 6 (RBAC and auth) complete in the README and name Phase 6B (the web app on sample data) as the next step.
 - Run every question as one pack role: retrieval searches only that role's items, the SQL guard checks that role's tables and columns, the SQL prompt shows only its permitted schema (an aggregate-only role gets its view and sums its metric columns), queries run as that role's ClickHouse user, `jobs.ask` takes `--role` and each eval case runs as its own role; the shared `agent_readonly` user is removed.
 - Plan Phase 6B, which builds every screen of the web app design on pack-owned sample data before the api phases, and give phases 6-12 a Web wiring section naming the features each moves to the real api.
@@ -106,6 +107,7 @@
 
 ### Fixed
 
+- Show the Sample data badge on every console detail page (review item, proposal, dataset, evaluation report and run trace), and decide every console badge from the same feature sources as the rest of the app.
 - Keep small chart axis values distinct: value ticks round to three significant digits instead of one decimal, so a cost axis reads 0.05, 0.1, 0.15 rather than repeating 0.1 and 0.2.
 - Fill the browser window with the chat app and the workspace console: the page body now has a definite height, so the layouts no longer stop at their 600px minimum on taller windows.
 - Resolve a question's metric, dimension and value terms across the whole pack, so a term the asking role may not read is denied by the gate instead of being answered with the closest metric the role can read; only the examples given to SQL generation stay filtered by role.

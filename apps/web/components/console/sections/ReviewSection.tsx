@@ -128,7 +128,7 @@ function ItemDetail({ item, loading, reload }: { item?: ReviewItem; loading: boo
 
   const evidence = item?.evidence;
   return (
-    <DetailPage
+    <DetailPage feature="review"
       title={item?.name}
       mono
       status={item?.status}
@@ -228,7 +228,7 @@ function ProposalDetail({ item, reload }: { item: ReviewItem; reload: () => Prom
   const back = () => navigate("/console/review");
 
   return (
-    <DetailPage
+    <DetailPage feature="review"
       title={t("ui.proposals")}
       status={item.status}
       onBack={back}

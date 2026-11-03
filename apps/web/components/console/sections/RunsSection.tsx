@@ -82,7 +82,7 @@ export function RunDetail({ traceId }: { traceId: string }) {
   const { data, failed } = useLoad(useCallback(async () => ({ trace: await api.runs.trace(traceId) }), [api, traceId]));
   const run = data?.trace?.run;
   return (
-    <DetailPage title={t("ui.runDetail")} status={run?.status} backLabel={t("ui.backToRuns")} onBack={() => navigate("/console/runs")}
+    <DetailPage feature="runs" title={t("ui.runDetail")} status={run?.status} backLabel={t("ui.backToRuns")} onBack={() => navigate("/console/runs")}
       loading={!data && !failed} missing={!run}
       meta={run ? <code className="fc-code fc-hide-sm" title={run.trace_id}>{run.trace_id}</code> : null}>
       {run ? (

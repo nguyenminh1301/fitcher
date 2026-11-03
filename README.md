@@ -6,11 +6,11 @@ The planned application answers questions such as "Top 10 best-selling products 
 ## Current status
 
 The repository runs the six lab services and answers `data_query` questions from the command line.
-Docker Compose starts ClickHouse, OpenSearch, LiteLLM, Keycloak, the FastAPI skeleton in `apps/api` (`GET /health`) and the Next.js placeholder page in `apps/web`; their configuration lives in [infra/](infra/README.md).
+Docker Compose starts ClickHouse, OpenSearch, LiteLLM, Keycloak, the FastAPI skeleton in `apps/api` (`GET /health`) and the Next.js web app in `apps/web`; their configuration lives in [infra/](infra/README.md).
 `jobs/` loads the e-commerce lab dataset into ClickHouse `raw` and refreshes it, and [dbt/](dbt/README.md) builds the `sales_lines`, `returns_fact` and `sessions_daily` marts; [packs/](packs/README.md) holds the Domain Pack schemas and the hand-written `ecommerce_twin` pack, which `jobs/compile_pack.py` validates, test-runs and indexes into OpenSearch; `jobs/ask.py` runs the LangGraph agent in `apps/api/app/agent` over the compiled pack, with its prompts in `apps/api/prompts/`.
 
 The architecture is settled in [DECISIONS.md](docs/DECISIONS.md) and delivered in the order of the [master plan](docs/MASTER_PLAN.md), with one [detailed plan per phase](docs/plans/README.md).
-Phases 1 (lab dataset and dbt marts), 2 (hand-written Domain Pack and compiler), 3 (core agent on the CLI) and 4 (eval harness) are complete: `jobs/eval.py` scores a pack's eval set per layer, and the 31-case `ecommerce_twin` eval set has a recorded [baseline](docs/eval/ecommerce_twin-baseline.md). Phase 5 (logging and tracing) is complete as well: every `jobs.ask` and `jobs.eval` run writes its run row, node events, SQL attempts and LiteLLM calls to ClickHouse `agent_logs`, and [docs/tracing.md](docs/tracing.md) shows how to read one trace. Phase 6 (RBAC and auth) is complete: `compile_pack` turns `policies.yaml` into per-role ClickHouse roles, column grants, row policies, aggregate-only views and users; every question runs as one pack role (`--role`), a question the role may not read is denied before any SQL and every access decision is written to `agent_logs.audit`; the Keycloak realm carries the pack roles and lab users. Phase 6B (the web app on sample data) is next.
+Phases 1 (lab dataset and dbt marts), 2 (hand-written Domain Pack and compiler), 3 (core agent on the CLI) and 4 (eval harness) are complete: `jobs/eval.py` scores a pack's eval set per layer, and the 31-case `ecommerce_twin` eval set has a recorded [baseline](docs/eval/ecommerce_twin-baseline.md). Phase 5 (logging and tracing) is complete as well: every `jobs.ask` and `jobs.eval` run writes its run row, node events, SQL attempts and LiteLLM calls to ClickHouse `agent_logs`, and [docs/tracing.md](docs/tracing.md) shows how to read one trace. Phase 6 (RBAC and auth) is complete: `compile_pack` turns `policies.yaml` into per-role ClickHouse roles, column grants, row policies, aggregate-only views and users; every question runs as one pack role (`--role`), a question the role may not read is denied before any SQL and every access decision is written to `agent_logs.audit`; the Keycloak realm carries the pack roles and lab users. Phase 6B (the web app on sample data) is complete: every screen of the [web app design](docs/design/web-app.md) works on the active pack's sample data in English and Vietnamese, light and dark themes, at desktop and phone widths. That covers the chat app with streamed answers, charts, tables and SQL, and the workspace console with each role's sections. Each feature shows a Sample data badge until its backend phase wires it to the api. Phase 7 (API and streaming) is next.
 
 ## Architecture
 
@@ -137,7 +137,7 @@ npm --prefix apps/web run dev
 ```
 
 Host and Docker services use the same ports; stop the Compose services before starting host servers.
-`npm --prefix apps/web run test` runs the web unit tests (Vitest). Until each feature is wired to the api, the web app shows the active pack's sample data ([packs/](packs/README.md#sample-data-for-the-web-app)); set `ACTIVE_PACK` in the shell before `npm --prefix apps/web run dev` (Compose sets it for the `web` service). In development, `/dev/components` shows the shared components of the design system in both languages and themes. After replacing `apps/web/app/styles/tokens.json` with a new export of the design tokens, run `npm --prefix apps/web run tokens` to regenerate `tokens.css`.
+`npm --prefix apps/web run test` runs the web unit tests (Vitest). Until each feature is wired to the api, the web app shows the active pack's sample data ([packs/](packs/README.md#sample-data-for-the-web-app)); set `ACTIVE_PACK` in the shell before `npm --prefix apps/web run dev` (Compose sets it for the `web` service). Open `http://127.0.0.1:3000`, ask one of the suggested questions, and switch between the pack's lab identities from the account menu: `lab.reviewer` and `lab.admin` also open the workspace console at `/console`. In development, `/dev/components` shows the shared components of the design system in both languages and themes. After replacing `apps/web/app/styles/tokens.json` with a new export of the design tokens, run `npm --prefix apps/web run tokens` to regenerate `tokens.css`.
 Commit dependency changes with the corresponding `apps/api/uv.lock` or `apps/web/package-lock.json`.
 
 ## Repository workflow
@@ -189,7 +189,7 @@ The PR size labeler runs for branches within this repository; fork PRs do not re
 
 ## Next steps
 
-- Phase 6B: Build every screen of the web app design on pack-owned sample data ([plan](docs/plans/phase-06b-web-app-on-sample-data.md)).
+- Phase 7: Expose the agent through the API with streamed answers, then switch the chat features in `apps/web/lib/api/sources.ts` from sample data to the api ([plan](docs/plans/phase-07-api-and-streaming.md)).
 - Later phases follow the [master plan](docs/MASTER_PLAN.md); each starts from its [phase plan](docs/plans/README.md).
 
 See [CHANGELOG.md](CHANGELOG.md) for repository changes and [SECURITY.md](SECURITY.md) for vulnerability reporting.
