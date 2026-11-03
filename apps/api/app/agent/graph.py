@@ -56,7 +56,8 @@ def _unless_failed(next_node: str) -> Callable[[AgentState], str]:
 def build_graph(deps: AgentDeps):
     graph = StateGraph(AgentState)
     nodes = {
-        "load_context": load_context, "router": router, "out_of_scope": out_of_scope, "extract": extract, "resolve_time": resolve_time, "retrieve": retrieve, "build_spec": build_spec, "gate": gate,
+        "load_context": load_context, "router": router, "out_of_scope": out_of_scope,
+        "extract": extract, "resolve_time": resolve_time, "retrieve": retrieve, "build_spec": build_spec, "gate": gate,
         "generate_sql": generate_sql, "guard": guard, "explain": explain_node, "execute": execute_node,
         "check": check, "shape_result": shape_result, "summarize": summarize,
     }
@@ -66,7 +67,8 @@ def build_graph(deps: AgentDeps):
     graph.add_edge(START, "load_context")
     graph.add_edge("load_context", "router")
     graph.add_conditional_edges(
-        "router", lambda state: "out_of_scope" if state["intent"] == "out_of_scope" else "extract", ["out_of_scope", "extract"],
+        "router", lambda state: "out_of_scope" if state["intent"] == "out_of_scope" else "extract",
+        ["out_of_scope", "extract"],
     )
     graph.add_edge("out_of_scope", END)
     graph.add_conditional_edges("extract", _unless_rejected("resolve_time"), ["resolve_time", END])

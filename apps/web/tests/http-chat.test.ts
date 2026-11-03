@@ -69,7 +69,20 @@ describe("http chat", () => {
     expect(events).toEqual([STATUS, DONE]);
     const [url, init] = fetcher.mock.calls[0];
     expect(url).toBe("/api/ask");
-    expect(JSON.parse(init?.body as string)).toEqual({ question: "Top products?", conversation_id: "c1", timezone: "Asia/Ho_Chi_Minh" });
+    expect(JSON.parse(init?.body as string)).toEqual({ question: "Top products?", conversation_id: null, timezone: "Asia/Ho_Chi_Minh" });
+  });
+
+  it("continues the api's conversation that a chat's first answer started", async () => {
+    const apiId = "6f1c2c3e-8f4b-4c55-9a35-2f0d8a1b7c10";
+    const { fetcher, chat: http } = chat(() => new Response(stream([frame(DONE)]), { headers: { "x-conversation-id": apiId } }));
+    const signal = new AbortController().signal;
+
+    await collect(http.ask({ question: "Top products?", conversation_id: "c1" }, signal));
+    await collect(http.ask({ question: "And last year?", conversation_id: "c1" }, signal));
+    await collect(http.ask({ question: "Another chat", conversation_id: "c2" }, signal));
+
+    const sent = fetcher.mock.calls.map(([, init]) => JSON.parse(init?.body as string).conversation_id);
+    expect(sent).toEqual([null, apiId, null]);
   });
 
   it("ends a stopped answer with a stopped notice on the run's trace", async () => {
