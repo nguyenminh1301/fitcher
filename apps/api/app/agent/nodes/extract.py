@@ -22,12 +22,16 @@ from app.llm.client import LLMError
 
 ALIAS = "fast"
 PROMPT = "extract.v3"
+# Shown right before the question: the fast alias reads a reply to a clarifying question as the whole
+# question unless the instruction to combine them sits next to it.
 CONVERSATION = """
 Earlier turns (JSON lines, oldest first):
 {turns}
 
 Query behind the previous answer:
 {spec}
+
+The message below is the user's next message in this conversation. If the assistant's last answer asked the user to choose something, the message is that choice: extract the earlier question with the choice filled in, keeping the earlier question's periods. Otherwise, when a query is shown above and the message names no period of its own, keep or move that query's periods with `previous_periods` and leave `periods` empty.
 """
 
 

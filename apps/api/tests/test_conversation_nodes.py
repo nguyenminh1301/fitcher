@@ -147,6 +147,9 @@ def test_extract_prompt_shows_recent_turns_and_previous_spec_only_with_history()
     prompt = follow.llm.calls[0].prompt
     assert "Earlier turns" in prompt and "question 1" in prompt and "answer 1" in prompt
     assert '"Q1 2025"' in prompt and "Blue secret row" not in prompt
+    # The instruction to combine a reply with the question it answers sits right before the question.
+    assert prompt.index("the message is that choice") > prompt.index("Earlier turns")
+    assert prompt.index("the message is that choice") < prompt.index("<question>")
     assert update["extraction"].previous_periods.offset == -1
     assert "rejection" not in update
 
