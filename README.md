@@ -97,6 +97,8 @@ A comment line keeps the connection open every 15 seconds. Disconnecting stops t
 
 A missing, expired or otherwise invalid token gets 401. The request runs as one pack role: the one named by an `X-Active-Role` header, which the token must hold, or else the token's first role in `policies.yaml` order; a token without a pack role gets 403, and a role that may not read what the question needs gets a `deny` event (try `lab.marketing`).
 Each user may ask `RATE_LIMIT_PER_MINUTE` questions per minute (10 by default); beyond it `/ask` answers 429 with `Retry-After` before any work starts.
+With `conversation_id`, `edit_of_turn: k` asks the question in place of turn k and `retry_of_turn: k` asks turn k's question again, each under a new revision; the turns after k leave the conversation and its context.
+`GET /conversations` (newest activity first, `limit` and `offset`), `GET /conversations/search?q=` (titles and the user's own questions, ignoring case and diacritics), `GET`/`PATCH`/`DELETE /conversations/{id}` (the current thread with each answer's events; title, pinned, group) and `GET`/`POST`/`PATCH`/`DELETE /conversation-groups` manage the signed-in user's conversations; another user's conversation or group, or a deleted one, is 404, and deleting only hides it from its owner.
 `GET /me` returns the signed-in user, their pack and console roles and the active role; `GET /pack` names the active pack and its roles without a token.
 Every run sends billable requests to the LiteLLM aliases, like `jobs.ask`.
 

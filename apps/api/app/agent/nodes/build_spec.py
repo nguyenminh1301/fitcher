@@ -16,8 +16,6 @@ range and adds warnings; it never blocks the question.
 
 from collections.abc import Iterable
 from datetime import date
-import re
-import unicodedata
 
 from pydantic import ValidationError
 
@@ -27,6 +25,7 @@ from app.agent.state import AgentDeps, AgentState
 from app.contracts.query_spec import Filter, Period, QuerySpec
 from app.packs.compiler import CompiledPack, DateCoverage
 from app.packs.models import Dataset
+from app.text import fold
 
 # A runner-up scoring at least this share of the best candidate makes a term ambiguous.
 AMBIGUITY_RATIO = 0.9
@@ -49,13 +48,6 @@ class _Tie(Exception):
 
     def __init__(self, candidates: list[str]):
         self.candidates = candidates
-
-
-def fold(text: str) -> str:
-    """Lowercase, strip diacritics (including đ) and collapse punctuation to single spaces."""
-    text = unicodedata.normalize("NFKD", text.replace("đ", "d").replace("Đ", "D"))
-    text = "".join(char for char in text if not unicodedata.combining(char)).lower()
-    return " ".join(re.split(r"[^a-z0-9]+", text)).strip()
 
 
 def _forms(term: str) -> set[str]:

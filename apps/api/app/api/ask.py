@@ -2,7 +2,8 @@
 
 The request is authenticated, mapped to its pack role and rate limited before
 the graph starts. The question then opens a turn of its conversation: a new
-one when the request names none, otherwise one the user owns, or 404. The
+one when the request names none, otherwise one the user owns, or 404; an edit
+or retry opens a new revision of a turn in its thread, or 404. The
 conversation id is returned in the ``X-Conversation-Id`` header. The graph
 runs in a worker thread over the conversation's thread so far;
 ``AnswerEvents`` turns each node's start and end, and the final state, into
@@ -36,7 +37,7 @@ from app.contracts.events import (
     AskRequest, ChartSpecEvent, ClarifyEvent, DenyEvent, DoneEvent, ErrorEvent, EventModel, ResultEvent, SqlEvent,
     StatusEvent, SummaryEvent,
 )
-from app.conversation.store import ConversationNotFound, ConversationStore, OpenTurn
+from app.conversation.store import ConversationNotFound, ConversationStore, OpenTurn, TurnNotFound
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -56,6 +57,12 @@ class AnswerEvents:
     def __init__(self, role: str):
         self.role = role
         self.trace_id = ""
+        # Every event of the answer other than status, in stream order; stored with the answer.
+        self.answered: list[EventModel] = []
+
+    def _keep(self, events: list[EventModel]) -> list[EventModel]:
+        self.answered += [event for event in events if event.event != "status"]
+        return events
 
     def node(self, name: str, phase: Literal["start", "end"], state: AgentState, update: Mapping | None) -> list[EventModel]:
         self.trace_id = state["trace_id"]
@@ -77,9 +84,12 @@ class AnswerEvents:
         elif name == "summarize":
             warnings = update.get("warnings", state.get("warnings", []))
             events.append(SummaryEvent(**trace, text=update.get("summary") or "", lang=_language(state), warnings=warnings))
-        return events
+        return self._keep(events)
 
     def finish(self, state: AgentState) -> list[EventModel]:
+        return self._keep(self._closing(state))
+
+    def _closing(self, state: AgentState) -> list[EventModel]:
         self.trace_id = state["trace_id"]
         trace = {"trace_id": self.trace_id}
         if state.get("reply") is not None:
@@ -112,7 +122,7 @@ def frame(event: EventModel) -> str:
     return f"event: {event.event}\ndata: {event.model_dump_json()}\n\n"
 
 
-# Stores a finished run's answer; called with the final state and its closing events before they are sent.
+# Stores a finished run's answer; called with the final state and every answer event before the last are sent.
 Record = Callable[[AgentState, list[EventModel]], None]
 
 
@@ -134,7 +144,7 @@ def stored_answer(store: ConversationStore, turn: OpenTurn) -> Record:
     def record(state: AgentState, events: list[EventModel]) -> None:
         store.answer(
             turn, trace_id=state["trace_id"], content=answer_text(state, events), query_spec=state.get("spec"),
-            result=state.get("result"),
+            result=state.get("result"), events=events,
         )
 
     return record
@@ -166,7 +176,7 @@ async def event_stream(
             closing = events.finish(state)
             if record is not None:
                 try:
-                    record(state, closing)
+                    record(state, events.answered)
                 except Exception:  # noqa: BLE001 - the answer still reaches the client; the next turn lacks it
                     logger.exception("could not store the answer of trace %s", events.trace_id)
             for event in closing:
@@ -228,9 +238,14 @@ def ask(
     except TimeResolutionError as error:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(error)) from None
     try:
-        turn = store.open_turn(principal.user_id, request.conversation_id, request.question)
+        turn = store.open_turn(
+            principal.user_id, request.conversation_id, request.question,
+            edit_of_turn=request.edit_of_turn, retry_of_turn=request.retry_of_turn,
+        )
     except ConversationNotFound:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="conversation not found") from None
+    except TurnNotFound:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="turn not found in the conversation") from None
     except Exception:  # noqa: BLE001 - ClickHouse is unreachable or refused the conversation tables
         logger.exception("cannot open a conversation turn")
         raise unavailable("the conversation store is unavailable") from None
@@ -240,7 +255,7 @@ def ask(
         logger.exception("cannot prepare a run as role %s", role)
         raise unavailable("the agent cannot reach its data store") from None
     return StreamingResponse(
-        event_stream(run, request.question, AnswerEvents(role), record=stored_answer(store, turn)),
+        event_stream(run, turn.question, AnswerEvents(role), record=stored_answer(store, turn)),
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no", "X-Conversation-Id": turn.conversation_id},
     )

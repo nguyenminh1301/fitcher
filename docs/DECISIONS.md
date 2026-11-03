@@ -295,7 +295,7 @@ Tables (MergeTree, 90-day TTL, ordered by `(trace_id, ts)`, `(user_id, ts)` or, 
 | `llm_calls` | alias, model, tokens, cost, errors (written through a LiteLLM callback) |
 | `sql_runs` | SQL, ch_query_id, rows, errors, retry count |
 | `audit` | ALLOW/DENY, blocked tables, role |
-| `chat_messages` | conversation_id, turn, revision, role, content, QuerySpec, shaped Result (at most 5,000 rows) |
+| `chat_messages` | conversation_id, turn, revision, role, content, QuerySpec, shaped Result (at most 5,000 rows), the answer's other stream events so a conversation shows again as it was answered |
 | `conversations` | conversation_id, user, title, pinned, group, deleted flag, update time (§15) |
 | `conversation_groups` | group id, user, name, deleted flag, update time (§15) |
 | `feedback` | like/dislike, notes |

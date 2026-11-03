@@ -14,6 +14,9 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "apps" / "api"))
 
 from app.contracts.chart_spec import ChartSpec  # noqa: E402 - needs apps/api on the path
+from app.contracts.conversations import (  # noqa: E402
+    Conversation, ConversationGroup, ConversationPatch, ConversationThread, GroupInput,
+)
 from app.contracts.events import AskEvent, AskRequest  # noqa: E402
 from app.contracts.query_spec import QuerySpec  # noqa: E402
 from app.contracts.result import Result  # noqa: E402
@@ -26,6 +29,11 @@ CONTRACTS = {
     "chart_spec": (ChartSpec, "validation"),
     "ask_request": (AskRequest, "validation"),
     "ask_event": (AskEvent, "serialization"),
+    "conversation": (Conversation, "serialization"),
+    "conversation_group": (ConversationGroup, "serialization"),
+    "conversation_thread": (ConversationThread, "serialization"),
+    "conversation_patch": (ConversationPatch, "validation"),
+    "group_input": (GroupInput, "validation"),
 }
 SCHEMAS = ROOT / "apps" / "web" / "lib" / "contracts" / "schemas"
 

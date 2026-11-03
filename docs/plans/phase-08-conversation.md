@@ -50,7 +50,7 @@ apps/api/prompts/router.v1.md metadata_qa.v1.md
 
 ## Contracts
 
-- `chat_messages` row: `conversation_id, turn, revision, user_id, role, content, query_spec, result, trace_id, ts`; `result` holds the shaped Result JSON (at most 5,000 rows) of assistant turns. The current thread holds, for each turn, its latest revision, and stops before any turn whose latest revision is older than the latest revision of an earlier turn.
+- `chat_messages` row: `conversation_id, turn, revision, user_id, role, content, query_spec, result, events, trace_id, ts`; `result` holds the shaped Result JSON (at most 5,000 rows) of assistant turns and `events` the answer's other stream events (no status events), so a thread opened later renders as it was answered. The current thread holds, for each turn, its latest revision, and stops before any turn whose latest revision is older than the latest revision of an earlier turn.
 - `conversations` row: `user_id, conversation_id, title, pinned, group_id, deleted, created_at, updated_at`; `conversation_groups` row: `user_id, group_id, name, deleted, updated_at`. Both `ReplacingMergeTree(updated_at)` ordered by `(user_id, id)`, 90-day TTL on `updated_at`.
 - `/ask` request gains `edit_of_turn: int | null` and `retry_of_turn: int | null` (at most one).
 - `clarify` event: `{trace_id, question, options: [{id, label}]}`.

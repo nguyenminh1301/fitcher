@@ -40,7 +40,7 @@ Four configuration users reach it, each with its own password:
 | `agent_logs_writer` | `CLICKHOUSE_LOGS_WRITER_PASSWORD` | `INSERT` on `agent_logs`; no reads |
 | `agent_logs_trace_reader` | `CLICKHOUSE_TRACE_READER_PASSWORD` | `SELECT` on `runs`, `events`, `llm_calls`, `sql_runs`, `audit`, `eval_reports` and `system.query_log` |
 | `agent_logs_review_reader` | `CLICKHOUSE_REVIEW_READER_PASSWORD` | `SELECT` on `example_proposals`, `feedback` and `chat_messages` for the `pack_reviewer` and `admin` paths |
-| `agent_conversations` | `CLICKHOUSE_CONVERSATIONS_PASSWORD` | `SELECT` and `INSERT` on `chat_messages` and `conversations`; the api's conversation store, which filters every query by the requesting user |
+| `agent_conversations` | `CLICKHOUSE_CONVERSATIONS_PASSWORD` | `SELECT` and `INSERT` on `chat_messages`, `conversations` and `conversation_groups`; the api's conversation store, which filters every query by the requesting user |
 
 The agent's role users have no access to `agent_logs`.
 With the stack running, `AGENT_LOGS_LIVE_TEST=1` and the five passwords in the environment, `jobs/tests/test_agent_log_users.py` checks these grants against the server.

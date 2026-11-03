@@ -9,7 +9,7 @@ TABLES = [
     "chat_messages", "feedback", "eval_reports", "example_proposals",
 ]
 # Tables whose rows are replaced on every change and expire 90 days after their last update.
-REPLACED_TABLES = ["conversations"]
+REPLACED_TABLES = ["conversations", "conversation_groups"]
 
 
 class FakeClient:
@@ -48,7 +48,7 @@ def test_schema_only_creates_objects_that_do_not_exist():
 
 def test_chat_messages_columns_added_later_reach_existing_volumes():
     created = table_statement("chat_messages")
-    for column in ("turn UInt32", "revision UInt32", "result String"):
+    for column in ("turn UInt32", "revision UInt32", "result String", "events String"):
         assert f"    {column}" in created
         assert f"ALTER TABLE agent_logs.chat_messages ADD COLUMN IF NOT EXISTS {column}" in schema_statements()
 
@@ -80,6 +80,7 @@ def test_every_table_expires_after_90_days_and_accepts_dedup_tokens(table):
         ("eval_reports", "ORDER BY (pack, ts)"),
         ("example_proposals", "ORDER BY (pack, ts)"),
         ("conversations", "ORDER BY (user_id, conversation_id)"),
+        ("conversation_groups", "ORDER BY (user_id, group_id)"),
     ],
 )
 def test_table_sort_keys(table, order_by):

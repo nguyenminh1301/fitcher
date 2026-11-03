@@ -17,6 +17,7 @@
             <grants>
                 <query>GRANT SELECT, INSERT ON agent_logs.chat_messages</query>
                 <query>GRANT SELECT, INSERT ON agent_logs.conversations</query>
+                <query>GRANT SELECT, INSERT ON agent_logs.conversation_groups</query>
             </grants>
         </agent_conversations>
     </users>
