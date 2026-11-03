@@ -12,7 +12,7 @@ See [DECISIONS §3](../docs/DECISIONS.md#3-docker-compose) and the [Phase 0 plan
 | `clickhouse/initdb/010-agent-logs.sql` | Creates the `agent_logs` database and its run log tables |
 | `litellm/config.yaml` | Aliases `fast`, `sql-gen`, `sql-gen-hard` and `embed`, with models from `LITELLM_MODEL_*` |
 | `litellm/callbacks/clickhouse_logger.py` | Proxy callback writing one `agent_logs.llm_calls` row per call as `agent_logs_writer` |
-| `keycloak/realm-finch.json` | Realm `finch`: the active pack's policy roles and the console roles `pack_reviewer` and `admin`, one lab user per role without credentials, and the public `finch-web` client whose access tokens carry the realm roles |
+| `keycloak/realm-finch.json` | Realm `finch`: the active pack's policy roles and the console roles `pack_reviewer` and `admin`, one lab user per role without credentials, the public `finch-web` client whose access tokens carry the realm roles and the api audience, and the lab-only `finch-cli` password-grant client |
 | `opensearch/` | Host requirements; no custom JVM or plugin settings |
 
 ## ClickHouse users and databases
@@ -63,3 +63,6 @@ docker compose run --rm jobs python -m jobs.set_lab_passwords
 
 Each user has a verified `@fitcher.test` email, so the first sign-in asks for no profile update.
 `finch-web` access tokens carry the user's roles under `realm_access.roles`.
+Access tokens of `finch-web` and of the lab-only `finch-cli` client name `finch-api` as audience, which the api requires (`KEYCLOAK_AUDIENCE`).
+`finch-web` redirects only to the web app's `/auth/callback`; `finch-cli` has no browser flow and grants tokens for a lab user's username and password, for curl against the api.
+`KC_HOSTNAME` fixes the issuer to `http://localhost:8080/realms/finch` (`KEYCLOAK_ISSUER`) whichever address requested a token, while containers keep reaching Keycloak at `keycloak:8080`; the api reads the signing keys from `KEYCLOAK_JWKS_URL`.

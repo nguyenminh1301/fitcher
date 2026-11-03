@@ -26,6 +26,10 @@ class Settings:
     log_batch_size: int
     log_flush_interval_ms: int
     log_queue_max: int
+    # Access token checks (Phase 7); empty values leave the authenticated endpoints unavailable.
+    keycloak_issuer: str
+    keycloak_audience: str
+    keycloak_jwks_url: str
 
 
 def positive_int(env: Mapping[str, str], name: str, default: int) -> int:
@@ -52,4 +56,7 @@ def load_settings(env: Mapping[str, str] | None = None) -> Settings:
         log_batch_size=positive_int(env, "LOG_BATCH_SIZE", 100),
         log_flush_interval_ms=positive_int(env, "LOG_FLUSH_INTERVAL_MS", 1000),
         log_queue_max=positive_int(env, "LOG_QUEUE_MAX", 10_000),
+        keycloak_issuer=env.get("KEYCLOAK_ISSUER", ""),
+        keycloak_audience=env.get("KEYCLOAK_AUDIENCE", ""),
+        keycloak_jwks_url=env.get("KEYCLOAK_JWKS_URL", ""),
     )
