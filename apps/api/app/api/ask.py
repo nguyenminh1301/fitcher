@@ -1,15 +1,20 @@
 """``POST /ask``: answer one question as a stream of server-sent events (DECISIONS §6).
 
 The request is authenticated, mapped to its pack role and rate limited before
-the graph starts. The graph runs in a worker thread; ``AnswerEvents`` turns
-each node's start and end, and the final state, into the events of
-``app.contracts.events`` in the fixed order. A comment frame keeps the
-connection open every 15 seconds. When the client disconnects, the run stops
-at its next node and the ClickHouse query it may be running is killed.
+the graph starts. The question then opens a turn of its conversation: a new
+one when the request names none, otherwise one the user owns, or 404. The
+conversation id is returned in the ``X-Conversation-Id`` header. The graph
+runs in a worker thread over the conversation's thread so far;
+``AnswerEvents`` turns each node's start and end, and the final state, into
+the events of ``app.contracts.events`` in the fixed order. The answer is
+stored before its last event is sent, so a follow-up can read it at once.
+A comment frame keeps the connection open every 15 seconds. When the client
+disconnects, the run stops at its next node and the ClickHouse query it may
+be running is killed.
 """
 
 import asyncio
-from collections.abc import AsyncIterator, Mapping
+from collections.abc import AsyncIterator, Callable, Mapping
 import logging
 import math
 import threading
@@ -24,13 +29,14 @@ from app.agent.state import AgentState, RunCancelled
 from app.api.agent import Agent, AgentRun
 from app.api.auth import current_principal, current_role
 from app.api.rate_limit import RateLimiter
-from app.api.runtime import get_agent, get_rate_limiter, unavailable
+from app.api.runtime import get_agent, get_conversation_store, get_rate_limiter, unavailable
 from app.auth.jwt import Principal
 from app.contracts.chart_spec import table_spec
 from app.contracts.events import (
     AskRequest, ChartSpecEvent, ClarifyEvent, DenyEvent, DoneEvent, ErrorEvent, EventModel, ResultEvent, SqlEvent,
     StatusEvent, SummaryEvent,
 )
+from app.conversation.store import ConversationNotFound, ConversationStore, OpenTurn
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -41,7 +47,7 @@ TERMINAL = frozenset({"done", "error"})
 
 
 def _language(state: Mapping) -> str:
-    return getattr(state.get("extraction"), "language", None) or "en"
+    return getattr(state.get("extraction"), "language", None) or state.get("language") or "en"
 
 
 class AnswerEvents:
@@ -73,6 +79,8 @@ class AnswerEvents:
     def finish(self, state: AgentState) -> list[EventModel]:
         self.trace_id = state["trace_id"]
         trace = {"trace_id": self.trace_id}
+        if state.get("reply") is not None:
+            return [SummaryEvent(**trace, text=state["reply"], lang=_language(state)), DoneEvent(**trace)]
         if state.get("rejection"):
             # The data_query flow's refusals are in English; the clarify branch with options is Phase 8's.
             return [ClarifyEvent(**trace, question=state["rejection"], lang="en"), DoneEvent(**trace)]
@@ -98,8 +106,37 @@ def frame(event: EventModel) -> str:
     return f"event: {event.event}\ndata: {event.model_dump_json()}\n\n"
 
 
+# Stores a finished run's answer; called with the final state and its closing events before they are sent.
+Record = Callable[[AgentState, list[EventModel]], None]
+
+
+def answer_text(state: AgentState, events: list[EventModel]) -> str:
+    """What the user reads as the answer: the summary, clarifying question, denial or error message."""
+    if state.get("summary"):
+        return state["summary"]
+    for event in events:
+        if isinstance(event, SummaryEvent):
+            return event.text
+        if isinstance(event, ClarifyEvent):
+            return event.question
+        if isinstance(event, DenyEvent | ErrorEvent):
+            return event.message
+    return ""
+
+
+def stored_answer(store: ConversationStore, turn: OpenTurn) -> Record:
+    def record(state: AgentState, events: list[EventModel]) -> None:
+        store.answer(
+            turn, trace_id=state["trace_id"], content=answer_text(state, events), query_spec=state.get("spec"),
+            result=state.get("result"),
+        )
+
+    return record
+
+
 async def event_stream(
     run: AgentRun, question: str, events: AnswerEvents, heartbeat_seconds: float = HEARTBEAT_SECONDS,
+    record: Record | None = None,
 ) -> AsyncIterator[str]:
     loop = asyncio.get_running_loop()
     queue: asyncio.Queue[EventModel | None] = asyncio.Queue()
@@ -119,7 +156,14 @@ async def event_stream(
 
     def work() -> None:
         try:
-            for event in events.finish(run.run(question, progress)):
+            state = run.run(question, progress)
+            closing = events.finish(state)
+            if record is not None:
+                try:
+                    record(state, closing)
+                except Exception:  # noqa: BLE001 - the answer still reaches the client; the next turn lacks it
+                    logger.exception("could not store the answer of trace %s", events.trace_id)
+            for event in closing:
                 put(event)
         except RunCancelled:
             pass
@@ -171,17 +215,26 @@ def ask(
     role: Annotated[str, Depends(current_role)],
     _: Annotated[None, Depends(rate_limited)],
     agent: Annotated[Agent, Depends(get_agent)],
+    store: Annotated[ConversationStore, Depends(get_conversation_store)],
 ) -> StreamingResponse:
     try:
         today = reference_date(request.timezone)
     except TimeResolutionError as error:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(error)) from None
     try:
-        run = agent.start(role=role, user_id=principal.user_id, today=today)
+        turn = store.open_turn(principal.user_id, request.conversation_id, request.question)
+    except ConversationNotFound:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="conversation not found") from None
+    except Exception:  # noqa: BLE001 - ClickHouse is unreachable or refused the conversation tables
+        logger.exception("cannot open a conversation turn")
+        raise unavailable("the conversation store is unavailable") from None
+    try:
+        run = agent.start(role=role, user_id=principal.user_id, today=today, history=turn.history)
     except Exception:  # noqa: BLE001 - the role's ClickHouse client could not be created
         logger.exception("cannot prepare a run as role %s", role)
         raise unavailable("the agent cannot reach its data store") from None
     return StreamingResponse(
-        event_stream(run, request.question, AnswerEvents(role)), media_type="text/event-stream",
-        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+        event_stream(run, request.question, AnswerEvents(role), record=stored_answer(store, turn)),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no", "X-Conversation-Id": turn.conversation_id},
     )

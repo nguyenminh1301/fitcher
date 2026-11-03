@@ -2,12 +2,13 @@
 
 ``Agent`` holds the LLM, search, embedding and log clients of the active pack
 and one ClickHouse client per pack role, created on that role's first
-question. ``Agent.start`` prepares a run as one user and role; the run records
+question. ``Agent.start`` prepares a run as one user and role over the
+conversation's thread so far; the run records
 the id of each query it sends, so ``cancel`` can stop the one still running
 when the client goes away, through the ``agent_query_stopper`` user.
 """
 
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass, replace
 from datetime import date
 from functools import partial
@@ -19,6 +20,7 @@ from uuid import uuid4
 from app.agent.graph import run_question
 from app.agent.state import AgentDeps, AgentState, Progress
 from app.config import Settings
+from app.conversation.store import Turn
 from app.data.clickhouse import ClickHouseRunner, QueryLimits, QueryStopper, agent_client, stopper_client
 from app.llm.client import LiteLLMClient
 from app.llm.embeddings import LiteLLMEmbeddings
@@ -95,12 +97,12 @@ class Agent:
                 self._stopper = QueryStopper(stopper_client())
         return self._stopper, Names(self.compiled.pack.name).user(role)
 
-    def start(self, *, role: str, user_id: str, today: date) -> GraphRun:
+    def start(self, *, role: str, user_id: str, today: date, history: Sequence[Turn] = ()) -> GraphRun:
         query_ids = QueryIds()
         runner = ClickHouseRunner(self._client(role), self._limits, new_query_id=query_ids)
         deps = AgentDeps(
             llm=self._llm, search=self._search, embeddings=self._embeddings, runner=runner,
-            compiled=self.compiled, today=today, logs=self._logs, user_id=user_id, role=role,
+            compiled=self.compiled, today=today, logs=self._logs, user_id=user_id, role=role, history=tuple(history),
         )
         return GraphRun(deps, query_ids, partial(self._stopper_for, role))
 
