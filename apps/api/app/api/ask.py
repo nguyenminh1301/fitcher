@@ -25,7 +25,6 @@ from uuid import uuid4
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import StreamingResponse
 
-from app.agent.chart_recommender import recommend_chart
 from app.agent.nodes.resolve_time import TimeResolutionError, reference_date
 from app.agent.state import AgentState, RunCancelled
 from app.api.agent import Agent, AgentRun
@@ -76,8 +75,9 @@ class AnswerEvents:
             attempts = update.get("attempts", state["attempts"])
             events.append(SqlEvent(**trace, sql=attempts[-1].sql, attempt=len(attempts)))
         elif name == "shape_result":
-            result = update["result"]
-            events += [ResultEvent(**trace, result=result), ChartSpecEvent(**trace, spec=recommend_chart(result))]
+            events.append(ResultEvent(**trace, result=update["result"]))
+        elif name == "chart_recommender":
+            events.append(ChartSpecEvent(**trace, spec=update["chart_spec"]))
         elif name == "chart_edit":
             # The stored result is sent again so the client always holds the rows it draws.
             events += [ResultEvent(**trace, result=update["result"]), ChartSpecEvent(**trace, spec=update["chart_spec"])]

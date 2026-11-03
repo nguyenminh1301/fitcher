@@ -6,7 +6,7 @@ for a chart edit of a previous result and, otherwise, the data_query flow:
 extract -> resolve_time -> retrieve -> build_spec -> gate -> generate_sql ->
 guard -> explain -> execute -> check, where check loops back to generate_sql
 for repairable errors, stops on policy errors or exhausted retries, and
-otherwise continues to shape_result -> summarize. A node that sets
+otherwise continues to shape_result -> chart_recommender -> summarize. A node that sets
 ``rejection``, or the gate's ``denial`` or ``clarification``, ends the run
 before any SQL is generated.
 """
@@ -19,6 +19,7 @@ from langgraph.graph import END, START, StateGraph
 
 from app.agent.nodes.build_spec import build_spec
 from app.agent.nodes.chart_edit import chart_edit
+from app.agent.nodes.chart_recommender import chart_recommender
 from app.agent.nodes.check import check, route
 from app.agent.nodes.execute import execute_node
 from app.agent.nodes.explain import explain_node
@@ -70,7 +71,7 @@ def build_graph(deps: AgentDeps):
         "chart_edit": chart_edit,
         "extract": extract, "resolve_time": resolve_time, "retrieve": retrieve, "build_spec": build_spec, "gate": gate,
         "generate_sql": generate_sql, "guard": guard, "explain": explain_node, "execute": execute_node,
-        "check": check, "shape_result": shape_result, "summarize": summarize,
+        "check": check, "shape_result": shape_result, "chart_recommender": chart_recommender, "summarize": summarize,
     }
     for name, node in nodes.items():
         graph.add_node(name, partial(instrument(name, node), deps=deps))
@@ -93,7 +94,8 @@ def build_graph(deps: AgentDeps):
     graph.add_conditional_edges(
         "check", route, {"retry": "generate_sql", "shape": "shape_result", "stop": END}
     )
-    graph.add_edge("shape_result", "summarize")
+    graph.add_edge("shape_result", "chart_recommender")
+    graph.add_edge("chart_recommender", "summarize")
     graph.add_edge("summarize", END)
     return graph.compile()
 

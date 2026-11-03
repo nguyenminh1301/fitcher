@@ -5,11 +5,10 @@ from dataclasses import replace
 from agent_fixtures import GOOD_SQL, deps, extraction_reply, routing_reply
 import pytest
 
-from app.agent.chart_recommender import recommend_chart
+from app.agent.chart_rules import recommend_chart
 from app.agent.graph import run_question
 from app.agent.nodes.chart_edit import chart_edit
 from app.agent.nodes.router import router
-from app.contracts.chart_spec import table_spec
 from app.conversation.store import Turn
 
 QUESTION = "Top 10 best-selling widgets in Q1 2024 compared with Q1 2025"
@@ -39,11 +38,13 @@ def test_the_router_prompt_lists_the_chart_types():
     assert "`chart_type`" in agent.llm.calls[0].prompt and "grouped_bar" in agent.llm.calls[0].prompt
 
 
-@pytest.mark.parametrize("requested", [None, "line", "pie"])
-def test_until_the_chart_rules_exist_the_recommender_offers_the_table(requested):
-    result = previous_turn().result
+@pytest.mark.parametrize(("requested", "drawn"), [("table", "table"), ("pie", "bar"), ("line", "bar"), (None, "bar")])
+def test_chart_edit_draws_the_type_asked_for_when_the_rules_allow_it(requested, drawn):
+    turn = previous_turn()
 
-    assert recommend_chart(result, requested) == table_spec(result)
+    update = chart_edit({"previous_spec": turn.query_spec, "previous_result": turn.result, "chart_type": requested}, deps([]))
+
+    assert update["chart_spec"].type == drawn
 
 
 def test_chart_edit_reuses_the_previous_spec_and_result():
@@ -51,7 +52,7 @@ def test_chart_edit_reuses_the_previous_spec_and_result():
 
     update = chart_edit({"previous_spec": turn.query_spec, "previous_result": turn.result, "chart_type": "line"}, deps([]))
 
-    assert (update["spec"], update["result"], update["chart_spec"]) == (turn.query_spec, turn.result, table_spec(turn.result))
+    assert (update["spec"], update["result"], update["chart_spec"]) == (turn.query_spec, turn.result, recommend_chart(turn.result, turn.query_spec, "line"))
 
 
 def test_draw_it_as_a_line_runs_no_sql_node():

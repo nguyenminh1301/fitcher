@@ -16,7 +16,7 @@ from app.observability.instrument import PAYLOAD_LIMIT, payload_json
 QUESTION = "Top 10 best-selling widgets in Q1 2024 compared with Q1 2025"
 NODES = [
     "load_context", "router", "extract", "resolve_time", "retrieve", "build_spec", "gate", "generate_sql", "guard", "explain", "execute", "check",
-    "shape_result", "summarize",
+    "shape_result", "chart_recommender", "summarize",
 ]
 
 
@@ -44,8 +44,8 @@ def test_result_rows_are_logged_as_counts_only():
     run_question(QUESTION, agent)
     execute, shape = (event for event in queued(agent, "events") if event.node in ("execute", "shape_result"))
     assert "Widget 0" not in execute.payload and "Widget 0" not in shape.payload
-    assert json.loads(execute.payload)["output"]["row_count"] == 2
-    assert json.loads(shape.payload)["result"]["row_count"] == 2
+    assert json.loads(execute.payload)["output"]["row_count"] == 7
+    assert json.loads(shape.payload)["result"]["row_count"] == 7
 
 
 def test_a_node_that_raises_writes_an_error_event():
@@ -66,7 +66,7 @@ def test_every_execution_writes_a_sql_run():
     first, second = queued(agent, "sql_runs")
     assert (first.attempt, first.query_id, first.rows, first.sql) == (1, "qid-slow", 0, GOOD_SQL)
     assert first.error == "runtime: Code: 159. Timeout exceeded"
-    assert (second.attempt, second.query_id, second.rows, second.error) == (2, "qid-ok", 2, "")
+    assert (second.attempt, second.query_id, second.rows, second.error) == (2, "qid-ok", 7, "")
     assert first.trace_id == second.trace_id == state["trace_id"]
 
 

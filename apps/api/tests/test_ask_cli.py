@@ -19,7 +19,7 @@ def test_successful_run_prints_sql_table_warnings_and_summary(capsys):
     assert code == 0
     assert f"Trace: {state['trace_id']}" in out
     assert "SQL attempt 1 (sql-gen):\nSELECT widget_name" in out
-    assert "Result (2 rows):" in out
+    assert "Result (7 rows):" in out
     assert "Widget 0" in out and "10.5" in out
     assert "Summary:\nBlue led." in out
 
