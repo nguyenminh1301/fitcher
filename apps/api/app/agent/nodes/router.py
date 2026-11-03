@@ -12,6 +12,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.agent.nodes.load_context import spec_json, turn_lines
 from app.agent.prompts import render
 from app.agent.state import AgentDeps, AgentState
 from app.llm.client import LLMError
@@ -19,8 +20,6 @@ from app.llm.client import LLMError
 ALIAS = "fast"
 PROMPT = "router.v1"
 MIN_CONFIDENCE = 0.5
-# Characters of each earlier question and answer the prompt shows.
-TURN_TEXT_LIMIT = 300
 
 Intent = Literal["data_query", "metadata_qa", "chart_edit", "out_of_scope"]
 
@@ -33,23 +32,14 @@ class Routing(BaseModel):
     language: str = Field(pattern=r"^[a-z]{2}$")
 
 
-def _history(state: AgentState) -> str:
-    lines = [
-        json.dumps({"question": turn.question[:TURN_TEXT_LIMIT], "answer": turn.answer[:TURN_TEXT_LIMIT]}, ensure_ascii=False)
-        for turn in state.get("history", [])
-    ]
-    return "\n".join(lines) or "none"
-
-
 def router(state: AgentState, deps: AgentDeps) -> dict:
     profile = deps.compiled.pack.business_profile
-    previous = state.get("previous_spec")
     prompt = render(
         PROMPT,
         industry=profile.industry,
         datasets="\n".join(f"- {dataset.description}" for dataset in deps.compiled.pack.datasets.datasets),
-        history=_history(state),
-        previous_spec=json.dumps(previous.model_dump(mode="json", exclude={"warnings"}), ensure_ascii=False) if previous else "none",
+        history=turn_lines(state.get("history", [])),
+        previous_spec=spec_json(state.get("previous_spec")),
         question=json.dumps(state["question"], ensure_ascii=False),
     )
     try:

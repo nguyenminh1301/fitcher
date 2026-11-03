@@ -195,12 +195,46 @@ def resolve_periods(
     return periods
 
 
+class PeriodShift(BaseModel):
+    """A follow-up's periods as the previous query's periods moved by ``offset`` ``unit``s (0 keeps them)."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    unit: Unit
+    offset: int = Field(ge=-1000, le=1000)
+
+
+def _period_label(start: date, end: date, cal: _Calendar) -> str:
+    """The usual label of a whole year, quarter or month, otherwise the dates it covers."""
+    for unit in ("year", "quarter", "month"):
+        if start == _unit_start(unit, start, cal) and end == _shift(unit, start, 1):
+            return _unit_label(unit, start, cal)
+    return f"{start.isoformat()} to {(end - timedelta(days=1)).isoformat()}"
+
+
+def shift_periods(periods: Sequence[Period], shift: PeriodShift, fiscal_start_month: int) -> list[Period]:
+    cal = _Calendar(fiscal_start_month, "fiscal")
+    moved = []
+    for period in periods:
+        start, end = _shift(shift.unit, period.start, shift.offset), _shift(shift.unit, period.end, shift.offset)
+        moved.append(Period(label=_period_label(start, end, cal), start=start, end=end))
+    return moved
+
+
 def resolve_time(state: "AgentState", deps: "AgentDeps") -> dict:
-    """Graph node: resolve the extracted periods against the deps' reference date."""
+    """Graph node: resolve the extracted periods against the deps' reference date.
+
+    A follow-up that names no period of its own moves the previous query's periods instead.
+    """
+    extraction = state["extraction"]
+    fiscal_start_month = deps.compiled.pack.business_profile.fiscal_year_start_month
+    previous = state.get("previous_spec")
+    if not extraction.periods:
+        if extraction.previous_periods is not None and previous is not None:
+            return {"periods": shift_periods(previous.periods, extraction.previous_periods, fiscal_start_month)}
+        return {"rejection": "the question names no period"}
     try:
-        periods = resolve_periods(
-            state["extraction"].periods, deps.today, deps.compiled.pack.business_profile.fiscal_year_start_month
-        )
+        periods = resolve_periods(extraction.periods, deps.today, fiscal_start_month)
     except TimeResolutionError as error:
         return {"rejection": f"the period cannot be resolved: {error}"}
     return {"periods": periods}

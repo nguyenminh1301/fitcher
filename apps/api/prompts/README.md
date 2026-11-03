@@ -9,7 +9,8 @@ Templates use `$name` placeholders, filled by `app.agent.prompts.render`.
 | --- | --- | --- |
 | `router.v1.md` | `fast` | One of `data_query`, `metadata_qa`, `chart_edit` or `out_of_scope` with a confidence and the question's language, from the question, the conversation's recent questions and answers and the previous QuerySpec |
 | `out_of_scope.v1.md` | `fast` | One or two sentences in the question's language saying what the assistant answers, for an out-of-scope question |
-| `extract.v2.md` | `fast` | Structured terms, period descriptors, filters, `top_n`, comparison and language of the question |
+| `extract.v3.md` | `fast` | Structured terms, period descriptors, filters, `top_n`, comparison and language of the question; in a conversation, the complete question a follow-up means, with its periods as a shift of the previous query's periods when it names none |
+| `extract.v2.md` | `fast` | The previous extraction prompt, without conversation context; kept so earlier eval results stay comparable |
 | `generate_sql.v1.md` | `sql-gen`, `sql-gen-hard` on the third retry | One ClickHouse SELECT for the QuerySpec over the permitted schema, metric expressions, declared joins and examples, with the previous SQL and error on a retry |
 | `summarize.v1.md` | `fast` | Two to four sentences in the question's language from the returned rows only |
 
