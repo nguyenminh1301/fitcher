@@ -119,6 +119,18 @@ class ChatMessageRecord(LogRecord):
     events: str = ""
 
 
+class FeedbackRecord(LogRecord):
+    """A user's like or dislike of one of their answers, with an optional note."""
+
+    TABLE: ClassVar[str] = "feedback"
+
+    user_id: str
+    ts: datetime
+    trace_id: str
+    rating: str
+    note: str
+
+
 class ConversationRecord(LogRecord):
     """One state of a conversation; the row with the latest ``updated_at`` wins."""
 

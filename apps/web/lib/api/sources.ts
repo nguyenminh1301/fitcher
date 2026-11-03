@@ -15,7 +15,7 @@ export const sources: Sources = {
   auth: "http",
   chat: "http",
   conversations: "http",
-  feedback: "mock",
+  feedback: "http",
   datasets: "mock",
   review: "mock",
   documents: "mock",

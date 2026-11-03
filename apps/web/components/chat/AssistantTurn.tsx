@@ -8,8 +8,7 @@ import { useState } from "react";
 import { WarningBanner } from "@/components/ui/feedback";
 import type { AskEvent } from "@/lib/api/events";
 import type { Turn } from "@/lib/api/conversations";
-import type { FeedbackInput, OrientedChartSpec } from "@/lib/api/provisional";
-import type { ChartType } from "@/lib/contracts";
+import type { ChartSpec, ChartType, FeedbackInput } from "@/lib/contracts";
 import { stepFor, type StepId } from "@/lib/steps";
 
 import { ChartCard } from "./ChartCard";
@@ -52,16 +51,18 @@ export function stepsOf(events: AskEvent[], streaming: boolean, failed: boolean,
 export function AssistantTurn({ turn, streaming, onStop, onRetry, onFollowUp, onFeedback }: Props) {
   const events = turn.events;
   const result = only(events, "result")?.result;
-  // Sample scenarios carry a bar orientation the contract gains in Phase 9.
-  const spec = only(events, "chart_spec")?.spec as OrientedChartSpec | undefined;
+  const spec = only(events, "chart_spec")?.spec;
   const summary = only(events, "summary");
   const sql = only(events, "sql")?.sql;
   const deny = only(events, "deny");
   const clarify = only(events, "clarify");
   const error = only(events, "error");
   const traceId = events[0]?.trace_id ?? "";
-  const [type, setType] = useState<ChartType>(spec?.type ?? "table");
-  const [orientation, setOrientation] = useState<"vertical" | "horizontal">(spec?.orientation ?? "horizontal");
+  // The reader's switch wins; until then the chart follows the spec, which arrives while the answer streams.
+  const [pickedType, setType] = useState<ChartType | null>(null);
+  const [pickedOrientation, setOrientation] = useState<"vertical" | "horizontal" | null>(null);
+  const type = pickedType ?? spec?.type ?? "table";
+  const orientation = pickedOrientation ?? spec?.orientation ?? "horizontal";
   const steps = stepsOf(events, streaming, error?.kind === "failed", !!deny);
   const feedback = (rating: "like" | "dislike", note?: string) => onFeedback?.({ trace_id: traceId, rating, ...(note ? { note } : {}) });
 

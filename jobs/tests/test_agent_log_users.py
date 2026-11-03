@@ -119,10 +119,10 @@ def test_the_query_stopper_may_only_list_and_stop_queries():
     assert root.find("users/agent_query_stopper/password").get("from_env") == "CLICKHOUSE_QUERY_STOPPER_PASSWORD"
 
 
-def test_the_conversation_store_reads_and_writes_conversation_tables_only():
+def test_the_conversation_store_reaches_conversation_tables_and_only_writes_feedback():
     assert grants("agent_conversations.xml", "agent_conversations") == [
         "GRANT SELECT, INSERT ON agent_logs.chat_messages", "GRANT SELECT, INSERT ON agent_logs.conversations",
-        "GRANT SELECT, INSERT ON agent_logs.conversation_groups",
+        "GRANT SELECT, INSERT ON agent_logs.conversation_groups", "GRANT INSERT ON agent_logs.feedback",
     ]
     root = ElementTree.parse(USERS_DIR / "agent_conversations.xml").getroot()
     assert root.find("users/agent_conversations/password").get("from_env") == "CLICKHOUSE_CONVERSATIONS_PASSWORD"

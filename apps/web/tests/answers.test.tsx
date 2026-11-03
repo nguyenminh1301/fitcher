@@ -1,10 +1,13 @@
 import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+// ECharts needs a real browser; these tests check which chart is chosen, not how it is drawn.
+vi.mock("@/components/chat/ChartView", () => ({ ChartView: ({ spec }: { spec: { type: string } }) => <div data-testid="chart">{spec.type}</div> }));
+
 import { AssistantTurn } from "@/components/chat/AssistantTurn";
 import type { AskEvent } from "@/lib/api/events";
 import type { Turn } from "@/lib/api/conversations";
-import type { Result } from "@/lib/contracts";
+import type { ChartSpec, Result } from "@/lib/contracts";
 import { I18nProvider, useI18n } from "@/lib/i18n/react";
 
 const T = "trace-1";
@@ -63,6 +66,48 @@ describe("answer", () => {
     expect(screen.getByText("Q1 2026 is only partly covered by the data")).toBeTruthy();
     expect(screen.getByRole("radiogroup", { name: "Chart type" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "SQL" })).toBeTruthy();
+  });
+
+  it("switches a grouped bar to a bar and a table without calling the network", () => {
+    const fetch = vi.fn();
+    vi.stubGlobal("fetch", fetch);
+    const compared: Result = {
+      columns: [
+        { name: "widget_name", type: "string", role: "dimension" },
+        { name: "widget_revenue_q1_2024", type: "number", role: "measure", format: "currency" },
+        { name: "widget_revenue_q1_2025", type: "number", role: "measure", format: "currency" },
+      ],
+      rows: [["SKU1", 10, 12], ["SKU2", 8, 11]], row_count: 2,
+    };
+    const spec: ChartSpec = { type: "grouped_bar", x: "widget_name", y: ["widget_revenue_q1_2024", "widget_revenue_q1_2025"], orientation: "vertical", allowed_types: ["grouped_bar", "bar", "table"] };
+    show([{ event: "result", result: compared, trace_id: T }, { event: "chart_spec", spec, trace_id: T }, { event: "done", trace_id: T }]);
+
+    for (const name of ["Bar", "Table", "Grouped bar"]) {
+      const option = screen.getByRole("radio", { name: new RegExp(`^${name}`) });
+      fireEvent.click(option);
+      expect(option.getAttribute("aria-checked")).toBe("true");
+    }
+    expect(screen.getByRole("radio", { name: /^Line/ }).getAttribute("aria-disabled")).toBe("true");
+    expect(fetch).not.toHaveBeenCalled();
+    vi.unstubAllGlobals();
+  });
+
+  it("draws the chart the api chose when its spec arrives while the answer streams", () => {
+    const spec: ChartSpec = { type: "bar", x: "region", y: ["sales"], orientation: "vertical", allowed_types: ["bar", "table"] };
+    const streamed = [...ANSWER.slice(0, 5)];
+    const { rerender } = render(<I18nProvider><AssistantTurn turn={turn(streamed)} streaming onStop={vi.fn()} onFollowUp={vi.fn()} /></I18nProvider>);
+
+    rerender(<I18nProvider><AssistantTurn turn={turn([...streamed, { event: "chart_spec", spec, trace_id: T }, { event: "done", trace_id: T }])} streaming={false} onStop={vi.fn()} onFollowUp={vi.fn()} /></I18nProvider>);
+
+    expect(screen.getByRole("radio", { name: /^Bar/ }).getAttribute("aria-checked")).toBe("true");
+  });
+
+  it("disables the donut for a time series", () => {
+    const monthly: Result = { columns: [{ name: "month", type: "date", role: "time" }, { name: "sales", type: "number", role: "measure" }], rows: [["2025-01-01", 1], ["2025-02-01", 2]], row_count: 2 };
+    const spec: ChartSpec = { type: "line", x: "month", y: ["sales"], orientation: "vertical", allowed_types: ["line", "bar", "table"] };
+    show([{ event: "result", result: monthly, trace_id: T }, { event: "chart_spec", spec, trace_id: T }, { event: "done", trace_id: T }]);
+
+    expect(screen.getByRole("radio", { name: /^Pie \/ donut/ }).getAttribute("aria-disabled")).toBe("true");
   });
 
   it("keeps the summary in its own language when the interface language changes", () => {

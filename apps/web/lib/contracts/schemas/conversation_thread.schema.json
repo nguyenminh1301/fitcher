@@ -76,6 +76,22 @@
           "default": null,
           "title": "Format"
         },
+        "orientation": {
+          "anyOf": [
+            {
+              "enum": [
+                "vertical",
+                "horizontal"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Orientation"
+        },
         "allowed_types": {
           "items": {
             "enum": [

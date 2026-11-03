@@ -66,7 +66,8 @@ GOOD_SQL = (
 )
 
 
-def good_output(rows: int = 2) -> QueryOutput:
+# Seven widgets are more groups than a pie allows, so the chart rules settle the chart without the fast tie-break.
+def good_output(rows: int = 7) -> QueryOutput:
     return QueryOutput(
         query_id="qid-ok",
         columns=["widget_name", "widget_revenue_q1_2025"],

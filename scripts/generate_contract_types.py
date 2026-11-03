@@ -18,6 +18,7 @@ from app.contracts.conversations import (  # noqa: E402
     Conversation, ConversationGroup, ConversationPatch, ConversationThread, GroupInput,
 )
 from app.contracts.events import AskEvent, AskRequest  # noqa: E402
+from app.contracts.feedback import FeedbackInput  # noqa: E402
 from app.contracts.query_spec import QuerySpec  # noqa: E402
 from app.contracts.result import Result  # noqa: E402
 
@@ -34,6 +35,7 @@ CONTRACTS = {
     "conversation_thread": (ConversationThread, "serialization"),
     "conversation_patch": (ConversationPatch, "validation"),
     "group_input": (GroupInput, "validation"),
+    "feedback_input": (FeedbackInput, "validation"),
 }
 SCHEMAS = ROOT / "apps" / "web" / "lib" / "contracts" / "schemas"
 

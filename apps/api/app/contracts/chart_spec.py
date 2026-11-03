@@ -1,8 +1,7 @@
 """ChartSpec: how the web app draws a Result (DECISIONS §7 and §8).
 
-``app.agent.chart_recommender`` chooses the spec of every answer and chart
-edit; until its DECISIONS §8 rules arrive in Phase 9 it returns
-``table_spec``, the rules' fallback row. The LLM
+``app.agent.chart_rules`` chooses the spec of every answer and chart
+edit by the DECISIONS §8 rules; ``table_spec`` is their fallback row. The LLM
 never writes chart data: a ChartSpec only names result columns.
 """
 
@@ -23,6 +22,8 @@ class ChartSpec(ContractModel):
     series: str | None = None
     sort: Literal["asc", "desc"] | None = None
     format: ValueFormat | None = None
+    # How a bar is laid out: horizontal when its labels are long (DECISIONS §8); unset for other types.
+    orientation: Literal["vertical", "horizontal"] | None = None
     # Every type valid for the data; the web app disables the others (DECISIONS §8).
     allowed_types: list[ChartType] = Field(min_length=1)
 

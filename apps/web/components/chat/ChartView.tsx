@@ -1,15 +1,14 @@
 "use client";
 
-// Draws a OrientedChartSpec with ECharts, in the design's data colours read from the theme tokens; a KPI is a
+// Draws a ChartSpec with ECharts, in the design's data colours read from the theme tokens; a KPI is a
 // large number. Charts are images with a description; the data table below is their accessible equivalent.
 
 import type { EChartsInstance } from "echarts-for-react";
 import dynamic from "next/dynamic";
 import { useEffect, useState } from "react";
 
-import type { OrientedChartSpec } from "@/lib/api/provisional";
 import { formatCell, toEChartsOption } from "@/lib/chart/toEChartsOption";
-import type { Result } from "@/lib/contracts";
+import type { ChartSpec, Result } from "@/lib/contracts";
 import { useI18n } from "@/lib/i18n/react";
 
 const ReactECharts = dynamic(() => import("echarts-for-react"), { ssr: false });
@@ -40,7 +39,7 @@ function usePalette(): { palette: string[]; grid: string } {
   return palette;
 }
 
-export function ChartView({ spec, result, onReady }: { spec: OrientedChartSpec; result: Result; onReady?: (chart: EChartsInstance) => void }) {
+export function ChartView({ spec, result, onReady }: { spec: ChartSpec; result: Result; onReady?: (chart: EChartsInstance) => void }) {
   const { t, locale } = useI18n();
   const { palette, grid } = usePalette();
 

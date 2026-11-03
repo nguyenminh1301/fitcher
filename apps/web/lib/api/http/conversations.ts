@@ -11,7 +11,8 @@ import type { AskEvent } from "../events";
 /** How many conversations the sidebar reads; the api keeps them for 90 days. */
 export const LIST_LIMIT = 200;
 
-async function refused(response: Response): Promise<Error> {
+/** The error for a refused api call, with the api's reason when it gave one. */
+export async function refused(response: Response): Promise<Error> {
   let reason = "";
   try {
     const body = (await response.json()) as { detail?: unknown; error?: unknown };

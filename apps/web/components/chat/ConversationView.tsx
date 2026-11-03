@@ -55,7 +55,7 @@ export function ConversationView({ id }: { id: string }) {
                       onStop={stop}
                       onRetry={running ? undefined : () => void ask(turn.question, { conversationId: id, retryOf: turn.turn })}
                       onFollowUp={(text) => void ask(text, { conversationId: id })}
-                      onFeedback={(input) => void api.feedback.send(input)}
+                      onFeedback={(input) => api.feedback.send(input).catch((error: unknown) => console.error("feedback was not saved", error))}
                     />
                   </div>
                 </div>

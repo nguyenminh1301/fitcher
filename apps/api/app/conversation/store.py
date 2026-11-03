@@ -41,7 +41,10 @@ from app.contracts.conversations import (
 from app.contracts.events import ChartSpecEvent, DoneEvent, Event, EventModel, ResultEvent, SummaryEvent
 from app.contracts.query_spec import QuerySpec
 from app.contracts.result import Result
-from app.observability.events import ChatMessageRecord, ConversationGroupRecord, ConversationRecord, LogRecord, utc_now
+from app.contracts.feedback import FeedbackInput
+from app.observability.events import (
+    ChatMessageRecord, ConversationGroupRecord, ConversationRecord, FeedbackRecord, LogRecord, utc_now,
+)
 from app.text import fold
 
 DATABASE = "agent_logs"
@@ -68,11 +71,19 @@ MESSAGES_SQL = (
 ACTIVITY_SQL = (
     "SELECT conversation_id, max(ts) FROM agent_logs.chat_messages WHERE user_id = {user_id:String} GROUP BY conversation_id"
 )
+ANSWERS_SQL = (
+    "SELECT count() FROM agent_logs.chat_messages "
+    "WHERE user_id = {user_id:String} AND trace_id = {trace_id:String} AND role = 'assistant'"
+)
 QUESTIONS_SQL = (
     "SELECT conversation_id, content FROM agent_logs.chat_messages WHERE user_id = {user_id:String} AND role = 'user'"
 )
 
 _EVENTS = TypeAdapter(list[Event])
+
+
+class AnswerNotFound(Exception):
+    """The requesting user has no answer with this trace id."""
 
 
 class ConversationNotFound(Exception):
@@ -226,6 +237,13 @@ class ConversationStore:
                 for turn in turns
             ],
         )
+
+    def record_feedback(self, user_id: str, feedback: FeedbackInput) -> None:
+        """Write a like or dislike of one of the user's answers; raises ``AnswerNotFound`` for any other trace."""
+        [(count,)] = self._query(ANSWERS_SQL, user_id=user_id, trace_id=feedback.trace_id)
+        if not count:
+            raise AnswerNotFound(feedback.trace_id)
+        self._insert(FeedbackRecord(user_id=user_id, ts=self._clock(), **feedback.model_dump()))
 
     # the sidebar
 

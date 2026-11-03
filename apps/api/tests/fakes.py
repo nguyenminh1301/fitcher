@@ -223,7 +223,7 @@ class FakeConversationClient:
     def __init__(self, fail: bool = False, naive_times: bool = False):
         self.fail = fail
         self.naive_times = naive_times
-        self.tables: dict[str, list[dict]] = {"chat_messages": [], "conversations": [], "conversation_groups": []}
+        self.tables: dict[str, list[dict]] = {"chat_messages": [], "conversations": [], "conversation_groups": [], "feedback": []}
         self.queries: list[str] = []
 
     def _check(self) -> None:
@@ -279,5 +279,7 @@ class FakeConversationClient:
             for row in messages:
                 last[row["conversation_id"]] = max(row["ts"], last.get(row["conversation_id"], row["ts"]))
             return QueryResult(list(last.items()))
+        if sql == store.ANSWERS_SQL:
+            return QueryResult([(sum(row["role"] == "assistant" and row["trace_id"] == parameters["trace_id"] for row in messages),)])
         assert sql == store.QUESTIONS_SQL, sql
         return QueryResult([(row["conversation_id"], row["content"]) for row in messages if row["role"] == "user"])

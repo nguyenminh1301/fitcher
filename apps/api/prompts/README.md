@@ -14,6 +14,7 @@ Templates use `$name` placeholders, filled by `app.agent.prompts.render`.
 | `extract.v3.md` | `fast` | Structured terms, period descriptors, filters, `top_n`, comparison and language of the question; in a conversation, the complete question a follow-up means, with its periods as a shift of the previous query's periods when it names none |
 | `extract.v2.md` | `fast` | The previous extraction prompt, without conversation context; kept so earlier eval results stay comparable |
 | `generate_sql.v1.md` | `sql-gen`, `sql-gen-hard` on the third retry | One ClickHouse SELECT for the QuerySpec over the permitted schema, metric expressions, declared joins and examples, with the previous SQL and error on a retry |
+| `chart_recommender.v1.md` | `fast` | `bar` or `pie` for a question whose rows suit both, from the question only, never the rows |
 | `summarize.v1.md` | `fast` | Two to four sentences in the question's language from the returned rows only |
 
 Change a prompt by adding a new version file and pointing its node at it, so earlier eval results stay comparable.

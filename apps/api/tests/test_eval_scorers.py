@@ -125,7 +125,7 @@ def test_retrieval_fails_when_it_did_not_run():
 # execution
 
 def test_execution_matches_reference():
-    score = score_execution(_case(), _answered_state(), _reference([["Widget 0", 10.5], ["Widget 1", 10.5]]))
+    score = score_execution(_case(), _answered_state(), _reference([[f"Widget {number}", 10.5] for number in range(7)]))
 
     assert score.status == "pass"
 
@@ -133,7 +133,7 @@ def test_execution_matches_reference():
 def test_execution_reports_the_comparison_reason():
     score = score_execution(_case(), _answered_state(), _reference([["Widget 0", 10.5]]))
 
-    assert (score.status, score.reason) == ("fail", "expected 1 rows, got 2")
+    assert (score.status, score.reason) == ("fail", "expected 1 rows, got 7")
 
 
 def test_execution_fails_with_rejection_reason():
@@ -156,7 +156,7 @@ def test_execution_fails_with_last_sql_error():
 # whole case
 
 def test_active_case_scores_every_layer():
-    score = score_case(_case(), _answered_state(), _reference([["Widget 0", 10.5], ["Widget 1", 10.5]]), active=True)
+    score = score_case(_case(), _answered_state(), _reference([[f"Widget {number}", 10.5] for number in range(7)]), active=True)
 
     assert list(score.layers) == list(LAYERS)
     assert score.layers["intent"].status == "pass"

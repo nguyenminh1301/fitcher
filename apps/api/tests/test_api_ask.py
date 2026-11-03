@@ -111,7 +111,7 @@ def test_a_data_question_streams_status_sql_result_chart_summary_and_done(ask_cl
     sql = next(event for event in events if event["event"] == "sql")
     assert sql["sql"].startswith(GOOD_SQL) and sql["attempt"] == 1
     chart = next(event for event in events if event["event"] == "chart_spec")["spec"]
-    assert chart["type"] == "table" and chart["allowed_types"] == ["table"]
+    assert chart["type"] == "bar" and chart["allowed_types"] == ["bar", "table"]
     summary = next(event for event in events if event["event"] == "summary")
     assert (summary["text"], summary["lang"]) == ("Widget 0 led.", "en")
     assert ask_client.agent.started[0][:2] == ("viewer", "lab.viewer")
@@ -123,9 +123,21 @@ def test_every_node_streams_a_start_and_an_end_status_in_graph_order(ask_client)
     nodes = [node for node, phase in statuses if phase == "start"]
     assert nodes == [
         "load_context", "router", "extract", "resolve_time", "retrieve", "build_spec", "gate", "generate_sql", "guard", "explain", "execute",
-        "check", "shape_result", "summarize",
+        "check", "shape_result", "chart_recommender", "summarize",
     ]
     assert statuses == [item for node in nodes for item in ((node, "start"), (node, "end"))]
+
+
+def test_a_share_question_streams_the_chart_the_fast_alias_picks_from_a_bar_and_pie_tie():
+    agent = FakeAgent(
+        [routing_reply(), extraction_reply(), GOOD_SQL, {"chart_type": "pie"}, "Widget 0 is half."], FakeRunner(runs=[good_output(rows=2)]),
+    )
+
+    events = collect(agent)
+
+    chart = next(event for event in events if event["event"] == "chart_spec")["spec"]
+    assert (chart["type"], chart["allowed_types"]) == ("pie", ["bar", "pie", "table"])
+    assert kinds(events) == ["sql", "result", "chart_spec", "summary", "done"]
 
 
 def test_a_repaired_query_streams_each_sql_attempt_before_the_result():

@@ -30,7 +30,7 @@ def test_question_flows_to_a_result_and_summary():
     assert spec.dimensions == ["widget_name"]
     assert [period.label for period in spec.periods] == ["Q1 2024", "Q1 2025"]
     assert (spec.top_n, spec.rank_by, spec.rank_period, spec.compare) == (10, "widget_revenue", "Q1 2025", True)
-    assert state["result"].row_count == 2
+    assert state["result"].row_count == 7
     assert state["result"].columns[1].format == "currency"
     assert state["summary"] == SUMMARY
     assert [call.alias for call in agent.llm.calls] == ["fast", "fast", "sql-gen", "fast"]
@@ -93,7 +93,7 @@ def test_result_with_two_columns_of_one_name_is_repaired():
 
     state = run_question(QUESTION, agent)
 
-    assert state["result"].row_count == 2
+    assert state["result"].row_count == 7
     first = state["attempts"][0]
     assert (first.error.category, first.error.node, first.query_id) == ("sql", "execute", "qid-twice")
     assert "widget_name" in first.error.message

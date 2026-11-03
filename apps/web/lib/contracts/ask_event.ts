@@ -59,6 +59,7 @@ export type Y = string[];
 export type Series = string | null;
 export type Sort = ("asc" | "desc") | null;
 export type Format1 = ("currency" | "count" | "ratio" | "percent" | "days" | "number") | null;
+export type Orientation = ("vertical" | "horizontal") | null;
 /**
  * @minItems 1
  */
@@ -141,6 +142,7 @@ export interface ChartSpec {
   series?: Series;
   sort?: Sort;
   format?: Format1;
+  orientation?: Orientation;
   allowed_types: AllowedTypes;
 }
 export interface SummaryEvent {
