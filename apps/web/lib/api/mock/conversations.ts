@@ -5,7 +5,8 @@ import { readStored, storageAvailable, writeStored } from "@/lib/storage";
 import { fold } from "@/lib/text";
 
 import type { FitcherApi } from "../client";
-import type { ConversationGroup, ConversationThread, Identity } from "../provisional";
+import type { ConversationGroup, ConversationThread } from "../conversations";
+import type { Identity } from "../provisional";
 import type { SampleData } from "./load";
 
 type Saved = { threads: ConversationThread[]; groups: ConversationGroup[] };

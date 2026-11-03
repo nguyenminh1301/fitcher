@@ -4,6 +4,7 @@
 import type { Feature, FitcherApi } from "../client";
 import { httpAuth } from "./auth";
 import { httpChat } from "./chat";
+import { httpConversations } from "./conversations";
 
 export class NotWiredError extends Error {
   constructor(readonly feature: Feature) {
@@ -20,7 +21,7 @@ function asyncNotWired<T extends object>(feature: Feature): T {
 export const httpApi: FitcherApi = {
   auth: httpAuth,
   chat: httpChat,
-  conversations: asyncNotWired("conversations"),
+  conversations: httpConversations,
   feedback: asyncNotWired("feedback"),
   datasets: asyncNotWired("datasets"),
   review: asyncNotWired("review"),

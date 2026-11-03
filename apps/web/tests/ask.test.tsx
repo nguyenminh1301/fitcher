@@ -113,3 +113,67 @@ describe("asking a question", () => {
     expect(state.threads[id].turns.map((turn) => [turn.turn, turn.revision, turn.question])).toEqual([[1, 2, "top edited"]]);
   });
 });
+
+
+describe("asking through the api", () => {
+  function apiChat(conversationId: string) {
+    const requests: unknown[] = [];
+    const base = api();
+    const chat: FitcherApi["chat"] = {
+      suggestions: async () => [],
+      async *ask(request, _signal, onConversation) {
+        requests.push(request);
+        onConversation?.(conversationId);
+        yield { event: "done", trace_id: "t" };
+      },
+    };
+    return { requests, api: { ...base, chat } as FitcherApi };
+  }
+
+  function mount(value: FitcherApi) {
+    const navigate = vi.fn();
+    render(
+      <ChatProvider api={value} navigate={navigate} activeId={null}>
+        <Probe />
+      </ChatProvider>,
+    );
+    return navigate;
+  }
+
+  it("starts a conversation without an id and moves it to the id the api gave it", async () => {
+    const { requests, api: value } = apiChat("api-1");
+    const navigate = mount(value);
+    await waitFor(() => expect(state.loaded).toBe(true));
+
+    await act(async () => {
+      await state.ask("top widgets");
+    });
+
+    await waitFor(() => expect(state.threads["api-1"]?.turns[0].events.at(-1)?.event).toBe("done"));
+    expect(requests[0]).toMatchObject({ question: "top widgets", conversation_id: null, edit_of_turn: null, retry_of_turn: null });
+    expect(navigate).toHaveBeenLastCalledWith("api-1");
+    expect(state.threads["api-1"].conversation.id).toBe("api-1");
+    expect(Object.keys(state.threads)).toEqual(["api-1"]);
+  });
+
+  it("sends an edit or a retry with its turn and the conversation", async () => {
+    const { requests, api: value } = apiChat("api-1");
+    mount(value);
+    await waitFor(() => expect(state.loaded).toBe(true));
+    await act(async () => {
+      await state.ask("top widgets");
+    });
+    await waitFor(() => expect(state.busy).toBeNull());
+
+    await act(async () => {
+      await state.ask("top gadgets", { conversationId: "api-1", editOf: 1 });
+    });
+    await waitFor(() => expect(state.busy).toBeNull());
+    await act(async () => {
+      await state.ask("", { conversationId: "api-1", retryOf: 1 });
+    });
+
+    expect(requests[1]).toMatchObject({ question: "top gadgets", conversation_id: "api-1", edit_of_turn: 1, retry_of_turn: null });
+    expect(requests[2]).toMatchObject({ question: "top gadgets", conversation_id: "api-1", edit_of_turn: null, retry_of_turn: 1 });
+  });
+});

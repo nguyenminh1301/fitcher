@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { Finch } from "@/components/brand/Logo";
 import { Skeleton } from "@/components/ui/feedback";
-import type { Turn } from "@/lib/api/provisional";
+import type { Turn } from "@/lib/api/conversations";
 import { useChat } from "@/lib/chat/ChatContext";
 import { useI18n } from "@/lib/i18n/react";
 

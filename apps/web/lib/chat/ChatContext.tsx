@@ -6,7 +6,8 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 import type { FitcherApi } from "@/lib/api/client";
-import type { Conversation, ConversationGroup, ConversationThread, Identity, Turn } from "@/lib/api/provisional";
+import type { Conversation, ConversationGroup, ConversationThread, Turn } from "@/lib/api/conversations";
+import type { Identity } from "@/lib/api/provisional";
 import type { AskRequest } from "@/lib/contracts";
 import { isSample, sources as currentSources, type Sources } from "@/lib/api/sources";
 import { langOf } from "@/lib/text";
@@ -111,7 +112,8 @@ export function ChatProvider({ api, navigate, activeId, sources = currentSources
     async (question: string, options: AskOptions = {}) => {
       if (busyRef.current) return options.conversationId ?? busyRef.current;
       const existing = options.conversationId ? await loadThread(options.conversationId) : null;
-      const id = existing?.conversation.id ?? crypto.randomUUID();
+      // A new conversation shows under a browser id until the api names it.
+      let id = existing?.conversation.id ?? crypto.randomUUID();
       const stamp = now().toISOString();
       const conversation: Conversation = existing
         ? { ...existing.conversation, updated_at: stamp }
@@ -137,15 +139,28 @@ export function ChatProvider({ api, navigate, activeId, sources = currentSources
       setBusy(id);
       const abort = new AbortController();
       controller.current = abort;
-      // Edit and retry replace the turn here; /ask learns of them with the conversation endpoints (Phase 8).
+      // Edit and retry replace the turn here and on the api, which stores the new revision.
       const request: AskRequest = {
         question: turn.question,
-        conversation_id: id,
+        conversation_id: existing ? id : null,
         timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        edit_of_turn: options.editOf ?? null,
+        retry_of_turn: options.retryOf ?? null,
+      };
+      const named = (apiId: string) => {
+        if (apiId === id) return;
+        const { [id]: _replaced, ...others } = threadsRef.current;
+        threadsRef.current = others;
+        id = apiId;
+        thread = { ...thread, conversation: { ...thread.conversation, id } };
+        putThread(thread);
+        busyRef.current = id;
+        setBusy(id);
+        navigate(id);
       };
       void (async () => {
         try {
-          for await (const event of api.chat.ask(request, abort.signal)) {
+          for await (const event of api.chat.ask(request, abort.signal, named)) {
             const last = thread.turns.at(-1) as Turn;
             thread = { ...thread, turns: [...thread.turns.slice(0, -1), { ...last, events: [...last.events, event] }] };
             putThread(thread);

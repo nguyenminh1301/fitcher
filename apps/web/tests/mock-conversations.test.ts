@@ -2,7 +2,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { createMockConversations } from "@/lib/api/mock/conversations";
 import { EMPTY_CONSOLE, EMPTY_SCENARIOS, type SampleData } from "@/lib/api/mock/load";
-import type { ConversationThread, Identity } from "@/lib/api/provisional";
+import type { ConversationThread } from "@/lib/api/conversations";
+import type { Identity } from "@/lib/api/provisional";
 
 const SEED: ConversationThread = {
   conversation: { id: "c1", title: "Doanh thu quý 1", pinned: false, group_id: null, updated_at: "2026-11-01T10:00:00Z" },

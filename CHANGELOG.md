@@ -4,6 +4,7 @@
 
 ### Added
 
+- Keep the chat sidebar's conversations in the api instead of browser storage: the web server's `/api/conversations` and `/api/conversation-groups` routes forward list, search, read, rename, pin, group and delete to the api with the session's token, a new chat starts without an id and takes the one the api names in `X-Conversation-Id`, edit and retry send `edit_of_turn` and `retry_of_turn`, the conversations feature drops its Sample data badge, and the browser's provisional conversation types give way to the generated contract types.
 - Manage conversations from the api: `GET /conversations` lists the signed-in user's conversations by latest activity with `limit` and `offset`, `GET /conversations/search?q=` matches titles and the user's own questions ignoring case and diacritics, `GET /conversations/{id}` returns the current thread with each answer's stream events, `PATCH`/`DELETE /conversations/{id}` rename, pin, group or hide one, and `/conversation-groups` creates, renames, lists and deletes personal groups (deleting a group moves its conversations back to no group); another user's or a deleted conversation or group is 404, changes write new `ReplacingMergeTree` rows, and the generated web contract types include these models.
 - Edit or retry an earlier question: `/ask` takes `edit_of_turn` or `retry_of_turn` with the conversation's id, asks the new or stored question under a new revision of that turn with only the turns before it as context, and the turns after it leave the conversation; a turn outside the thread is 404.
 - Keep each answer's stream events in `agent_logs.chat_messages.events` (without status events and without the result, whose rows stay in `result`), add the `agent_logs.conversation_groups` table, and let `agent_conversations` read and write it; `jobs.apply_log_schema` adds both to an existing volume.
@@ -148,6 +149,7 @@
 
 ### Security
 
+- Record verified false positives of the Git secret scan in `.gitleaksignore` by their gitleaks fingerprint: the first entry is a test URL that the `generic-api-key` rule reads as a key, and that test now compares the URL's path instead.
 - Stop agent queries from lifting their limits with 0, which ClickHouse reads as unlimited: the `agent_readonly` profile now requires `max_execution_time`, `max_result_rows` and `max_memory_usage` of at least 1, the runner no longer sends `max_result_rows = 0` when it describes an empty result, and `QUERY_MAX_*` values must be positive integers.
 - Record the pyasn1, pypdf and py3-pip-wheel advisories published after the LiteLLM v1.106.6 pin as expiring image exceptions, because no newer stable LiteLLM release fixes them.
 - Scan the four pinned third-party service images in the image audit with the same fixable High/Critical gate and complete reports, with per-image expiring exceptions for advisories only an upstream release can fix, and validate the Compose file in CI.
