@@ -6,18 +6,19 @@ import { useEffect, useState } from "react";
 import { Icon } from "@/components/brand/Icon";
 import { Logo } from "@/components/brand/Logo";
 import { Button } from "@/components/ui/controls";
+import { WarningBanner } from "@/components/ui/feedback";
 import { SampleDataBadge } from "@/components/ui/SampleDataBadge";
 import { Preferences } from "@/components/ui/Preferences";
 import { api } from "@/lib/api";
 import { isSample } from "@/lib/api/sources";
 import { useI18n } from "@/lib/i18n/react";
 
-/** Sign-in with the company account (Keycloak, wired in Phase 7); on sample data the demo identities stand in. */
-export function SignInScreen() {
+/** Sign-in with the company account through Keycloak; on sample data the demo identities stand in. */
+export function SignInScreen({ failed = false }: { failed?: boolean }) {
   const { t } = useI18n();
   const [pack, setPack] = useState("");
   useEffect(() => {
-    void api.auth.pack().then((info) => setPack(info.name));
+    void api.auth.pack().then((info) => setPack(info.name)).catch(() => undefined);
   }, []);
   const sample = isSample("auth");
   return (
@@ -33,7 +34,8 @@ export function SignInScreen() {
             <p style={{ margin: "var(--base-size-8) 0 0", color: "var(--fgColor-muted)", fontSize: 16, lineHeight: "24px" }}>{t("ui.signInSub", { pack })}</p>
           </div>
           <div className="fc-stack" style={{ gap: "var(--base-size-12)" }}>
-            <Button variant="primary" size="xl" block icon="building" disabled={sample}>{t("ui.continueSso")}</Button>
+            {failed ? <WarningBanner tone="danger">{t("ui.signInFailed")}</WarningBanner> : null}
+            <Button variant="primary" size="xl" block icon="building" disabled={sample} onClick={() => window.location.assign("/auth/sign-in")}>{t("ui.continueSso")}</Button>
             {sample ? (
               <div className="fc-row" style={{ justifyContent: "center" }}>
                 <SampleDataBadge feature="auth" />

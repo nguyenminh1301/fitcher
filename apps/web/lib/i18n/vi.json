@@ -242,6 +242,7 @@
     "copiedAnswer": "Đã sao chép câu trả lời",
     "welcomeBack": "Chào mừng trở lại",
     "signInSub": "Đăng nhập để hỏi về dữ liệu của {pack}.",
+    "signInFailed": "Đăng nhập chưa hoàn tất. Hãy thử lại.",
     "continueSso": "Tiếp tục với tài khoản công ty",
     "group_knowledge": "Tri thức",
     "group_observe": "Giám sát",

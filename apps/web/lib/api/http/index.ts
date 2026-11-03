@@ -2,6 +2,7 @@
 // switches the feature to "http" in lib/api/sources.ts; until then every method says it is not wired.
 
 import type { Feature, FitcherApi } from "../client";
+import { httpAuth } from "./auth";
 
 export class NotWiredError extends Error {
   constructor(readonly feature: Feature) {
@@ -24,7 +25,7 @@ function asyncNotWired<T extends object>(feature: Feature): T {
 }
 
 export const httpApi: FitcherApi = {
-  auth: asyncNotWired("auth"),
+  auth: httpAuth,
   chat: notWired("chat"),
   conversations: asyncNotWired("conversations"),
   feedback: asyncNotWired("feedback"),

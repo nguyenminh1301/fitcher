@@ -41,7 +41,7 @@ function renderShell(options: { sources?: Partial<Sources>; locale?: "en" | "vi"
   render(
     <ThemeProvider>
     <I18nProvider initial={options.locale ?? "en"}>
-      <ChatProvider api={api} navigate={navigate} activeId={null} sources={options.sources} now={() => NOW}>
+      <ChatProvider api={api} navigate={navigate} activeId={null} sources={options.sources ?? {}} now={() => NOW}>
         <ChatLayout>
           <p>page</p>
         </ChatLayout>

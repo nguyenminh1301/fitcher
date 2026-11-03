@@ -18,12 +18,14 @@ function delay<T>(value: T, ms = 150): Promise<T> {
   return new Promise((resolve) => setTimeout(() => resolve(value), ms));
 }
 
-export function createMockApi(options: { latencyMs?: number } = {}): MockApi {
+/** ``identity`` replaces the demo identities with the signed-in user once sign-in is real. */
+export function createMockApi(options: { latencyMs?: number; identity?: () => Promise<Identity | null> } = {}): MockApi {
   const load = sampleLoader();
   const wait = <T>(value: T) => delay(value, options.latencyMs ?? 0);
   let current: Identity | null = null;
 
   async function identity(): Promise<Identity | null> {
+    if (options.identity) return options.identity();
     if (current) return current;
     const { console } = await load();
     const stored = readStored(IDENTITY_KEY);
@@ -53,6 +55,7 @@ export function createMockApi(options: { latencyMs?: number } = {}): MockApi {
         const { console } = await load();
         return { ...console.pack, roles: console.pack_roles };
       },
+      signOut: async () => "/sign-in",
     },
     chat: createMockChat(load, identity),
     conversations: createMockConversations(load, identity),
