@@ -434,3 +434,11 @@ def test_out_of_scope_streams_summary_and_done():
     ]
     answered = client.tables["chat_messages"][-1]
     assert (answered["content"], answered["query_spec"], answered["result"]) == ("Mình chỉ trả lời về dữ liệu.", "", "")
+
+
+def test_a_definition_question_streams_summary_and_done():
+    [response] = ask_with(answer([routing_reply("metadata_qa"), "Widget revenue is money from sales."]), ConversationStore(FakeConversationClient()), {})
+
+    events = parse(response.text)
+    assert kinds(events) == ["summary", "done"]
+    assert events[-2]["text"] == "Widget revenue is money from sales."

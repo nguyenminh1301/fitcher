@@ -8,6 +8,7 @@ Templates use `$name` placeholders, filled by `app.agent.prompts.render`.
 | Prompt | Alias | Node |
 | --- | --- | --- |
 | `router.v1.md` | `fast` | One of `data_query`, `metadata_qa`, `chart_edit` or `out_of_scope` with a confidence and the question's language, from the question, the conversation's recent questions and answers and the previous QuerySpec |
+| `metadata_qa.v1.md` | `fast` | Two to five sentences in the question's language explaining a term, metric, column or dataset from the role-filtered glossary, metric, dataset and document hits only, never quoting figures from them |
 | `out_of_scope.v1.md` | `fast` | One or two sentences in the question's language saying what the assistant answers, for an out-of-scope question |
 | `extract.v3.md` | `fast` | Structured terms, period descriptors, filters, `top_n`, comparison and language of the question; in a conversation, the complete question a follow-up means, with its periods as a shift of the previous query's periods when it names none |
 | `extract.v2.md` | `fast` | The previous extraction prompt, without conversation context; kept so earlier eval results stay comparable |

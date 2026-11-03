@@ -1,7 +1,8 @@
 """The agent's LangGraph flow (DECISIONS §6, without the chart recommender).
 
 load_context -> router, then out_of_scope -> end for an out-of-scope
-question and, for every other intent so far, the data_query flow:
+question, metadata_qa -> end for a definition question and, for every other
+intent so far, the data_query flow:
 extract -> resolve_time -> retrieve -> build_spec -> gate -> generate_sql ->
 guard -> explain -> execute -> check, where check loops back to generate_sql
 for repairable errors, stops on policy errors or exhausted retries, and
@@ -25,6 +26,7 @@ from app.agent.nodes.gate import gate
 from app.agent.nodes.generate_sql import generate_sql
 from app.agent.nodes.guard import guard
 from app.agent.nodes.load_context import load_context
+from app.agent.nodes.metadata_qa import metadata_qa
 from app.agent.nodes.out_of_scope import out_of_scope
 from app.agent.nodes.resolve_time import resolve_time
 from app.agent.nodes.retrieve import retrieve
@@ -53,10 +55,15 @@ def _unless_failed(next_node: str) -> Callable[[AgentState], str]:
     return lambda state: "check" if state["attempts"][-1].error is not None else next_node
 
 
+def _branch(state: AgentState) -> str:
+    """The node the router's intent leads to; every other intent so far takes the data question flow."""
+    return {"out_of_scope": "out_of_scope", "metadata_qa": "metadata_qa"}.get(state["intent"], "extract")
+
+
 def build_graph(deps: AgentDeps):
     graph = StateGraph(AgentState)
     nodes = {
-        "load_context": load_context, "router": router, "out_of_scope": out_of_scope,
+        "load_context": load_context, "router": router, "out_of_scope": out_of_scope, "metadata_qa": metadata_qa,
         "extract": extract, "resolve_time": resolve_time, "retrieve": retrieve, "build_spec": build_spec, "gate": gate,
         "generate_sql": generate_sql, "guard": guard, "explain": explain_node, "execute": execute_node,
         "check": check, "shape_result": shape_result, "summarize": summarize,
@@ -66,11 +73,9 @@ def build_graph(deps: AgentDeps):
 
     graph.add_edge(START, "load_context")
     graph.add_edge("load_context", "router")
-    graph.add_conditional_edges(
-        "router", lambda state: "out_of_scope" if state["intent"] == "out_of_scope" else "extract",
-        ["out_of_scope", "extract"],
-    )
+    graph.add_conditional_edges("router", _branch, ["out_of_scope", "metadata_qa", "extract"])
     graph.add_edge("out_of_scope", END)
+    graph.add_edge("metadata_qa", END)
     graph.add_conditional_edges("extract", _unless_rejected("resolve_time"), ["resolve_time", END])
     graph.add_conditional_edges("resolve_time", _unless_rejected("retrieve"), ["retrieve", END])
     graph.add_conditional_edges("retrieve", _unless_rejected("build_spec"), ["build_spec", END])
