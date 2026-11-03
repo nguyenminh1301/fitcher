@@ -137,11 +137,11 @@ def test_execution_reports_the_comparison_reason():
 
 
 def test_execution_fails_with_rejection_reason():
-    state = run_question("Which widgets?", deps([routing_reply(), extraction_reply(rank_term=None)]))
+    state = run_question("Widgets on Mars?", deps([routing_reply(), extraction_reply(filters=[{"column_term": None, "op": "=", "values": ["Mars"]}])]))
 
     score = score_execution(_case(), state, _reference([["Widget 0", 10.5]]))
 
-    assert (score.status, score.reason) == ("fail", "rejected: the question names no measure to report")
+    assert (score.status, score.reason) == ("fail", "rejected: no value of widget_sales matches \'Mars\'")
 
 
 def test_execution_fails_with_last_sql_error():

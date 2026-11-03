@@ -134,22 +134,23 @@ def test_retrieval_failure_is_rejected_before_sql(error):
     assert state.get("spec") is None and state["attempts"] == []
 
 
-def test_question_without_a_measure_is_rejected_before_sql():
+def test_question_without_a_measure_asks_for_one_before_sql():
     agent = deps([routing_reply(), extraction_reply(rank_term=None)])
 
     state = run_question("Which widgets in 2024?", agent)
 
-    assert state["rejection"] == "the question names no measure to report"
+    assert state["clarification"].question == "Which measure should I report?"
     assert [call.alias for call in agent.llm.calls] == ["fast", "fast"]
     assert "attempts" not in state or state["attempts"] == []
 
 
-def test_vague_ranking_word_is_rejected_instead_of_guessed():
+def test_vague_ranking_word_is_asked_about_instead_of_guessed():
     agent = deps([routing_reply(), extraction_reply(rank_term="best")])
 
     state = run_question("Best widgets in 2024?", agent)
 
-    assert state["rejection"] == "'best' does not say which measure to rank by"
+    assert state["clarification"].question == 'Which measure do you mean by "best"?'
+    assert state.get("spec") is None
 
 
 def _audits(logs) -> list:

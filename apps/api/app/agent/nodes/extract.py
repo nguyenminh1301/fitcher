@@ -5,8 +5,8 @@ The ``fast`` alias returns structured terms, never dates or database names;
 In a conversation the prompt also shows the recent turns and the previous
 QuerySpec: the alias restates a follow-up as the complete question it means,
 and gives its periods as a shift of the previous ones (``previous_periods``)
-when it names none. Without a clarify branch yet, a question with no metric,
-or with no period and no previous one to move, is refused before any SQL.
+when it names none. A question that names no measure or no period is not
+refused here: ``build_spec`` records what is missing and the gate asks.
 """
 
 import json
@@ -62,8 +62,4 @@ def extract(state: AgentState, deps: AgentDeps) -> dict:
         extraction = deps.llm.structured(ALIAS, prompt, Extraction)
     except LLMError as error:
         return {"rejection": f"the question could not be read: {error}"}
-    if not extraction.metric_terms and extraction.rank_term is None:
-        return {"extraction": extraction, "rejection": "the question names no measure to report"}
-    if not extraction.periods and extraction.previous_periods is None:
-        return {"extraction": extraction, "rejection": "the question names no period"}
     return {"extraction": extraction, "time_grain": extraction.time_grain}

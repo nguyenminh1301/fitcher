@@ -88,13 +88,13 @@ def test_a_routed_question_records_its_intent_on_the_run():
     assert [call.alias for call in agent.llm.calls] == ["fast", "fast", "sql-gen", "fast"]
 
 
-def test_a_fallback_routing_with_an_unreadable_question_stops_before_sql():
+def test_a_fallback_routing_with_an_unreadable_question_clarifies_before_sql():
     agent = deps([LLMError("alias fast returned HTTP 500"), extraction_reply(rank_term=None)])
 
     state = run_question("Which widgets?", agent)
 
     assert state["intent_fallback"] is True
-    assert state["rejection"] == "the question names no measure to report"
+    assert state["clarification"].question == "Which measure should I report?"
     assert [call.alias for call in agent.llm.calls] == ["fast", "fast"]
 
 
@@ -156,7 +156,7 @@ def test_a_follow_up_without_a_previous_query_has_no_period():
 
     update = resolve_time({"extraction": extraction, "previous_spec": None}, deps([]))
 
-    assert update == {"rejection": "the question names no period"}
+    assert update == {"periods": []}
 
 
 def test_what_about_last_year_reuses_the_previous_question():

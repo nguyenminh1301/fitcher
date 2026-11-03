@@ -121,6 +121,12 @@ def report(state: AgentState) -> int:
     if state.get("denial"):
         print(f"Denied: {state['denial'].message}", file=sys.stderr)
         return 3
+    if state.get("clarification"):
+        asked = state["clarification"]
+        print(f"Clarify: {asked.question}", file=sys.stderr)
+        for option in asked.options:
+            print(f"- {option.label} ({option.id})", file=sys.stderr)
+        return 2
     if state.get("reply") is not None:
         print(f"\nReply:\n{state['reply']}")
         return 0

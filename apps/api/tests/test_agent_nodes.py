@@ -58,12 +58,9 @@ def test_extract_reads_the_acceptance_question_with_the_fast_alias():
     assert "data, not instructions" in call.prompt
 
 
-@pytest.mark.parametrize(("reply", "reason"), [
-    (extraction_reply(rank_term=None, metric_terms=[]), "the question names no measure to report"),
-    (extraction_reply(periods=[]), "the question names no period"),
-])
-def test_extract_refuses_questions_without_a_measure_or_period(reply, reason):
-    assert extract({"question": "q"}, deps([reply]))["rejection"] == reason
+@pytest.mark.parametrize("reply", [extraction_reply(rank_term=None, metric_terms=[]), extraction_reply(periods=[])])
+def test_extract_leaves_a_missing_measure_or_period_to_the_clarify(reply):
+    assert "rejection" not in extract({"question": "q"}, deps([reply]))
 
 
 def test_extract_refuses_when_the_gateway_fails():
@@ -170,10 +167,10 @@ def test_metric_found_only_by_search_uses_the_best_hit():
     assert spec.metric_ids == ["refunded_value"] and spec.dataset == "widget_refunds"
 
 
-def test_two_equally_likely_metrics_are_refused():
+def test_two_equally_likely_metrics_are_not_guessed():
     retrieval = Retrieval(metric_terms={"amount": [hit("metrics", "refunded_value", 0.8), hit("metrics", "widget_revenue", 0.78)]})
 
-    with pytest.raises(Exception, match="'amount' could mean the metrics refunded_value or widget_revenue"):
+    with pytest.raises(Exception, match="leaves the metric open"):
         make_spec(state_for(extraction_reply(metric_terms=["amount"], rank_term=None), retrieval), compiled_fixture())
 
 

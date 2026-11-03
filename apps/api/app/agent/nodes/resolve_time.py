@@ -224,7 +224,8 @@ def shift_periods(periods: Sequence[Period], shift: PeriodShift, fiscal_start_mo
 def resolve_time(state: "AgentState", deps: "AgentDeps") -> dict:
     """Graph node: resolve the extracted periods against the deps' reference date.
 
-    A follow-up that names no period of its own moves the previous query's periods instead.
+    A follow-up that names no period of its own moves the previous query's periods instead; with
+    neither, there are no periods and ``build_spec`` records the missing period.
     """
     extraction = state["extraction"]
     fiscal_start_month = deps.compiled.pack.business_profile.fiscal_year_start_month
@@ -232,7 +233,7 @@ def resolve_time(state: "AgentState", deps: "AgentDeps") -> dict:
     if not extraction.periods:
         if extraction.previous_periods is not None and previous is not None:
             return {"periods": shift_periods(previous.periods, extraction.previous_periods, fiscal_start_month)}
-        return {"rejection": "the question names no period"}
+        return {"periods": []}
     try:
         periods = resolve_periods(extraction.periods, deps.today, fiscal_start_month)
     except TimeResolutionError as error:

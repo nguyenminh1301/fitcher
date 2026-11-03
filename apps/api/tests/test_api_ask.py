@@ -174,11 +174,20 @@ def test_exhausted_retries_end_with_the_last_sql_and_an_error():
     assert "Unknown identifier" in error["error"]
 
 
-def test_a_question_the_flow_cannot_read_asks_for_clarification():
-    events = collect(FakeAgent([routing_reply(), extraction_reply(metric_terms=[], rank_term=None)]))
+def test_an_ambiguous_question_streams_clarify_with_options_and_done():
+    events = collect(FakeAgent([routing_reply(), extraction_reply(metric_terms=[], rank_term=None, language="vi")]))
 
     assert kinds(events) == ["clarify", "done"]
-    assert "names no measure" in events[-2]["question"]
+    clarify = events[-2]
+    assert (clarify["question"], clarify["lang"]) == ("Bạn muốn xem chỉ số nào?", "vi")
+    assert [option["id"] for option in clarify["options"]] == ["metric:widget_revenue", "metric:refunded_value"]
+
+
+def test_a_question_the_flow_cannot_read_is_refused_without_options():
+    events = collect(FakeAgent([routing_reply(), extraction_reply(filters=[{"column_term": None, "op": "=", "values": ["Mars"]}])]))
+
+    assert kinds(events) == ["clarify", "done"]
+    assert (events[-2]["question"], events[-2]["options"]) == ("no value of widget_sales matches \'Mars\'", [])
 
 
 class ScriptedRun:
