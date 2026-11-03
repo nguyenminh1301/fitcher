@@ -130,6 +130,7 @@
 
 ### Fixed
 
+- Draw a streamed answer as the chart its `chart_spec` names instead of the table: the chat kept the chart type it had before the spec arrived, so every live answer opened as a table until the reader switched it.
 - Keep the web chat working now that `/ask` accepts only conversation ids the api created: the web server's `/api/ask` passes the api's `X-Conversation-Id` header through, and the browser's chat sends no conversation id with a chat's first question and the api's id with its follow-ups, so they read the earlier turns, until the conversation endpoints replace the browser's sample conversations.
 - Show the Sample data badge on every console detail page (review item, proposal, dataset, evaluation report and run trace), and decide every console badge from the same feature sources as the rest of the app.
 - Keep small chart axis values distinct: value ticks round to three significant digits instead of one decimal, so a cost axis reads 0.05, 0.1, 0.15 rather than repeating 0.1 and 0.2.

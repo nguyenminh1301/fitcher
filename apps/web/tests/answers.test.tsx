@@ -92,6 +92,16 @@ describe("answer", () => {
     vi.unstubAllGlobals();
   });
 
+  it("draws the chart the api chose when its spec arrives while the answer streams", () => {
+    const spec: ChartSpec = { type: "bar", x: "region", y: ["sales"], orientation: "vertical", allowed_types: ["bar", "table"] };
+    const streamed = [...ANSWER.slice(0, 5)];
+    const { rerender } = render(<I18nProvider><AssistantTurn turn={turn(streamed)} streaming onStop={vi.fn()} onFollowUp={vi.fn()} /></I18nProvider>);
+
+    rerender(<I18nProvider><AssistantTurn turn={turn([...streamed, { event: "chart_spec", spec, trace_id: T }, { event: "done", trace_id: T }])} streaming={false} onStop={vi.fn()} onFollowUp={vi.fn()} /></I18nProvider>);
+
+    expect(screen.getByRole("radio", { name: /^Bar/ }).getAttribute("aria-checked")).toBe("true");
+  });
+
   it("disables the donut for a time series", () => {
     const monthly: Result = { columns: [{ name: "month", type: "date", role: "time" }, { name: "sales", type: "number", role: "measure" }], rows: [["2025-01-01", 1], ["2025-02-01", 2]], row_count: 2 };
     const spec: ChartSpec = { type: "line", x: "month", y: ["sales"], orientation: "vertical", allowed_types: ["line", "bar", "table"] };

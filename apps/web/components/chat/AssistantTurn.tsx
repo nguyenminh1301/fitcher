@@ -58,8 +58,11 @@ export function AssistantTurn({ turn, streaming, onStop, onRetry, onFollowUp, on
   const clarify = only(events, "clarify");
   const error = only(events, "error");
   const traceId = events[0]?.trace_id ?? "";
-  const [type, setType] = useState<ChartType>(spec?.type ?? "table");
-  const [orientation, setOrientation] = useState<"vertical" | "horizontal">(spec?.orientation ?? "horizontal");
+  // The reader's switch wins; until then the chart follows the spec, which arrives while the answer streams.
+  const [pickedType, setType] = useState<ChartType | null>(null);
+  const [pickedOrientation, setOrientation] = useState<"vertical" | "horizontal" | null>(null);
+  const type = pickedType ?? spec?.type ?? "table";
+  const orientation = pickedOrientation ?? spec?.orientation ?? "horizontal";
   const steps = stepsOf(events, streaming, error?.kind === "failed", !!deny);
   const feedback = (rating: "like" | "dislike", note?: string) => onFeedback?.({ trace_id: traceId, rating, ...(note ? { note } : {}) });
 
