@@ -242,6 +242,7 @@
     "copiedAnswer": "Answer copied",
     "welcomeBack": "Welcome back",
     "signInSub": "Sign in to ask questions about {pack} data.",
+    "signInFailed": "Sign-in did not complete. Try again.",
     "continueSso": "Continue with company account",
     "group_knowledge": "Knowledge",
     "group_observe": "Observe",

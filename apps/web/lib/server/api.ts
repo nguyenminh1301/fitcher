@@ -1,0 +1,36 @@
+// Calls from the web server to the fitcher api, with the signed-in user's access token.
+
+import { cookies } from "next/headers";
+
+import { SESSION_COOKIE, accessToken, authConfig, dropSession } from "./auth";
+
+export function apiBase(env: Record<string, string | undefined> = process.env): string {
+  return (env.API_URL ?? "http://127.0.0.1:8000").replace(/\/+$/, "");
+}
+
+export function jsonError(error: string, status: number): Response {
+  return Response.json({ error }, { status, headers: { "cache-control": "no-store" } });
+}
+
+/**
+ * Send a request to the api as the signed-in user. Without a session, or when the api refuses the
+ * token, the user is signed out and the answer is a 401.
+ */
+export async function callApi(path: string, init: RequestInit = {}): Promise<Response> {
+  const session = (await cookies()).get(SESSION_COOKIE)?.value;
+  const token = await accessToken(authConfig(), session);
+  if (!token) return jsonError("signed_out", 401);
+  const headers = new Headers(init.headers);
+  headers.set("authorization", `Bearer ${token}`);
+  let response: Response;
+  try {
+    response = await fetch(`${apiBase()}${path}`, { ...init, headers, cache: "no-store" });
+  } catch {
+    return jsonError("api_unreachable", 502);
+  }
+  if (response.status === 401) {
+    dropSession(session);
+    return jsonError("signed_out", 401);
+  }
+  return response;
+}

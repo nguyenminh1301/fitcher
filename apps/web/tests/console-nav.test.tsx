@@ -27,7 +27,7 @@ function renderConsole(user: string, section: string | null) {
   render(
     <ThemeProvider>
       <I18nProvider initial="en">
-        <ChatProvider api={createMockApi()} navigate={vi.fn()} activeId={null}>
+        <ChatProvider api={createMockApi()} navigate={vi.fn()} activeId={null} sources={{}}>
           <ConsoleLayout section={section} navigate={navigate} onChat={onChat}>
             <p>section page</p>
           </ConsoleLayout>

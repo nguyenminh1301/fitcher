@@ -30,6 +30,8 @@ export interface FitcherApi {
     current(): Promise<Identity | null>;
     switchTo(userId: string): Promise<Identity>;
     pack(): Promise<{ name: string; display_name: string; roles: string[] }>;
+    /** End the session; the address to open next. */
+    signOut(): Promise<string>;
   };
   chat: {
     ask(request: AskRequest, signal: AbortSignal): AsyncIterable<AskEvent>;

@@ -8,7 +8,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import type { FitcherApi } from "@/lib/api/client";
 import type { Conversation, ConversationGroup, ConversationThread, Identity, Turn } from "@/lib/api/provisional";
 import type { AskRequest } from "@/lib/contracts";
-import { sources as currentSources, type Sources } from "@/lib/api/sources";
+import { isSample, sources as currentSources, type Sources } from "@/lib/api/sources";
 import { langOf } from "@/lib/text";
 
 // A conversation's title is its first question cut to 80 characters (DECISIONS §15).
@@ -48,10 +48,12 @@ type ProviderProps = {
   activeId: string | null;
   sources?: Partial<Sources>;
   now?: () => Date;
+  /** Called when real sign-in finds no session, to send the user to the sign-in page. */
+  onSignedOut?: () => void;
   children: ReactNode;
 };
 
-export function ChatProvider({ api, navigate, activeId, sources = currentSources, now = () => new Date(), children }: ProviderProps) {
+export function ChatProvider({ api, navigate, activeId, sources = currentSources, now = () => new Date(), onSignedOut, children }: ProviderProps) {
   const [identity, setIdentity] = useState<Identity | null>(null);
   const [identities, setIdentities] = useState<Identity[]>([]);
   const [pack, setPack] = useState<ChatState["pack"]>(null);
@@ -76,6 +78,10 @@ export function ChatProvider({ api, navigate, activeId, sources = currentSources
     (async () => {
       const [current, all, packInfo] = await Promise.all([api.auth.current(), api.auth.identities(), api.auth.pack()]);
       if (cancelled) return;
+      if (current === null && !isSample("auth", sources)) {
+        onSignedOut?.();
+        return;
+      }
       setIdentity(current);
       setIdentities(all);
       setPack(packInfo);

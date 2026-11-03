@@ -12,7 +12,7 @@ export const FEATURES: Feature[] = [
 ];
 
 export const sources: Sources = {
-  auth: "mock",
+  auth: "http",
   chat: "mock",
   conversations: "mock",
   feedback: "mock",
