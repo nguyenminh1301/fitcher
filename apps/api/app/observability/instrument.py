@@ -1,8 +1,9 @@
 """Node events and SQL attempts of a logged run.
 
 ``instrument`` wraps a graph node without changing its ``(state, deps)``
-signature: it opens the node's span and queues one ``events`` row with the
-node's start, end, status and state update as a JSON payload. Payloads are
+signature: it tells ``deps.progress`` when the node starts and ends, opens the
+node's span and queues one ``events`` row with the node's start, end, status
+and state update as a JSON payload. Payloads are
 capped at 16 KB and never hold result rows, only their count.
 ``LoggingRunner`` queues one ``sql_runs`` row per query the run executes.
 """
@@ -61,6 +62,8 @@ def instrument(name: str, node: Callable) -> Callable:
                 duration_ms=round((time.monotonic() - clock) * 1000), payload=text, payload_truncated=truncated,
             ))
 
+        if deps.progress is not None:
+            deps.progress(name, "start", state, None)
         with node_span(name):
             try:
                 update = node(state, deps)
@@ -68,6 +71,8 @@ def instrument(name: str, node: Callable) -> Callable:
                 log("error", {"error": f"{type(error).__name__}: {error}"})
                 raise
         log("ok", update or {})
+        if deps.progress is not None:
+            deps.progress(name, "end", state, update or {})
         return update
 
     return wrapper

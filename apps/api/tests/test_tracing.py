@@ -10,6 +10,7 @@ import httpx
 import pytest
 
 from app.agent.graph import run_question
+from app.agent.state import RunCancelled
 from app.data.clickhouse import QueryError
 from app.llm.client import LiteLLMClient
 from app.llm.embeddings import LiteLLMEmbeddings
@@ -79,6 +80,24 @@ def test_graph_exception_still_writes_the_final_row():
         run_question(QUESTION, agent)
     final = agent.logs.runs()[-1]
     assert final.status == "error" and "RuntimeError: driver crashed" in final.error
+
+
+def test_a_cancelled_run_stops_before_its_next_node_and_records_it():
+    seen = []
+
+    def progress(name, phase, state, update):
+        seen.append((name, phase))
+        if name == "retrieve":
+            raise RunCancelled()
+
+    agent = replace(logged([extraction_reply(), GOOD_SQL, "Blue led."]), progress=progress)
+    with pytest.raises(RunCancelled):
+        run_question(QUESTION, agent)
+
+    assert seen[-1] == ("retrieve", "start")
+    assert agent.llm.calls[-1].alias == "fast" and len(agent.llm.calls) == 1
+    final = agent.logs.runs()[-1]
+    assert final.status == "cancelled"
 
 
 def test_llm_calls_carry_the_trace_and_node_and_are_counted():

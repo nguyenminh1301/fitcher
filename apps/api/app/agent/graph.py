@@ -26,7 +26,7 @@ from app.agent.nodes.resolve_time import resolve_time
 from app.agent.nodes.retrieve import retrieve
 from app.agent.nodes.shape_result import shape_result
 from app.agent.nodes.summarize import summarize
-from app.agent.state import AgentDeps, AgentState
+from app.agent.state import AgentDeps, AgentState, RunCancelled
 from app.observability.instrument import LoggingRunner, instrument
 from app.observability.runs import RunLog
 from app.observability.tracing import run_span
@@ -91,7 +91,10 @@ def _outcome(state: AgentState) -> tuple[str, str, str]:
 
 
 def run_question(question: str, deps: AgentDeps) -> AgentState:
-    """Run one question under its own trace; with ``deps.logs`` its run row brackets the graph."""
+    """Run one question under its own trace; with ``deps.logs`` its run row brackets the graph.
+
+    A ``RunCancelled`` raised by ``deps.progress`` ends the run as ``cancelled`` and propagates.
+    """
     with run_span() as run:
         initial: AgentState = {
             "question": question,
@@ -108,6 +111,9 @@ def run_question(question: str, deps: AgentDeps) -> AgentState:
         deps = replace(deps, runner=LoggingRunner(deps.runner, deps.logs))
         try:
             state = build_graph(deps).invoke(initial, config=config)
+        except RunCancelled:
+            log.finish("cancelled", intent="", error="the client stopped the run")
+            raise
         except Exception as error:
             log.finish("error", intent="", error=f"{type(error).__name__}: {error}")
             raise

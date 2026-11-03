@@ -9,13 +9,14 @@ from app.contracts.query_spec import ContractModel
 MAX_RESULT_ROWS = 5000
 
 Cell = str | int | float | bool | None
+ValueFormat = Literal["currency", "count", "ratio", "percent", "days", "number"]
 
 
 class ColumnInfo(ContractModel):
     name: str = Field(min_length=1)
     type: Literal["string", "number", "date", "datetime", "boolean"]
     role: Literal["dimension", "measure", "time"]
-    format: Literal["currency", "count", "ratio", "percent", "days", "number"] | None = None
+    format: ValueFormat | None = None
 
 
 class Result(ContractModel):
