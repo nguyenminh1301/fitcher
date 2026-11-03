@@ -6,12 +6,6 @@ import type { ChartSpec, Result } from "@/lib/contracts";
 import type { ConversationThread } from "./conversations";
 import type { AskEvent } from "./events";
 
-/**
- * The ChartSpec contract plus the bar orientation the sample scenarios carry; Phase 9 adds `orientation`
- * to the contract (its open question 4) and deletes this.
- */
-export type OrientedChartSpec = ChartSpec & { orientation?: "vertical" | "horizontal" };
-
 /** Who is signed in; Keycloak replaces the demo identities in Phase 7. */
 export interface Identity {
   user_id: string;
@@ -130,7 +124,7 @@ export interface Scenario {
   sql?: string;
   repair?: { sql: string; error: string };
   result?: Result;
-  chart_spec?: OrientedChartSpec;
+  chart_spec?: ChartSpec;
   summary?: string;
   warnings?: string[];
   clarify?: { question: string; options: { id: string; label: string }[] };

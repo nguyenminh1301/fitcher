@@ -238,6 +238,7 @@ Every event carries `trace_id`. Events 3-5 belong to the SQL path only; per bran
   "series": "period",
   "sort": "desc",
   "format": "currency",
+  "orientation": "vertical",  // optional, bar only: vertical | horizontal (long labels)
   "allowed_types": ["grouped_bar", "bar", "table"]
 }
 ```

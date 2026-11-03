@@ -32,7 +32,7 @@ def test_the_table_spec_puts_the_first_label_column_on_x_and_the_measures_on_y()
 
     assert spec.model_dump() == {
         "type": "table", "x": "period", "y": ["sales", "units"], "series": None, "sort": None,
-        "format": "currency", "allowed_types": ["table"],
+        "format": "currency", "orientation": None, "allowed_types": ["table"],
     }
 
 
@@ -40,3 +40,14 @@ def test_a_result_of_measures_only_uses_its_first_column_as_x():
     result = Result(columns=[ColumnInfo(name="total", type="number", role="measure")], rows=[[3]], row_count=1)
 
     assert (table_spec(result).x, table_spec(result).y) == ("total", ["total"])
+
+
+def test_a_bar_may_carry_its_orientation_and_other_specs_leave_it_unset():
+    bar = ChartSpec(type="bar", x="region", y=["sales"], orientation="horizontal", allowed_types=["bar", "table"])
+
+    assert (bar.orientation, table_spec(Result(columns=[ColumnInfo(name="n", type="number", role="measure")], rows=[[1]], row_count=1)).orientation) == ("horizontal", None)
+
+
+def test_an_unknown_orientation_is_rejected():
+    with pytest.raises(ValidationError, match="orientation"):
+        ChartSpec(type="bar", x="region", y=["sales"], orientation="diagonal", allowed_types=["bar"])

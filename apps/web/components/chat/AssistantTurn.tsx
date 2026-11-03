@@ -8,8 +8,8 @@ import { useState } from "react";
 import { WarningBanner } from "@/components/ui/feedback";
 import type { AskEvent } from "@/lib/api/events";
 import type { Turn } from "@/lib/api/conversations";
-import type { FeedbackInput, OrientedChartSpec } from "@/lib/api/provisional";
-import type { ChartType } from "@/lib/contracts";
+import type { FeedbackInput } from "@/lib/api/provisional";
+import type { ChartSpec, ChartType } from "@/lib/contracts";
 import { stepFor, type StepId } from "@/lib/steps";
 
 import { ChartCard } from "./ChartCard";
@@ -52,8 +52,7 @@ export function stepsOf(events: AskEvent[], streaming: boolean, failed: boolean,
 export function AssistantTurn({ turn, streaming, onStop, onRetry, onFollowUp, onFeedback }: Props) {
   const events = turn.events;
   const result = only(events, "result")?.result;
-  // Sample scenarios carry a bar orientation the contract gains in Phase 9.
-  const spec = only(events, "chart_spec")?.spec as OrientedChartSpec | undefined;
+  const spec = only(events, "chart_spec")?.spec;
   const summary = only(events, "summary");
   const sql = only(events, "sql")?.sql;
   const deny = only(events, "deny");
