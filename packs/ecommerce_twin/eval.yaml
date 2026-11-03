@@ -771,3 +771,44 @@ cases:
     status: approved
     evidence: *cases
     confidence: 1.0
+
+  # chart_edit: the previous answer redrawn without SQL
+
+  - id: monthly_orders_as_line_chart
+    previous_question: Số đơn hàng theo tháng năm 2024
+    question: Vẽ thành biểu đồ đường
+    language: vi
+    category: chart_edit
+    role: analyst
+    expected:
+      intent: chart_edit
+      outcome: answer
+    status: approved
+    evidence: *cases
+    confidence: 1.0
+
+  - id: region_net_sales_as_bars
+    previous_question: Net sales by region in 2024 compared with 2025
+    question: Show that as a bar chart
+    language: en
+    category: chart_edit
+    role: analyst
+    expected:
+      intent: chart_edit
+      outcome: answer
+    status: approved
+    evidence: *cases
+    confidence: 1.0
+
+  - id: top_brands_as_pie
+    previous_question: Top 5 brands by units sold in 2025
+    question: Draw it as a pie chart
+    language: en
+    category: chart_edit
+    role: analyst
+    expected:
+      intent: chart_edit
+      outcome: answer
+    status: approved
+    evidence: *cases
+    confidence: 1.0

@@ -5,8 +5,8 @@ carries ``active_from_phase`` and is reported as not yet scored. An active
 case is a ``data_query`` or an ``out_of_scope`` question: a data question that
 expects an answer needs a reference result, either ``expected_sql`` or
 ``expected_rows``; one that expects a clarifying question or a denial, and an
-out-of-scope question, need none. A ``follow_up`` case names the
-``previous_question`` it follows.
+out-of-scope question, need none, and so does a chart edit. A ``follow_up``
+or ``chart_edit`` case names the ``previous_question`` it follows.
 """
 
 from collections.abc import Sequence
@@ -18,6 +18,7 @@ from app.packs.models import EvalCase, Pack
 # The delivery phase the engine has reached; later phases raise it when they
 # build the branches their cases need.
 ENGINE_PHASE = 8
+FOLLOWS_A_QUESTION = ("follow_up", "chart_edit")
 
 
 class EvalSetError(ValueError):
@@ -41,9 +42,10 @@ def ranks(case: EvalCase) -> bool:
 
 def _check_active(case: EvalCase) -> None:
     expected = case.expected
-    if case.category == "follow_up" and case.previous_question is None:
+    if case.category in FOLLOWS_A_QUESTION and case.previous_question is None:
         raise EvalSetError(f"case {case.id} is a {case.category} case and needs previous_question")
-    if (expected.intent, expected.outcome) in {("data_query", "deny"), ("data_query", "clarify"), ("out_of_scope", "answer")}:
+    decisions = {("data_query", "deny"), ("data_query", "clarify"), ("out_of_scope", "answer"), ("chart_edit", "answer")}
+    if (expected.intent, expected.outcome) in decisions:
         return
     if expected.intent != "data_query" or expected.outcome != "answer":
         raise EvalSetError(

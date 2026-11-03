@@ -251,3 +251,25 @@ def test_deny_case_names_a_clarifying_question_it_got_instead():
     score = score_case(_deny_case(), asked, None, active=True)
 
     assert score.layers["execution"].reason == "expected a denial, but the run asked a clarifying question"
+
+
+def _chart_edit_case():
+    return _case(category="chart_edit", expected=EvalExpected(intent="chart_edit", outcome="answer"), expected_sql=None,
+                 previous_question="Top widgets")
+
+
+def test_chart_edit_case_passes_on_a_chart_spec_without_sql():
+    answered = _answered_state()
+    redrawn = {"intent": "chart_edit", "result": answered["result"], "chart_spec": object(), "attempts": []}
+
+    score = score_case(_chart_edit_case(), redrawn, None, active=True)
+
+    assert {name: layer.status for name, layer in score.layers.items()} == {
+        "intent": "pass", "extraction": "not_scored", "retrieval": "not_scored", "execution": "pass",
+    }
+
+
+def test_chart_edit_case_fails_when_sql_ran():
+    score = score_case(_chart_edit_case(), {**_answered_state(), "intent": "chart_edit"}, None, active=True)
+
+    assert score.layers["execution"].reason == "expected the previous result redrawn, but SQL was generated"

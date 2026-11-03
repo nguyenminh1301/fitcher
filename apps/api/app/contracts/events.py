@@ -7,7 +7,8 @@ and carries the run's ``trace_id``. Per branch the non-status events are:
 - deny: ``deny -> done``
 - data success: ``sql -> result -> chart_spec -> summary -> done``
 - failure: ``[sql] -> error``
-- out_of_scope: ``summary -> done``
+- out_of_scope and metadata_qa: ``summary -> done``
+- chart_edit: ``result -> chart_spec -> done``, the previous turn's result sent again
 
 ``status`` events come before and between them, one at the start and one at
 the end of each graph node. ``sql`` is the checked query that runs, sent when

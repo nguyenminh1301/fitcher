@@ -56,9 +56,8 @@ def test_active_answer_case_needs_sql_or_rows():
         load_eval_set(_pack([_case("no_reference", expected_sql=None)]))
 
 
-@pytest.mark.parametrize("intent", ["metadata_qa", "chart_edit"])
-def test_active_case_must_be_a_branch_the_engine_answers(intent):
-    expected = EvalExpected(intent=intent, outcome="answer")
+def test_active_case_must_be_a_branch_the_engine_scores():
+    expected = EvalExpected(intent="metadata_qa", outcome="answer")
 
     with pytest.raises(EvalSetError, match="not_built_yet"):
         load_eval_set(_pack([_case("not_built_yet", expected=expected, expected_sql=None)]))
@@ -111,3 +110,13 @@ def test_active_deny_case_needs_no_reference():
     case = _case("blocked", expected=deny, expected_sql=None, active_from_phase=6)
 
     assert [item.id for item in load_eval_set(_pack([case])).cases] == ["blocked"]
+
+
+def test_a_chart_edit_case_needs_the_question_it_redraws():
+    expected = EvalExpected(intent="chart_edit", outcome="answer")
+
+    with pytest.raises(EvalSetError, match="previous_question"):
+        load_eval_set(_pack([_case("orphan", category="chart_edit", expected=expected, expected_sql=None)]))
+
+    redraw = _case("redraw", category="chart_edit", expected=expected, expected_sql=None, previous_question="Top widgets in 2024")
+    assert [item.id for item in load_eval_set(_pack([redraw])).cases] == ["redraw"]

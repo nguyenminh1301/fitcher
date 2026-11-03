@@ -194,8 +194,8 @@ Every event carries `trace_id`. Events 3-5 belong to the SQL path only; per bran
 - data success: `status* -> sql -> result -> chart_spec -> summary -> done`
 - failure: `status* -> [sql] -> error`
 - out_of_scope: `status* -> summary -> done`
-
-The `metadata_qa` and `chart_edit` branches are added with their nodes; their event sequences are defined in the conversation phase plan.
+- metadata_qa: `status* -> summary -> done`
+- chart_edit: `status* -> result -> chart_spec -> done`, re-sending the stored result so the client always has the rows it draws
 
 ## 7. Data contracts
 

@@ -25,13 +25,13 @@
             "type": "string",
             "enum": [
               "two_period_compare", "top_n", "string_filter", "monthly_trend", "ambiguous", "unauthorized", "out_of_scope",
-              "follow_up"
+              "follow_up", "chart_edit"
             ]
           },
           "role": {"$ref": "common.schema.json#/$defs/id", "description": "Role the question is asked as."},
           "previous_question": {
             "$ref": "common.schema.json#/$defs/text",
-            "description": "Asked first in the same conversation; the case's question follows it up. Required for follow_up cases."
+            "description": "Asked first in the same conversation; the case's question follows it up. Required for follow_up and chart_edit cases."
           },
           "expected": {
             "type": "object",
