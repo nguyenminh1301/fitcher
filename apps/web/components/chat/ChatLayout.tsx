@@ -11,7 +11,7 @@ import { Logo } from "@/components/brand/Logo";
 import { Button, TextField } from "@/components/ui/controls";
 import { Dialog, Menu, type MenuItem } from "@/components/ui/overlay";
 import { SampleDataBadge } from "@/components/ui/SampleDataBadge";
-import type { Conversation, ConversationGroup } from "@/lib/api/provisional";
+import type { Conversation, ConversationGroup } from "@/lib/api/conversations";
 import { recency, useChat } from "@/lib/chat/ChatContext";
 import { useI18n } from "@/lib/i18n/react";
 

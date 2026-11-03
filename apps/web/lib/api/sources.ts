@@ -14,7 +14,7 @@ export const FEATURES: Feature[] = [
 export const sources: Sources = {
   auth: "http",
   chat: "http",
-  conversations: "mock",
+  conversations: "http",
   feedback: "mock",
   datasets: "mock",
   review: "mock",

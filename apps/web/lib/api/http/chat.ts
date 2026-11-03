@@ -1,10 +1,7 @@
 // The chat against the api (Phase 7): POST /api/ask streams the events of DECISIONS §6, parsed from the
 // server-sent event stream. Stop aborts the request, which ends the run on the api, and the answer
-// ends with a stopped notice.
-//
-// Conversations are still kept in the browser (sample data) and carry the browser's own ids, which the
-// api does not know. A chat's first question starts an api conversation; its X-Conversation-Id is kept
-// for this page so the chat's follow-ups continue it. The conversation endpoints replace this mapping.
+// ends with a stopped notice. A request without a conversation id starts one; the api names it in the
+// X-Conversation-Id header, which ``onConversation`` receives before the first event.
 
 import { parseStream } from "@/lib/sse/parseStream";
 import type { StreamEvent } from "@/lib/contracts";
@@ -25,18 +22,14 @@ async function refusal(response: Response): Promise<string> {
 }
 
 export function createHttpChat(fetcher: typeof fetch = (...args) => fetch(...args)): FitcherApi["chat"] {
-  // The browser's conversation id -> the api's.
-  const apiConversations = new Map<string, string>();
   return {
-    async *ask(request, signal) {
+    async *ask(request, signal, onConversation) {
       let trace = "";
       const stopped = (): AskEvent => ({ event: "error", kind: "stopped", message: "stopped", sql: null, error: null, trace_id: trace });
-      const local = request.conversation_id ?? null;
-      const body = { ...request, conversation_id: local ? (apiConversations.get(local) ?? null) : null };
       let response: Response;
       try {
         response = await fetcher("/api/ask", {
-          method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body), signal,
+          method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(request), signal,
         });
       } catch (error) {
         if (!signal.aborted) throw error;
@@ -45,7 +38,7 @@ export function createHttpChat(fetcher: typeof fetch = (...args) => fetch(...arg
       }
       if (!response.ok || !response.body) throw new Error(await refusal(response));
       const started = response.headers.get("x-conversation-id");
-      if (local && started) apiConversations.set(local, started);
+      if (started) onConversation?.(started);
       try {
         for await (const frame of parseStream(response.body)) {
           const event = JSON.parse(frame.data) as StreamEvent;

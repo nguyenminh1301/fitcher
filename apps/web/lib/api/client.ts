@@ -1,14 +1,12 @@
 // The web app's whole view of the backend, one group per feature. Each feature has a sample
 // implementation (lib/api/mock) and a real one (lib/api/http); lib/api/sources.ts picks per feature.
 
-import type { AskRequest } from "@/lib/contracts";
+import type { AskRequest, ConversationPatch } from "@/lib/contracts";
 
+import type { Conversation, ConversationGroup, ConversationThread } from "./conversations";
 import type { AskEvent } from "./events";
 import type {
   AuditRow,
-  Conversation,
-  ConversationGroup,
-  ConversationThread,
   CostRow,
   DatasetView,
   DocumentRow,
@@ -22,7 +20,7 @@ import type {
   UserRow,
 } from "./provisional";
 
-export type ConversationPatch = Partial<Pick<Conversation, "title" | "pinned" | "group_id">>;
+export type { ConversationPatch } from "@/lib/contracts";
 
 export interface FitcherApi {
   auth: {
@@ -34,7 +32,8 @@ export interface FitcherApi {
     signOut(): Promise<string>;
   };
   chat: {
-    ask(request: AskRequest, signal: AbortSignal): AsyncIterable<AskEvent>;
+    /** Stream an answer; ``onConversation`` learns the id the api gave a conversation the request started. */
+    ask(request: AskRequest, signal: AbortSignal, onConversation?: (conversationId: string) => void): AsyncIterable<AskEvent>;
     suggestions(): Promise<{ text: string; lang: string }[]>;
   };
   conversations: {

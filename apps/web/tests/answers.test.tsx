@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { AssistantTurn } from "@/components/chat/AssistantTurn";
 import type { AskEvent } from "@/lib/api/events";
-import type { Turn } from "@/lib/api/provisional";
+import type { Turn } from "@/lib/api/conversations";
 import type { Result } from "@/lib/contracts";
 import { I18nProvider, useI18n } from "@/lib/i18n/react";
 

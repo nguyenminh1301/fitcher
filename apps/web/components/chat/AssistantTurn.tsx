@@ -7,7 +7,8 @@ import { useState } from "react";
 
 import { WarningBanner } from "@/components/ui/feedback";
 import type { AskEvent } from "@/lib/api/events";
-import type { FeedbackInput, OrientedChartSpec, Turn } from "@/lib/api/provisional";
+import type { Turn } from "@/lib/api/conversations";
+import type { FeedbackInput, OrientedChartSpec } from "@/lib/api/provisional";
 import type { ChartType } from "@/lib/contracts";
 import { stepFor, type StepId } from "@/lib/steps";
 

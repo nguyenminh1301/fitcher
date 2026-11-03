@@ -3,6 +3,7 @@
 
 import type { ChartSpec, Result } from "@/lib/contracts";
 
+import type { ConversationThread } from "./conversations";
 import type { AskEvent } from "./events";
 
 /**
@@ -16,31 +17,6 @@ export interface Identity {
   user_id: string;
   display_name: string;
   roles: string[];
-}
-
-/** Conversations and their turns; Phase 8. */
-export interface Conversation {
-  id: string;
-  title: string;
-  pinned: boolean;
-  group_id: string | null;
-  updated_at: string;
-}
-export interface ConversationGroup {
-  id: string;
-  name: string;
-}
-export interface Turn {
-  turn: number;
-  revision: number;
-  question: string;
-  question_lang: string;
-  events: AskEvent[];
-  feedback?: "like" | "dislike";
-}
-export interface ConversationThread {
-  conversation: Conversation;
-  turns: Turn[];
 }
 
 /** POST /feedback; Phase 9. */

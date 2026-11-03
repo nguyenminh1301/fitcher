@@ -12,6 +12,18 @@ export function jsonError(error: string, status: number): Response {
   return Response.json({ error }, { status, headers: { "cache-control": "no-store" } });
 }
 
+/** Forward a JSON request to the api path as the signed-in user and pass its answer back unchanged. */
+export async function forwardJson(request: Request, path: string): Promise<Response> {
+  const body = request.method === "GET" || request.method === "DELETE" ? undefined : await request.text();
+  const response = await callApi(path, {
+    method: request.method, body, headers: body === undefined ? undefined : { "content-type": "application/json" },
+  });
+  if (response.status === 204) return new Response(null, { status: 204 });
+  return new Response(response.body, {
+    status: response.status, headers: { "content-type": "application/json", "cache-control": "no-store" },
+  });
+}
+
 /**
  * Send a request to the api as the signed-in user. Without a session, or when the api refuses the
  * token, the user is signed out and the answer is a 401.
