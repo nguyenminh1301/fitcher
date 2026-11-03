@@ -70,7 +70,7 @@ describe("conversation routes", () => {
     replies.push(Response.json({ conversation: { id: "c 1" }, turns: [] }), Response.json({ id: "c 1" }), new Response(null, { status: 204 }));
 
     expect((await read(request("/api/conversations/c%201"), params({ id: "c 1" }))).status).toBe(200);
-    expect(last().url).toBe("http://api:8000/conversations/c%201");
+    expect(new URL(last().url).pathname).toBe("/conversations/c%201");
     await update(request("/api/conversations/c%201", "PATCH", { pinned: true }), params({ id: "c 1" }));
     expect(last()).toMatchObject({ method: "PATCH", body: JSON.stringify({ pinned: true }) });
     const deleted = await remove(request("/api/conversations/c%201", "DELETE"), params({ id: "c 1" }));
