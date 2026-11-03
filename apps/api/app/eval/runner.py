@@ -4,7 +4,8 @@ Each active case first obtains its reference result, from ``expected_sql``
 run on the read-only ClickHouse user or from inline ``expected_rows``, then
 asks its question with its own trace id and a time limit; a case with a
 ``previous_question`` asks that first, and its question follows it up in the
-same conversation within the same time limit. Every case runs as its ``role``: retrieval, the guard and, through ``runner_for``, the ClickHouse
+same conversation within the same time limit. Every case runs as its
+``role``: retrieval, the guard and, through ``runner_for``, the ClickHouse
 user are that role's, and so is its reference query. A failing reference
 query, an exception or a timeout fails that case and the run continues;
 inactive cases are reported without running.
