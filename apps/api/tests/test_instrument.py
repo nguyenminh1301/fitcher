@@ -4,7 +4,7 @@ from dataclasses import replace
 from datetime import date
 import json
 
-from agent_fixtures import GOOD_SQL, deps, extraction_reply, good_output
+from agent_fixtures import GOOD_SQL, deps, extraction_reply, good_output, routing_reply
 from fakes import FakeLogWriter, FakeRunner
 from pydantic import BaseModel
 import pytest
@@ -15,7 +15,7 @@ from app.observability.instrument import PAYLOAD_LIMIT, payload_json
 
 QUESTION = "Top 10 best-selling widgets in Q1 2024 compared with Q1 2025"
 NODES = [
-    "extract", "resolve_time", "retrieve", "build_spec", "gate", "generate_sql", "guard", "explain", "execute", "check",
+    "load_context", "router", "extract", "resolve_time", "retrieve", "build_spec", "gate", "generate_sql", "guard", "explain", "execute", "check",
     "shape_result", "summarize",
 ]
 
@@ -29,7 +29,7 @@ def queued(agent, table):
 
 
 def test_each_node_writes_one_event():
-    agent = logged([extraction_reply(), GOOD_SQL, "Blue led."])
+    agent = logged([routing_reply(), extraction_reply(), GOOD_SQL, "Blue led."])
     state = run_question(QUESTION, agent)
     events = queued(agent, "events")
     assert [event.node for event in events] == NODES
@@ -40,7 +40,7 @@ def test_each_node_writes_one_event():
 
 
 def test_result_rows_are_logged_as_counts_only():
-    agent = logged([extraction_reply(), GOOD_SQL, "Blue led."])
+    agent = logged([routing_reply(), extraction_reply(), GOOD_SQL, "Blue led."])
     run_question(QUESTION, agent)
     execute, shape = (event for event in queued(agent, "events") if event.node in ("execute", "shape_result"))
     assert "Widget 0" not in execute.payload and "Widget 0" not in shape.payload
@@ -49,7 +49,7 @@ def test_result_rows_are_logged_as_counts_only():
 
 
 def test_a_node_that_raises_writes_an_error_event():
-    agent = logged([extraction_reply(), GOOD_SQL], FakeRunner(runs=[RuntimeError("driver crashed")]))
+    agent = logged([routing_reply(), extraction_reply(), GOOD_SQL], FakeRunner(runs=[RuntimeError("driver crashed")]))
     with pytest.raises(RuntimeError):
         run_question(QUESTION, agent)
     last = queued(agent, "events")[-1]
@@ -60,7 +60,7 @@ def test_a_node_that_raises_writes_an_error_event():
 def test_every_execution_writes_a_sql_run():
     failure = QueryError("runtime", "Code: 159. Timeout exceeded", "qid-slow", 159)
     agent = logged(
-        [extraction_reply(), GOOD_SQL, GOOD_SQL, "Blue led."], FakeRunner(runs=[failure, good_output()])
+        [routing_reply(), extraction_reply(), GOOD_SQL, GOOD_SQL, "Blue led."], FakeRunner(runs=[failure, good_output()])
     )
     state = run_question(QUESTION, agent)
     first, second = queued(agent, "sql_runs")

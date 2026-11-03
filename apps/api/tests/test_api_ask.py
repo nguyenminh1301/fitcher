@@ -6,7 +6,7 @@ import json
 import threading
 import time
 
-from agent_fixtures import GOOD_SQL, compiled_fixture, deps, extraction_reply, good_output
+from agent_fixtures import GOOD_SQL, compiled_fixture, deps, extraction_reply, good_output, routing_reply
 from auth_fixtures import token, verifier
 from fakes import FakeRunner
 from fastapi.testclient import TestClient
@@ -62,7 +62,7 @@ def serve(agent: FakeAgent, compiled, per_minute: int = 3):
 
 @pytest.fixture
 def ask_client():
-    agent = FakeAgent([extraction_reply(), GOOD_SQL, "Widget 0 led."])
+    agent = FakeAgent([routing_reply(), extraction_reply(), GOOD_SQL, "Widget 0 led."])
     serve(agent, compiled_fixture())
     with TestClient(app) as client:
         client.agent = agent
@@ -98,7 +98,7 @@ def test_a_data_question_streams_status_sql_result_chart_summary_and_done(ask_cl
     assert response.headers["content-type"].startswith("text/event-stream")
     events = parse(response.text)
     assert kinds(events) == ["sql", "result", "chart_spec", "summary", "done"]
-    assert events[0] == {"event": "status", "trace_id": events[0]["trace_id"], "node": "extract", "phase": "start", "attempt": None}
+    assert events[0] == {"event": "status", "trace_id": events[0]["trace_id"], "node": "load_context", "phase": "start", "attempt": None}
     assert len({event["trace_id"] for event in events}) == 1
     sql = next(event for event in events if event["event"] == "sql")
     assert sql["sql"].startswith(GOOD_SQL) and sql["attempt"] == 1
@@ -114,7 +114,7 @@ def test_every_node_streams_a_start_and_an_end_status_in_graph_order(ask_client)
 
     nodes = [node for node, phase in statuses if phase == "start"]
     assert nodes == [
-        "extract", "resolve_time", "retrieve", "build_spec", "gate", "generate_sql", "guard", "explain", "execute",
+        "load_context", "router", "extract", "resolve_time", "retrieve", "build_spec", "gate", "generate_sql", "guard", "explain", "execute",
         "check", "shape_result", "summarize",
     ]
     assert statuses == [item for node in nodes for item in ((node, "start"), (node, "end"))]
@@ -122,7 +122,7 @@ def test_every_node_streams_a_start_and_an_end_status_in_graph_order(ask_client)
 
 def test_a_repaired_query_streams_each_sql_attempt_before_the_result():
     agent = FakeAgent(
-        [extraction_reply(), "SELECT nope(widget_name) FROM marts.widget_sales", GOOD_SQL, "Done."],
+        [routing_reply(), extraction_reply(), "SELECT nope(widget_name) FROM marts.widget_sales", GOOD_SQL, "Done."],
         FakeRunner(explains=[sql_error()], runs=[good_output()]),
     )
 
@@ -135,7 +135,7 @@ def test_a_repaired_query_streams_each_sql_attempt_before_the_result():
 
 def test_a_role_without_permission_receives_a_deny_event():
     compiled = pack_with_refunds_clerk()
-    agent = FakeAgent([extraction_reply()], compiled=compiled)
+    agent = FakeAgent([routing_reply(), extraction_reply()], compiled=compiled)
     serve(agent, compiled)
     clerk = token(realm_access={"roles": ["refunds_clerk"]})
     try:
@@ -155,7 +155,7 @@ def test_a_role_without_permission_receives_a_deny_event():
 
 def test_exhausted_retries_end_with_the_last_sql_and_an_error():
     sqls = [f"SELECT widget_name AS w{n} FROM marts.widget_sales" for n in range(4)]
-    agent = FakeAgent([extraction_reply(), *sqls], FakeRunner(explains=[sql_error()] * 4))
+    agent = FakeAgent([routing_reply(), extraction_reply(), *sqls], FakeRunner(explains=[sql_error()] * 4))
 
     events = collect(agent)
 
@@ -167,7 +167,7 @@ def test_exhausted_retries_end_with_the_last_sql_and_an_error():
 
 
 def test_a_question_the_flow_cannot_read_asks_for_clarification():
-    events = collect(FakeAgent([extraction_reply(metric_terms=[], rank_term=None)]))
+    events = collect(FakeAgent([routing_reply(), extraction_reply(metric_terms=[], rank_term=None)]))
 
     assert kinds(events) == ["clarify", "done"]
     assert "names no measure" in events[-2]["question"]

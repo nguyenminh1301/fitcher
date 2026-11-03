@@ -2,7 +2,7 @@
 
 from dataclasses import replace
 
-from agent_fixtures import GOOD_SQL, compiled_fixture, deps, extraction_reply
+from agent_fixtures import GOOD_SQL, compiled_fixture, deps, extraction_reply, routing_reply
 from fake_llm import FakeLLMClient
 import pytest
 
@@ -11,7 +11,7 @@ from jobs.ask import FaultInjectingLLM, choose_role, format_table, inject_fault,
 
 
 def test_successful_run_prints_sql_table_warnings_and_summary(capsys):
-    state = run_question("Top widgets", deps([extraction_reply(), GOOD_SQL, "Blue led."]))
+    state = run_question("Top widgets", deps([routing_reply(), extraction_reply(), GOOD_SQL, "Blue led."]))
 
     code = report(state)
 
@@ -25,14 +25,14 @@ def test_successful_run_prints_sql_table_warnings_and_summary(capsys):
 
 
 def test_rejected_question_exits_with_code_2_and_the_reason(capsys):
-    state = run_question("Which widgets?", deps([extraction_reply(rank_term=None)]))
+    state = run_question("Which widgets?", deps([routing_reply(), extraction_reply(rank_term=None)]))
 
     assert report(state) == 2
     assert "Rejected: the question names no measure to report" in capsys.readouterr().err
 
 
 def test_failed_run_prints_the_last_sql_and_error_and_exits_1(capsys):
-    state = run_question("Top widgets", deps([extraction_reply(), "SELECT secret FROM marts.widget_sales"]))
+    state = run_question("Top widgets", deps([routing_reply(), extraction_reply(), "SELECT secret FROM marts.widget_sales"]))
 
     code = report(state)
 
@@ -92,7 +92,7 @@ def test_role_flag_is_parsed():
 
 
 def test_denied_question_exits_with_code_3_and_the_message(capsys):
-    agent = deps([extraction_reply()])
+    agent = deps([routing_reply(), extraction_reply()])
     agent = replace(agent, role="nobody")
 
     state = run_question("Top widgets", agent)

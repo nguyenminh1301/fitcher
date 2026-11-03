@@ -42,6 +42,11 @@ def extraction_reply(**overrides) -> dict:
     return {**reply, **overrides}
 
 
+def routing_reply(intent: str = "data_query", confidence: float = 0.9, language: str = "en") -> dict:
+    """The router's reply; graph runs ask it first."""
+    return {"intent": intent, "confidence": confidence, "language": language}
+
+
 def example_hit() -> dict:
     return {"id": "revenue_by_widget", "score": 0.9, "source": {
         "type": "example", "title": "Top 10 widgets by revenue",

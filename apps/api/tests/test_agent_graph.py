@@ -2,7 +2,7 @@
 
 from dataclasses import replace
 
-from agent_fixtures import GOOD_SQL, deps, extraction_reply, good_output
+from agent_fixtures import GOOD_SQL, deps, extraction_reply, good_output, routing_reply
 from fakes import FakeEmbeddings, FakeLogWriter, FakeRunner
 import pytest
 
@@ -20,7 +20,7 @@ def sql_error(message: str = "Code: 47. DB::Exception: Unknown identifier") -> Q
 
 
 def test_question_flows_to_a_result_and_summary():
-    agent = deps([extraction_reply(), GOOD_SQL, SUMMARY])
+    agent = deps([routing_reply(), extraction_reply(), GOOD_SQL, SUMMARY])
 
     state = run_question(QUESTION, agent)
 
@@ -33,7 +33,7 @@ def test_question_flows_to_a_result_and_summary():
     assert state["result"].row_count == 2
     assert state["result"].columns[1].format == "currency"
     assert state["summary"] == SUMMARY
-    assert [call.alias for call in agent.llm.calls] == ["fast", "sql-gen", "fast"]
+    assert [call.alias for call in agent.llm.calls] == ["fast", "fast", "sql-gen", "fast"]
     assert [call[0] for call in agent.runner.calls] == ["explain", "run"]
     assert all(call[2] == state["trace_id"] for call in agent.runner.calls)
     assert state["attempts"][0].query_id == "qid-ok"
@@ -41,21 +41,21 @@ def test_question_flows_to_a_result_and_summary():
 
 def test_broken_sql_is_repaired_within_the_retry_limit():
     runner = FakeRunner(explains=[sql_error()], runs=[good_output()])
-    agent = deps([extraction_reply(), "SELECT nope(widget_name) AS x FROM marts.widget_sales", GOOD_SQL, SUMMARY], runner)
+    agent = deps([routing_reply(), extraction_reply(), "SELECT nope(widget_name) AS x FROM marts.widget_sales", GOOD_SQL, SUMMARY], runner)
 
     state = run_question(QUESTION, agent)
 
     assert state["result"] is not None
     assert [attempt.alias for attempt in state["attempts"]] == ["sql-gen", "sql-gen"]
     assert state["attempts"][0].error.category == "sql"
-    retry_prompt = agent.llm.calls[2].prompt
+    retry_prompt = agent.llm.calls[3].prompt
     assert "The previous attempt failed" in retry_prompt
     assert "Unknown identifier" in retry_prompt
 
 
 def test_exhausted_retries_return_the_last_sql_and_error_without_a_result():
     runner = FakeRunner(explains=[sql_error()] * 4)
-    agent = deps([extraction_reply(), *[f"SELECT widget_name AS w{n} FROM marts.widget_sales" for n in range(4)]], runner)
+    agent = deps([routing_reply(), extraction_reply(), *[f"SELECT widget_name AS w{n} FROM marts.widget_sales" for n in range(4)]], runner)
 
     state = run_question(QUESTION, agent)
 
@@ -67,7 +67,7 @@ def test_exhausted_retries_return_the_last_sql_and_error_without_a_result():
 
 
 def test_policy_violation_stops_without_retry():
-    agent = deps([extraction_reply(), "SELECT secret FROM marts.widget_sales"])
+    agent = deps([routing_reply(), extraction_reply(), "SELECT secret FROM marts.widget_sales"])
 
     state = run_question(QUESTION, agent)
 
@@ -79,7 +79,7 @@ def test_policy_violation_stops_without_retry():
 
 def test_access_denied_at_execution_is_a_policy_stop():
     runner = FakeRunner(runs=[QueryError("policy", "Code: 497. ACCESS_DENIED", "qid-x", 497)])
-    agent = deps([extraction_reply(), GOOD_SQL], runner)
+    agent = deps([routing_reply(), extraction_reply(), GOOD_SQL], runner)
 
     state = run_question(QUESTION, agent)
 
@@ -89,7 +89,7 @@ def test_access_denied_at_execution_is_a_policy_stop():
 
 def test_result_with_two_columns_of_one_name_is_repaired():
     twice = QueryOutput(query_id="qid-twice", columns=["widget_name", "widget_name"], types=["String", "String"], rows=[("A", "A")])
-    agent = deps([extraction_reply(), GOOD_SQL, GOOD_SQL, SUMMARY], FakeRunner(runs=[twice, good_output()]))
+    agent = deps([routing_reply(), extraction_reply(), GOOD_SQL, GOOD_SQL, SUMMARY], FakeRunner(runs=[twice, good_output()]))
 
     state = run_question(QUESTION, agent)
 
@@ -97,11 +97,11 @@ def test_result_with_two_columns_of_one_name_is_repaired():
     first = state["attempts"][0]
     assert (first.error.category, first.error.node, first.query_id) == ("sql", "execute", "qid-twice")
     assert "widget_name" in first.error.message
-    assert first.error.message in agent.llm.calls[2].prompt
+    assert first.error.message in agent.llm.calls[3].prompt
 
 
 def test_zero_rows_pass_with_a_warning():
-    agent = deps([extraction_reply(), GOOD_SQL, SUMMARY], FakeRunner(runs=[good_output(rows=0)]))
+    agent = deps([routing_reply(), extraction_reply(), GOOD_SQL, SUMMARY], FakeRunner(runs=[good_output(rows=0)]))
 
     state = run_question(QUESTION, agent)
 
@@ -111,7 +111,7 @@ def test_zero_rows_pass_with_a_warning():
 
 def test_out_of_coverage_period_passes_with_a_warning():
     periods = [{"kind": "year", "year": 2030}]
-    agent = deps([extraction_reply(periods=periods, compare=False), GOOD_SQL, SUMMARY])
+    agent = deps([routing_reply(), extraction_reply(periods=periods, compare=False), GOOD_SQL, SUMMARY])
 
     state = run_question(QUESTION, agent)
 
@@ -125,27 +125,27 @@ def test_retrieval_failure_is_rejected_before_sql(error):
         def embed(self, texts):
             raise error
 
-    agent = deps([extraction_reply()], embeddings=Broken())
+    agent = deps([routing_reply(), extraction_reply()], embeddings=Broken())
 
     state = run_question(QUESTION, agent)
 
     assert state["rejection"] == f"the pack context could not be retrieved: {error}"
-    assert [call.alias for call in agent.llm.calls] == ["fast"]
+    assert [call.alias for call in agent.llm.calls] == ["fast", "fast"]
     assert state.get("spec") is None and state["attempts"] == []
 
 
 def test_question_without_a_measure_is_rejected_before_sql():
-    agent = deps([extraction_reply(rank_term=None)])
+    agent = deps([routing_reply(), extraction_reply(rank_term=None)])
 
     state = run_question("Which widgets in 2024?", agent)
 
     assert state["rejection"] == "the question names no measure to report"
-    assert [call.alias for call in agent.llm.calls] == ["fast"]
+    assert [call.alias for call in agent.llm.calls] == ["fast", "fast"]
     assert "attempts" not in state or state["attempts"] == []
 
 
 def test_vague_ranking_word_is_rejected_instead_of_guessed():
-    agent = deps([extraction_reply(rank_term="best")])
+    agent = deps([routing_reply(), extraction_reply(rank_term="best")])
 
     state = run_question("Best widgets in 2024?", agent)
 
@@ -168,13 +168,13 @@ def _clerk(agent):
 
 def test_denied_question_ends_before_any_sql_with_a_deny_audit_row():
     logs = FakeLogWriter()
-    agent = _clerk(replace(deps([extraction_reply()]), logs=logs))
+    agent = _clerk(replace(deps([routing_reply(), extraction_reply()]), logs=logs))
 
     state = run_question(QUESTION, agent)
 
     assert state["denial"].blocked == ["widget_sales"]
     assert state.get("attempts") == [] and agent.runner.calls == []
-    assert [call.alias for call in agent.llm.calls] == ["fast"]
+    assert [call.alias for call in agent.llm.calls] == ["fast", "fast"]
     assert [(a.decision, a.dataset) for a in _audits(logs)] == [("DENY", "widget_sales")]
     run = [record for record in logs.written if record.TABLE == "runs"][-1]
     assert run.status == "denied" and "nothing was queried" in run.error
@@ -182,7 +182,7 @@ def test_denied_question_ends_before_any_sql_with_a_deny_audit_row():
 
 def test_permitted_sql_attempt_writes_an_allow_audit_row():
     logs = FakeLogWriter()
-    agent = replace(deps([extraction_reply(), GOOD_SQL, SUMMARY]), logs=logs)
+    agent = replace(deps([routing_reply(), extraction_reply(), GOOD_SQL, SUMMARY]), logs=logs)
 
     run_question(QUESTION, agent)
 
@@ -193,7 +193,7 @@ def test_permitted_sql_attempt_writes_an_allow_audit_row():
 
 def test_guard_rejection_writes_a_deny_audit_row():
     logs = FakeLogWriter()
-    agent = replace(deps([extraction_reply(), "SELECT secret FROM marts.widget_sales"]), logs=logs)
+    agent = replace(deps([routing_reply(), extraction_reply(), "SELECT secret FROM marts.widget_sales"]), logs=logs)
 
     run_question(QUESTION, agent)
 
@@ -204,7 +204,7 @@ def test_guard_rejection_writes_a_deny_audit_row():
 def test_clickhouse_access_denied_writes_a_deny_audit_row_after_the_allow():
     logs = FakeLogWriter()
     runner = FakeRunner(runs=[QueryError("policy", "Code: 497. ACCESS_DENIED", "qid-x", 497)])
-    agent = replace(deps([extraction_reply(), GOOD_SQL], runner), logs=logs)
+    agent = replace(deps([routing_reply(), extraction_reply(), GOOD_SQL], runner), logs=logs)
 
     run_question(QUESTION, agent)
 
@@ -229,7 +229,7 @@ def test_term_the_role_may_not_read_is_denied_not_replaced_by_a_visible_metric()
         return hits
 
     extraction = extraction_reply(metric_terms=["money taken for widgets"], rank_term=None, top_n=None)
-    agent = _clerk(deps([extraction], search=search))
+    agent = _clerk(deps([routing_reply(), extraction], search=search))
 
     state = run_question(QUESTION, agent)
 

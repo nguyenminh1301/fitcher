@@ -14,6 +14,7 @@ from pydantic import BaseModel, ConfigDict
 from app.agent.errors import AgentError
 from app.contracts.query_spec import Period, QuerySpec
 from app.contracts.result import Result
+from app.conversation.store import Turn
 from app.data.clickhouse import QueryOutput
 from app.llm.client import LLMClient
 from app.llm.embeddings import EmbeddingClient
@@ -70,6 +71,8 @@ class AgentDeps:
     role: str = ""
     # Told when each node starts and ends (the api streams it); it may raise RunCancelled.
     progress: Progress | None = None
+    # The conversation's current thread before this question, oldest first; empty for a new conversation.
+    history: tuple[Turn, ...] = ()
 
 
 class Attempt(BaseModel):
@@ -87,6 +90,15 @@ class AgentState(TypedDict, total=False):
     question: str
     trace_id: str
     profile: BusinessProfile
+    # The last turns of the conversation and the latest QuerySpec and result among them.
+    history: list[Turn]
+    previous_spec: QuerySpec | None
+    previous_result: Result | None
+    # The router's intent; intent_fallback is set when it was uncertain and data_query was assumed.
+    intent: str
+    intent_fallback: bool
+    # The question's language as the router read it; None when it could not.
+    language: str | None
     extraction: BaseModel | None
     periods: list[Period]
     retrieval: BaseModel | None
