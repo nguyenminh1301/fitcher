@@ -136,8 +136,8 @@ def ask_in_conversation(case: EvalCase, deps: AgentDeps) -> AgentState:
 def _run_case(case: EvalCase, deps: AgentDeps, timeout: float, reference_errors: list[str]) -> CaseScore:
     reference, reference_error = None, None
     try:
-        # A case that expects a denial has no reference result to compare.
-        if case.expected.outcome == "answer":
+        # Only an answered data question has a reference result; denials, clarifications and replies have none.
+        if case.expected.intent == "data_query" and case.expected.outcome == "answer":
             reference = reference_result(case, deps)
     except ReferenceQueryError as error:
         reference_error = str(error).removeprefix(f"{case.id}: ")

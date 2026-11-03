@@ -229,3 +229,14 @@ def test_a_failed_previous_question_fails_the_case():
 
     assert score.error == "previous question: RuntimeError: gateway exploded"
     assert score.layers["execution"].status == "fail"
+
+
+def test_an_out_of_scope_case_needs_no_reference_query():
+    expected = EvalExpected(intent="out_of_scope", outcome="answer")
+    case = _case("poem", category="out_of_scope", question="Write a poem", expected=expected, expected_sql=None)
+    agent = deps([routing_reply("out_of_scope"), "I answer data questions."], runner=FakeRunner())
+
+    run = _run(_set(case), agent)
+
+    assert run.cases[0].layers["execution"].status == "pass"
+    assert run.reference_errors == [] and agent.runner.calls == []

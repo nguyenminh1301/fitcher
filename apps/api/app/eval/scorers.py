@@ -137,6 +137,8 @@ def score_denial(state: AgentState) -> LayerScore:
         return LayerScore(status="fail", reason="expected a denial, but the question was answered")
     if state.get("rejection"):
         return LayerScore(status="fail", reason=f"expected a denial, but the question was rejected: {state['rejection']}")
+    if state.get("clarification") is not None:
+        return LayerScore(status="fail", reason="expected a denial, but the run asked a clarifying question")
     errors = [attempt.error for attempt in state.get("attempts", []) if attempt.error is not None]
     return LayerScore(status="fail", reason=f"expected a denial, got {errors[-1] if errors else 'no decision'}")
 

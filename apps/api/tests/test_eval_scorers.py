@@ -243,3 +243,11 @@ def test_out_of_scope_case_fails_when_the_question_was_answered_with_sql():
 
     assert score.layers["intent"].status == "fail"
     assert score.layers["execution"].reason == "expected an out-of-scope reply, but SQL was generated"
+
+
+def test_deny_case_names_a_clarifying_question_it_got_instead():
+    asked = run_question("Best widgets?", deps([routing_reply(), extraction_reply(rank_term="best")]))
+
+    score = score_case(_deny_case(), asked, None, active=True)
+
+    assert score.layers["execution"].reason == "expected a denial, but the run asked a clarifying question"
