@@ -54,8 +54,8 @@ PERIODS_LONG = result(
     [label("period"), label("widget_name"), number("widget_revenue")],
     [[period, f"Widget {index}", 10.0] for period in ("Q1 2024", "Q1 2025") for index in range(10)],
 )
-TWO_NUMBERS = result([number("unit_price"), number("units_sold", "count")], [[9.5, 120], [12.0, 80], [15.0, 40]])
-ONE_POINT = result([number("unit_price"), number("units_sold", "count")], [[9.5, 120]])
+TWO_NUMBERS = result([number("widget_price"), number("widgets_sold", "count")], [[9.5, 120], [12.0, 80], [15.0, 40]])
+ONE_POINT = result([number("widget_price"), number("widgets_sold", "count")], [[9.5, 120]])
 THREE_LABELS = result([label("a"), label("b"), label("c"), number("widget_revenue")], [["x", "y", "z", 1.0], ["x", "y", "w", 2.0]])
 ONLY_LABELS = result([label("widget_name")], [["Blue"], ["Green"]])
 EMPTY = result([label("widget_name"), number("widget_revenue")], [])
@@ -84,7 +84,7 @@ EMPTY = result([label("widget_name"), number("widget_revenue")], [])
         pytest.param(SHARE, None, {"type": "bar", "allowed_types": ["bar", "pie", "table"]}, id="at most 6 non-negative groups also allow a pie"),
         pytest.param(SEVEN_REGIONS, None, {"type": "bar", "allowed_types": ["bar", "table"]}, id="7 groups never allow a pie"),
         pytest.param(WITH_A_LOSS, None, {"type": "bar", "allowed_types": ["bar", "table"]}, id="a negative value never allows a pie"),
-        pytest.param(TWO_NUMBERS, None, {"type": "scatter", "x": "unit_price", "y": ["units_sold"], "allowed_types": ["scatter", "table"]}, id="number + number is a scatter"),
+        pytest.param(TWO_NUMBERS, None, {"type": "scatter", "x": "widget_price", "y": ["widgets_sold"], "allowed_types": ["scatter", "table"]}, id="number + number is a scatter"),
         pytest.param(ONE_POINT, None, {"type": "table", "allowed_types": ["table"]}, id="one row of two numbers falls back to the table"),
         pytest.param(THREE_LABELS, None, {"type": "table", "allowed_types": ["table"]}, id="three labels fall back to the table"),
         pytest.param(ONLY_LABELS, None, {"type": "table", "allowed_types": ["table"]}, id="no measure falls back to the table"),
