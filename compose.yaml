@@ -89,6 +89,10 @@ services:
       KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN:?set KEYCLOAK_ADMIN in .env}
       KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:?set KEYCLOAK_ADMIN_PASSWORD in .env}
       KC_HEALTH_ENABLED: "true"
+      # Tokens name the address browsers use as issuer, whichever address requested them;
+      # containers still reach Keycloak at keycloak:8080.
+      KC_HOSTNAME: http://localhost:8080
+      KC_HOSTNAME_BACKCHANNEL_DYNAMIC: "true"
     ports:
       - "127.0.0.1:8080:8080"
     volumes:
@@ -128,6 +132,10 @@ services:
       ACTIVE_PACK: ${ACTIVE_PACK:?set ACTIVE_PACK in .env}
       OPENSEARCH_URL: http://opensearch:9200
       EMBEDDING_DIMENSIONS: ${EMBEDDING_DIMENSIONS:-1024}
+      # Access tokens /ask accepts (apps/api/app/auth/jwt.py).
+      KEYCLOAK_ISSUER: ${KEYCLOAK_ISSUER:-http://localhost:8080/realms/finch}
+      KEYCLOAK_AUDIENCE: ${KEYCLOAK_AUDIENCE:-finch-api}
+      KEYCLOAK_JWKS_URL: ${KEYCLOAK_JWKS_URL:-http://keycloak:8080/realms/finch/protocol/openid-connect/certs}
     ports:
       - "127.0.0.1:8000:8000"
     volumes:

@@ -33,13 +33,42 @@
       "directAccessGrantsEnabled": false,
       "serviceAccountsEnabled": false,
       "rootUrl": "http://localhost:3000",
-      "redirectUris": ["http://localhost:3000/*"],
+      "redirectUris": ["http://localhost:3000/auth/callback"],
       "webOrigins": ["http://localhost:3000"],
       "defaultClientScopes": ["web-origins", "acr", "profile", "roles", "basic", "email"],
       "attributes": {
         "pkce.code.challenge.method": "S256",
         "post.logout.redirect.uris": "http://localhost:3000/*"
-      }
+      },
+      "protocolMappers": [
+        {
+          "name": "finch-api audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {"included.custom.audience": "finch-api", "access.token.claim": "true", "id.token.claim": "false"}
+        }
+      ]
+    },
+    {
+      "clientId": "finch-cli",
+      "name": "fitcher lab command line",
+      "description": "Lab only: password grant for curl against the api; no browser sign-in.",
+      "enabled": true,
+      "publicClient": true,
+      "protocol": "openid-connect",
+      "standardFlowEnabled": false,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": true,
+      "serviceAccountsEnabled": false,
+      "defaultClientScopes": ["acr", "profile", "roles", "basic", "email"],
+      "protocolMappers": [
+        {
+          "name": "finch-api audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {"included.custom.audience": "finch-api", "access.token.claim": "true", "id.token.claim": "false"}
+        }
+      ]
     }
   ]
 }

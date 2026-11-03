@@ -58,3 +58,28 @@ def test_lab_users_can_sign_in_without_completing_a_profile():
         assert user["email"].endswith(".test") and user["emailVerified"] is True, user["username"]
         assert user["firstName"] and user["lastName"], user["username"]
         assert not user.get("requiredActions"), user["username"]
+
+
+def _client(client_id: str) -> dict:
+    return next(client for client in REALM["clients"] if client["clientId"] == client_id)
+
+
+def test_web_and_cli_access_tokens_name_the_api_as_audience():
+    for client_id in ("finch-web", "finch-cli"):
+        audiences = [
+            mapper["config"]["included.custom.audience"] for mapper in _client(client_id).get("protocolMappers", [])
+            if mapper["protocolMapper"] == "oidc-audience-mapper" and mapper["config"]["access.token.claim"] == "true"
+        ]
+        assert audiences == ["finch-api"], client_id
+
+
+def test_the_cli_client_only_grants_tokens_for_a_username_and_password():
+    client = _client("finch-cli")
+
+    assert client["publicClient"] is True and client["directAccessGrantsEnabled"] is True
+    assert client["standardFlowEnabled"] is False and client["implicitFlowEnabled"] is False
+    assert "roles" in client["defaultClientScopes"]
+
+
+def test_the_web_client_redirects_only_to_its_sign_in_callback():
+    assert _client("finch-web")["redirectUris"] == ["http://localhost:3000/auth/callback"]
