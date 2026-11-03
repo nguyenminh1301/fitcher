@@ -4,7 +4,7 @@ from dataclasses import replace
 from datetime import date
 import time
 
-from agent_fixtures import GOOD_SQL, deps, extraction_reply, good_output
+from agent_fixtures import GOOD_SQL, deps, extraction_reply, good_output, routing_reply
 from fakes import FakeRunner
 import pytest
 
@@ -45,19 +45,19 @@ def _run(eval_set: EvalSet, agent, timeout: float = 5.0):
 
 
 def test_runs_active_cases_and_skips_inactive_ones():
-    agent = deps([extraction_reply(), GOOD_SQL, "Blue led."], runner=FakeRunner(runs=[good_output(), good_output()]))
+    agent = deps([routing_reply(), extraction_reply(), GOOD_SQL, "Blue led."], runner=FakeRunner(runs=[good_output(), good_output()]))
 
     run = _run(_set(_inactive("later"), _case("now")), agent)
 
     assert [score.case_id for score in run.cases] == ["later", "now"]
     assert {layer.status for layer in run.cases[0].layers.values()} == {"not_scored"}
     assert run.cases[1].layers["execution"].status == "pass"
-    assert len(agent.llm.calls) == 3
+    assert len(agent.llm.calls) == 4
     assert (run.pack, run.reference_date, run.threshold) == ("minimal", date(2026, 1, 15), 0.8)
 
 
 def test_reference_sql_runs_as_its_own_trace():
-    agent = deps([extraction_reply(), GOOD_SQL, "Blue led."], runner=FakeRunner(runs=[good_output(), good_output()]))
+    agent = deps([routing_reply(), extraction_reply(), GOOD_SQL, "Blue led."], runner=FakeRunner(runs=[good_output(), good_output()]))
 
     run = _run(_set(_case("now")), agent)
 
@@ -83,7 +83,7 @@ def test_expected_rows_become_a_typed_reference():
 
 def test_reference_query_error_is_recorded_and_the_run_continues():
     runner = FakeRunner(runs=[QueryError("sql", "Unknown identifier", "qid-ref", 47), good_output()])
-    agent = deps([extraction_reply(), GOOD_SQL, "Blue led."], runner=runner)
+    agent = deps([routing_reply(), extraction_reply(), GOOD_SQL, "Blue led."], runner=runner)
 
     run = _run(_set(_case("broken_reference")), agent)
 
@@ -103,7 +103,7 @@ def test_exception_in_one_case_does_not_stop_the_run():
         return []
 
     runner = FakeRunner(runs=[good_output(), good_output(), good_output()])
-    agent = deps([extraction_reply(), extraction_reply(), GOOD_SQL, "Blue led."], runner=runner, search=search)
+    agent = deps([routing_reply(), extraction_reply(), routing_reply(), extraction_reply(), GOOD_SQL, "Blue led."], runner=runner, search=search)
 
     run = _run(_set(_case("crashes"), _case("survives")), agent)
 
@@ -129,7 +129,7 @@ def test_case_timeout_marks_the_case_and_continues():
         time.sleep(0.3)
         return extraction_reply()
 
-    agent = deps([slow_extraction], runner=FakeRunner(runs=[good_output()]))
+    agent = deps([routing_reply(), slow_extraction], runner=FakeRunner(runs=[good_output()]))
 
     run = _run(_set(_case("slow")), agent, timeout=0.05)
 
@@ -139,7 +139,7 @@ def test_case_timeout_marks_the_case_and_continues():
 
 def test_case_records_elapsed_seconds():
     ticks = iter([10.0, 12.5])
-    agent = deps([extraction_reply(), GOOD_SQL, "Blue led."], runner=FakeRunner(runs=[good_output(), good_output()]))
+    agent = deps([routing_reply(), extraction_reply(), GOOD_SQL, "Blue led."], runner=FakeRunner(runs=[good_output(), good_output()]))
 
     run = run_eval("minimal", _set(_case("now")), agent, timeout=5.0, threshold=0.8, clock=lambda: next(ticks))
 
@@ -156,7 +156,7 @@ def test_reference_sql_result_is_typed_by_the_pack():
 
 
 def test_each_case_runs_as_its_role_with_that_roles_runner():
-    agent = deps([extraction_reply(), GOOD_SQL, "Blue led.", extraction_reply(), GOOD_SQL, "Blue led."], runner=None)
+    agent = deps([routing_reply(), extraction_reply(), GOOD_SQL, "Blue led.", routing_reply(), extraction_reply(), GOOD_SQL, "Blue led."], runner=None)
     pack = agent.compiled.pack
     auditor = pack.policies.roles[0].model_copy(update={"id": "auditor"})
     policies = pack.policies.model_copy(update={"roles": [*pack.policies.roles, auditor]})
@@ -186,7 +186,7 @@ def body_roles(body: dict) -> list[str]:
 def test_deny_case_runs_no_reference_query():
     expected = EvalExpected(intent="data_query", outcome="deny", metrics=["widget_revenue"], dataset="widget_sales")
     case = _case("blocked", category="unauthorized", role="nobody", expected=expected, expected_sql=None, active_from_phase=6)
-    agent = deps([extraction_reply()], runner=FakeRunner())
+    agent = deps([routing_reply(), extraction_reply()], runner=FakeRunner())
 
     run = _run(_set(case), agent)
 

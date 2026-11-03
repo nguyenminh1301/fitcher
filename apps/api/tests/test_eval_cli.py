@@ -6,7 +6,7 @@ import json
 from pathlib import Path
 import shutil
 
-from agent_fixtures import GOOD_SQL, deps, extraction_reply, good_output
+from agent_fixtures import GOOD_SQL, deps, extraction_reply, good_output, routing_reply
 from conftest import FIXTURE_PACK, SCHEMA_DIR
 from fakes import FakeLogWriter, FakeRunner
 import pytest
@@ -35,7 +35,7 @@ def _add_second_case(packs_dir: Path) -> None:
 
 
 def _answers(cases: int) -> list:
-    return [extraction_reply(top_n=5), GOOD_SQL, "Blue led."] * cases
+    return [routing_reply(), extraction_reply(top_n=5), GOOD_SQL, "Blue led."] * cases
 
 
 def _factory(runner: FakeRunner, cases: int = 1, seen: list | None = None, logs=None):

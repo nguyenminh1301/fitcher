@@ -1,6 +1,6 @@
 """Scoring one eval case per layer from the final graph state."""
 
-from agent_fixtures import GOOD_SQL, deps, extraction_reply
+from agent_fixtures import GOOD_SQL, deps, extraction_reply, routing_reply
 
 from app.agent.errors import AgentError
 from app.agent.graph import run_question
@@ -35,7 +35,7 @@ def _case(**updates) -> EvalCase:
 
 
 def _answered_state():
-    return run_question("Top widgets", deps([extraction_reply(), GOOD_SQL, "Blue led."]))
+    return run_question("Top widgets", deps([routing_reply(), extraction_reply(), GOOD_SQL, "Blue led."]))
 
 
 def _reference(rows) -> Result:
@@ -137,7 +137,7 @@ def test_execution_reports_the_comparison_reason():
 
 
 def test_execution_fails_with_rejection_reason():
-    state = run_question("Which widgets?", deps([extraction_reply(rank_term=None)]))
+    state = run_question("Which widgets?", deps([routing_reply(), extraction_reply(rank_term=None)]))
 
     score = score_execution(_case(), state, _reference([["Widget 0", 10.5]]))
 

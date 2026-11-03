@@ -117,3 +117,19 @@ def test_the_query_stopper_may_only_list_and_stop_queries():
     ]
     root = ElementTree.parse(USERS_DIR / "agent_query_stopper.xml").getroot()
     assert root.find("users/agent_query_stopper/password").get("from_env") == "CLICKHOUSE_QUERY_STOPPER_PASSWORD"
+
+
+def test_the_conversation_store_reads_and_writes_conversation_tables_only():
+    assert grants("agent_conversations.xml", "agent_conversations") == [
+        "GRANT SELECT, INSERT ON agent_logs.chat_messages", "GRANT SELECT, INSERT ON agent_logs.conversations",
+    ]
+    root = ElementTree.parse(USERS_DIR / "agent_conversations.xml").getroot()
+    assert root.find("users/agent_conversations/password").get("from_env") == "CLICKHOUSE_CONVERSATIONS_PASSWORD"
+
+
+@live
+def test_the_conversation_store_cannot_read_run_logs():
+    client = connect("agent_conversations", "CLICKHOUSE_CONVERSATIONS_PASSWORD")
+    client.query("SELECT count() FROM agent_logs.conversations")
+    client.query("SELECT count() FROM agent_logs.chat_messages")
+    assert_denied(client, "SELECT count() FROM agent_logs.runs")

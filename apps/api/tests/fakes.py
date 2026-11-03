@@ -204,3 +204,43 @@ class FakeLogWriter:
 
     def runs(self) -> list:
         return [record for record in self.written if record.TABLE == "runs"]
+
+
+class QueryResult:
+    def __init__(self, rows: list[tuple]):
+        self.result_rows = rows
+
+
+class FakeConversationClient:
+    """In-memory ``agent_logs`` conversation tables behind the two reads ``ConversationStore`` sends.
+
+    ``fail`` makes every call raise, as an unreachable ClickHouse would.
+    """
+
+    def __init__(self, fail: bool = False):
+        self.fail = fail
+        self.tables: dict[str, list[dict]] = {"chat_messages": [], "conversations": []}
+        self.queries: list[str] = []
+
+    def _check(self) -> None:
+        if self.fail:
+            raise ConnectionError("ClickHouse is unreachable")
+
+    def insert(self, table, data, column_names, database):
+        self._check()
+        assert database == "agent_logs"
+        self.tables[table] += [dict(zip(column_names, row)) for row in data]
+
+    def query(self, sql, parameters):
+        self._check()
+        self.queries.append(sql)
+        key = (parameters["user_id"], parameters["conversation_id"])
+        rows = [row for row in self.tables["conversations" if "conversations FINAL" in sql else "chat_messages"]
+                if (row["user_id"], row["conversation_id"]) == key]
+        if "FROM agent_logs.conversations FINAL" in sql:
+            rows.sort(key=lambda row: row["updated_at"])
+            return QueryResult([(int(bool(rows) and not rows[-1]["deleted"]),)])
+        assert "FROM agent_logs.chat_messages" in sql
+        columns = [name.strip() for name in sql.split("SELECT", 1)[1].split("FROM", 1)[0].split(",")]
+        rows.sort(key=lambda row: (row["turn"], row["revision"], row["ts"]))
+        return QueryResult([tuple(row[column] for column in columns) for row in rows])

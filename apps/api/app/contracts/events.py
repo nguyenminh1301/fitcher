@@ -7,6 +7,7 @@ and carries the run's ``trace_id``. Per branch the non-status events are:
 - deny: ``deny -> done``
 - data success: ``sql -> result -> chart_spec -> summary -> done``
 - failure: ``[sql] -> error``
+- out_of_scope: ``summary -> done``
 
 ``status`` events come before and between them, one at the start and one at
 the end of each graph node. ``sql`` is the checked query that runs, sent when
@@ -26,7 +27,7 @@ from app.contracts.result import Result
 
 class AskRequest(ContractModel):
     question: str = Field(min_length=1, max_length=4000)
-    # Accepted now; follow-up questions read the conversation from Phase 8.
+    # A conversation of the asking user to continue; null starts one. The response names it in X-Conversation-Id.
     conversation_id: str | None = None
     # The browser's IANA time zone; UTC when null (DECISIONS §6 step 5).
     timezone: str | None = None

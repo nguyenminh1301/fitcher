@@ -14,6 +14,7 @@ from app.api.agent import Agent
 from app.api.rate_limit import RateLimiter
 from app.auth.jwt import JwksCache, TokenSettings, TokenVerifier
 from app.config import load_settings
+from app.conversation.store import ConversationStore, conversations_client
 from app.llm.client import LLMError
 from app.packs.compiler import CompileError, CompiledPack, load_compiled
 
@@ -47,6 +48,14 @@ def get_agent() -> Agent:
     try:
         return Agent(load_settings(), get_compiled())
     except LLMError as error:
+        raise unavailable(str(error)) from None
+
+
+@cache
+def get_conversation_store() -> ConversationStore:
+    try:
+        return ConversationStore(conversations_client())
+    except RuntimeError as error:
         raise unavailable(str(error)) from None
 
 

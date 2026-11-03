@@ -4,7 +4,7 @@ from dataclasses import replace
 import json
 import re
 
-from agent_fixtures import GOOD_SQL, deps, extraction_reply
+from agent_fixtures import GOOD_SQL, deps, extraction_reply, routing_reply
 from fakes import FakeLogWriter, FakeRunner
 import httpx
 import pytest
@@ -24,20 +24,20 @@ def logged(llm_replies, runner=None, logs=None):
 
 
 def test_trace_id_is_the_32_hex_opentelemetry_trace_id():
-    agent = deps([extraction_reply(), GOOD_SQL, "Blue led."])
+    agent = deps([routing_reply(), extraction_reply(), GOOD_SQL, "Blue led."])
     state = run_question(QUESTION, agent)
     assert re.fullmatch(r"[0-9a-f]{32}", state["trace_id"])
     assert all(call[2] == state["trace_id"] for call in agent.runner.calls)
 
 
 def test_each_run_gets_its_own_trace_id():
-    first = run_question(QUESTION, deps([extraction_reply(), GOOD_SQL, "Blue led."]))
-    second = run_question(QUESTION, deps([extraction_reply(), GOOD_SQL, "Blue led."]))
+    first = run_question(QUESTION, deps([routing_reply(), extraction_reply(), GOOD_SQL, "Blue led."]))
+    second = run_question(QUESTION, deps([routing_reply(), extraction_reply(), GOOD_SQL, "Blue led."]))
     assert first["trace_id"] != second["trace_id"]
 
 
 def test_run_rows_bracket_the_graph():
-    agent = logged([extraction_reply(), GOOD_SQL, "Blue led."])
+    agent = logged([routing_reply(), extraction_reply(), GOOD_SQL, "Blue led."])
     state = run_question(QUESTION, agent)
     running, final = agent.logs.runs()
     assert (running.status, final.status) == ("running", "succeeded")
@@ -49,33 +49,42 @@ def test_run_rows_bracket_the_graph():
 
 
 def test_failed_running_row_marks_the_log_incomplete_but_answers():
-    agent = logged([extraction_reply(), GOOD_SQL, "Blue led."], logs=FakeLogWriter(write_results=[False]))
+    agent = logged([routing_reply(), extraction_reply(), GOOD_SQL, "Blue led."], logs=FakeLogWriter(write_results=[False]))
     state = run_question(QUESTION, agent)
     assert state["summary"] == "Blue led."
     assert agent.logs.runs()[-1].log_complete is False
 
 
 def test_lost_records_mark_the_log_incomplete():
-    agent = logged([extraction_reply(), GOOD_SQL, "Blue led."], logs=FakeLogWriter(lost=2))
+    agent = logged([routing_reply(), extraction_reply(), GOOD_SQL, "Blue led."], logs=FakeLogWriter(lost=2))
     run_question(QUESTION, agent)
     final = agent.logs.runs()[-1]
     assert (final.log_complete, final.lost_records) == (False, 2)
 
 
+def test_an_out_of_scope_run_records_its_intent_and_success():
+    agent = logged([routing_reply("out_of_scope"), "I answer data questions."])
+
+    run_question("Write me a poem", agent)
+
+    final = agent.logs.runs()[-1]
+    assert (final.status, final.intent, final.error) == ("succeeded", "out_of_scope", "")
+
+
 def test_rejected_and_failed_runs_record_their_status():
-    rejected = logged([extraction_reply(rank_term=None)])
+    rejected = logged([routing_reply(), extraction_reply(rank_term=None)])
     run_question("Which widgets?", rejected)
     final = rejected.logs.runs()[-1]
     assert final.status == "rejected" and "no measure" in final.error
 
-    failed = logged([extraction_reply(), "SELECT secret FROM marts.widget_sales"])
+    failed = logged([routing_reply(), extraction_reply(), "SELECT secret FROM marts.widget_sales"])
     run_question(QUESTION, failed)
     final = failed.logs.runs()[-1]
     assert final.status == "failed" and "policy" in final.error
 
 
 def test_graph_exception_still_writes_the_final_row():
-    agent = logged([extraction_reply(), GOOD_SQL], runner=FakeRunner(runs=[RuntimeError("driver crashed")]))
+    agent = logged([routing_reply(), extraction_reply(), GOOD_SQL], runner=FakeRunner(runs=[RuntimeError("driver crashed")]))
     with pytest.raises(RuntimeError, match="driver crashed"):
         run_question(QUESTION, agent)
     final = agent.logs.runs()[-1]
@@ -90,12 +99,12 @@ def test_a_cancelled_run_stops_before_its_next_node_and_records_it():
         if name == "retrieve":
             raise RunCancelled()
 
-    agent = replace(logged([extraction_reply(), GOOD_SQL, "Blue led."]), progress=progress)
+    agent = replace(logged([routing_reply(), extraction_reply(), GOOD_SQL, "Blue led."]), progress=progress)
     with pytest.raises(RunCancelled):
         run_question(QUESTION, agent)
 
     assert seen[-1] == ("retrieve", "start")
-    assert agent.llm.calls[-1].alias == "fast" and len(agent.llm.calls) == 1
+    assert agent.llm.calls[-1].alias == "fast" and len(agent.llm.calls) == 2
     final = agent.logs.runs()[-1]
     assert final.status == "cancelled"
 

@@ -1,5 +1,7 @@
-"""The ``data_query`` LangGraph flow (DECISIONS §6 steps 4-16, without router, gate and charts).
+"""The agent's LangGraph flow (DECISIONS §6, without the chart recommender).
 
+load_context -> router, then out_of_scope -> end for an out-of-scope
+question and, for every other intent so far, the data_query flow:
 extract -> resolve_time -> retrieve -> build_spec -> gate -> generate_sql ->
 guard -> explain -> execute -> check, where check loops back to generate_sql
 for repairable errors, stops on policy errors or exhausted retries, and
@@ -22,8 +24,11 @@ from app.agent.nodes.extract import extract
 from app.agent.nodes.gate import gate
 from app.agent.nodes.generate_sql import generate_sql
 from app.agent.nodes.guard import guard
+from app.agent.nodes.load_context import load_context
+from app.agent.nodes.out_of_scope import out_of_scope
 from app.agent.nodes.resolve_time import resolve_time
 from app.agent.nodes.retrieve import retrieve
+from app.agent.nodes.router import router
 from app.agent.nodes.shape_result import shape_result
 from app.agent.nodes.summarize import summarize
 from app.agent.state import AgentDeps, AgentState, RunCancelled
@@ -51,6 +56,7 @@ def _unless_failed(next_node: str) -> Callable[[AgentState], str]:
 def build_graph(deps: AgentDeps):
     graph = StateGraph(AgentState)
     nodes = {
+        "load_context": load_context, "router": router, "out_of_scope": out_of_scope,
         "extract": extract, "resolve_time": resolve_time, "retrieve": retrieve, "build_spec": build_spec, "gate": gate,
         "generate_sql": generate_sql, "guard": guard, "explain": explain_node, "execute": execute_node,
         "check": check, "shape_result": shape_result, "summarize": summarize,
@@ -58,7 +64,13 @@ def build_graph(deps: AgentDeps):
     for name, node in nodes.items():
         graph.add_node(name, partial(instrument(name, node), deps=deps))
 
-    graph.add_edge(START, "extract")
+    graph.add_edge(START, "load_context")
+    graph.add_edge("load_context", "router")
+    graph.add_conditional_edges(
+        "router", lambda state: "out_of_scope" if state["intent"] == "out_of_scope" else "extract",
+        ["out_of_scope", "extract"],
+    )
+    graph.add_edge("out_of_scope", END)
     graph.add_conditional_edges("extract", _unless_rejected("resolve_time"), ["resolve_time", END])
     graph.add_conditional_edges("resolve_time", _unless_rejected("retrieve"), ["retrieve", END])
     graph.add_conditional_edges("retrieve", _unless_rejected("build_spec"), ["build_spec", END])
@@ -78,13 +90,12 @@ def build_graph(deps: AgentDeps):
 
 def _outcome(state: AgentState) -> tuple[str, str, str]:
     """Status, intent and error of a finished run for its ``runs`` row."""
-    spec = state.get("spec")
-    intent = spec.intent if spec is not None else ""
+    intent = state.get("intent", "")
     if state.get("rejection"):
         return "rejected", intent, state["rejection"]
     if state.get("denial"):
         return "denied", intent, state["denial"].message
-    if state.get("result") is not None:
+    if state.get("result") is not None or state.get("reply") is not None:
         return "succeeded", intent, ""
     errors = state.get("errors", [])
     return "failed", intent, str(errors[-1]) if errors else ""
@@ -99,7 +110,6 @@ def run_question(question: str, deps: AgentDeps) -> AgentState:
         initial: AgentState = {
             "question": question,
             "trace_id": run.trace_id,
-            "profile": deps.compiled.pack.business_profile,
             "attempts": [],
             "errors": [],
             "warnings": [],

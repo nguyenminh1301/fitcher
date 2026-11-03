@@ -61,6 +61,16 @@ describe("ask route", () => {
     expect(call.init.signal).toBeInstanceOf(AbortSignal);
   });
 
+  it("passes the api's conversation id through", async () => {
+    await signedIn();
+    const id = "6f1c2c3e-8f4b-4c55-9a35-2f0d8a1b7c10";
+    replies.push(new Response("", { headers: { "content-type": "text/event-stream", "x-conversation-id": id } }));
+
+    const response = await ask({ question: "Top products?" });
+
+    expect(response.headers.get("x-conversation-id")).toBe(id);
+  });
+
   it("passes the api's refusal through", async () => {
     await signedIn();
     replies.push(Response.json({ detail: "the token holds no role of this pack" }, { status: 403 }));

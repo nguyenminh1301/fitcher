@@ -5,10 +5,11 @@ from dataclasses import dataclass, field, replace
 import json
 import threading
 import time
+import uuid
 
-from agent_fixtures import GOOD_SQL, compiled_fixture, deps, extraction_reply, good_output
+from agent_fixtures import GOOD_SQL, compiled_fixture, deps, extraction_reply, good_output, routing_reply
 from auth_fixtures import token, verifier
-from fakes import FakeRunner
+from fakes import FakeConversationClient, FakeRunner
 from fastapi.testclient import TestClient
 import pytest
 
@@ -18,6 +19,7 @@ from app.api.agent import GraphRun, QueryIds
 from app.api.ask import AnswerEvents, event_stream
 from app.api.rate_limit import RateLimiter
 from app.contracts.events import AskEvent
+from app.conversation.store import ConversationStore
 from app.data.clickhouse import QueryError, QueryStopper
 from app.main import app
 
@@ -36,11 +38,15 @@ class FakeAgent:
     runner: FakeRunner | None = None
     compiled: object = None
     started: list = field(default_factory=list)
+    histories: list = field(default_factory=list)
 
-    def start(self, *, role, user_id, today):
+    def start(self, *, role, user_id, today, history=()):
         self.started.append((role, user_id, today))
+        self.histories.append(history)
         agent_deps = deps(self.llm_replies, self.runner)
-        return GraphRun(replace(agent_deps, compiled=self.compiled or agent_deps.compiled, role=role, user_id=user_id))
+        return GraphRun(replace(
+            agent_deps, compiled=self.compiled or agent_deps.compiled, role=role, user_id=user_id, history=history,
+        ))
 
 
 def pack_with_refunds_clerk():
@@ -52,8 +58,10 @@ def pack_with_refunds_clerk():
     return compiled.model_copy(update={"pack": compiled.pack.model_copy(update={"policies": policies})})
 
 
-def serve(agent: FakeAgent, compiled, per_minute: int = 3):
+def serve(agent: FakeAgent, compiled, per_minute: int = 3, store: ConversationStore | None = None):
     limiter = RateLimiter(per_minute)
+    store = store or ConversationStore(FakeConversationClient())
+    app.dependency_overrides[runtime.get_conversation_store] = lambda: store
     app.dependency_overrides[runtime.get_verifier] = lambda: verifier()
     app.dependency_overrides[runtime.get_compiled] = lambda: compiled
     app.dependency_overrides[runtime.get_agent] = lambda: agent
@@ -62,7 +70,7 @@ def serve(agent: FakeAgent, compiled, per_minute: int = 3):
 
 @pytest.fixture
 def ask_client():
-    agent = FakeAgent([extraction_reply(), GOOD_SQL, "Widget 0 led."])
+    agent = FakeAgent([routing_reply(), extraction_reply(), GOOD_SQL, "Widget 0 led."])
     serve(agent, compiled_fixture())
     with TestClient(app) as client:
         client.agent = agent
@@ -98,7 +106,7 @@ def test_a_data_question_streams_status_sql_result_chart_summary_and_done(ask_cl
     assert response.headers["content-type"].startswith("text/event-stream")
     events = parse(response.text)
     assert kinds(events) == ["sql", "result", "chart_spec", "summary", "done"]
-    assert events[0] == {"event": "status", "trace_id": events[0]["trace_id"], "node": "extract", "phase": "start", "attempt": None}
+    assert events[0] == {"event": "status", "trace_id": events[0]["trace_id"], "node": "load_context", "phase": "start", "attempt": None}
     assert len({event["trace_id"] for event in events}) == 1
     sql = next(event for event in events if event["event"] == "sql")
     assert sql["sql"].startswith(GOOD_SQL) and sql["attempt"] == 1
@@ -114,7 +122,7 @@ def test_every_node_streams_a_start_and_an_end_status_in_graph_order(ask_client)
 
     nodes = [node for node, phase in statuses if phase == "start"]
     assert nodes == [
-        "extract", "resolve_time", "retrieve", "build_spec", "gate", "generate_sql", "guard", "explain", "execute",
+        "load_context", "router", "extract", "resolve_time", "retrieve", "build_spec", "gate", "generate_sql", "guard", "explain", "execute",
         "check", "shape_result", "summarize",
     ]
     assert statuses == [item for node in nodes for item in ((node, "start"), (node, "end"))]
@@ -122,7 +130,7 @@ def test_every_node_streams_a_start_and_an_end_status_in_graph_order(ask_client)
 
 def test_a_repaired_query_streams_each_sql_attempt_before_the_result():
     agent = FakeAgent(
-        [extraction_reply(), "SELECT nope(widget_name) FROM marts.widget_sales", GOOD_SQL, "Done."],
+        [routing_reply(), extraction_reply(), "SELECT nope(widget_name) FROM marts.widget_sales", GOOD_SQL, "Done."],
         FakeRunner(explains=[sql_error()], runs=[good_output()]),
     )
 
@@ -135,7 +143,7 @@ def test_a_repaired_query_streams_each_sql_attempt_before_the_result():
 
 def test_a_role_without_permission_receives_a_deny_event():
     compiled = pack_with_refunds_clerk()
-    agent = FakeAgent([extraction_reply()], compiled=compiled)
+    agent = FakeAgent([routing_reply(), extraction_reply()], compiled=compiled)
     serve(agent, compiled)
     clerk = token(realm_access={"roles": ["refunds_clerk"]})
     try:
@@ -155,7 +163,7 @@ def test_a_role_without_permission_receives_a_deny_event():
 
 def test_exhausted_retries_end_with_the_last_sql_and_an_error():
     sqls = [f"SELECT widget_name AS w{n} FROM marts.widget_sales" for n in range(4)]
-    agent = FakeAgent([extraction_reply(), *sqls], FakeRunner(explains=[sql_error()] * 4))
+    agent = FakeAgent([routing_reply(), extraction_reply(), *sqls], FakeRunner(explains=[sql_error()] * 4))
 
     events = collect(agent)
 
@@ -167,7 +175,7 @@ def test_exhausted_retries_end_with_the_last_sql_and_an_error():
 
 
 def test_a_question_the_flow_cannot_read_asks_for_clarification():
-    events = collect(FakeAgent([extraction_reply(metric_terms=[], rank_term=None)]))
+    events = collect(FakeAgent([routing_reply(), extraction_reply(metric_terms=[], rank_term=None)]))
 
     assert kinds(events) == ["clarify", "done"]
     assert "names no measure" in events[-2]["question"]
@@ -321,3 +329,99 @@ def test_a_failed_stop_is_logged_and_never_raised(caplog):
     GraphRun(deps([]), ids, broken).cancel()
 
     assert "could not stop query" in caplog.text
+
+
+def ask_with(agent: FakeAgent, store: ConversationStore, *bodies: dict) -> list:
+    serve(agent, compiled_fixture(), store=store)
+    try:
+        with TestClient(app) as client:
+            return [post(client, **body) for body in bodies]
+    finally:
+        app.dependency_overrides.clear()
+
+
+def answer(agent_replies=None) -> FakeAgent:
+    return FakeAgent(agent_replies or [routing_reply(), extraction_reply(), GOOD_SQL, "Widget 0 led."])
+
+
+def test_a_first_question_starts_a_conversation_and_stores_both_turns():
+    client = FakeConversationClient()
+
+    [response] = ask_with(answer(), ConversationStore(client), {})
+
+    conversation_id = response.headers["x-conversation-id"]
+    assert uuid.UUID(conversation_id).version == 4
+    assert kinds(parse(response.text))[-1] == "done"
+    [conversation] = client.tables["conversations"]
+    assert (conversation["user_id"], conversation["conversation_id"], conversation["title"]) == ("lab.viewer", conversation_id, QUESTION)
+    asked, answered = client.tables["chat_messages"]
+    assert (asked["role"], asked["content"], asked["turn"]) == ("user", QUESTION, 1)
+    assert (answered["role"], answered["content"], answered["turn"]) == ("assistant", "Widget 0 led.", 1)
+    assert answered["trace_id"] == parse(response.text)[0]["trace_id"]
+    assert '"widget_revenue"' in answered["query_spec"] and '"Widget 0"' in answered["result"]
+
+
+def test_a_follow_up_reads_the_previous_turn():
+    agent, client = answer(), FakeConversationClient()
+    store = ConversationStore(client)
+    first = ask_with(agent, store, {})[0]
+    conversation_id = first.headers["x-conversation-id"]
+
+    [second] = ask_with(agent, store, {"question": "What about last year?", "conversation_id": conversation_id})
+
+    assert second.headers["x-conversation-id"] == conversation_id
+    [previous] = agent.histories[1]
+    assert (previous.turn, previous.question, previous.answer) == (1, QUESTION, "Widget 0 led.")
+    assert previous.query_spec is not None and previous.result is not None
+    assert [row["turn"] for row in client.tables["chat_messages"]] == [1, 1, 2, 2]
+
+
+def test_another_users_conversation_is_404_before_any_llm_call():
+    agent, client = answer(), FakeConversationClient()
+    store = ConversationStore(client)
+    theirs = store.open_turn("lab.analyst", None, "Their question")
+
+    [response] = ask_with(agent, store, {"conversation_id": theirs.conversation_id})
+
+    assert response.status_code == 404
+    assert agent.started == []
+    assert [row["user_id"] for row in client.tables["chat_messages"]] == ["lab.analyst"]
+
+
+def test_an_unreachable_store_is_503():
+    agent = answer()
+
+    [response] = ask_with(agent, ConversationStore(FakeConversationClient(fail=True)), {})
+
+    assert response.status_code == 503
+    assert agent.started == []
+
+
+class AnswerWriteFails(FakeConversationClient):
+    def insert(self, table, data, column_names, database):
+        if table == "chat_messages" and dict(zip(column_names, data[0]))["role"] == "assistant":
+            raise ConnectionError("ClickHouse went away")
+        super().insert(table, data, column_names, database)
+
+
+def test_a_failed_answer_write_still_ends_with_done(caplog):
+    [response] = ask_with(answer(), ConversationStore(AnswerWriteFails()), {})
+
+    assert kinds(parse(response.text)) == ["sql", "result", "chart_spec", "summary", "done"]
+    assert "could not store the answer" in caplog.text
+
+
+def test_out_of_scope_streams_summary_and_done():
+    client = FakeConversationClient()
+
+    [response] = ask_with(answer([routing_reply("out_of_scope", language="vi"), "Mình chỉ trả lời về dữ liệu."]), ConversationStore(client), {})
+
+    events = parse(response.text)
+    assert kinds(events) == ["summary", "done"]
+    summary = events[-2]
+    assert (summary["text"], summary["lang"], summary["warnings"]) == ("Mình chỉ trả lời về dữ liệu.", "vi", [])
+    assert [event["node"] for event in events if event["event"] == "status" and event["phase"] == "start"] == [
+        "load_context", "router", "out_of_scope",
+    ]
+    answered = client.tables["chat_messages"][-1]
+    assert (answered["content"], answered["query_spec"], answered["result"]) == ("Mình chỉ trả lời về dữ liệu.", "", "")

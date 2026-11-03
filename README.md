@@ -91,7 +91,8 @@ curl -N -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json"   
 ```
 
 The body is `{"question": ..., "conversation_id": null, "timezone": null}`, with the asker's IANA time zone (UTC when null).
-Each frame is `event: <name>` with JSON `data` carrying the run's `trace_id`, in the DECISIONS §6 order: `status` at the start and end of every graph node, then `sql` (the checked query, repeated for each repair), `result`, `chart_spec`, `summary` and `done` for an answer; `clarify` or `deny` and `done` when the question cannot be queried; `error` last when no SQL attempt produced a result.
+A question without `conversation_id` starts a conversation; the response's `X-Conversation-Id` header names it, and passing that id with the next question makes it a follow-up that reads the previous turns. An id that is not one of the user's own conversations gets 404 before any work starts. Every question and answer is stored in `agent_logs.chat_messages`.
+Each frame is `event: <name>` with JSON `data` carrying the run's `trace_id`, in the DECISIONS §6 order: `status` at the start and end of every graph node, then `sql` (the checked query, repeated for each repair), `result`, `chart_spec`, `summary` and `done` for an answer; `summary` and `done` alone for an out-of-scope question; `clarify` or `deny` and `done` when the question cannot be queried; `error` last when no SQL attempt produced a result.
 A comment line keeps the connection open every 15 seconds. Disconnecting stops the run at its next node, stops its running ClickHouse query and logs the run as `cancelled`.
 
 A missing, expired or otherwise invalid token gets 401. The request runs as one pack role: the one named by an `X-Active-Role` header, which the token must hold, or else the token's first role in `policies.yaml` order; a token without a pack role gets 403, and a role that may not read what the question needs gets a `deny` event (try `lab.marketing`).

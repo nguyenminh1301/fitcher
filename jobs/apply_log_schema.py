@@ -4,8 +4,9 @@ Run with ``docker compose run --rm jobs python -m jobs.apply_log_schema``.
 
 The ClickHouse entrypoint runs ``infra/clickhouse/initdb`` only on a fresh
 volume; this job applies the same file to a volume created before it existed.
-Every statement is ``CREATE ... IF NOT EXISTS``, so running it again changes
-nothing and never alters a table that already exists.
+Every statement is ``CREATE ... IF NOT EXISTS`` or ``ALTER TABLE ... ADD
+COLUMN IF NOT EXISTS``, so running it again changes nothing; on a volume that
+predates a column, it adds the column and leaves existing rows in place.
 """
 
 import argparse
