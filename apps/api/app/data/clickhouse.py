@@ -153,6 +153,38 @@ class ClickHouseRunner:
         )
 
 
+class QueryStopper:
+    """Stops a running agent query by its id and user.
+
+    ``KILL QUERY WHERE`` reads ``system.processes``, which lists every user's
+    running SQL, so the role users cannot run it; ``agent_query_stopper`` may
+    only list and stop queries.
+    """
+
+    def __init__(self, client):
+        self._client = client
+
+    def stop(self, query_id: str, user: str) -> None:
+        self._client.command(
+            "KILL QUERY WHERE query_id = {query_id:String} AND user = {user:String} ASYNC",
+            parameters={"query_id": query_id, "user": user},
+        )
+
+
+def stopper_client(env: Mapping[str, str] | None = None):
+    env = os.environ if env is None else env
+    password = env.get("CLICKHOUSE_QUERY_STOPPER_PASSWORD", "")
+    if not password:
+        raise RuntimeError("CLICKHOUSE_QUERY_STOPPER_PASSWORD must be set")
+    return clickhouse_connect.get_client(
+        host=env.get("CLICKHOUSE_HOST", "clickhouse"),
+        port=int(env.get("CLICKHOUSE_HTTP_PORT", "8123")),
+        username="agent_query_stopper",
+        password=password,
+        autogenerate_session_id=False,
+    )
+
+
 def agent_client(pack: str, role: str, env: Mapping[str, str] | None = None):
     """Client for the role's read-only user that compile_pack created; the admin credentials are never used here.
 

@@ -4,6 +4,7 @@ Each node is a function of ``(state, deps)`` that returns the state fields it
 changes, so it can be tested alone with fake dependencies (DECISIONS §13).
 """
 
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from datetime import date
 from typing import Literal, Protocol, TypedDict
@@ -44,6 +45,14 @@ class QueryRunner(Protocol):
     def run(self, sql: str, trace_id: str) -> QueryOutput: ...
 
 
+class RunCancelled(Exception):
+    """Raised by a progress callback to stop the run at the next node; the run is logged as cancelled."""
+
+
+# Called with the node name, "start" or "end", the state the node received and, at the end, its update.
+Progress = Callable[[str, Literal["start", "end"], "AgentState", Mapping | None], None]
+
+
 @dataclass(frozen=True)
 class AgentDeps:
     llm: LLMClient
@@ -59,6 +68,8 @@ class AgentDeps:
     # The pack role the question is asked as: it filters retrieval, picks the guard's allowlist
     # and names the ClickHouse user that ``runner`` connects as.
     role: str = ""
+    # Told when each node starts and ends (the api streams it); it may raise RunCancelled.
+    progress: Progress | None = None
 
 
 class Attempt(BaseModel):

@@ -109,3 +109,11 @@ def test_review_reader_cannot_select_trace_tables():
 def test_writer_cannot_select():
     client = connect("agent_logs_writer", "CLICKHOUSE_LOGS_WRITER_PASSWORD")
     assert_denied(client, "SELECT count() FROM agent_logs.runs")
+
+
+def test_the_query_stopper_may_only_list_and_stop_queries():
+    assert grants("agent_query_stopper.xml", "agent_query_stopper") == [
+        "GRANT SELECT ON system.processes", "GRANT KILL QUERY ON *.*",
+    ]
+    root = ElementTree.parse(USERS_DIR / "agent_query_stopper.xml").getroot()
+    assert root.find("users/agent_query_stopper/password").get("from_env") == "CLICKHOUSE_QUERY_STOPPER_PASSWORD"

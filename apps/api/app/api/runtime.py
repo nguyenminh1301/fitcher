@@ -10,8 +10,11 @@ from pathlib import Path
 
 from fastapi import HTTPException, status
 
+from app.api.agent import Agent
+from app.api.rate_limit import RateLimiter
 from app.auth.jwt import JwksCache, TokenSettings, TokenVerifier
 from app.config import load_settings
+from app.llm.client import LLMError
 from app.packs.compiler import CompileError, CompiledPack, load_compiled
 
 
@@ -37,3 +40,22 @@ def get_compiled() -> CompiledPack:
         return load_compiled(Path(settings.compiled_pack_dir), settings.active_pack)
     except CompileError as error:
         raise unavailable(str(error)) from None
+
+
+@cache
+def get_agent() -> Agent:
+    try:
+        return Agent(load_settings(), get_compiled())
+    except LLMError as error:
+        raise unavailable(str(error)) from None
+
+
+@cache
+def get_rate_limiter() -> RateLimiter:
+    return RateLimiter(load_settings().rate_limit_per_minute)
+
+
+def close() -> None:
+    """Flush and stop the agent's log writer if a question ever built the agent."""
+    if get_agent.cache_info().currsize:
+        get_agent().close()

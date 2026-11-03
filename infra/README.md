@@ -8,6 +8,7 @@ See [DECISIONS §3](../docs/DECISIONS.md#3-docker-compose) and the [Phase 0 plan
 | `clickhouse/config.d/listen.xml` | Listen on container interfaces; Compose publishes ports on host loopback only |
 | `clickhouse/users.d/users.xml` | Removes the passwordless `default` user |
 | `clickhouse/users.d/agent_logs.xml` | Insert-only `agent_logs_writer`, trace reader and review reader users for `agent_logs` |
+| `clickhouse/users.d/agent_query_stopper.xml` | `agent_query_stopper`, which may only list and stop running queries; the api stops the query of an answer whose client disconnected |
 | `clickhouse/initdb/001-databases.sql` | Creates `raw`, `marts` and `data_meta` |
 | `clickhouse/initdb/010-agent-logs.sql` | Creates the `agent_logs` database and its run log tables |
 | `litellm/config.yaml` | Aliases `fast`, `sql-gen`, `sql-gen-hard` and `embed`, with models from `LITELLM_MODEL_*` |
