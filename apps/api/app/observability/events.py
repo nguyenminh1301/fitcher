@@ -96,3 +96,37 @@ class EvalReportRecord(LogRecord):
     execution_rate: float
     passed: bool
     report: str
+
+
+class ChatMessageRecord(LogRecord):
+    """One question (``user``) or answer (``assistant``) of a conversation turn."""
+
+    TABLE: ClassVar[str] = "chat_messages"
+
+    user_id: str
+    ts: datetime
+    conversation_id: str
+    trace_id: str
+    role: str
+    content: str
+    # QuerySpec JSON of an answer, empty otherwise.
+    query_spec: str
+    turn: int
+    revision: int
+    # Shaped Result JSON of an answer, empty otherwise.
+    result: str
+
+
+class ConversationRecord(LogRecord):
+    """One state of a conversation; the row with the latest ``updated_at`` wins."""
+
+    TABLE: ClassVar[str] = "conversations"
+
+    user_id: str
+    conversation_id: str
+    title: str
+    pinned: bool
+    group_id: str
+    deleted: bool
+    created_at: datetime
+    updated_at: datetime

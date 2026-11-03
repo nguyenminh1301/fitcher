@@ -32,17 +32,18 @@ The agent runs every generated query as the ClickHouse user of the asking role, 
 `compile_pack` creates these users, their roles, column grants, row policies, aggregate-only views and the shared read-only profile from the pack's `policies.yaml` (see [packs/](../packs/README.md#compiling-a-pack)); they live in the data volume and are reconciled on every compile.
 Their passwords derive from `CLICKHOUSE_AGENT_PASSWORD`; after changing it, run `compile_pack` again.
 
-Run logs live in `agent_logs`. On a volume created before `010-agent-logs.sql` existed, create its tables with `docker compose run --rm jobs python -m jobs.apply_log_schema`.
-Three configuration users reach it, each with its own password:
+Run logs live in `agent_logs`. On a volume created before `010-agent-logs.sql` existed, or before one of its tables or columns was added, create what is missing with `docker compose run --rm jobs python -m jobs.apply_log_schema`.
+Four configuration users reach it, each with its own password:
 
 | User | Password | Access |
 | --- | --- | --- |
 | `agent_logs_writer` | `CLICKHOUSE_LOGS_WRITER_PASSWORD` | `INSERT` on `agent_logs`; no reads |
 | `agent_logs_trace_reader` | `CLICKHOUSE_TRACE_READER_PASSWORD` | `SELECT` on `runs`, `events`, `llm_calls`, `sql_runs`, `audit`, `eval_reports` and `system.query_log` |
 | `agent_logs_review_reader` | `CLICKHOUSE_REVIEW_READER_PASSWORD` | `SELECT` on `example_proposals`, `feedback` and `chat_messages` for the `pack_reviewer` and `admin` paths |
+| `agent_conversations` | `CLICKHOUSE_CONVERSATIONS_PASSWORD` | `SELECT` and `INSERT` on `chat_messages` and `conversations`; the api's conversation store, which filters every query by the requesting user |
 
 The agent's role users have no access to `agent_logs`.
-With the stack running, `AGENT_LOGS_LIVE_TEST=1` and the four passwords in the environment, `jobs/tests/test_agent_log_users.py` checks these grants against the server.
+With the stack running, `AGENT_LOGS_LIVE_TEST=1` and the five passwords in the environment, `jobs/tests/test_agent_log_users.py` checks these grants against the server.
 
 ## LiteLLM
 

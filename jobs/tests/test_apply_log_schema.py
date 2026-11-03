@@ -8,6 +8,8 @@ TABLES = [
     "runs", "events", "llm_calls", "sql_runs", "audit",
     "chat_messages", "feedback", "eval_reports", "example_proposals",
 ]
+# Tables whose rows are replaced on every change and expire 90 days after their last update.
+REPLACED_TABLES = ["conversations"]
 
 
 class FakeClient:
@@ -38,7 +40,24 @@ def test_schema_only_creates_objects_that_do_not_exist():
     statements = schema_statements()
     assert statements[0] == "CREATE DATABASE IF NOT EXISTS agent_logs"
     for statement in statements:
-        assert re.match(r"CREATE (DATABASE|TABLE|VIEW) IF NOT EXISTS |SYSTEM FLUSH LOGS$", statement), statement
+        assert re.match(
+            r"CREATE (DATABASE|TABLE|VIEW) IF NOT EXISTS |SYSTEM FLUSH LOGS$|ALTER TABLE \S+ ADD COLUMN IF NOT EXISTS ",
+            statement,
+        ), statement
+
+
+def test_chat_messages_columns_added_later_reach_existing_volumes():
+    created = table_statement("chat_messages")
+    for column in ("turn UInt32", "revision UInt32", "result String"):
+        assert f"    {column}" in created
+        assert f"ALTER TABLE agent_logs.chat_messages ADD COLUMN IF NOT EXISTS {column}" in schema_statements()
+
+
+@pytest.mark.parametrize("table", REPLACED_TABLES)
+def test_replaced_tables_keep_the_latest_row_per_user_and_id(table):
+    statement = table_statement(table)
+    assert "ENGINE = ReplacingMergeTree(updated_at)" in statement
+    assert "TTL toDateTime(updated_at) + INTERVAL 90 DAY" in statement
 
 
 @pytest.mark.parametrize("table", TABLES)
@@ -60,6 +79,7 @@ def test_every_table_expires_after_90_days_and_accepts_dedup_tokens(table):
         ("feedback", "ORDER BY (user_id, ts)"),
         ("eval_reports", "ORDER BY (pack, ts)"),
         ("example_proposals", "ORDER BY (pack, ts)"),
+        ("conversations", "ORDER BY (user_id, conversation_id)"),
     ],
 )
 def test_table_sort_keys(table, order_by):

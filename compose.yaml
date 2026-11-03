@@ -15,6 +15,8 @@ services:
       CLICKHOUSE_REVIEW_READER_PASSWORD: ${CLICKHOUSE_REVIEW_READER_PASSWORD:?set CLICKHOUSE_REVIEW_READER_PASSWORD in .env}
       # Read by users.d/agent_query_stopper.xml.
       CLICKHOUSE_QUERY_STOPPER_PASSWORD: ${CLICKHOUSE_QUERY_STOPPER_PASSWORD:?set CLICKHOUSE_QUERY_STOPPER_PASSWORD in .env}
+      # Read by users.d/agent_conversations.xml.
+      CLICKHOUSE_CONVERSATIONS_PASSWORD: ${CLICKHOUSE_CONVERSATIONS_PASSWORD:?set CLICKHOUSE_CONVERSATIONS_PASSWORD in .env}
     ports:
       - "127.0.0.1:8123:8123"
       - "127.0.0.1:9000:9000"
@@ -24,6 +26,7 @@ services:
       - ./infra/clickhouse/users.d/users.xml:/etc/clickhouse-server/users.d/users.xml:ro
       - ./infra/clickhouse/users.d/agent_logs.xml:/etc/clickhouse-server/users.d/agent_logs.xml:ro
       - ./infra/clickhouse/users.d/agent_query_stopper.xml:/etc/clickhouse-server/users.d/agent_query_stopper.xml:ro
+      - ./infra/clickhouse/users.d/agent_conversations.xml:/etc/clickhouse-server/users.d/agent_conversations.xml:ro
       - ./infra/clickhouse/initdb:/docker-entrypoint-initdb.d:ro
     ulimits:
       nofile:
@@ -128,6 +131,8 @@ services:
       CLICKHOUSE_LOGS_WRITER_PASSWORD: ${CLICKHOUSE_LOGS_WRITER_PASSWORD:?set CLICKHOUSE_LOGS_WRITER_PASSWORD in .env}
       # Stops the running query of an answer whose client disconnected.
       CLICKHOUSE_QUERY_STOPPER_PASSWORD: ${CLICKHOUSE_QUERY_STOPPER_PASSWORD:?set CLICKHOUSE_QUERY_STOPPER_PASSWORD in .env}
+      # Reads and writes the asking user's conversations.
+      CLICKHOUSE_CONVERSATIONS_PASSWORD: ${CLICKHOUSE_CONVERSATIONS_PASSWORD:?set CLICKHOUSE_CONVERSATIONS_PASSWORD in .env}
       LOG_BATCH_SIZE: ${LOG_BATCH_SIZE:-100}
       LOG_FLUSH_INTERVAL_MS: ${LOG_FLUSH_INTERVAL_MS:-1000}
       LOG_QUEUE_MAX: ${LOG_QUEUE_MAX:-10000}

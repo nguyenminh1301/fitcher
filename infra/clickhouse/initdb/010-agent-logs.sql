@@ -1,7 +1,8 @@
 -- Agent run logs (DECISIONS §10). The ClickHouse entrypoint runs this file on a
 -- fresh volume; `python -m jobs.apply_log_schema` applies it to an existing one.
--- Every statement only creates what is missing, so both paths are idempotent;
--- changing an existing table needs its own deliberate migration.
+-- Every statement only creates what is missing, or adds a column that is
+-- missing, so both paths are idempotent; any other change to an existing table
+-- needs its own deliberate migration.
 --
 -- jobs.apply_log_schema splits this file on semicolons after dropping comment
 -- lines, so no statement may contain a semicolon inside a string literal.
@@ -107,7 +108,9 @@ ORDER BY (trace_id, ts)
 TTL toDateTime(ts) + INTERVAL 90 DAY
 SETTINGS non_replicated_deduplication_window = 10000;
 
--- Conversation turns, read back for follow-up questions.
+-- Conversation turns, read back for follow-up questions. Each question and
+-- its answer share a turn number; an edit or retry of a turn writes it again
+-- under a higher revision. result holds the shaped Result JSON of an answer.
 CREATE TABLE IF NOT EXISTS agent_logs.chat_messages
 (
     user_id String,
@@ -116,11 +119,38 @@ CREATE TABLE IF NOT EXISTS agent_logs.chat_messages
     trace_id String,
     role LowCardinality(String),
     content String,
-    query_spec String
+    query_spec String,
+    turn UInt32,
+    revision UInt32,
+    result String
 )
 ENGINE = MergeTree
 ORDER BY (user_id, ts)
 TTL toDateTime(ts) + INTERVAL 90 DAY
+SETTINGS non_replicated_deduplication_window = 10000;
+
+-- Columns added after chat_messages was first created; no-ops on a fresh volume.
+ALTER TABLE agent_logs.chat_messages ADD COLUMN IF NOT EXISTS turn UInt32;
+ALTER TABLE agent_logs.chat_messages ADD COLUMN IF NOT EXISTS revision UInt32;
+ALTER TABLE agent_logs.chat_messages ADD COLUMN IF NOT EXISTS result String;
+
+-- One row per change of a conversation (created, renamed, pinned, moved or
+-- deleted); read with FINAL for its current state. Delete only hides it from
+-- its owner. Rows expire 90 days after the last change.
+CREATE TABLE IF NOT EXISTS agent_logs.conversations
+(
+    user_id String,
+    conversation_id String,
+    title String,
+    pinned Bool,
+    group_id String,
+    deleted Bool,
+    created_at DateTime64(3, 'UTC'),
+    updated_at DateTime64(3, 'UTC')
+)
+ENGINE = ReplacingMergeTree(updated_at)
+ORDER BY (user_id, conversation_id)
+TTL toDateTime(updated_at) + INTERVAL 90 DAY
 SETTINGS non_replicated_deduplication_window = 10000;
 
 CREATE TABLE IF NOT EXISTS agent_logs.feedback
