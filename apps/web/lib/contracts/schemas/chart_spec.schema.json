@@ -1,0 +1,103 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "type": {
+      "enum": [
+        "bar",
+        "line",
+        "pie",
+        "scatter",
+        "kpi",
+        "table",
+        "grouped_bar"
+      ],
+      "title": "Type",
+      "type": "string"
+    },
+    "x": {
+      "minLength": 1,
+      "title": "X",
+      "type": "string"
+    },
+    "y": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Y",
+      "type": "array"
+    },
+    "series": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Series"
+    },
+    "sort": {
+      "anyOf": [
+        {
+          "enum": [
+            "asc",
+            "desc"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Sort"
+    },
+    "format": {
+      "anyOf": [
+        {
+          "enum": [
+            "currency",
+            "count",
+            "ratio",
+            "percent",
+            "days",
+            "number"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Format"
+    },
+    "allowed_types": {
+      "items": {
+        "enum": [
+          "bar",
+          "line",
+          "pie",
+          "scatter",
+          "kpi",
+          "table",
+          "grouped_bar"
+        ],
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "Allowed Types",
+      "type": "array"
+    }
+  },
+  "required": [
+    "type",
+    "x",
+    "y",
+    "allowed_types"
+  ],
+  "title": "ChartSpec",
+  "type": "object"
+}

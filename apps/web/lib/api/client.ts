@@ -1,9 +1,10 @@
 // The web app's whole view of the backend, one group per feature. Each feature has a sample
 // implementation (lib/api/mock) and a real one (lib/api/http); lib/api/sources.ts picks per feature.
 
+import type { AskRequest } from "@/lib/contracts";
+
+import type { AskEvent } from "./events";
 import type {
-  AskEvent,
-  AskRequest,
   AuditRow,
   Conversation,
   ConversationGroup,

@@ -1,42 +1,15 @@
 // Contracts the backend has no Pydantic model for yet (DECISIONS §7 and §15): the sample-data mode uses
 // them until the phase named on each type adds its model and generated type, then deletes it here.
 
-import type { Result } from "@/lib/contracts";
+import type { ChartSpec, Result } from "@/lib/contracts";
 
-/** DECISIONS §7 ChartSpec; model and generated type arrive in Phase 7. */
-export type ChartType = "bar" | "line" | "pie" | "scatter" | "kpi" | "table" | "grouped_bar";
-export interface ChartSpec {
-  type: ChartType;
-  x: string;
-  y: string[];
-  series?: string | null;
-  sort?: "asc" | "desc" | null;
-  format?: string | null;
-  orientation?: "vertical" | "horizontal";
-  allowed_types: ChartType[];
-}
+import type { AskEvent } from "./events";
 
-/** Stream events of /ask in DECISIONS §6 order; models arrive in Phase 7. */
-type Traced = { trace_id: string };
-export type AskEvent =
-  | (Traced & { event: "status"; node: string; phase: "start" | "end"; attempt?: number })
-  | (Traced & { event: "clarify"; question: string; options: { id: string; label: string }[]; lang: string })
-  | (Traced & { event: "deny"; message: string; role: string; blocked: string[]; lang: string })
-  | (Traced & { event: "sql"; sql: string; attempt: number })
-  | (Traced & { event: "result"; result: Result })
-  | (Traced & { event: "chart_spec"; spec: ChartSpec })
-  | (Traced & { event: "summary"; text: string; lang: string; warnings: string[] })
-  | (Traced & { event: "done" })
-  | (Traced & { event: "error"; kind: "failed" | "network" | "internal" | "stopped"; message: string; sql?: string; error?: string });
-
-/** The body of POST /ask; Phase 7 (edit and retry: Phase 8). */
-export interface AskRequest {
-  question: string;
-  conversation_id?: string;
-  time_zone: string;
-  edit_of_turn?: number;
-  retry_of_turn?: number;
-}
+/**
+ * The ChartSpec contract plus the bar orientation the sample scenarios carry; Phase 9 adds `orientation`
+ * to the contract (its open question 4) and deletes this.
+ */
+export type OrientedChartSpec = ChartSpec & { orientation?: "vertical" | "horizontal" };
 
 /** Who is signed in; Keycloak replaces the demo identities in Phase 7. */
 export interface Identity {
@@ -181,7 +154,7 @@ export interface Scenario {
   sql?: string;
   repair?: { sql: string; error: string };
   result?: Result;
-  chart_spec?: ChartSpec;
+  chart_spec?: OrientedChartSpec;
   summary?: string;
   warnings?: string[];
   clarify?: { question: string; options: { id: string; label: string }[] };

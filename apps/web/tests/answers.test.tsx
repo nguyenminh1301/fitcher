@@ -2,12 +2,13 @@ import { act, cleanup, fireEvent, render, screen, within } from "@testing-librar
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { AssistantTurn } from "@/components/chat/AssistantTurn";
-import type { AskEvent, Turn } from "@/lib/api/provisional";
+import type { AskEvent } from "@/lib/api/events";
+import type { Turn } from "@/lib/api/provisional";
 import type { Result } from "@/lib/contracts";
 import { I18nProvider, useI18n } from "@/lib/i18n/react";
 
 const T = "trace-1";
-const status = (node: string, attempt?: number): AskEvent => ({ event: "status", node, phase: "end", trace_id: T, ...(attempt ? { attempt } : {}) });
+const status = (node: string, attempt?: number): AskEvent => ({ event: "status", node, phase: "end", trace_id: T, attempt: attempt ?? null });
 const RESULT: Result = { columns: [{ name: "region", type: "string", role: "dimension" }, { name: "sales", type: "number", role: "measure" }], rows: [["West", 10]], row_count: 1 };
 const ANSWER: AskEvent[] = [
   status("extract"), status("generate_sql"), { event: "sql", sql: "SELECT region, sum(x) AS sales FROM marts.t GROUP BY region", attempt: 1, trace_id: T },
@@ -100,7 +101,7 @@ describe("answer", () => {
   });
 
   it("says the run was stopped", () => {
-    show([status("extract"), { event: "error", kind: "stopped", message: "stopped", trace_id: T }]);
+    show([status("extract"), { event: "error", kind: "stopped", message: "stopped", sql: null, error: null, trace_id: T }]);
 
     expect(screen.getByText("Stopped")).toBeTruthy();
   });

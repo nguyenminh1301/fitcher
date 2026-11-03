@@ -1,0 +1,622 @@
+{
+  "$defs": {
+    "ChartSpec": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "enum": [
+            "bar",
+            "line",
+            "pie",
+            "scatter",
+            "kpi",
+            "table",
+            "grouped_bar"
+          ],
+          "title": "Type",
+          "type": "string"
+        },
+        "x": {
+          "minLength": 1,
+          "title": "X",
+          "type": "string"
+        },
+        "y": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Y",
+          "type": "array"
+        },
+        "series": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Series"
+        },
+        "sort": {
+          "anyOf": [
+            {
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Sort"
+        },
+        "format": {
+          "anyOf": [
+            {
+              "enum": [
+                "currency",
+                "count",
+                "ratio",
+                "percent",
+                "days",
+                "number"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Format"
+        },
+        "allowed_types": {
+          "items": {
+            "enum": [
+              "bar",
+              "line",
+              "pie",
+              "scatter",
+              "kpi",
+              "table",
+              "grouped_bar"
+            ],
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Allowed Types",
+          "type": "array"
+        }
+      },
+      "required": [
+        "type",
+        "x",
+        "y",
+        "allowed_types"
+      ],
+      "title": "ChartSpec",
+      "type": "object"
+    },
+    "ChartSpecEvent": {
+      "additionalProperties": false,
+      "properties": {
+        "trace_id": {
+          "title": "Trace Id",
+          "type": "string"
+        },
+        "event": {
+          "const": "chart_spec",
+          "default": "chart_spec",
+          "title": "Event",
+          "type": "string"
+        },
+        "spec": {
+          "$ref": "#/$defs/ChartSpec"
+        }
+      },
+      "required": [
+        "trace_id",
+        "event",
+        "spec"
+      ],
+      "title": "ChartSpecEvent",
+      "type": "object"
+    },
+    "ClarifyEvent": {
+      "additionalProperties": false,
+      "properties": {
+        "trace_id": {
+          "title": "Trace Id",
+          "type": "string"
+        },
+        "event": {
+          "const": "clarify",
+          "default": "clarify",
+          "title": "Event",
+          "type": "string"
+        },
+        "question": {
+          "title": "Question",
+          "type": "string"
+        },
+        "options": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/ClarifyOption"
+          },
+          "title": "Options",
+          "type": "array"
+        },
+        "lang": {
+          "title": "Lang",
+          "type": "string"
+        }
+      },
+      "required": [
+        "trace_id",
+        "event",
+        "question",
+        "options",
+        "lang"
+      ],
+      "title": "ClarifyEvent",
+      "type": "object"
+    },
+    "ClarifyOption": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "label": {
+          "title": "Label",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "label"
+      ],
+      "title": "ClarifyOption",
+      "type": "object"
+    },
+    "ColumnInfo": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "type": {
+          "enum": [
+            "string",
+            "number",
+            "date",
+            "datetime",
+            "boolean"
+          ],
+          "title": "Type",
+          "type": "string"
+        },
+        "role": {
+          "enum": [
+            "dimension",
+            "measure",
+            "time"
+          ],
+          "title": "Role",
+          "type": "string"
+        },
+        "format": {
+          "anyOf": [
+            {
+              "enum": [
+                "currency",
+                "count",
+                "ratio",
+                "percent",
+                "days",
+                "number"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Format"
+        }
+      },
+      "required": [
+        "name",
+        "type",
+        "role"
+      ],
+      "title": "ColumnInfo",
+      "type": "object"
+    },
+    "DenyEvent": {
+      "additionalProperties": false,
+      "properties": {
+        "trace_id": {
+          "title": "Trace Id",
+          "type": "string"
+        },
+        "event": {
+          "const": "deny",
+          "default": "deny",
+          "title": "Event",
+          "type": "string"
+        },
+        "message": {
+          "title": "Message",
+          "type": "string"
+        },
+        "role": {
+          "title": "Role",
+          "type": "string"
+        },
+        "blocked": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Blocked",
+          "type": "array"
+        },
+        "lang": {
+          "title": "Lang",
+          "type": "string"
+        }
+      },
+      "required": [
+        "trace_id",
+        "event",
+        "message",
+        "role",
+        "blocked",
+        "lang"
+      ],
+      "title": "DenyEvent",
+      "type": "object"
+    },
+    "DoneEvent": {
+      "additionalProperties": false,
+      "properties": {
+        "trace_id": {
+          "title": "Trace Id",
+          "type": "string"
+        },
+        "event": {
+          "const": "done",
+          "default": "done",
+          "title": "Event",
+          "type": "string"
+        }
+      },
+      "required": [
+        "trace_id",
+        "event"
+      ],
+      "title": "DoneEvent",
+      "type": "object"
+    },
+    "ErrorEvent": {
+      "additionalProperties": false,
+      "description": "``failed``: no SQL attempt produced a result; ``internal``: the run broke, with no detail for the client.",
+      "properties": {
+        "trace_id": {
+          "title": "Trace Id",
+          "type": "string"
+        },
+        "event": {
+          "const": "error",
+          "default": "error",
+          "title": "Event",
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "failed",
+            "internal"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "message": {
+          "title": "Message",
+          "type": "string"
+        },
+        "sql": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Sql"
+        },
+        "error": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Error"
+        }
+      },
+      "required": [
+        "trace_id",
+        "event",
+        "kind",
+        "message",
+        "sql",
+        "error"
+      ],
+      "title": "ErrorEvent",
+      "type": "object"
+    },
+    "Result": {
+      "additionalProperties": false,
+      "properties": {
+        "columns": {
+          "items": {
+            "$ref": "#/$defs/ColumnInfo"
+          },
+          "minItems": 1,
+          "title": "Columns",
+          "type": "array"
+        },
+        "rows": {
+          "items": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "type": "array"
+          },
+          "maxItems": 5000,
+          "title": "Rows",
+          "type": "array"
+        },
+        "row_count": {
+          "minimum": 0,
+          "title": "Row Count",
+          "type": "integer"
+        },
+        "truncated": {
+          "default": false,
+          "title": "Truncated",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "columns",
+        "rows",
+        "row_count"
+      ],
+      "title": "Result",
+      "type": "object"
+    },
+    "ResultEvent": {
+      "additionalProperties": false,
+      "properties": {
+        "trace_id": {
+          "title": "Trace Id",
+          "type": "string"
+        },
+        "event": {
+          "const": "result",
+          "default": "result",
+          "title": "Event",
+          "type": "string"
+        },
+        "result": {
+          "$ref": "#/$defs/Result"
+        }
+      },
+      "required": [
+        "trace_id",
+        "event",
+        "result"
+      ],
+      "title": "ResultEvent",
+      "type": "object"
+    },
+    "SqlEvent": {
+      "additionalProperties": false,
+      "properties": {
+        "trace_id": {
+          "title": "Trace Id",
+          "type": "string"
+        },
+        "event": {
+          "const": "sql",
+          "default": "sql",
+          "title": "Event",
+          "type": "string"
+        },
+        "sql": {
+          "title": "Sql",
+          "type": "string"
+        },
+        "attempt": {
+          "minimum": 1,
+          "title": "Attempt",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "trace_id",
+        "event",
+        "sql",
+        "attempt"
+      ],
+      "title": "SqlEvent",
+      "type": "object"
+    },
+    "StatusEvent": {
+      "additionalProperties": false,
+      "properties": {
+        "trace_id": {
+          "title": "Trace Id",
+          "type": "string"
+        },
+        "event": {
+          "const": "status",
+          "default": "status",
+          "title": "Event",
+          "type": "string"
+        },
+        "node": {
+          "title": "Node",
+          "type": "string"
+        },
+        "phase": {
+          "enum": [
+            "start",
+            "end"
+          ],
+          "title": "Phase",
+          "type": "string"
+        },
+        "attempt": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Attempt"
+        }
+      },
+      "required": [
+        "trace_id",
+        "event",
+        "node",
+        "phase",
+        "attempt"
+      ],
+      "title": "StatusEvent",
+      "type": "object"
+    },
+    "SummaryEvent": {
+      "additionalProperties": false,
+      "properties": {
+        "trace_id": {
+          "title": "Trace Id",
+          "type": "string"
+        },
+        "event": {
+          "const": "summary",
+          "default": "summary",
+          "title": "Event",
+          "type": "string"
+        },
+        "text": {
+          "title": "Text",
+          "type": "string"
+        },
+        "lang": {
+          "title": "Lang",
+          "type": "string"
+        },
+        "warnings": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Warnings",
+          "type": "array"
+        }
+      },
+      "required": [
+        "trace_id",
+        "event",
+        "text",
+        "lang",
+        "warnings"
+      ],
+      "title": "SummaryEvent",
+      "type": "object"
+    }
+  },
+  "description": "Any one event of the stream; its JSON Schema is the discriminated union the web app parses.",
+  "discriminator": {
+    "mapping": {
+      "chart_spec": "#/$defs/ChartSpecEvent",
+      "clarify": "#/$defs/ClarifyEvent",
+      "deny": "#/$defs/DenyEvent",
+      "done": "#/$defs/DoneEvent",
+      "error": "#/$defs/ErrorEvent",
+      "result": "#/$defs/ResultEvent",
+      "sql": "#/$defs/SqlEvent",
+      "status": "#/$defs/StatusEvent",
+      "summary": "#/$defs/SummaryEvent"
+    },
+    "propertyName": "event"
+  },
+  "oneOf": [
+    {
+      "$ref": "#/$defs/StatusEvent"
+    },
+    {
+      "$ref": "#/$defs/ClarifyEvent"
+    },
+    {
+      "$ref": "#/$defs/DenyEvent"
+    },
+    {
+      "$ref": "#/$defs/SqlEvent"
+    },
+    {
+      "$ref": "#/$defs/ResultEvent"
+    },
+    {
+      "$ref": "#/$defs/ChartSpecEvent"
+    },
+    {
+      "$ref": "#/$defs/SummaryEvent"
+    },
+    {
+      "$ref": "#/$defs/DoneEvent"
+    },
+    {
+      "$ref": "#/$defs/ErrorEvent"
+    }
+  ],
+  "title": "AskEvent"
+}

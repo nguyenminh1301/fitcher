@@ -4,7 +4,7 @@ import { useRef, type KeyboardEvent } from "react";
 
 import { Icon } from "@/components/brand/Icon";
 import { Tooltip } from "@/components/ui/feedback";
-import type { ChartType } from "@/lib/api/provisional";
+import type { ChartType } from "@/lib/contracts";
 import { CHART_TYPES, UNSUITABLE_REASON } from "@/lib/chart/toEChartsOption";
 import { useI18n } from "@/lib/i18n/react";
 
