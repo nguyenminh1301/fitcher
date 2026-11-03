@@ -10,6 +10,7 @@ import { DELETE as removeGroup, PATCH as renameGroup } from "@/app/api/conversat
 import { GET as list } from "@/app/api/conversations/route";
 import { DELETE as remove, GET as read, PATCH as update } from "@/app/api/conversations/[id]/route";
 import { GET as search } from "@/app/api/conversations/search/route";
+import { POST as feedback } from "@/app/api/feedback/route";
 import { GET as callback } from "@/app/auth/callback/route";
 import { GET as signIn } from "@/app/auth/sign-in/route";
 import { LOGIN_COOKIE, SESSION_COOKIE } from "@/lib/server/auth";
@@ -100,6 +101,16 @@ describe("conversation routes", () => {
 
     expect(response.status).toBe(404);
     expect(await response.json()).toEqual({ detail: "conversation not found" });
+  });
+
+  it("forwards feedback with the session's token and passes the api's 404 for another user's answer through", async () => {
+    await signedIn();
+    replies.push(new Response(null, { status: 204 }), Response.json({ detail: "answer not found" }, { status: 404 }));
+    const body = { trace_id: "t".repeat(32), rating: "dislike", note: "Wrong quarter" };
+
+    expect((await feedback(request("/api/feedback", "POST", body))).status).toBe(204);
+    expect(last()).toMatchObject({ url: "http://api:8000/feedback", method: "POST", body: JSON.stringify(body), auth: "Bearer access-1" });
+    expect((await feedback(request("/api/feedback", "POST", { ...body, trace_id: "theirs" }))).status).toBe(404);
   });
 
   it("is a 401 without a session and never calls the api", async () => {

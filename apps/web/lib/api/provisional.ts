@@ -13,13 +13,6 @@ export interface Identity {
   roles: string[];
 }
 
-/** POST /feedback; Phase 9. */
-export interface FeedbackInput {
-  trace_id: string;
-  rating: "like" | "dislike";
-  note?: string;
-}
-
 /** Console rows; Datasets, Review and Documents in Phase 10, the rest in Phase 12. */
 export interface DatasetView {
   id: string;

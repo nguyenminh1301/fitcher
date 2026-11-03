@@ -1,7 +1,7 @@
 // The web app's whole view of the backend, one group per feature. Each feature has a sample
 // implementation (lib/api/mock) and a real one (lib/api/http); lib/api/sources.ts picks per feature.
 
-import type { AskRequest, ConversationPatch } from "@/lib/contracts";
+import type { AskRequest, ConversationPatch, FeedbackInput } from "@/lib/contracts";
 
 import type { Conversation, ConversationGroup, ConversationThread } from "./conversations";
 import type { AskEvent } from "./events";
@@ -11,7 +11,6 @@ import type {
   DatasetView,
   DocumentRow,
   EvalReport,
-  FeedbackInput,
   FeedbackRow,
   Identity,
   ReviewItem,
