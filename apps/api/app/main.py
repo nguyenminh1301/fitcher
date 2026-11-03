@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
-from app.api import ask, auth, conversations, runtime
+from app.api import ask, auth, conversations, feedback, runtime
 
 
 @asynccontextmanager
@@ -16,6 +16,7 @@ app = FastAPI(title="fitcher API", version="0.1.0", lifespan=lifespan)
 app.include_router(auth.router)
 app.include_router(ask.router)
 app.include_router(conversations.router)
+app.include_router(feedback.router)
 
 
 @app.get("/health")

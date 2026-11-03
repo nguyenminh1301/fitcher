@@ -2,8 +2,9 @@
     <!--
         The api's conversation store (DECISIONS §10, §15): it writes each
         question and answer synchronously and reads a conversation back for
-        its owner, so follow-up questions see the previous turn. It reaches
-        only the conversation tables; every query filters by the requesting
+        its owner, so follow-up questions see the previous turn, and writes a
+        user's feedback on their own answers. It reaches only the conversation
+        and feedback tables; every query filters by the requesting
         user. The password comes from the clickhouse container environment.
     -->
     <users>
@@ -18,6 +19,7 @@
                 <query>GRANT SELECT, INSERT ON agent_logs.chat_messages</query>
                 <query>GRANT SELECT, INSERT ON agent_logs.conversations</query>
                 <query>GRANT SELECT, INSERT ON agent_logs.conversation_groups</query>
+                <query>GRANT INSERT ON agent_logs.feedback</query>
             </grants>
         </agent_conversations>
     </users>

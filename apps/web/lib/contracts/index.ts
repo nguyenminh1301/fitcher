@@ -9,6 +9,7 @@ export type { ConversationGroup } from "./conversation_group";
 export type { ConversationPatch } from "./conversation_patch";
 export type { ConversationThread as ConversationThreadContract, ConversationTurn } from "./conversation_thread";
 export type { GroupInput } from "./group_input";
+export type { FeedbackInput } from "./feedback_input";
 export type {
   AskEvent as StreamEvent,
   ChartSpecEvent,
