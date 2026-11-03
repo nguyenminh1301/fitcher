@@ -42,9 +42,9 @@ def extraction_reply(**overrides) -> dict:
     return {**reply, **overrides}
 
 
-def routing_reply(intent: str = "data_query", confidence: float = 0.9, language: str = "en") -> dict:
+def routing_reply(intent: str = "data_query", confidence: float = 0.9, language: str = "en", chart_type: str | None = None) -> dict:
     """The router's reply; graph runs ask it first."""
-    return {"intent": intent, "confidence": confidence, "language": language}
+    return {"intent": intent, "confidence": confidence, "language": language, "chart_type": chart_type}
 
 
 def example_hit() -> dict:

@@ -1,7 +1,8 @@
 """ChartSpec: how the web app draws a Result (DECISIONS §7 and §8).
 
-The chart recommender that applies the DECISIONS §8 rules arrives in Phase 9;
-until then every answer gets ``table_spec``, the rules' fallback row. The LLM
+``app.agent.chart_recommender`` chooses the spec of every answer and chart
+edit; until its DECISIONS §8 rules arrive in Phase 9 it returns
+``table_spec``, the rules' fallback row. The LLM
 never writes chart data: a ChartSpec only names result columns.
 """
 

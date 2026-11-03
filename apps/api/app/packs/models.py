@@ -181,7 +181,7 @@ class EvalCase(Draftable):
     language: str
     category: Literal[
         "two_period_compare", "top_n", "string_filter", "monthly_trend", "ambiguous", "unauthorized", "out_of_scope",
-        "follow_up",
+        "follow_up", "chart_edit",
     ]
     role: str
     expected: EvalExpected

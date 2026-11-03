@@ -54,7 +54,7 @@ def test_router_returns_the_intent_and_language():
 
     update = router({"question": "Doanh thu thuần là gì?", "history": [], "previous_spec": None}, agent)
 
-    assert update == {"intent": "metadata_qa", "intent_fallback": False, "language": "vi"}
+    assert update == {"intent": "metadata_qa", "intent_fallback": False, "language": "vi", "chart_type": None}
     assert agent.llm.calls[0].alias == ALIAS == "fast"
 
 
@@ -76,7 +76,7 @@ def test_router_prompt_carries_history_and_previous_spec_but_no_rows():
 def test_an_uncertain_or_failed_routing_falls_back_to_data_query(reply):
     update = router({"question": "q", "history": [], "previous_spec": None}, deps([reply]))
 
-    assert update == {"intent": "data_query", "intent_fallback": True, "language": None}
+    assert update == {"intent": "data_query", "intent_fallback": True, "language": None, "chart_type": None}
 
 
 def test_a_routed_question_records_its_intent_on_the_run():

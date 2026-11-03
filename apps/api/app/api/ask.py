@@ -24,6 +24,7 @@ from uuid import uuid4
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import StreamingResponse
 
+from app.agent.chart_recommender import recommend_chart
 from app.agent.nodes.resolve_time import TimeResolutionError, reference_date
 from app.agent.state import AgentState, RunCancelled
 from app.api.agent import Agent, AgentRun
@@ -31,7 +32,6 @@ from app.api.auth import current_principal, current_role
 from app.api.rate_limit import RateLimiter
 from app.api.runtime import get_agent, get_conversation_store, get_rate_limiter, unavailable
 from app.auth.jwt import Principal
-from app.contracts.chart_spec import table_spec
 from app.contracts.events import (
     AskRequest, ChartSpecEvent, ClarifyEvent, DenyEvent, DoneEvent, ErrorEvent, EventModel, ResultEvent, SqlEvent,
     StatusEvent, SummaryEvent,
@@ -70,7 +70,10 @@ class AnswerEvents:
             events.append(SqlEvent(**trace, sql=attempts[-1].sql, attempt=len(attempts)))
         elif name == "shape_result":
             result = update["result"]
-            events += [ResultEvent(**trace, result=result), ChartSpecEvent(**trace, spec=table_spec(result))]
+            events += [ResultEvent(**trace, result=result), ChartSpecEvent(**trace, spec=recommend_chart(result))]
+        elif name == "chart_edit":
+            # The stored result is sent again so the client always holds the rows it draws.
+            events += [ResultEvent(**trace, result=update["result"]), ChartSpecEvent(**trace, spec=update["chart_spec"])]
         elif name == "summarize":
             warnings = update.get("warnings", state.get("warnings", []))
             events.append(SummaryEvent(**trace, text=update.get("summary") or "", lang=_language(state), warnings=warnings))

@@ -240,3 +240,16 @@ def test_an_out_of_scope_case_needs_no_reference_query():
 
     assert run.cases[0].layers["execution"].status == "pass"
     assert run.reference_errors == [] and agent.runner.calls == []
+
+
+def test_a_chart_edit_case_redraws_the_previous_answer_without_sql():
+    expected = EvalExpected(intent="chart_edit", outcome="answer")
+    case = _case("as_line", category="chart_edit", question="Draw it as a line", expected=expected, expected_sql=None,
+                 previous_question="Top 10 widgets in Q1 2024 vs Q1 2025")
+    agent = deps([routing_reply(), extraction_reply(), GOOD_SQL, "Blue led.", routing_reply("chart_edit", chart_type="line")],
+                 runner=FakeRunner(runs=[good_output()]))
+
+    [score] = _run(_set(case), agent).cases
+
+    assert (score.layers["intent"].status, score.layers["execution"].status) == ("pass", "pass")
+    assert [call[0] for call in agent.runner.calls] == ["explain", "run"]

@@ -5,8 +5,9 @@
 - retrieval: recall of the labelled dataset and columns among the retrieved candidates.
 - execution: the answer's result set matches the reference result; for a case
   that expects a denial, a clarifying question or an out-of-scope reply, the
-  run ended that way. A denial and an out-of-scope reply score no extraction
-  or retrieval.
+  run ended that way; a chart edit passes when the previous result was
+  redrawn without SQL. A denial, an out-of-scope reply and a chart edit score
+  no extraction or retrieval.
 
 A case whose branch a later phase builds is not scored on any layer.
 """
@@ -170,6 +171,14 @@ def score_reply(state: AgentState) -> LayerScore:
     return LayerScore(status="fail", reason="expected an out-of-scope reply, got none")
 
 
+def score_redraw(state: AgentState) -> LayerScore:
+    if state.get("attempts"):
+        return LayerScore(status="fail", reason="expected the previous result redrawn, but SQL was generated")
+    if state.get("chart_spec") is not None and state.get("result") is not None:
+        return LayerScore(status="pass")
+    return LayerScore(status="fail", reason="expected the previous result redrawn, got no chart")
+
+
 def score_case(case: EvalCase, state: AgentState, reference: Result | None, *, active: bool) -> CaseScore:
     expected = case.expected
     decision_only = LayerScore(status="not_scored", reason="this case scores the decision only")
@@ -182,6 +191,9 @@ def score_case(case: EvalCase, state: AgentState, reference: Result | None, *, a
     elif expected.intent == "out_of_scope":
         layers = {"intent": score_intent(expected, state), "extraction": decision_only, "retrieval": decision_only,
                   "execution": score_reply(state)}
+    elif expected.intent == "chart_edit":
+        layers = {"intent": score_intent(expected, state), "extraction": decision_only, "retrieval": decision_only,
+                  "execution": score_redraw(state)}
     else:
         execution = score_clarification(state) if expected.outcome == "clarify" else score_execution(case, state, reference)
         layers = {
