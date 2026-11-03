@@ -216,11 +216,13 @@ class FakeConversationClient:
 
     ``FINAL`` reads keep the row with the latest ``updated_at`` per key, as a
     ReplacingMergeTree does. ``fail`` makes every call raise, as an unreachable
-    ClickHouse would.
+    ClickHouse would; ``naive_times`` returns times without a time zone, as
+    clickhouse-connect returns ``DateTime64('UTC')`` values.
     """
 
-    def __init__(self, fail: bool = False):
+    def __init__(self, fail: bool = False, naive_times: bool = False):
         self.fail = fail
+        self.naive_times = naive_times
         self.tables: dict[str, list[dict]] = {"chat_messages": [], "conversations": [], "conversation_groups": []}
         self.queries: list[str] = []
 
@@ -241,6 +243,15 @@ class FakeConversationClient:
         return list(latest.values())
 
     def query(self, sql, parameters):
+        result = self._answer(sql, parameters)
+        if self.naive_times:
+            result.result_rows = [
+                tuple(value.replace(tzinfo=None) if hasattr(value, "tzinfo") and hasattr(value, "hour") else value for value in row)
+                for row in result.result_rows
+            ]
+        return result
+
+    def _answer(self, sql, parameters):
         from app.conversation import store
 
         self._check()

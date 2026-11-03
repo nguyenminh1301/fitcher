@@ -25,7 +25,7 @@ titles and own questions, read by the ``(user_id, ...)`` key.
 
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from itertools import groupby
 import json
 import os
@@ -297,7 +297,11 @@ class ConversationStore:
     # reads
 
     def _query(self, sql: str, **parameters: str) -> list[tuple]:
-        return self._client.query(sql, parameters=parameters).result_rows
+        # DateTime64('UTC') values come back without a time zone; they are UTC.
+        return [
+            tuple(value.replace(tzinfo=UTC) if isinstance(value, datetime) and value.tzinfo is None else value for value in row)
+            for row in self._client.query(sql, parameters=parameters).result_rows
+        ]
 
     def _rows(self, user_id: str) -> list[ConversationRecord]:
         return [

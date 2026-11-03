@@ -223,3 +223,13 @@ def test_deleting_a_group_moves_its_conversations_back_to_no_group(store):
     store.delete_group("ana", group.id)
 
     assert store.conversations("ana", limit=10, offset=0)[0].group_id is None
+
+
+def test_rows_clickhouse_returns_without_a_time_zone_are_read_as_utc():
+    store = ConversationStore(FakeConversationClient(naive_times=True), clock=Clock())
+    turn = answered(store)
+
+    updated = store.update("ana", turn.conversation_id, ConversationPatch(pinned=True))
+
+    assert updated.updated_at.tzinfo is not None
+    assert store.conversations("ana", limit=1, offset=0)[0].updated_at.utcoffset().total_seconds() == 0
