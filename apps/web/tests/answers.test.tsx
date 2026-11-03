@@ -73,13 +73,13 @@ describe("answer", () => {
     vi.stubGlobal("fetch", fetch);
     const compared: Result = {
       columns: [
-        { name: "product_id", type: "string", role: "dimension" },
-        { name: "net_sales_q1_2024", type: "number", role: "measure", format: "currency" },
-        { name: "net_sales_q1_2025", type: "number", role: "measure", format: "currency" },
+        { name: "widget_name", type: "string", role: "dimension" },
+        { name: "widget_revenue_q1_2024", type: "number", role: "measure", format: "currency" },
+        { name: "widget_revenue_q1_2025", type: "number", role: "measure", format: "currency" },
       ],
       rows: [["SKU1", 10, 12], ["SKU2", 8, 11]], row_count: 2,
     };
-    const spec: ChartSpec = { type: "grouped_bar", x: "product_id", y: ["net_sales_q1_2024", "net_sales_q1_2025"], orientation: "vertical", allowed_types: ["grouped_bar", "bar", "table"] };
+    const spec: ChartSpec = { type: "grouped_bar", x: "widget_name", y: ["widget_revenue_q1_2024", "widget_revenue_q1_2025"], orientation: "vertical", allowed_types: ["grouped_bar", "bar", "table"] };
     show([{ event: "result", result: compared, trace_id: T }, { event: "chart_spec", spec, trace_id: T }, { event: "done", trace_id: T }]);
 
     for (const name of ["Bar", "Table", "Grouped bar"]) {
