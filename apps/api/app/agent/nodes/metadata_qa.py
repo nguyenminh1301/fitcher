@@ -46,7 +46,8 @@ def metadata_qa(state: AgentState, deps: AgentDeps) -> dict:
             _entry(index, hit)
             for index in SEARCHED
             for hit in deps.search.search(
-                alias_name(pack.name, index), hybrid_query(question, vector, [deps.role], HITS_PER_INDEX), pipeline=HYBRID_PIPELINE,
+                alias_name(pack.name, index), hybrid_query(question, vector, [deps.role], HITS_PER_INDEX),
+                pipeline=HYBRID_PIPELINE,
             )
         ]
     except (EmbeddingError, SearchError) as error:
