@@ -56,11 +56,27 @@ def test_active_answer_case_needs_sql_or_rows():
         load_eval_set(_pack([_case("no_reference", expected_sql=None)]))
 
 
-def test_active_case_must_be_an_answered_data_query():
-    clarify = EvalExpected(intent="data_query", outcome="clarify")
+@pytest.mark.parametrize("intent", ["metadata_qa", "chart_edit"])
+def test_active_case_must_be_a_branch_the_engine_answers(intent):
+    expected = EvalExpected(intent=intent, outcome="answer")
 
-    with pytest.raises(EvalSetError, match="unlabelled_clarify"):
-        load_eval_set(_pack([_case("unlabelled_clarify", expected=clarify, expected_sql=None)]))
+    with pytest.raises(EvalSetError, match="not_built_yet"):
+        load_eval_set(_pack([_case("not_built_yet", expected=expected, expected_sql=None)]))
+
+
+@pytest.mark.parametrize(("intent", "outcome"), [("data_query", "clarify"), ("out_of_scope", "answer")])
+def test_active_clarify_and_out_of_scope_cases_need_no_reference(intent, outcome):
+    case = _case("decision", expected=EvalExpected(intent=intent, outcome=outcome), expected_sql=None)
+
+    assert [item.id for item in load_eval_set(_pack([case])).cases] == ["decision"]
+
+
+def test_a_follow_up_case_needs_its_previous_question():
+    with pytest.raises(EvalSetError, match="previous_question"):
+        load_eval_set(_pack([_case("orphan", category="follow_up")]))
+
+    asked = _case("asked", category="follow_up", previous_question="Top 10 widgets in Q1 2024 vs Q1 2025")
+    assert [item.id for item in load_eval_set(_pack([asked])).cases] == ["asked"]
 
 
 def test_inactive_case_needs_no_reference():
@@ -86,8 +102,8 @@ def test_ranks_for_top_n_and_monthly_trend():
     assert ranks(_case("filter", category="string_filter", expected=plain)) is False
 
 
-def test_engine_has_reached_the_deny_branch():
-    assert ENGINE_PHASE >= 6
+def test_engine_has_reached_the_conversation_branches():
+    assert ENGINE_PHASE >= 8
 
 
 def test_active_deny_case_needs_no_reference():

@@ -72,10 +72,15 @@ def test_an_out_of_scope_run_records_its_intent_and_success():
 
 
 def test_rejected_and_failed_runs_record_their_status():
-    rejected = logged([routing_reply(), extraction_reply(rank_term=None)])
-    run_question("Which widgets?", rejected)
+    rejected = logged([routing_reply(), extraction_reply(filters=[{"column_term": None, "op": "=", "values": ["Mars"]}])])
+    run_question("Widgets on Mars?", rejected)
     final = rejected.logs.runs()[-1]
-    assert final.status == "rejected" and "no measure" in final.error
+    assert final.status == "rejected" and "Mars" in final.error
+
+    clarified = logged([routing_reply(), extraction_reply(rank_term=None)])
+    run_question("Which widgets?", clarified)
+    final = clarified.logs.runs()[-1]
+    assert (final.status, final.intent, final.error) == ("clarified", "data_query", "")
 
     failed = logged([routing_reply(), extraction_reply(), "SELECT secret FROM marts.widget_sales"])
     run_question(QUESTION, failed)

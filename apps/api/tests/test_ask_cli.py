@@ -32,10 +32,18 @@ def test_out_of_scope_question_prints_the_reply_and_exits_0(capsys):
 
 
 def test_rejected_question_exits_with_code_2_and_the_reason(capsys):
-    state = run_question("Which widgets?", deps([routing_reply(), extraction_reply(rank_term=None)]))
+    state = run_question("Widgets on Mars?", deps([routing_reply(), extraction_reply(filters=[{"column_term": None, "op": "=", "values": ["Mars"]}])]))
 
     assert report(state) == 2
-    assert "Rejected: the question names no measure to report" in capsys.readouterr().err
+    assert "Rejected: no value of widget_sales matches \'Mars\'" in capsys.readouterr().err
+
+
+def test_an_ambiguous_question_prints_the_clarifying_question_and_options(capsys):
+    state = run_question("Best widgets in 2024?", deps([routing_reply(), extraction_reply(rank_term="best")]))
+
+    assert report(state) == 2
+    err = capsys.readouterr().err
+    assert 'Clarify: Which measure do you mean by "best"?' in err and "- Widget revenue (metric:widget_revenue)" in err
 
 
 def test_failed_run_prints_the_last_sql_and_error_and_exits_1(capsys):

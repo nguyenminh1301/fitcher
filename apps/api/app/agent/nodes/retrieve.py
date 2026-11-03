@@ -3,7 +3,7 @@
 All query texts are embedded in one ``embed`` call. Metric terms search the
 glossary and metrics, dimension terms the glossary and dataset columns,
 filter values the column values, and the whole question the examples and
-datasets. The candidates for the question's own terms (metrics, dimensions and
+datasets, and the metrics too when it names no measure. The candidates for the question's own terms (metrics, dimensions and
 filter values) are searched across every role of the pack, so a term is
 resolved to what it means and the gate can deny it, instead of being replaced
 by the closest item the asking role may read. The context shown to the SQL
@@ -38,6 +38,8 @@ class Retrieval(BaseModel):
     values: dict[str, list[Hit]] = {}
     examples: list[Hit] = []
     datasets: list[Hit] = []
+    # Metrics closest to a question that names no measure, readable by the asking role: a clarify's options.
+    question_metrics: list[Hit] = []
 
 
 def retrieve(state: AgentState, deps: AgentDeps) -> dict:
@@ -79,4 +81,5 @@ def _retrieve(state: AgentState, deps: AgentDeps) -> "Retrieval":
         values={value: lexical(value) for value in values},
         examples=semantic("examples", state["question"], asking_role),
         datasets=semantic("datasets", state["question"], asking_role),
+        question_metrics=[] if metric_terms else semantic("metrics", state["question"], asking_role),
     )

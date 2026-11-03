@@ -6,11 +6,14 @@ import pytest
 
 from app.agent.nodes.resolve_time import (
     PeriodDescriptor,
+    PeriodShift,
     TimeResolutionError,
     reference_date,
     resolve_period,
     resolve_periods,
+    shift_periods,
 )
+from app.contracts.query_spec import Period
 
 TODAY = date(2026, 1, 15)
 
@@ -131,3 +134,39 @@ def test_reference_date_uses_the_users_time_zone():
 def test_unknown_time_zone_is_rejected():
     with pytest.raises(TimeResolutionError, match="unknown time zone"):
         reference_date("Mars/Olympus", datetime(2025, 1, 1, tzinfo=UTC))
+
+
+def shifted(periods: list[tuple[str, str]], fiscal_start_month: int = 1, **shift) -> list[tuple[str, str, str]]:
+    moved = shift_periods(
+        [Period(label="p", start=date.fromisoformat(start), end=date.fromisoformat(end)) for start, end in periods],
+        PeriodShift(**shift), fiscal_start_month,
+    )
+    return [(period.label, period.start.isoformat(), period.end.isoformat()) for period in moved]
+
+
+def test_shift_moves_both_quarters_one_year_back():
+    periods = [("2024-01-01", "2024-04-01"), ("2025-01-01", "2025-04-01")]
+
+    assert shifted(periods, unit="year", offset=-1) == [
+        ("Q1 2023", "2023-01-01", "2023-04-01"), ("Q1 2024", "2024-01-01", "2024-04-01"),
+    ]
+
+
+def test_shift_relabels_years_months_and_fiscal_quarters():
+    assert shifted([("2025-01-01", "2026-01-01")], unit="year", offset=-1) == [("2024", "2024-01-01", "2025-01-01")]
+    assert shifted([("2025-12-01", "2026-01-01")], unit="month", offset=-1) == [("2025-11", "2025-11-01", "2025-12-01")]
+    assert shifted([("2024-04-01", "2024-07-01")], 4, unit="quarter", offset=1) == [("FY2025 Q2", "2024-07-01", "2024-10-01")]
+    assert shifted([("2024-04-01", "2025-04-01")], 4, unit="year", offset=1) == [("FY2026", "2025-04-01", "2026-04-01")]
+
+
+def test_shift_labels_a_plain_range_by_its_dates():
+    assert shifted([("2025-03-05", "2025-04-01")], unit="day", offset=-7) == [
+        ("2025-02-26 to 2025-03-24", "2025-02-26", "2025-03-25"),
+    ]
+    assert shifted([("2026-01-05", "2026-01-12")], unit="week", offset=-1) == [
+        ("2025-12-29 to 2026-01-04", "2025-12-29", "2026-01-05"),
+    ]
+
+
+def test_a_zero_shift_keeps_the_periods_and_relabels_them():
+    assert shifted([("2024-01-01", "2024-04-01")], unit="year", offset=0) == [("Q1 2024", "2024-01-01", "2024-04-01")]

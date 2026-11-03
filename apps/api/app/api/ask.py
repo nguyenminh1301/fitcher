@@ -81,8 +81,11 @@ class AnswerEvents:
         trace = {"trace_id": self.trace_id}
         if state.get("reply") is not None:
             return [SummaryEvent(**trace, text=state["reply"], lang=_language(state)), DoneEvent(**trace)]
+        if state.get("clarification"):
+            asked = state["clarification"]
+            return [ClarifyEvent(**trace, question=asked.question, options=asked.options, lang=asked.lang), DoneEvent(**trace)]
         if state.get("rejection"):
-            # The data_query flow's refusals are in English; the clarify branch with options is Phase 8's.
+            # A question the flow cannot read at all is refused in English, without options.
             return [ClarifyEvent(**trace, question=state["rejection"], lang="en"), DoneEvent(**trace)]
         if state.get("denial"):
             denial = state["denial"]

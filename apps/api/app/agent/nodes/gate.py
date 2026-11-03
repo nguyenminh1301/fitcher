@@ -1,6 +1,8 @@
-"""Deny a question the asking role may not read, before any SQL (DECISIONS §6 step 8).
+"""Clarify an ambiguous question, or deny one the asking role may not read, before any SQL (DECISIONS §6 step 8).
 
-The gate compares the QuerySpec with the role's grants in ``policies.yaml``:
+A question ``build_spec`` could not settle (its ``need``) gets a clarifying
+question with options from ``clarify``, offering only metrics the role may read.
+Otherwise the gate compares the QuerySpec with the role's grants in ``policies.yaml``:
 the dataset must be granted, and so must every column the query needs, which
 are the grouped and filtered columns, the time column when periods are named
 and, for a plain grant, the columns the metric expressions read. An
@@ -15,6 +17,7 @@ from sqlglot import exp
 from pydantic import BaseModel, ConfigDict
 
 from app.agent.audit import audit
+from app.agent.nodes.clarify import clarification
 from app.agent.state import AgentDeps, AgentState
 from app.contracts.query_spec import QuerySpec
 from app.packs.models import Pack
@@ -74,8 +77,23 @@ def authorize(spec: QuerySpec, pack: Pack, role: str, language: str) -> Denial |
     return Denial(dataset=spec.dataset, blocked=blocked, message=_message(role, blocked, language, aggregate))
 
 
+def may_read_metric(pack: Pack, role: str, metric_id: str) -> bool:
+    """Whether ``role`` may report ``metric_id``: its dataset is granted with every column it reads, or as an aggregate."""
+    metric = next(item for item in pack.metrics.metrics if item.id == metric_id)
+    grant = next((g for item in pack.policies.roles if item.id == role for g in item.datasets if g.dataset == metric.dataset), None)
+    if grant is None:
+        return False
+    if grant.aggregate_only is not None:
+        return metric_id in grant.aggregate_only.metrics
+    return all(column in grant.columns for column in _metric_columns(metric.sql_expr))
+
+
 def gate(state: AgentState, deps: AgentDeps) -> dict:
-    language = getattr(state.get("extraction"), "language", "en")
+    language = getattr(state.get("extraction"), "language", None) or state.get("language") or "en"
+    pack = deps.compiled.pack
+    if state.get("need") is not None:
+        asked = clarification(state["need"], language, pack, lambda metric_id: may_read_metric(pack, deps.role, metric_id))
+        return {"clarification": asked}
     denial = authorize(state["spec"], deps.compiled.pack, deps.role, language)
     if denial is None:
         return {}

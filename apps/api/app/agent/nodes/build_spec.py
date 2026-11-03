@@ -5,9 +5,10 @@ a metric id or name, or a column name exactly, ignoring case, diacritics,
 punctuation and a plural "s"; otherwise the retrieval hits decide. A ranking
 term ("best-selling") must match exactly or through a business-profile
 convention, so a vague "best" alone is never guessed; next to a named measure
-("top 5 brands by units sold") it ranks by that measure. Without a clarify branch yet,
-a measure whose two best candidates score almost alike is refused, as are
-metrics from different datasets and terms that match nothing.
+("top 5 brands by units sold") it ranks by that measure. What the question leaves
+open becomes a ``Need`` that the gate asks about: no measure, a ranking word
+alone, a term whose best candidates score almost alike, or no period. Metrics
+from different datasets and terms or values that match nothing are refused.
 
 The coverage check compares each period with the dataset's compiled date
 range and adds warnings; it never blocks the question.
@@ -20,6 +21,7 @@ import unicodedata
 
 from pydantic import ValidationError
 
+from app.agent.nodes.clarify import Need
 from app.agent.nodes.retrieve import Hit, Retrieval
 from app.agent.state import AgentDeps, AgentState
 from app.contracts.query_spec import Filter, Period, QuerySpec
@@ -32,6 +34,21 @@ AMBIGUITY_RATIO = 0.9
 
 class SpecRejected(Exception):
     """The question cannot be mapped to one unambiguous QuerySpec."""
+
+
+class NeedsChoice(SpecRejected):
+    """The question leaves open what ``need`` describes; the user is asked instead of refused."""
+
+    def __init__(self, need: Need):
+        super().__init__(f"the question leaves the {need.kind} open")
+        self.need = need
+
+
+class _Tie(Exception):
+    """Several candidates score almost alike; ``candidates`` holds them best first."""
+
+    def __init__(self, candidates: list[str]):
+        self.candidates = candidates
 
 
 def fold(text: str) -> str:
@@ -95,12 +112,16 @@ class _Catalog:
         return list(dict.fromkeys(found))
 
 
-def _best(candidates: dict[str, float], what: str, term: str) -> str | None:
+def _ranked(candidates: dict[str, float]) -> list[str]:
+    return [name for name, _ in sorted(candidates.items(), key=lambda item: -item[1])]
+
+
+def _best(candidates: dict[str, float]) -> str | None:
     if not candidates:
         return None
     ranked = sorted(candidates.items(), key=lambda item: -item[1])
     if len(ranked) > 1 and ranked[1][1] >= AMBIGUITY_RATIO * ranked[0][1]:
-        raise SpecRejected(f"'{term}' could mean the {what} {ranked[0][0]} or {ranked[1][0]}")
+        raise _Tie([name for name, score in ranked if score >= AMBIGUITY_RATIO * ranked[0][1]])
     return ranked[0][0]
 
 
@@ -124,21 +145,25 @@ def _resolve_metric(term: str, catalog: _Catalog, retrieval: Retrieval) -> str:
         convention = catalog.convention_metric(term)
         if convention in exact:
             return convention
-        raise SpecRejected(f"'{term}' could mean the metrics {', '.join(exact)}")
-    found = _best(_metric_from_hits(retrieval.metric_terms.get(term, [])), "metrics", term)
+        raise NeedsChoice(Need(kind="metric", term=term, candidates=exact))
+    try:
+        found = _best(_metric_from_hits(retrieval.metric_terms.get(term, [])))
+    except _Tie as tie:
+        raise NeedsChoice(Need(kind="metric", term=term, candidates=tie.candidates)) from None
     if found is None or found not in catalog.metrics:
         raise SpecRejected(f"no metric matches '{term}'")
     return found
 
 
-def _resolve_rank_metric(term: str, catalog: _Catalog) -> str:
+def _resolve_rank_metric(term: str, catalog: _Catalog, retrieval: Retrieval) -> str:
     exact = catalog.exact_metrics(term)
     if len(exact) == 1:
         return exact[0]
     convention = catalog.convention_metric(term)
     if convention is not None:
         return convention
-    raise SpecRejected(f"'{term}' does not say which measure to rank by")
+    candidates = exact or _ranked(_metric_from_hits(retrieval.metric_terms.get(term, [])))
+    raise NeedsChoice(Need(kind="metric", term=term, candidates=candidates))
 
 
 def _column_from_hits(hits: Iterable[Hit], dataset: Dataset) -> dict[str, float]:
@@ -165,8 +190,11 @@ def _resolve_column(term: str, dataset: Dataset, catalog: _Catalog, retrieval: R
     if len(exact) == 1:
         return exact[0]
     if len(exact) > 1:
-        raise SpecRejected(f"'{term}' could mean the columns {', '.join(exact)}")
-    found = _best(_column_from_hits(retrieval.dimension_terms.get(term, []), dataset), "columns", term)
+        raise NeedsChoice(Need(kind="column", term=term, candidates=[f"{dataset.id}.{column}" for column in exact]))
+    try:
+        found = _best(_column_from_hits(retrieval.dimension_terms.get(term, []), dataset))
+    except _Tie as tie:
+        raise NeedsChoice(Need(kind="column", term=term, candidates=[f"{dataset.id}.{c}" for c in tie.candidates])) from None
     if found is None:
         raise SpecRejected(f"no column of {dataset.id} matches '{term}'")
     return found
@@ -210,11 +238,13 @@ def make_spec(state: AgentState, compiled: CompiledPack) -> QuerySpec:
     periods = state["periods"]
     catalog = _Catalog(compiled)
 
+    if not extraction.metric_terms and not extraction.rank_term:
+        raise NeedsChoice(Need(kind="metric", candidates=_ranked(_metric_from_hits(retrieval.question_metrics))))
     metric_ids = [_resolve_metric(term, catalog, retrieval) for term in extraction.metric_terms]
     rank_by = None
     if extraction.rank_term:
         try:
-            rank_by = _resolve_rank_metric(extraction.rank_term, catalog)
+            rank_by = _resolve_rank_metric(extraction.rank_term, catalog, retrieval)
         except SpecRejected:
             # A vague ranking word ("top", "cao nhất") next to a named measure ranks by that measure;
             # alone it is still refused rather than guessed.
@@ -228,6 +258,8 @@ def make_spec(state: AgentState, compiled: CompiledPack) -> QuerySpec:
     if len(datasets) != 1:
         raise SpecRejected(f"the metrics {', '.join(metric_ids)} come from different datasets")
     dataset = catalog.datasets[datasets.pop()]
+    if not periods:
+        raise NeedsChoice(Need(kind="period"))
 
     dimensions = [_resolve_column(term, dataset, catalog, retrieval) for term in extraction.dimension_terms]
     if state.get("time_grain") and dataset.time_column not in dimensions:
@@ -260,6 +292,8 @@ def make_spec(state: AgentState, compiled: CompiledPack) -> QuerySpec:
 def build_spec(state: AgentState, deps: AgentDeps) -> dict:
     try:
         spec = make_spec(state, deps.compiled)
+    except NeedsChoice as choice:
+        return {"need": choice.need}
     except SpecRejected as rejection:
         return {"rejection": str(rejection)}
     except ValidationError as error:

@@ -1,10 +1,12 @@
 """Load a pack's eval set and decide which cases are scored.
 
-Only approved cases run. A case whose branch (router, clarify, deny) a later
-delivery phase builds carries ``active_from_phase`` and is reported as not
-yet scored. Every active case is a ``data_query``: one that expects an answer
-needs a reference result, either ``expected_sql`` or ``expected_rows``; one
-that expects a denial needs none.
+Only approved cases run. A case whose branch a later delivery phase builds
+carries ``active_from_phase`` and is reported as not yet scored. An active
+case is a ``data_query`` or an ``out_of_scope`` question: a data question that
+expects an answer needs a reference result, either ``expected_sql`` or
+``expected_rows``; one that expects a clarifying question or a denial, and an
+out-of-scope question, need none. A ``follow_up`` case names the
+``previous_question`` it follows.
 """
 
 from collections.abc import Sequence
@@ -14,8 +16,8 @@ from datetime import date
 from app.packs.models import EvalCase, Pack
 
 # The delivery phase the engine has reached; later phases raise it when they
-# build the router, deny or clarify branches their cases need.
-ENGINE_PHASE = 6
+# build the branches their cases need.
+ENGINE_PHASE = 8
 
 
 class EvalSetError(ValueError):
@@ -39,7 +41,9 @@ def ranks(case: EvalCase) -> bool:
 
 def _check_active(case: EvalCase) -> None:
     expected = case.expected
-    if expected.intent == "data_query" and expected.outcome == "deny":
+    if case.category == "follow_up" and case.previous_question is None:
+        raise EvalSetError(f"case {case.id} is a {case.category} case and needs previous_question")
+    if (expected.intent, expected.outcome) in {("data_query", "deny"), ("data_query", "clarify"), ("out_of_scope", "answer")}:
         return
     if expected.intent != "data_query" or expected.outcome != "answer":
         raise EvalSetError(

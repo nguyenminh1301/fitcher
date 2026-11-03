@@ -137,11 +137,11 @@ def test_execution_reports_the_comparison_reason():
 
 
 def test_execution_fails_with_rejection_reason():
-    state = run_question("Which widgets?", deps([routing_reply(), extraction_reply(rank_term=None)]))
+    state = run_question("Widgets on Mars?", deps([routing_reply(), extraction_reply(filters=[{"column_term": None, "op": "=", "values": ["Mars"]}])]))
 
     score = score_execution(_case(), state, _reference([["Widget 0", 10.5]]))
 
-    assert (score.status, score.reason) == ("fail", "rejected: the question names no measure to report")
+    assert (score.status, score.reason) == ("fail", "rejected: no value of widget_sales matches \'Mars\'")
 
 
 def test_execution_fails_with_last_sql_error():
@@ -155,11 +155,11 @@ def test_execution_fails_with_last_sql_error():
 
 # whole case
 
-def test_active_case_scores_every_layer_and_leaves_intent_to_the_router():
+def test_active_case_scores_every_layer():
     score = score_case(_case(), _answered_state(), _reference([["Widget 0", 10.5], ["Widget 1", 10.5]]), active=True)
 
     assert list(score.layers) == list(LAYERS)
-    assert score.layers["intent"].status == "not_scored"
+    assert score.layers["intent"].status == "pass"
     assert [score.layers[layer].status for layer in ("extraction", "retrieval", "execution")] == ["pass", "fail", "pass"]
     assert (score.case_id, score.category, score.active) == ("top_widgets", "two_period_compare", True)
 
@@ -179,12 +179,12 @@ def _deny_case():
 
 
 def test_deny_case_passes_when_the_run_was_denied():
-    denied = {"denial": Denial(dataset="widget_sales", blocked=["widget_sales"], message="Your role ...")}
+    denied = {"intent": "data_query", "denial": Denial(dataset="widget_sales", blocked=["widget_sales"], message="Your role ...")}
 
     score = score_case(_deny_case(), denied, None, active=True)
 
-    assert score.layers["execution"].status == "pass"
-    assert {score.layers[layer].status for layer in ("intent", "extraction", "retrieval")} == {"not_scored"}
+    assert (score.layers["intent"].status, score.layers["execution"].status) == ("pass", "pass")
+    assert {score.layers[layer].status for layer in ("extraction", "retrieval")} == {"not_scored"}
 
 
 def test_deny_case_fails_when_the_run_answered():
@@ -192,3 +192,62 @@ def test_deny_case_fails_when_the_run_answered():
 
     assert score.layers["execution"].status == "fail"
     assert score.layers["execution"].reason == "expected a denial, but the question was answered"
+
+
+# intent, clarify and out-of-scope cases
+
+def test_intent_is_scored_from_the_router():
+    misrouted = {**_answered_state(), "intent": "out_of_scope"}
+
+    score = score_case(_case(), misrouted, None, active=True)
+
+    assert (score.layers["intent"].status, score.layers["intent"].reason) == ("fail", "expected data_query, got out_of_scope")
+
+
+def _clarify_case():
+    return _case(category="ambiguous", expected=_expected(outcome="clarify", rank_by=None, dataset=None, columns=[]), expected_sql=None)
+
+
+def test_clarify_case_passes_when_the_run_clarifies():
+    state = run_question("Best widgets?", deps([routing_reply(), extraction_reply(rank_term="best")]))
+
+    score = score_case(_clarify_case(), state, None, active=True)
+
+    assert {name: layer.status for name, layer in score.layers.items()} == {
+        "intent": "pass", "extraction": "pass", "retrieval": "not_scored", "execution": "pass",
+    }
+
+
+def test_clarify_case_fails_when_the_run_answered():
+    score = score_case(_clarify_case(), _answered_state(), None, active=True)
+
+    assert score.layers["execution"].reason == "expected a clarifying question, but the question was answered"
+
+
+def _out_of_scope_case():
+    return _case(category="out_of_scope", expected=EvalExpected(intent="out_of_scope", outcome="answer"), expected_sql=None)
+
+
+def test_out_of_scope_case_passes_on_a_reply_without_sql():
+    state = run_question("Write a poem", deps([routing_reply("out_of_scope"), "I answer data questions."]))
+
+    score = score_case(_out_of_scope_case(), state, None, active=True)
+
+    assert {name: layer.status for name, layer in score.layers.items()} == {
+        "intent": "pass", "extraction": "not_scored", "retrieval": "not_scored", "execution": "pass",
+    }
+
+
+def test_out_of_scope_case_fails_when_the_question_was_answered_with_sql():
+    score = score_case(_out_of_scope_case(), _answered_state(), None, active=True)
+
+    assert score.layers["intent"].status == "fail"
+    assert score.layers["execution"].reason == "expected an out-of-scope reply, but SQL was generated"
+
+
+def test_deny_case_names_a_clarifying_question_it_got_instead():
+    asked = run_question("Best widgets?", deps([routing_reply(), extraction_reply(rank_term="best")]))
+
+    score = score_case(_deny_case(), asked, None, active=True)
+
+    assert score.layers["execution"].reason == "expected a denial, but the run asked a clarifying question"
