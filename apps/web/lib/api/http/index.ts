@@ -3,19 +3,12 @@
 
 import type { Feature, FitcherApi } from "../client";
 import { httpAuth } from "./auth";
+import { httpChat } from "./chat";
 
 export class NotWiredError extends Error {
   constructor(readonly feature: Feature) {
     super(`The ${feature} feature is not connected to the api yet; it runs on sample data.`);
   }
-}
-
-function notWired<T extends object>(feature: Feature): T {
-  return new Proxy({} as T, {
-    get: () => () => {
-      throw new NotWiredError(feature);
-    },
-  });
 }
 
 function asyncNotWired<T extends object>(feature: Feature): T {
@@ -26,7 +19,7 @@ function asyncNotWired<T extends object>(feature: Feature): T {
 
 export const httpApi: FitcherApi = {
   auth: httpAuth,
-  chat: notWired("chat"),
+  chat: httpChat,
   conversations: asyncNotWired("conversations"),
   feedback: asyncNotWired("feedback"),
   datasets: asyncNotWired("datasets"),
