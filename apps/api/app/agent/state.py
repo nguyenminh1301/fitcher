@@ -99,6 +99,8 @@ class AgentState(TypedDict, total=False):
     intent_fallback: bool
     # The question's language as the router read it; None when it could not.
     language: str | None
+    # The out_of_scope branch's reply.
+    reply: str | None
     extraction: BaseModel | None
     periods: list[Period]
     retrieval: BaseModel | None

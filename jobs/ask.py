@@ -121,6 +121,9 @@ def report(state: AgentState) -> int:
     if state.get("denial"):
         print(f"Denied: {state['denial'].message}", file=sys.stderr)
         return 3
+    if state.get("reply") is not None:
+        print(f"\nReply:\n{state['reply']}")
+        return 0
     for number, attempt in enumerate(state.get("attempts", []), start=1):
         print(f"\nSQL attempt {number} ({attempt.alias}):\n{attempt.sql}")
         if attempt.error is not None:

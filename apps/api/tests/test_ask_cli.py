@@ -24,6 +24,13 @@ def test_successful_run_prints_sql_table_warnings_and_summary(capsys):
     assert "Summary:\nBlue led." in out
 
 
+def test_out_of_scope_question_prints_the_reply_and_exits_0(capsys):
+    state = run_question("Write me a poem", deps([routing_reply("out_of_scope"), "I answer data questions."]))
+
+    assert report(state) == 0
+    assert "Reply:\nI answer data questions." in capsys.readouterr().out
+
+
 def test_rejected_question_exits_with_code_2_and_the_reason(capsys):
     state = run_question("Which widgets?", deps([routing_reply(), extraction_reply(rank_term=None)]))
 

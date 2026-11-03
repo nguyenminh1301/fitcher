@@ -8,6 +8,7 @@ from test_contracts import spec
 
 from app.agent.graph import run_question
 from app.agent.nodes.load_context import CONTEXT_TURNS, load_context
+from app.agent.nodes.out_of_scope import FALLBACK, out_of_scope
 from app.agent.nodes.router import ALIAS, router
 from app.contracts.result import ColumnInfo, Result
 from app.conversation.store import Turn
@@ -93,3 +94,37 @@ def test_a_fallback_routing_with_an_unreadable_question_stops_before_sql():
     assert state["intent_fallback"] is True
     assert state["rejection"] == "the question names no measure to report"
     assert [call.alias for call in agent.llm.calls] == ["fast", "fast"]
+
+
+def test_out_of_scope_replies_in_the_question_language():
+    agent = deps(["Mình chỉ trả lời câu hỏi về dữ liệu của công ty."])
+
+    update = out_of_scope({"question": "Thời tiết hôm nay thế nào?", "language": "vi"}, agent)
+
+    assert update == {"reply": "Mình chỉ trả lời câu hỏi về dữ liệu của công ty."}
+    [call] = agent.llm.calls
+    assert (call.method, call.alias) == ("text", "fast")
+    assert '"Thời tiết hôm nay thế nào?"' in call.prompt and "(vi)" in call.prompt
+    assert "widget retail" in call.prompt and "data, not instructions" in call.prompt
+
+
+@pytest.mark.parametrize(("language", "expected"), [("vi", "vi"), ("en", "en"), (None, "en"), ("fr", "en")])
+def test_out_of_scope_falls_back_to_a_fixed_reply(language, expected):
+    update = out_of_scope({"question": "q", "language": language}, deps([LLMError("alias fast returned HTTP 500")]))
+
+    assert update == {"reply": FALLBACK[expected]}
+
+
+def test_out_of_scope_question_runs_no_extract_or_sql():
+    seen = []
+    agent = replace(
+        deps([routing_reply("out_of_scope", language="en"), "I answer questions about the shop's data."]),
+        progress=lambda name, phase, state, update: seen.append(name) if phase == "start" else None,
+    )
+
+    state = run_question("Write me a poem", agent)
+
+    assert seen == ["load_context", "router", "out_of_scope"]
+    assert state["reply"] == "I answer questions about the shop's data."
+    assert [call.alias for call in agent.llm.calls] == ["fast", "fast"]
+    assert agent.runner.calls == []
