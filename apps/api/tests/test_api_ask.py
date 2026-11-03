@@ -442,3 +442,22 @@ def test_a_definition_question_streams_summary_and_done():
     events = parse(response.text)
     assert kinds(events) == ["summary", "done"]
     assert events[-2]["text"] == "Widget revenue is money from sales."
+
+
+def test_a_chart_edit_streams_the_stored_result_and_a_chart_spec_without_sql():
+    client = FakeConversationClient()
+    store = ConversationStore(client)
+    [first] = ask_with(answer(), store, {})
+    conversation_id = first.headers["x-conversation-id"]
+    previous = next(event for event in parse(first.text) if event["event"] == "result")["result"]
+
+    redraw = FakeAgent([routing_reply("chart_edit", chart_type="line")])
+    [response] = ask_with(redraw, store, {"question": "Draw it as a line", "conversation_id": conversation_id})
+
+    events = parse(response.text)
+    assert kinds(events) == ["result", "chart_spec", "done"]
+    assert events[-3]["result"] == previous
+    assert not [event for event in events if event["event"] == "status" and event["node"] in ("generate_sql", "execute")]
+    answered = client.tables["chat_messages"][-1]
+    assert (answered["turn"], answered["role"]) == (2, "assistant")
+    assert answered["query_spec"] and answered["result"]

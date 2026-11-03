@@ -1,8 +1,8 @@
-"""The agent's LangGraph flow (DECISIONS §6, without the chart recommender).
+"""The agent's LangGraph flow (DECISIONS §6).
 
 load_context -> router, then out_of_scope -> end for an out-of-scope
-question, metadata_qa -> end for a definition question and, for every other
-intent so far, the data_query flow:
+question, metadata_qa -> end for a definition question, chart_edit -> end
+for a chart edit of a previous result and, otherwise, the data_query flow:
 extract -> resolve_time -> retrieve -> build_spec -> gate -> generate_sql ->
 guard -> explain -> execute -> check, where check loops back to generate_sql
 for repairable errors, stops on policy errors or exhausted retries, and
@@ -18,6 +18,7 @@ from functools import partial
 from langgraph.graph import END, START, StateGraph
 
 from app.agent.nodes.build_spec import build_spec
+from app.agent.nodes.chart_edit import chart_edit
 from app.agent.nodes.check import check, route
 from app.agent.nodes.execute import execute_node
 from app.agent.nodes.explain import explain_node
@@ -56,7 +57,9 @@ def _unless_failed(next_node: str) -> Callable[[AgentState], str]:
 
 
 def _branch(state: AgentState) -> str:
-    """The node the router's intent leads to; every other intent so far takes the data question flow."""
+    """The node the router's intent leads to; a chart edit with nothing to redraw takes the data question flow."""
+    if state["intent"] == "chart_edit":
+        return "chart_edit" if state.get("previous_result") is not None else "extract"
     return {"out_of_scope": "out_of_scope", "metadata_qa": "metadata_qa"}.get(state["intent"], "extract")
 
 
@@ -64,6 +67,7 @@ def build_graph(deps: AgentDeps):
     graph = StateGraph(AgentState)
     nodes = {
         "load_context": load_context, "router": router, "out_of_scope": out_of_scope, "metadata_qa": metadata_qa,
+        "chart_edit": chart_edit,
         "extract": extract, "resolve_time": resolve_time, "retrieve": retrieve, "build_spec": build_spec, "gate": gate,
         "generate_sql": generate_sql, "guard": guard, "explain": explain_node, "execute": execute_node,
         "check": check, "shape_result": shape_result, "summarize": summarize,
@@ -73,9 +77,10 @@ def build_graph(deps: AgentDeps):
 
     graph.add_edge(START, "load_context")
     graph.add_edge("load_context", "router")
-    graph.add_conditional_edges("router", _branch, ["out_of_scope", "metadata_qa", "extract"])
+    graph.add_conditional_edges("router", _branch, ["out_of_scope", "metadata_qa", "chart_edit", "extract"])
     graph.add_edge("out_of_scope", END)
     graph.add_edge("metadata_qa", END)
+    graph.add_edge("chart_edit", END)
     graph.add_conditional_edges("extract", _unless_rejected("resolve_time"), ["resolve_time", END])
     graph.add_conditional_edges("resolve_time", _unless_rejected("retrieve"), ["retrieve", END])
     graph.add_conditional_edges("retrieve", _unless_rejected("build_spec"), ["build_spec", END])
