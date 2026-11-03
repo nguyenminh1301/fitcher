@@ -212,14 +212,16 @@ class QueryResult:
 
 
 class FakeConversationClient:
-    """In-memory ``agent_logs`` conversation tables behind the two reads ``ConversationStore`` sends.
+    """In-memory ``agent_logs`` conversation tables answering each query ``ConversationStore`` sends.
 
-    ``fail`` makes every call raise, as an unreachable ClickHouse would.
+    ``FINAL`` reads keep the row with the latest ``updated_at`` per key, as a
+    ReplacingMergeTree does. ``fail`` makes every call raise, as an unreachable
+    ClickHouse would.
     """
 
     def __init__(self, fail: bool = False):
         self.fail = fail
-        self.tables: dict[str, list[dict]] = {"chat_messages": [], "conversations": []}
+        self.tables: dict[str, list[dict]] = {"chat_messages": [], "conversations": [], "conversation_groups": []}
         self.queries: list[str] = []
 
     def _check(self) -> None:
@@ -231,16 +233,40 @@ class FakeConversationClient:
         assert database == "agent_logs"
         self.tables[table] += [dict(zip(column_names, row)) for row in data]
 
+    def _latest(self, table: str, key: str, user_id: str) -> list[dict]:
+        latest: dict[str, dict] = {}
+        for row in self.tables[table]:
+            if row["user_id"] == user_id and (row[key] not in latest or row["updated_at"] >= latest[row[key]]["updated_at"]):
+                latest[row[key]] = row
+        return list(latest.values())
+
     def query(self, sql, parameters):
+        from app.conversation import store
+
         self._check()
         self.queries.append(sql)
-        key = (parameters["user_id"], parameters["conversation_id"])
-        rows = [row for row in self.tables["conversations" if "conversations FINAL" in sql else "chat_messages"]
-                if (row["user_id"], row["conversation_id"]) == key]
-        if "FROM agent_logs.conversations FINAL" in sql:
-            rows.sort(key=lambda row: row["updated_at"])
-            return QueryResult([(int(bool(rows) and not rows[-1]["deleted"]),)])
-        assert "FROM agent_logs.chat_messages" in sql
-        columns = [name.strip() for name in sql.split("SELECT", 1)[1].split("FROM", 1)[0].split(",")]
-        rows.sort(key=lambda row: (row["turn"], row["revision"], row["ts"]))
-        return QueryResult([tuple(row[column] for column in columns) for row in rows])
+        user = parameters["user_id"]
+        messages = [row for row in self.tables["chat_messages"] if row["user_id"] == user]
+        if sql in (store.CONVERSATION_SQL, store.CONVERSATIONS_SQL):
+            rows = self._latest("conversations", "conversation_id", user)
+            if sql == store.CONVERSATION_SQL:
+                rows = [row for row in rows if row["conversation_id"] == parameters["conversation_id"]]
+            return QueryResult([tuple(row[column] for column in store.CONVERSATION_COLUMNS) for row in rows])
+        if sql in (store.GROUP_SQL, store.GROUPS_SQL):
+            rows = self._latest("conversation_groups", "group_id", user)
+            if sql == store.GROUP_SQL:
+                rows = [row for row in rows if row["group_id"] == parameters["group_id"]]
+            return QueryResult([tuple(row[column] for column in store.GROUP_COLUMNS) for row in rows])
+        if sql == store.MESSAGES_SQL:
+            rows = sorted(
+                (row for row in messages if row["conversation_id"] == parameters["conversation_id"]),
+                key=lambda row: (row["turn"], row["revision"], row["ts"]),
+            )
+            return QueryResult([tuple(row.get(column, "") for column in store.MESSAGE_COLUMNS) for row in rows])
+        if sql == store.ACTIVITY_SQL:
+            last: dict[str, object] = {}
+            for row in messages:
+                last[row["conversation_id"]] = max(row["ts"], last.get(row["conversation_id"], row["ts"]))
+            return QueryResult(list(last.items()))
+        assert sql == store.QUESTIONS_SQL, sql
+        return QueryResult([(row["conversation_id"], row["content"]) for row in messages if row["role"] == "user"])

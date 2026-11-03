@@ -110,7 +110,9 @@ SETTINGS non_replicated_deduplication_window = 10000;
 
 -- Conversation turns, read back for follow-up questions. Each question and
 -- its answer share a turn number; an edit or retry of a turn writes it again
--- under a higher revision. result holds the shaped Result JSON of an answer.
+-- under a higher revision. result holds the shaped Result JSON of an answer
+-- and events its other stream events (sql, chart_spec, summary, clarify, deny
+-- or error) as a JSON array, so a conversation can be shown again.
 CREATE TABLE IF NOT EXISTS agent_logs.chat_messages
 (
     user_id String,
@@ -122,7 +124,8 @@ CREATE TABLE IF NOT EXISTS agent_logs.chat_messages
     query_spec String,
     turn UInt32,
     revision UInt32,
-    result String
+    result String,
+    events String
 )
 ENGINE = MergeTree
 ORDER BY (user_id, ts)
@@ -133,6 +136,7 @@ SETTINGS non_replicated_deduplication_window = 10000;
 ALTER TABLE agent_logs.chat_messages ADD COLUMN IF NOT EXISTS turn UInt32;
 ALTER TABLE agent_logs.chat_messages ADD COLUMN IF NOT EXISTS revision UInt32;
 ALTER TABLE agent_logs.chat_messages ADD COLUMN IF NOT EXISTS result String;
+ALTER TABLE agent_logs.chat_messages ADD COLUMN IF NOT EXISTS events String;
 
 -- One row per change of a conversation (created, renamed, pinned, moved or
 -- deleted); read with FINAL for its current state. Delete only hides it from
@@ -150,6 +154,20 @@ CREATE TABLE IF NOT EXISTS agent_logs.conversations
 )
 ENGINE = ReplacingMergeTree(updated_at)
 ORDER BY (user_id, conversation_id)
+TTL toDateTime(updated_at) + INTERVAL 90 DAY
+SETTINGS non_replicated_deduplication_window = 10000;
+
+-- A user's folders for conversations, one row per change like conversations.
+CREATE TABLE IF NOT EXISTS agent_logs.conversation_groups
+(
+    user_id String,
+    group_id String,
+    name String,
+    deleted Bool,
+    updated_at DateTime64(3, 'UTC')
+)
+ENGINE = ReplacingMergeTree(updated_at)
+ORDER BY (user_id, group_id)
 TTL toDateTime(updated_at) + INTERVAL 90 DAY
 SETTINGS non_replicated_deduplication_window = 10000;
 

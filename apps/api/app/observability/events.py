@@ -115,6 +115,8 @@ class ChatMessageRecord(LogRecord):
     revision: int
     # Shaped Result JSON of an answer, empty otherwise.
     result: str
+    # The answer's stream events other than status and result, as a JSON array; empty for a question.
+    events: str = ""
 
 
 class ConversationRecord(LogRecord):
@@ -129,4 +131,16 @@ class ConversationRecord(LogRecord):
     group_id: str
     deleted: bool
     created_at: datetime
+    updated_at: datetime
+
+
+class ConversationGroupRecord(LogRecord):
+    """One state of a user's conversation group; the row with the latest ``updated_at`` wins."""
+
+    TABLE: ClassVar[str] = "conversation_groups"
+
+    user_id: str
+    group_id: str
+    name: str
+    deleted: bool
     updated_at: datetime
