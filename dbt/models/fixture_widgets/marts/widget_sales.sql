@@ -6,7 +6,7 @@ select
     w.widget_name as widget_name,
     w.widget_category as widget_category,
     s.region as region,
-    s.quantity as quantity,
+    s.quantity as widget_count,
     s.sale_amount as sale_amount
 from {{ ref('stg_fixture_widgets__sales') }} as s
 inner join {{ ref('stg_fixture_widgets__widgets') }} as w on w.widget_id = s.widget_id

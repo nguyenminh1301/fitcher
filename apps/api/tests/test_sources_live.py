@@ -44,7 +44,7 @@ MIN_GROUP = 80
 CHECKS = {
     "columns": "SELECT table, name, type FROM system.columns WHERE database = 'marts' "
     "AND table IN ('widget_sales', 'widget_refunds') ORDER BY table, position",
-    "sales": "SELECT count(), sum(sale_amount), sum(quantity), min(sold_on), max(sold_on) FROM marts.widget_sales",
+    "sales": "SELECT count(), sum(sale_amount), sum(widget_count), min(sold_on), max(sold_on) FROM marts.widget_sales",
     "refunds": "SELECT count(), sum(refund_total), min(refunded_on), max(refunded_on) FROM marts.widget_refunds",
     "rows": "SELECT groupBitXor(cityHash64(*)) FROM marts.widget_sales",
     "refund_rows": "SELECT groupBitXor(cityHash64(*)) FROM marts.widget_refunds",
