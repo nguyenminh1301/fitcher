@@ -2,12 +2,14 @@
 
 - intent: the router chose the labelled intent.
 - extraction: the resolved periods, ``top_n`` and ``rank_by`` match the labels exactly.
-- retrieval: recall of the labelled dataset and columns among the retrieved candidates.
+- retrieval: recall of the labelled dataset and columns among the retrieved candidates;
+  for a definition case, recall of its ``expected_sources`` among the hits the answer was written from.
 - execution: the answer's result set matches the reference result; for a case
   that expects a denial, a clarifying question or an out-of-scope reply, the
   run ended that way; a chart edit passes when the previous result was
-  redrawn without SQL. A denial, an out-of-scope reply and a chart edit score
-  no extraction or retrieval.
+  redrawn without SQL, and a definition case when it was answered without SQL.
+  A denial, an out-of-scope reply and a chart edit score no extraction or
+  retrieval; a definition case scores no extraction.
 
 A case whose branch a later phase builds is not scored on any layer.
 """
@@ -22,6 +24,7 @@ from app.contracts.result import Result
 from app.eval.cases import ranks
 from app.eval.compare import Tolerance, compare_results
 from app.packs.models import EvalCase, EvalExpected
+from app.packs.search_indices import source_id
 
 Layer = Literal["intent", "extraction", "retrieval", "execution"]
 LAYERS: tuple[Layer, ...] = ("intent", "extraction", "retrieval", "execution")
@@ -171,6 +174,25 @@ def score_reply(state: AgentState) -> LayerScore:
     return LayerScore(status="fail", reason="expected an out-of-scope reply, got none")
 
 
+def score_sources(case: EvalCase, state: AgentState) -> LayerScore:
+    """Recall of the labelled sources among the hits a definition answer was written from."""
+    found = set(state.get("sources") or [])
+    keys = [":".join(source_id(label)) for label in case.expected_sources]
+    missing = [label for label, key in zip(case.expected_sources, keys, strict=True) if key not in found]
+    recall = 1 - len(missing) / len(keys)
+    if missing:
+        return LayerScore(status="fail", reason=f"missing: {', '.join(missing)}", recall=recall)
+    return LayerScore(status="pass", recall=recall)
+
+
+def score_definition(state: AgentState) -> LayerScore:
+    if state.get("attempts"):
+        return LayerScore(status="fail", reason="expected a definition, but SQL was generated")
+    if state.get("reply") is not None:
+        return LayerScore(status="pass")
+    return LayerScore(status="fail", reason="expected a definition, got no reply")
+
+
 def score_redraw(state: AgentState) -> LayerScore:
     if state.get("attempts"):
         return LayerScore(status="fail", reason="expected the previous result redrawn, but SQL was generated")
@@ -191,6 +213,9 @@ def score_case(case: EvalCase, state: AgentState, reference: Result | None, *, a
     elif expected.intent == "out_of_scope":
         layers = {"intent": score_intent(expected, state), "extraction": decision_only, "retrieval": decision_only,
                   "execution": score_reply(state)}
+    elif expected.intent == "metadata_qa":
+        layers = {"intent": score_intent(expected, state), "extraction": decision_only,
+                  "retrieval": score_sources(case, state), "execution": score_definition(state)}
     elif expected.intent == "chart_edit":
         layers = {"intent": score_intent(expected, state), "extraction": decision_only, "retrieval": decision_only,
                   "execution": score_redraw(state)}

@@ -16,7 +16,6 @@ See [DECISIONS §3](../docs/DECISIONS.md#3-docker-compose) and the [Phase 0 plan
 | `litellm/callbacks/screening_guard.py` | `pre_call` guardrail rejecting requests without the api's `screening` metadata and rerunning the EN/VI rules |
 | `litellm/callbacks/screening_rules.py` | Byte-identical copy of `apps/api/app/screening/rules.py` for the guardrail |
 | `keycloak/realm-finch.json` | Realm `finch`: the active pack's policy roles and the console roles `pack_reviewer` and `admin`, one lab user per role without credentials, the public `finch-web` client whose access tokens carry the realm roles and the api audience, and the lab-only `finch-cli` password-grant client |
-| `opensearch/` | Host requirements; no custom JVM or plugin settings |
 
 ## ClickHouse users and databases
 

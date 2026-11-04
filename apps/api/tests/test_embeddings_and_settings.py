@@ -69,7 +69,7 @@ def test_missing_gateway_settings_are_rejected():
 def test_settings_defaults():
     settings = load_settings({})
 
-    assert settings.opensearch_url == "http://opensearch:9200"
+    assert settings.qdrant_url == "http://qdrant:6333"
     assert settings.embedding_dimensions == 1024
     assert settings.column_values_top_k == 10_000
     assert settings.compiled_pack_dir == "build/packs"

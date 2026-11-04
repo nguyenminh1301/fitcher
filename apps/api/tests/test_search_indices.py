@@ -1,20 +1,12 @@
-"""Search index names, mappings, documents and queries for a pack."""
+"""Search collection names, documents, points and the hybrid query for a pack."""
 
 from conftest import SCHEMA_DIR
 from fakes import FakeEmbeddings, FakeSearch
 import pytest
 
 from app.packs.loader import load_pack
-from app.packs.search_indices import (
-    HYBRID_PIPELINE,
-    ColumnValue,
-    build_documents,
-    generation_of,
-    hybrid_query,
-    index_body,
-    search_pack,
-    value_query,
-)
+from app.packs.search_indices import INDEX_NAMES, ColumnValue, bm25_tokens, build_documents, generation_of, points, search_pack
+from app.search.client import hybrid_request, point_id, role_filter
 
 
 def _add_refunds_only_role(edit_pack):
@@ -34,23 +26,6 @@ def _add_refunds_only_role(edit_pack):
 ])
 def test_generation_of_matches_only_the_packs_physical_indices(name, expected):
     assert generation_of("shop", name) == expected
-
-
-def test_semantic_index_has_a_vector_and_folding_analyzer():
-    body = index_body("glossary_terms", 1024)
-
-    properties = body["mappings"]["properties"]
-    assert properties["embedding"]["dimension"] == 1024
-    assert properties["title"]["analyzer"] == "folded"
-    assert body["settings"]["index"]["analysis"]["analyzer"]["folded"]["filter"] == ["lowercase", "asciifolding"]
-    assert body["settings"]["index"]["knn"] is True
-
-
-def test_column_values_index_is_lexical_with_a_trigram_field():
-    properties = index_body("column_values", 1024)["mappings"]["properties"]
-
-    assert "embedding" not in properties
-    assert properties["title"]["fields"]["trigram"]["analyzer"] == "folded_trigram"
 
 
 def test_documents_carry_the_roles_granted_their_dataset_or_column(pack_dir, edit_pack):
@@ -118,21 +93,34 @@ def test_value_document_ids_are_unique_per_value(pack_dir):
     assert all(doc_id.startswith("widget_sales.widget_name.") for doc_id in ids)
 
 
-def test_hybrid_query_filters_both_subqueries_by_role():
-    query = hybrid_query("doanh thu", [0.1, 0.2], ["viewer"], 5)
+def test_the_hybrid_query_filters_every_prefetch_by_role_and_fuses_with_rrf():
+    body = hybrid_request("shop_metrics", "doanh thu", [0.1, 0.2], ["viewer"], 5)
 
-    lexical, semantic = query["query"]["hybrid"]["queries"]
-    assert lexical["bool"]["filter"] == [{"terms": {"allowed_roles": ["viewer"]}}]
-    assert semantic["knn"]["embedding"]["filter"] == {"terms": {"allowed_roles": ["viewer"]}}
-    assert query["_source"] == {"excludes": ["embedding"]}
+    assert body["query"] == {"fusion": "rrf"} and body["limit"] == 5 and body["with_payload"] is True
+    assert [prefetch["using"] for prefetch in body["prefetch"]] == ["dense", "bm25"]
+    assert all(prefetch["filter"] == role_filter(["viewer"]) for prefetch in body["prefetch"])
+    assert role_filter(["viewer"]) == {"must": [{"key": "allowed_roles", "match": {"any": ["viewer"]}}]}
+    assert body["prefetch"][0]["query"] == [0.1, 0.2]
 
 
-def test_value_query_is_fuzzy_and_role_filtered():
-    query = value_query("Blu Widgit", ["viewer"], 5)["query"]["bool"]
+def test_column_values_are_also_searched_by_trigrams():
+    body = hybrid_request("shop_column_values", "Electornics", [0.1], ["viewer"], 5)
+    assert [prefetch["using"] for prefetch in body["prefetch"]] == ["dense", "bm25", "trigram"]
 
-    assert query["should"][0]["match"]["title"]["fuzziness"] == "AUTO"
-    assert query["should"][1] == {"match": {"title.trigram": "Blu Widgit"}}
-    assert query["filter"] == [{"terms": {"allowed_roles": ["viewer"]}}]
+
+def test_a_query_without_words_searches_the_dense_vector_only():
+    assert [prefetch["using"] for prefetch in hybrid_request("shop_metrics", "?!", [0.1], ["viewer"], 5)["prefetch"]] == ["dense"]
+
+
+def test_points_keep_the_document_as_payload_and_weigh_the_title_twice():
+    documents = [{"id": "widget_revenue", "title": "widget revenue", "text": "Money", "embedding_text": "widget revenue. Money", "allowed_roles": ["viewer"]}]
+
+    [point] = points("shop_metrics_v1", documents, [[0.5, 0.5]])
+
+    assert point["id"] == point_id("widget_revenue")
+    assert point["payload"] == {"id": "widget_revenue", "title": "widget revenue", "text": "Money", "allowed_roles": ["viewer"]}
+    assert set(point["vector"]) == {"dense", "bm25"}
+    assert bm25_tokens(documents[0]).count("widget") == 2
 
 
 def test_search_pack_reads_every_alias_with_one_embedding():
@@ -143,7 +131,5 @@ def test_search_pack_reads_every_alias_with_one_embedding():
 
     assert results["metrics"] == [{"id": "m1", "score": 1.0, "source": {}}]
     assert embeddings.calls == [["revenue"]]
-    pipelines = {index: pipeline for index, _, pipeline in search.searches}
-    assert pipelines["shop_column_values"] is None
-    assert pipelines["shop_metrics"] == HYBRID_PIPELINE
-    assert len(search.searches) == 6
+    assert [request.alias for request in search.queries] == [f"shop_{index}" for index in INDEX_NAMES]
+

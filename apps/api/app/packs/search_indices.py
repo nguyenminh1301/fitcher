@@ -1,15 +1,15 @@
-"""OpenSearch index definitions, documents and queries for a compiled pack.
+"""Qdrant collections, documents and points for a compiled pack (DECISIONS §5).
 
-Each pack owns six logical indices. A compile writes generation ``N`` of every
-index under the physical name ``<pack>_<index>_v<N>``; retrieval reads the
+Each pack owns six logical collections. A compile writes generation ``N`` of
+every collection under the name ``<pack>_<index>_v<N>``; retrieval reads the
 alias ``<pack>_<index>``, so packs never overwrite each other and a new
 generation goes live with one atomic alias move.
 
-Every document is ``{id, type, pack, allowed_roles, title, text, ...}``. Text
-fields fold case and diacritics, so "doanh thu" also matches "Doanh Thu" and
-"doanh thú". Semantic indices carry an ``embedding`` vector searched together
-with BM25 through the hybrid pipeline; ``column_values`` is lexical only, with
-fuzzy and trigram matching for misspelled values.
+Every document is ``{id, type, pack, allowed_roles, title, text, ...}`` and
+becomes one point whose payload is the document. A point carries a dense
+``embed`` vector and a BM25 sparse vector of its title (counted twice) and
+text; column values also carry character trigrams, so a misspelled value
+still matches. ``allowed_roles`` and ``type`` have payload indexes.
 """
 
 from collections.abc import Iterable, Sequence
@@ -19,32 +19,10 @@ import re
 
 from app.llm.embeddings import EmbeddingClient
 from app.packs.models import Pack
-from app.search.opensearch import OpenSearch
+from app.search import sparse
+from app.search.client import BM25, DENSE, TRIGRAM, point_id, uses_trigrams
 
 INDEX_NAMES = ("glossary_terms", "metrics", "datasets", "column_values", "examples", "kb_docs")
-LEXICAL_INDICES = frozenset({"column_values"})
-HYBRID_PIPELINE = "hybrid_search"
-HYBRID_WEIGHTS = (0.5, 0.5)  # BM25, kNN
-
-HYBRID_PIPELINE_BODY = {
-    "description": "Normalize BM25 and kNN scores, then combine them.",
-    "phase_results_processors": [
-        {
-            "normalization-processor": {
-                "normalization": {"technique": "min_max"},
-                "combination": {"technique": "arithmetic_mean", "parameters": {"weights": list(HYBRID_WEIGHTS)}},
-            }
-        }
-    ],
-}
-
-_ANALYSIS = {
-    "filter": {"trigram": {"type": "ngram", "min_gram": 3, "max_gram": 3}},
-    "analyzer": {
-        "folded": {"type": "custom", "tokenizer": "standard", "filter": ["lowercase", "asciifolding"]},
-        "folded_trigram": {"type": "custom", "tokenizer": "standard", "filter": ["lowercase", "asciifolding", "trigram"]},
-    },
-}
 
 
 def alias_name(pack: str, index: str) -> str:
@@ -60,32 +38,6 @@ def generation_of(pack: str, name: str) -> tuple[str, int] | None:
     pattern = rf"{re.escape(pack)}_({'|'.join(INDEX_NAMES)})_v(\d+)"
     match = re.fullmatch(pattern, name)
     return (match.group(1), int(match.group(2))) if match else None
-
-
-def index_body(index: str, dimensions: int) -> dict:
-    """Settings and mappings for one physical index."""
-    properties: dict = {
-        "id": {"type": "keyword"},
-        "type": {"type": "keyword"},
-        "pack": {"type": "keyword"},
-        "allowed_roles": {"type": "keyword"},
-        "dataset": {"type": "keyword"},
-        "title": {"type": "text", "analyzer": "folded"},
-        "text": {"type": "text", "analyzer": "folded"},
-        "payload": {"type": "object", "enabled": False},
-    }
-    settings: dict = {"number_of_shards": 1, "number_of_replicas": 0, "analysis": _ANALYSIS}
-    if index in LEXICAL_INDICES:
-        properties["column"] = {"type": "keyword"}
-        properties["title"]["fields"] = {"trigram": {"type": "text", "analyzer": "folded_trigram"}}
-    else:
-        settings["knn"] = True
-        properties["embedding"] = {
-            "type": "knn_vector",
-            "dimension": dimensions,
-            "method": {"name": "hnsw", "engine": "lucene", "space_type": "cosinesimil"},
-        }
-    return {"settings": {"index": settings}, "mappings": {"dynamic": "strict", "properties": properties}}
 
 
 @dataclass(frozen=True)
@@ -137,6 +89,22 @@ class _Roles:
         return sorted(allowed)
 
 
+def value_id(dataset: str, column: str, value: str) -> str:
+    """The document id of one column value."""
+    digest = hashlib.sha1(value.encode(), usedforsecurity=False).hexdigest()[:16]
+    return f"{dataset}.{column}.{digest}"
+
+
+def source_id(source: str) -> tuple[str, str]:
+    """``(index, document id)`` of an eval label ``<index>:<key>``; a column value's key is ``dataset.column=value``."""
+    index, _, key = source.partition(":")
+    if index == "column_values":
+        column, _, value = key.partition("=")
+        dataset, _, name = column.partition(".")
+        return index, value_id(dataset, name, value)
+    return index, key
+
+
 def _document(pack: Pack, doc_type: str, doc_id: str, roles: list[str], title: str, text: str, **extra) -> dict:
     return {"id": doc_id, "type": doc_type, "pack": pack.name, "allowed_roles": roles, "title": title, "text": text, **extra}
 
@@ -144,8 +112,8 @@ def _document(pack: Pack, doc_type: str, doc_id: str, roles: list[str], title: s
 def build_documents(pack: Pack, column_values: Sequence[ColumnValue]) -> dict[str, list[dict]]:
     """Build the documents of all six indices from an approved-only pack.
 
-    Documents of semantic indices carry an ``embedding_text``; the compiler
-    replaces it with the ``embedding`` vector before indexing.
+    Every document carries an ``embedding_text``, which the compiler embeds
+    into the point's dense vector and leaves out of the payload.
     """
     roles = _Roles(pack)
     metric_dataset = {metric.id: metric.dataset for metric in pack.metrics.metrics}
@@ -191,11 +159,11 @@ def build_documents(pack: Pack, column_values: Sequence[ColumnValue]) -> dict[st
             ))
 
     for item in column_values:
-        digest = hashlib.sha1(item.value.encode(), usedforsecurity=False).hexdigest()[:16]
         documents["column_values"].append(_document(
-            pack, "column_value", f"{item.dataset}.{item.column}.{digest}", roles.column(item.dataset, item.column),
+            pack, "column_value", value_id(item.dataset, item.column, item.value), roles.column(item.dataset, item.column),
             item.value, f"{item.column} {item.dataset}", dataset=item.dataset, column=item.column,
             payload={"column": item.column, "value": item.value, "count": item.count},
+            embedding_text=item.value,
         ))
 
     for example in pack.examples.examples:
@@ -208,56 +176,27 @@ def build_documents(pack: Pack, column_values: Sequence[ColumnValue]) -> dict[st
     return documents
 
 
-def _role_filter(roles: Sequence[str]) -> dict:
-    return {"terms": {"allowed_roles": list(roles)}}
+def bm25_tokens(document: dict) -> list[str]:
+    """The keyword terms of a document: its title counts twice, so a match on the name ranks first."""
+    title = str(document.get("title", ""))
+    return sparse.terms(f"{title} {title} {document.get('text', '')}")
 
 
-def hybrid_query(text: str, vector: Sequence[float], roles: Sequence[str], size: int) -> dict:
-    """BM25 and kNN subqueries, both filtered by role, for the hybrid pipeline."""
-    return {
-        "size": size,
-        "_source": {"excludes": ["embedding"]},
-        "query": {
-            "hybrid": {
-                "queries": [
-                    {"bool": {
-                        "must": {"multi_match": {"query": text, "fields": ["title^2", "text"]}},
-                        "filter": [_role_filter(roles)],
-                    }},
-                    {"knn": {"embedding": {"vector": list(vector), "k": size, "filter": _role_filter(roles)}}},
-                ]
-            }
-        },
-    }
+def points(name: str, documents: Sequence[dict], vectors: Sequence[Sequence[float]]) -> list[dict]:
+    """The Qdrant points of one collection's documents, with their dense vectors in order."""
+    tokens = [bm25_tokens(document) for document in documents]
+    average = sparse.average_length(tokens)
+    result = []
+    for document, words, vector in zip(documents, tokens, vectors, strict=True):
+        payload = {key: value for key, value in document.items() if key != "embedding_text"}
+        named = {DENSE: list(vector), BM25: sparse.document_vector(words, average)}
+        if uses_trigrams(name):
+            named[TRIGRAM] = sparse.document_vector(sparse.trigrams(str(document.get("title", ""))), 1.0)
+        result.append({"id": point_id(document["id"]), "vector": named, "payload": payload})
+    return result
 
 
-def value_query(text: str, roles: Sequence[str], size: int) -> dict:
-    """Fuzzy and trigram match of a column value, filtered by role."""
-    return {
-        "size": size,
-        "query": {
-            "bool": {
-                "should": [
-                    {"match": {"title": {"query": text, "fuzziness": "AUTO", "boost": 2}}},
-                    {"match": {"title.trigram": text}},
-                ],
-                "minimum_should_match": 1,
-                "filter": [_role_filter(roles)],
-            }
-        },
-    }
-
-
-def search_pack(
-    search: OpenSearch, embeddings: EmbeddingClient, pack: str, text: str, roles: Sequence[str], size: int
-) -> dict[str, list[dict]]:
-    """Search the live aliases of all six indices of ``pack`` for ``text``."""
+def search_pack(search, embeddings: EmbeddingClient, pack: str, text: str, roles: Sequence[str], size: int) -> dict[str, list[dict]]:
+    """Search the live aliases of all six collections of ``pack`` for ``text`` through ``search.query``."""
     vector = embeddings.embed([text])[0]
-    results: dict[str, list[dict]] = {}
-    for index in INDEX_NAMES:
-        alias = alias_name(pack, index)
-        if index in LEXICAL_INDICES:
-            results[index] = search.search(alias, value_query(text, roles, size))
-        else:
-            results[index] = search.search(alias, hybrid_query(text, vector, roles, size), pipeline=HYBRID_PIPELINE)
-    return results
+    return {index: search.query(alias_name(pack, index), text, vector, roles, size) for index in INDEX_NAMES}

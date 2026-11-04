@@ -1,4 +1,4 @@
-"""Compile the fixture pack against fake ClickHouse, OpenSearch and embeddings."""
+"""Compile the fixture pack against fake ClickHouse, Qdrant and embeddings."""
 
 from datetime import UTC, date, datetime
 import json
@@ -18,9 +18,9 @@ from app.packs.compiler import (
     read_coverage,
 )
 from app.packs.loader import PackValidationError, load_pack
-from app.packs.search_indices import INDEX_NAMES
+from app.packs.search_indices import INDEX_NAMES, generation_of
 from app.screening.screen import Screener
-from app.search.opensearch import SearchError
+from app.search.client import SearchError, point_id
 
 PACK = "minimal"
 
@@ -59,25 +59,26 @@ def test_first_compile_publishes_generation_one(pack_dir, tmp_path):
 
     assert summary.generation == 1
     assert summary.metrics_tested == ["widget_revenue", "refunded_value"]
-    assert set(search.indices) == {f"{PACK}_{index}_v1" for index in INDEX_NAMES}
+    assert set(search.collections) == {f"{PACK}_{index}_v1" for index in INDEX_NAMES}
     assert search.aliases == {f"{PACK}_{index}": f"{PACK}_{index}_v1" for index in INDEX_NAMES}
     assert len(search.alias_updates) == 1
     assert summary.documents == {
         "glossary_terms": 2, "metrics": 2, "datasets": 10, "column_values": 2, "examples": 1, "kb_docs": 0,
     }
-    assert "hybrid_search" in search.pipelines
 
 
-def test_semantic_documents_carry_embeddings_and_values_do_not(pack_dir, tmp_path):
+def test_every_point_carries_a_dense_and_a_bm25_vector_and_values_also_trigrams(pack_dir, tmp_path):
     search = FakeSearch()
 
     run(pack_dir, tmp_path, search, embeddings=FakeEmbeddings(dimensions=4))
 
-    metric = search.documents[f"{PACK}_metrics_v1"][0]
-    value = search.documents[f"{PACK}_column_values_v1"][0]
-    assert len(metric["embedding"]) == 4 and "embedding_text" not in metric
-    assert "embedding" not in value and value["title"] == "Blue Widget"
-    assert search.indices[f"{PACK}_metrics_v1"]["mappings"]["properties"]["embedding"]["dimension"] == 4
+    metric = search.points[f"{PACK}_metrics_v1"][0]
+    value = search.points[f"{PACK}_column_values_v1"][0]
+    assert set(metric["vector"]) == {"dense", "bm25"} and len(metric["vector"]["dense"]) == 4
+    assert set(value["vector"]) == {"dense", "bm25", "trigram"}
+    assert "embedding_text" not in metric["payload"] and value["payload"]["title"] == "Blue Widget"
+    assert metric["id"] == point_id(metric["payload"]["id"])
+    assert search.collections[f"{PACK}_metrics_v1"] == 4
 
 
 def test_compiled_artifact_records_generation_and_coverage(pack_dir, tmp_path):
@@ -101,13 +102,13 @@ def test_recompile_moves_every_alias_in_one_request_then_deletes_the_old_generat
 
     assert summary.generation == 2
     swap = search.alias_updates[-1]
-    assert {action["remove"]["index"] for action in swap if "remove" in action} == {
-        f"{PACK}_{index}_v1" for index in INDEX_NAMES
+    assert {action["delete_alias"]["alias_name"] for action in swap if "delete_alias" in action} == {
+        f"{PACK}_{index}" for index in INDEX_NAMES
     }
-    assert {action["add"]["index"] for action in swap if "add" in action} == {
+    assert {action["create_alias"]["collection_name"] for action in swap if "create_alias" in action} == {
         f"{PACK}_{index}_v2" for index in INDEX_NAMES
     }
-    assert set(search.indices) == {f"{PACK}_{index}_v2" for index in INDEX_NAMES}
+    assert set(search.collections) == {f"{PACK}_{index}_v2" for index in INDEX_NAMES}
     assert load_compiled(tmp_path / "build", PACK).generation == 2
 
 
@@ -115,13 +116,13 @@ def test_failure_midway_deletes_the_partial_generation_and_keeps_live_aliases(pa
     search = FakeSearch()
     run(pack_dir, tmp_path, search)
     live = dict(search.aliases)
-    search.fail_bulk_into = "_examples_v2"
+    search.fail_upsert_into = "_examples_v2"
 
-    with pytest.raises(CompileError, match="building index generation 2 failed: bulk indexing into"):
+    with pytest.raises(CompileError, match="building index generation 2 failed: PUT /collections/"):
         run(pack_dir, tmp_path, search)
 
     assert search.aliases == live
-    assert set(search.indices) == {f"{PACK}_{index}_v1" for index in INDEX_NAMES}
+    assert set(search.collections) == {f"{PACK}_{index}_v1" for index in INDEX_NAMES}
     assert len(search.alias_updates) == 1
     assert load_compiled(tmp_path / "build", PACK).generation == 1
     assert not list((tmp_path / "build" / PACK).glob("*.tmp"))
@@ -133,7 +134,7 @@ def test_embedding_failure_deletes_the_partial_generation(pack_dir, tmp_path):
     with pytest.raises(CompileError, match="embedding service unavailable"):
         run(pack_dir, tmp_path, search, embeddings=FakeEmbeddings(fail_after=3))
 
-    assert search.indices == {}
+    assert search.collections == {}
     assert search.aliases == {}
     assert not (tmp_path / "build" / PACK / "compiled.json").exists()
 
@@ -143,13 +144,15 @@ def test_failed_cleanup_of_the_old_generation_keeps_the_compile_successful(pack_
     run(pack_dir, tmp_path, search)
 
     def refuse(name):
-        raise SearchError(f"DELETE /{name} returned HTTP 500")
+        raise SearchError(f"DELETE /collections/{name} returned HTTP 500")
 
-    monkeypatch.setattr(search, "delete_index", refuse)
+    monkeypatch.setattr(search, "delete_collection", refuse)
     summary = run(pack_dir, tmp_path, search)
 
     assert summary.generation == 2
-    assert summary.warnings == [f"older index generations were not deleted: DELETE /{PACK}_column_values_v1 returned HTTP 500"]
+    assert summary.warnings == [
+        f"older index generations were not deleted: DELETE /collections/{PACK}_column_values_v1 returned HTTP 500"
+    ]
     assert search.aliases == {f"{PACK}_{index}": f"{PACK}_{index}_v2" for index in INDEX_NAMES}
 
 
@@ -172,7 +175,7 @@ def test_failing_metric_aborts_with_its_id_and_the_clickhouse_error(pack_dir, tm
 
     assert "metric 'refunded_value': ClickHouse rejected sql_expr: Code: 47. DB::Exception" in str(raised.value)
     assert "widget_revenue" not in str(raised.value)
-    assert search.indices == {}
+    assert search.collections == {}
 
 
 def test_metric_test_run_is_read_only_with_a_time_limit(pack_dir, tmp_path):
@@ -234,7 +237,7 @@ def test_invalid_schema_is_rejected_with_file_and_path(pack_dir, edit_pack, tmp_
     with pytest.raises(PackValidationError, match=r"metrics\.yaml: metrics\[0\]\.unit"):
         run(pack_dir, tmp_path, search)
 
-    assert search.indices == {}
+    assert search.collections == {}
 
 
 def test_column_missing_from_the_warehouse_is_rejected(pack_dir, tmp_path):
@@ -253,7 +256,7 @@ def test_skip_index_stops_after_the_metric_test_run(pack_dir, tmp_path):
 
     assert summary.generation is None
     assert summary.metrics_tested == ["widget_revenue", "refunded_value"]
-    assert search.indices == {} and embeddings.calls == []
+    assert search.collections == {} and embeddings.calls == []
 
 
 def test_policies_are_applied_after_the_metric_test_run(pack_dir, tmp_path):
@@ -362,3 +365,30 @@ def test_without_the_classifier_no_chunk_is_indexed(pack_dir, tmp_path, monkeypa
     assert summary.warnings == [
         "the screening classifier is unavailable: column values were checked by the rules only and no document chunk was indexed"
     ]
+
+
+def test_queries_during_a_recompile_never_see_a_mixed_generation(pack_dir, tmp_path):
+    search = FakeSearch()
+    run(pack_dir, tmp_path, search)
+    seen: list[set[int]] = []
+    upsert, update = search.upsert, search.update_aliases
+
+    def snapshot() -> None:
+        # What a reader resolving every alias at this moment would get.
+        seen.append({generation_of(PACK, target)[1] for target in search.aliases.values()})
+
+    def upsert_while_reading(name, points):
+        snapshot()
+        return upsert(name, points)
+
+    def update_while_reading(actions):
+        snapshot()
+        update(actions)
+        snapshot()
+
+    search.upsert, search.update_aliases = upsert_while_reading, update_while_reading
+    run(pack_dir, tmp_path, search)
+
+    assert seen[0] == {1} and seen[-1] == {2}
+    assert all(len(generations) == 1 for generations in seen)
+    assert len(search.alias_updates) == 2

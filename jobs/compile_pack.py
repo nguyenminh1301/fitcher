@@ -7,7 +7,7 @@ through the ``embed`` alias, which is a billable request sent with
 screened first with the classifier in ``GUARD_MODEL_DIR`` and the report lists
 what screening kept out or flagged; ``--skip-index``
 stops after validation, the metric test-run and the access policies and calls
-neither LiteLLM nor OpenSearch.
+neither LiteLLM nor Qdrant.
 
 The pack's policies are applied to ClickHouse as the admin user after the
 metric test-run: roles, column grants, row policies, aggregate-only views and
@@ -32,7 +32,7 @@ from app.observability.tracing import trusted_pack_calls
 from app.packs.loader import PackValidationError
 from app.packs.search_indices import search_pack
 from app.screening.screen import Screener
-from app.search.opensearch import OpenSearch, SearchError
+from app.search.client import QdrantSearch, SearchError
 from jobs.lib.clickhouse import admin_client
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -85,7 +85,7 @@ def print_summary(summary: CompileSummary) -> None:
         print(f"  warning: {warning}")
 
 
-def check_search(args: argparse.Namespace, settings, search: OpenSearch, embeddings) -> int:
+def check_search(args: argparse.Namespace, settings, search: QdrantSearch, embeddings) -> int:
     compiled = load_compiled(Path(settings.compiled_pack_dir), args.pack)
     roles = args.role or [role.id for role in compiled.pack.policies.roles]
     results = search_pack(search, embeddings, args.pack, args.check_search, roles, CHECK_SEARCH_SIZE)
@@ -113,7 +113,7 @@ def _main(argv: list[str] | None) -> int:
     args = parse_args(argv)
     try:
         settings = load_settings()
-        search = OpenSearch(settings.opensearch_url)
+        search = QdrantSearch(settings.qdrant_url)
         if args.check_search is not None:
             embeddings = LiteLLMEmbeddings(
                 settings.litellm_base_url, settings.litellm_master_key, settings.embedding_dimensions

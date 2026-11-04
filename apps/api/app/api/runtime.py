@@ -6,7 +6,9 @@ keeps working; a failure is not cached, so the next request tries again.
 """
 
 from functools import cache
+import logging
 from pathlib import Path
+import threading
 
 from fastapi import HTTPException, status
 
@@ -18,6 +20,9 @@ from app.conversation.store import ConversationStore, conversations_client
 from app.llm.client import LLMError
 from app.packs.compiler import CompileError, CompiledPack, load_compiled
 from app.screening.screen import Screener
+
+
+logger = logging.getLogger(__name__)
 
 
 def unavailable(detail: str) -> HTTPException:
@@ -44,10 +49,36 @@ def get_compiled() -> CompiledPack:
         raise unavailable(str(error)) from None
 
 
-@cache
+_screener: Screener | None = None
+_screener_lock = threading.Lock()
+
+
 def get_screener() -> Screener:
-    """The question screener; without its model in ``GUARD_MODEL_DIR`` every question is refused."""
-    return Screener.from_settings(load_settings())
+    """The question screener, built once; without its model in ``GUARD_MODEL_DIR`` every question is refused.
+
+    Building it loads the classifier, which takes seconds, so the api builds it in the background at startup.
+    """
+    global _screener
+    with _screener_lock:
+        if _screener is None:
+            _screener = Screener.from_settings(load_settings())
+        return _screener
+
+
+def loaded_screener() -> Screener | None:
+    """The screener if it is built; never builds it, so ``/health`` stays fast."""
+    return _screener
+
+
+def _build_screener() -> None:
+    try:
+        get_screener()
+    except Exception:  # noqa: BLE001 - invalid settings leave screening unavailable; the next question tries again
+        logger.exception("cannot build the question screener")
+
+
+def build_screener_in_background() -> None:
+    threading.Thread(target=_build_screener, name="screener", daemon=True).start()
 
 
 @cache

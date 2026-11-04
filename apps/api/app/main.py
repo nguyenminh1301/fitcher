@@ -3,13 +3,13 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
-import logging
-
 from app.api import ask, auth, conversations, feedback, runtime
 
 
 @asynccontextmanager
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+    # Loading the screening classifier takes seconds; questions wait for it, /health does not.
+    runtime.build_screener_in_background()
     yield
     runtime.close()
 
@@ -21,17 +21,15 @@ app.include_router(conversations.router)
 app.include_router(feedback.router)
 
 
-logger = logging.getLogger(__name__)
-
-
 @app.get("/health")
 def health() -> dict[str, str | None]:
-    """Liveness, with whether questions can be screened; the gated classifier never makes it fail (DECISIONS §9)."""
-    try:
-        classifier = runtime.get_screener().classifier
-    except Exception:  # noqa: BLE001 - invalid screening settings leave screening unavailable, not the api down
-        logger.exception("cannot build the question screener")
-        classifier = None
+    """Liveness, with whether questions can be screened (DECISIONS §9).
+
+    It never loads the classifier: until the screener is built, and whenever the model is missing, it
+    reports ``screening: unavailable`` and stays healthy, so Compose and CI never depend on the gated model.
+    """
+    screener = runtime.loaded_screener()
+    classifier = screener.loaded if screener else None
     return {
         "status": "ok", "screening": "ready" if classifier else "unavailable",
         "classifier": classifier.version if classifier else None,

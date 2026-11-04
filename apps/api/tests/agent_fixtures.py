@@ -55,7 +55,7 @@ def example_hit() -> dict:
     }}
 
 
-def default_search(index: str, body: dict) -> list[dict]:
+def default_search(index: str, request) -> list[dict]:
     if index.endswith("_examples"):
         return [example_hit()]
     return []

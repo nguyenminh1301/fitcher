@@ -84,6 +84,9 @@ cases:
       WHERE product_category = 'Electronics'
         AND customer_region = 'West'
         AND order_date >= toDate('2024-01-01') AND order_date < toDate('2025-01-01')
+    expected_sources:
+      - "column_values:sales_lines.product_category=Electronics"
+      - "column_values:sales_lines.customer_region=West"
     status: approved
     evidence: *cases
     confidence: 1.0
@@ -409,6 +412,8 @@ cases:
       FROM marts.sales_lines
       WHERE customer_segment = 'vip'
         AND order_date >= toDate('2025-01-01') AND order_date < toDate('2026-01-01')
+    expected_sources:
+      - "column_values:sales_lines.customer_segment=vip"
     status: approved
     evidence: *cases
     confidence: 1.0
@@ -431,6 +436,8 @@ cases:
       FROM marts.sales_lines
       WHERE payment_method = 'paypal'
         AND order_date >= toDate('2025-07-01') AND order_date < toDate('2025-10-01')
+    expected_sources:
+      - "column_values:sales_lines.payment_method=paypal"
     status: approved
     evidence: *cases
     confidence: 1.0
@@ -453,6 +460,8 @@ cases:
       FROM marts.sessions_daily
       WHERE device = 'mobile'
         AND session_date >= toDate('2025-12-01') AND session_date < toDate('2026-01-01')
+    expected_sources:
+      - "column_values:sessions_daily.device=mobile"
     status: approved
     evidence: *cases
     confidence: 1.0
@@ -475,6 +484,8 @@ cases:
       FROM marts.returns_fact
       WHERE return_reason = 'defective'
         AND return_date >= toDate('2025-01-01') AND return_date < toDate('2026-01-01')
+    expected_sources:
+      - "column_values:returns_fact.return_reason=defective"
     status: approved
     evidence: *cases
     confidence: 1.0
@@ -500,6 +511,9 @@ cases:
       WHERE product_category = 'Apparel'
         AND customer_region = 'Northeast'
         AND order_date >= toDate('2024-01-01') AND order_date < toDate('2025-01-01')
+    expected_sources:
+      - "column_values:sales_lines.product_category=Apparel"
+      - "column_values:sales_lines.customer_region=Northeast"
     status: approved
     evidence: *cases
     confidence: 1.0
@@ -809,6 +823,128 @@ cases:
     expected:
       intent: chart_edit
       outcome: answer
+    status: approved
+    evidence: *cases
+    confidence: 1.0
+
+  # definition: what a term, metric or column means, answered by metadata_qa from these search hits
+
+  - id: net_sales_meaning
+    question: "What does net sales mean?"
+    language: en
+    category: definition
+    role: analyst
+    expected:
+      intent: metadata_qa
+      outcome: answer
+    expected_sources:
+      - "glossary_terms:net_sales"
+      - "metrics:net_sales"
+    status: approved
+    evidence: *cases
+    confidence: 1.0
+
+  - id: conversion_rate_definition
+    question: "How is the conversion rate calculated?"
+    language: en
+    category: definition
+    role: analyst
+    expected:
+      intent: metadata_qa
+      outcome: answer
+    expected_sources:
+      - "glossary_terms:conversion_rate"
+      - "metrics:conversion_rate"
+    status: approved
+    evidence: *cases
+    confidence: 1.0
+
+  - id: return_rate_definition
+    question: "What is the return rate?"
+    language: en
+    category: definition
+    role: analyst
+    expected:
+      intent: metadata_qa
+      outcome: answer
+    expected_sources:
+      - "glossary_terms:return_rate"
+      - "metrics:line_return_rate"
+    status: approved
+    evidence: *cases
+    confidence: 1.0
+
+  - id: customer_segment_meaning
+    question: "What does customer segment mean?"
+    language: en
+    category: definition
+    role: analyst
+    expected:
+      intent: metadata_qa
+      outcome: answer
+    expected_sources:
+      - "glossary_terms:customer_segment"
+      - "datasets:sales_lines.customer_segment"
+    status: approved
+    evidence: *cases
+    confidence: 1.0
+
+  - id: doanh_thu_thuan_definition
+    question: "Doanh thu thuần là gì?"
+    language: vi
+    category: definition
+    role: analyst
+    expected:
+      intent: metadata_qa
+      outcome: answer
+    expected_sources:
+      - "glossary_terms:net_sales"
+      - "metrics:net_sales"
+    status: approved
+    evidence: *cases
+    confidence: 1.0
+
+  - id: gia_tri_don_trung_binh_definition
+    question: "Giá trị đơn hàng trung bình được tính thế nào?"
+    language: vi
+    category: definition
+    role: analyst
+    expected:
+      intent: metadata_qa
+      outcome: answer
+    expected_sources:
+      - "glossary_terms:average_order_value"
+      - "metrics:average_order_value"
+    status: approved
+    evidence: *cases
+    confidence: 1.0
+
+  - id: tien_hoan_tra_definition
+    question: "Tiền hoàn trả nghĩa là gì?"
+    language: vi
+    category: definition
+    role: analyst
+    expected:
+      intent: metadata_qa
+      outcome: answer
+    expected_sources:
+      - "glossary_terms:refunds"
+      - "metrics:refund_total"
+    status: approved
+    evidence: *cases
+    confidence: 1.0
+
+  - id: phien_truy_cap_definition
+    question: "Phiên truy cập là gì?"
+    language: vi
+    category: definition
+    role: analyst
+    expected:
+      intent: metadata_qa
+      outcome: answer
+    expected_sources:
+      - "glossary_terms:sessions"
+      - "metrics:session_count"
     status: approved
     evidence: *cases
     confidence: 1.0

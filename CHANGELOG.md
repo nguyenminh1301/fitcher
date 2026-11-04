@@ -4,6 +4,8 @@
 
 ### Added
 
+- Score definition questions in the eval: the new `definition` category runs `metadata_qa` and passes when its answer, written without SQL, came from every hit labelled in the case's `expected_sources` (`<index>:<key>`); the `ecommerce_twin` set adds four English and four Vietnamese definition cases, and its string-filter cases label the column values they filter on.
+- Measure search per collection: `jobs.retrieval_eval --pack <name>` searches every labelled eval question as its case's role and reports recall@5, recall@10 and nDCG@10 per collection and language, the queries that missed a source, and a before/after table against an earlier JSON report.
 - Document input screening: the README explains fetching the classifier, the two screening modes and the measurement, and the infra README describes the gateway guardrail and how its rules copy is kept in step.
 - Show a blocked question in the chat: a `blocked` event renders a notice in the answer's language with the api's message, never the question, and the step list starts with Checking the question for the `screen` node; the sample chat streams `status -> blocked -> done` for the `ecommerce_twin` sample scenario `instructions_override`, and the sample scenario schema accepts kind `blocked` with its `screened_message`.
 - Fetch the screening classifier outside Git: `docker compose run --rm guard-model` runs `jobs.fetch_guard_model` in its own PyTorch image, downloads one pinned revision of the gated `meta-llama/Llama-Prompt-Guard-2-86M` with `HF_TOKEN` (passed to that service only and never printed), exports it to ONNX, checks the export with the api's classifier against PyTorch and known inputs and writes it with its version to the new `guard-models` volume, which `api` and `jobs` mount read-only; `.env.example` documents `SCREEN_MODE`, `SCREEN_FLAG_AT`, `SCREEN_BLOCK_AT` and `HF_TOKEN`.
@@ -107,6 +109,8 @@
 
 ### Changed
 
+- Search the pack on Qdrant instead of OpenSearch (DECISIONS §5): `compile_pack` writes each of the six collections as `<pack>_<index>_v<N>` with a named dense `embed` vector, a BM25 sparse vector (folded and unfolded EN/VI terms, identifiers split at underscores, IDF applied by Qdrant) and, for column values, a character-trigram sparse vector for misspellings, payload indexes on `allowed_roles` and `type`, verifies every count and moves all six aliases in one request before dropping the older generation; `retrieve` and `metadata_qa` prefetch every vector filtered by `allowed_roles` and fuse them with RRF on the server. The `qdrant` service (v1.20.0) and `QDRANT_URL` replace `OPENSEARCH_URL`; column values are now embedded too.
+- Search the pack through one interface: `retrieve` and `metadata_qa` call `query(alias, text, vector, roles, size)` instead of building OpenSearch requests, so the search engine can change without touching the nodes; filter values are embedded with the other query texts in the same `embed` call.
 - Plan four phases between Phase 9 and Phase 10 and record their decisions: 9B screens every question and indexed document chunk for prompt injection with EN/VI rules and a local classifier before any LLM call; 9C replaces OpenSearch with Qdrant hybrid search; 9D routes SQL generation by query complexity across model tiers and providers with an admin Models page; 9E connects PostgreSQL, MySQL/MariaDB, MongoDB and file sources through ClickHouse, copied or live. Phases 10, 11 and 12 now onboard from a connected source, prove neutrality with a dataset served from PostgreSQL, and show screening verdicts and cost by tier.
 - Mark Phase 6B (the web app on sample data) complete in the README, describe how to explore the chat app and the console with the lab identities, and name Phase 7 as the next step.
 - Mark Phase 6 (RBAC and auth) complete in the README and name Phase 6B (the web app on sample data) as the next step.
@@ -141,6 +145,7 @@
 
 ### Fixed
 
+- Keep the api healthy while the screening classifier loads: the api builds the screener in the background at startup and `/health` only reads its state, instead of loading the model inside the 2-second health probe, which kept the container unhealthy once the real model was present.
 - Draw a streamed answer as the chart its `chart_spec` names instead of the table: the chat kept the chart type it had before the spec arrived, so every live answer opened as a table until the reader switched it.
 - Keep the web chat working now that `/ask` accepts only conversation ids the api created: the web server's `/api/ask` passes the api's `X-Conversation-Id` header through, and the browser's chat sends no conversation id with a chat's first question and the api's id with its follow-ups, so they read the earlier turns, until the conversation endpoints replace the browser's sample conversations.
 - Show the Sample data badge on every console detail page (review item, proposal, dataset, evaluation report and run trace), and decide every console badge from the same feature sources as the rest of the app.
@@ -173,6 +178,7 @@
 
 ### Removed
 
+- Remove OpenSearch: the `opensearch` service and volume, `OPENSEARCH_JAVA_OPTS`, its image scan and exceptions (the Security workflow scans `qdrant/qdrant:v1.20.0` instead, with six bundled web-UI advisories recorded as expiring exceptions) and its documentation, after `docs/eval/ecommerce_twin-retrieval.md` showed Qdrant retrieval recall no lower than OpenSearch and the pack eval showed no regression.
 - Remove the TLC HVFHV download, DuckDB views, sample queries, PostgreSQL/pgvector service and OpenAI smoke check, which the domain-neutral ClickHouse architecture replaces.
 - Remove the TLC dataset guide, superseded by the domain-neutral architecture decisions.
 - Remove author, database migration and reviewer checklists from the pull request template.

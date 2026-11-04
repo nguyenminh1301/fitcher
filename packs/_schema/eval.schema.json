@@ -25,8 +25,14 @@
             "type": "string",
             "enum": [
               "two_period_compare", "top_n", "string_filter", "monthly_trend", "ambiguous", "unauthorized", "out_of_scope",
-              "follow_up", "chart_edit"
+              "follow_up", "chart_edit", "definition"
             ]
+          },
+          "expected_sources": {
+            "description": "Search hits retrieval must return, as <index>:<key>: the item id, dataset.column for a column, dataset.column=value for a column value. Required for definition cases, whose answer comes from these hits.",
+            "type": "array",
+            "uniqueItems": true,
+            "items": {"type": "string", "pattern": "^(glossary_terms|metrics|datasets|column_values|examples|kb_docs):.+$"}
           },
           "role": {"$ref": "common.schema.json#/$defs/id", "description": "Role the question is asked as."},
           "previous_question": {

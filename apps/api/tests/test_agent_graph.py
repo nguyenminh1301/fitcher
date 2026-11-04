@@ -9,7 +9,7 @@ import pytest
 from app.agent.graph import run_question
 from app.data.clickhouse import QueryError, QueryOutput
 from app.llm.embeddings import EmbeddingError
-from app.search.opensearch import SearchError
+from app.search.client import SearchError
 
 QUESTION = "Top 10 best-selling widgets in Q1 2024 compared with Q1 2025"
 SUMMARY = "Blue widgets led Q1 2025."

@@ -47,6 +47,10 @@ def _check_active(case: EvalCase) -> None:
     decisions = {("data_query", "deny"), ("data_query", "clarify"), ("out_of_scope", "answer"), ("chart_edit", "answer")}
     if (expected.intent, expected.outcome) in decisions:
         return
+    if (expected.intent, expected.outcome) == ("metadata_qa", "answer"):
+        if not case.expected_sources:
+            raise EvalSetError(f"case {case.id} is a definition case and needs expected_sources")
+        return
     if expected.intent != "data_query" or expected.outcome != "answer":
         raise EvalSetError(
             f"case {case.id} expects {expected.intent}/{expected.outcome}, which this engine cannot answer yet; "

@@ -1,15 +1,15 @@
-"""In-memory stand-ins for ClickHouse, OpenSearch and the embedding alias.
+"""In-memory stand-ins for ClickHouse, Qdrant and the embedding alias.
 
 They record every call so tests can assert ordering, and each can be told to
 fail at a chosen point.
 """
 
 from collections.abc import Iterable, Sequence
+from dataclasses import dataclass
 from datetime import date
-import fnmatch
 import re
 
-from app.search.opensearch import SearchError
+from app.search.client import SearchError
 
 
 class FakeWarehouse:
@@ -75,69 +75,74 @@ class FakeEmbeddings:
         return [[float(len(text) % 7), 1.0, 0.0, 0.5][: self.dimensions] for text in texts]
 
 
-class FakeSearch:
-    """In-memory OpenSearch: indices, documents, aliases and a call log.
+@dataclass(frozen=True)
+class SearchRequest:
+    alias: str
+    text: str
+    vector: list[float]
+    roles: list[str]
+    size: int
 
-    ``fail_bulk_into`` makes bulk indexing into any index whose name contains
-    that substring fail; ``search_results`` maps an alias to the hits returned.
+
+class FakeSearch:
+    """In-memory Qdrant: collections, points, aliases and a call log.
+
+    ``fail_upsert_into`` makes writing points into any collection whose name
+    contains that substring fail; ``search_results`` maps an alias to the hits
+    ``query`` returns, or is called with the alias and the request.
     """
 
-    def __init__(self, fail_bulk_into: str | None = None, search_results=None):
-        self.indices: dict[str, dict] = {}
-        self.documents: dict[str, list[dict]] = {}
+    def __init__(self, fail_upsert_into: str | None = None, search_results=None):
+        self.collections: dict[str, int] = {}
+        self.points: dict[str, list[dict]] = {}
         self.aliases: dict[str, str] = {}
-        self.pipelines: dict[str, dict] = {}
         self.alias_updates: list[list[dict]] = []
-        self.searches: list[tuple[str, dict, str | None]] = []
-        self.fail_bulk_into = fail_bulk_into
+        self.queries: list[SearchRequest] = []
+        self.fail_upsert_into = fail_upsert_into
         self.search_results = search_results or {}
 
-    def put_search_pipeline(self, name: str, body: dict) -> None:
-        self.pipelines[name] = body
+    def create_collection(self, name: str, dimensions: int) -> None:
+        if name in self.collections:
+            raise SearchError(f"collection {name} already exists")
+        self.collections[name] = dimensions
+        self.points[name] = []
 
-    def create_index(self, name: str, body: dict) -> None:
-        if name in self.indices:
-            raise SearchError(f"index {name} already exists")
-        self.indices[name] = body
-        self.documents[name] = []
+    def delete_collection(self, name: str) -> None:
+        self.collections.pop(name, None)
+        self.points.pop(name, None)
+        self.aliases = {alias: target for alias, target in self.aliases.items() if target != name}
 
-    def delete_index(self, name: str) -> None:
-        self.indices.pop(name, None)
-        self.documents.pop(name, None)
-        self.aliases = {alias: index for alias, index in self.aliases.items() if index != name}
+    def list_collections(self) -> list[str]:
+        return sorted(self.collections)
 
-    def list_indices(self, pattern: str) -> list[str]:
-        return sorted(name for name in self.indices if fnmatch.fnmatchcase(name, pattern))
-
-    def alias_targets(self, pattern: str) -> dict[str, list[str]]:
-        return {alias: [index] for alias, index in self.aliases.items() if fnmatch.fnmatchcase(alias, pattern)}
+    def alias_targets(self) -> dict[str, str]:
+        return dict(self.aliases)
 
     def update_aliases(self, actions: list[dict]) -> None:
         self.alias_updates.append(actions)
         for action in actions:
-            if "remove" in action:
-                self.aliases.pop(action["remove"]["alias"], None)
+            if "delete_alias" in action:
+                self.aliases.pop(action["delete_alias"]["alias_name"], None)
             else:
-                self.aliases[action["add"]["alias"]] = action["add"]["index"]
+                self.aliases[action["create_alias"]["alias_name"]] = action["create_alias"]["collection_name"]
 
-    def bulk_index(self, index: str, documents: Iterable[dict]) -> int:
-        if self.fail_bulk_into and self.fail_bulk_into in index:
-            raise SearchError(f"bulk indexing into {index} failed")
-        documents = list(documents)
-        self.documents[index].extend(documents)
-        return len(documents)
+    def upsert(self, name: str, points: Iterable[dict]) -> int:
+        if self.fail_upsert_into and self.fail_upsert_into in name:
+            raise SearchError(f"PUT /collections/{name}/points returned HTTP 500")
+        points = list(points)
+        self.points[name].extend(points)
+        return len(points)
 
-    def refresh(self, index: str) -> None:
-        pass
+    def count(self, name: str) -> int:
+        return len(self.points[name])
 
-    def count(self, index: str) -> int:
-        return len(self.documents[index])
-
-    def search(self, index: str, body: dict, pipeline: str | None = None) -> list[dict]:
-        self.searches.append((index, body, pipeline))
+    def query(self, alias: str, text: str, vector, roles, size: int) -> list[dict]:
+        """The agent's search interface; ``search_results`` is called with the alias and the request."""
+        request = SearchRequest(alias, text, list(vector), list(roles), size)
+        self.queries.append(request)
         if callable(self.search_results):
-            return self.search_results(index, body)
-        return self.search_results.get(index, [])
+            return self.search_results(alias, request)
+        return self.search_results.get(alias, [])
 
 
 class FakeRunner:

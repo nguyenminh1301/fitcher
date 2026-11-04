@@ -96,7 +96,7 @@ def test_reference_query_error_is_recorded_and_the_run_continues():
 def test_exception_in_one_case_does_not_stop_the_run():
     searches = []
 
-    def search(index: str, body: dict) -> list[dict]:
+    def search(index: str, request) -> list[dict]:
         searches.append(index)
         if len(searches) == 1:
             raise KeyError("payload")
@@ -173,14 +173,10 @@ def test_each_case_runs_as_its_role_with_that_roles_runner():
 
     assert set(runners) == {"viewer", "auditor"}
     assert all(len(runner.calls) >= 2 for runner in runners.values())
-    roles_searched = {role for _, body, _ in agent.search.searches for role in body_roles(body)}
+    roles_searched = {role for request in agent.search.queries for role in request.roles}
     assert roles_searched == {"viewer", "auditor"}
     assert len(run.cases) == 2
 
-
-def body_roles(body: dict) -> list[str]:
-    text = str(body)
-    return [role for role in ("viewer", "auditor") if f"'{role}'" in text]
 
 
 def test_deny_case_runs_no_reference_query():
