@@ -80,6 +80,11 @@ class Screener:
         return self._classifier
 
     @property
+    def loaded(self) -> Classifier | None:
+        """The classifier if it is loaded, without trying to load it."""
+        return self._classifier
+
+    @property
     def version(self) -> str:
         classifier = self.classifier
         return f"{RULES_VERSION}+{classifier.version}" if classifier else RULES_VERSION
