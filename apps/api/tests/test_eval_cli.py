@@ -39,7 +39,7 @@ def _answers(cases: int) -> list:
 
 
 def _factory(runner: FakeRunner, cases: int = 1, seen: list | None = None, logs=None):
-    def build(pack: str, reference: date):
+    def build(pack: str, reference: date, tiers=None):
         if seen is not None:
             seen.append((pack, reference))
         return replace(deps(_answers(cases), runner=runner), logs=logs)
@@ -139,6 +139,40 @@ def test_run_report_is_stored_in_agent_logs(packs_dir):
     assert (stored.pack, stored.execution_rate, stored.passed) == ("minimal", 1.0, True)
     assert len(stored.report_id) == 32
     assert json.loads(stored.report)["cases"][0]["case_id"] == CASE_ID
+
+
+def test_the_report_records_the_tier_mapping_and_its_overrides(packs_dir, tmp_path):
+    logs = FakeLogWriter()
+    output = tmp_path / "out"
+
+    code = _main(packs_dir, "--tier", "sql-small=anthropic-small", "--output-dir", str(output),
+                 factory=_factory(_matching(), logs=logs))
+
+    assert code == 0
+    (stored,) = [record for record in logs.written if record.TABLE == "eval_reports"]
+    assert stored.tiers["sql-small"] == "anthropic-small" and stored.tiers["sql-gen"] == "openai-medium"
+    assert stored.regressed is None
+    report = EvalRun.model_validate_json((output / "minimal-eval.json").read_text(encoding="utf-8"))
+    assert report.tiers == stored.tiers
+    assert report.cases[0].sql_tiers == ["sql-gen"]
+    assert "## Model routing" in (output / "minimal-eval.md").read_text(encoding="utf-8")
+
+
+def test_a_run_compared_with_its_baseline_records_whether_it_regressed(packs_dir, tmp_path):
+    _main(packs_dir, "--output-dir", str(tmp_path), factory=_factory(_matching()))
+    baseline = tmp_path / "minimal-eval.json"
+    logs = FakeLogWriter()
+
+    _main(packs_dir, "--baseline", str(baseline), factory=_factory(_matching(), logs=logs))
+
+    (stored,) = [record for record in logs.written if record.TABLE == "eval_reports"]
+    assert stored.regressed is False
+
+
+@pytest.mark.parametrize("value", ["embed=openai-embed", "sql-small", "sql-small=", "gpt=openai-small"])
+def test_only_a_chat_tier_can_be_overridden(packs_dir, value):
+    with pytest.raises(SystemExit):
+        _main(packs_dir, "--tier", value, factory=_factory(_matching()))
 
 
 def test_failing_run_is_stored_as_not_passed(packs_dir):

@@ -9,6 +9,12 @@ named by ``--pack``, whatever ``ACTIVE_PACK`` says. Every case's agent run is
 written to ClickHouse ``agent_logs`` under the trace id kept in its JSON score,
 and the JSON report itself to ``agent_logs.eval_reports``.
 
+Each tier calls its ``MODEL_TIER_<TIER>`` default; ``--tier <tier>=<alias>``
+overrides a chat tier for this run, for example ``--tier sql-small=openai-medium``.
+The mapping is stored with the report together with whether the run regressed
+against ``--baseline``: an alias becomes eligible for a tier on the Models page
+once its latest report passes without regression (DECISIONS §2 Model tiers).
+
 Exit codes: 0 when no layer regressed against ``--baseline`` and the execution
 match rate meets ``--threshold``; 1 on a regression or below the threshold; 2
 when the run cannot start or a reference query fails.
@@ -31,12 +37,22 @@ from app.eval.report import BaselineDiff, diff_baseline, layer_totals, meets_thr
 from app.eval.runner import EvalRun, run_eval
 from app.llm.client import LiteLLMClient
 from app.llm.embeddings import LiteLLMEmbeddings
+from app.llm.tiers import CHAT_TIERS, EMBED_TIER, TierMap
 from app.observability.events import EvalReportRecord, utc_now
 from app.observability.log_writer import start_log_writer
 from app.packs.compiler import CompileError, load_compiled
 from app.packs.loader import PackValidationError, load_pack
 from app.screening.screen import Screener
 from app.search.client import QdrantSearch
+
+
+def tier_override(value: str) -> tuple[str, str]:
+    tier, separator, alias = value.partition("=")
+    if not separator or not alias:
+        raise argparse.ArgumentTypeError(f"expected <tier>=<alias>, got {value!r}")
+    if tier not in CHAT_TIERS:
+        raise argparse.ArgumentTypeError(f"--tier takes a chat tier ({', '.join(CHAT_TIERS)}), got {tier!r}")
+    return tier, alias
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -48,17 +64,24 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--timeout", type=float, default=180.0, help="seconds allowed per case; default 180")
     parser.add_argument("--threshold", type=float, default=0.8, help="execution match rate the pack must reach; default 0.8")
     parser.add_argument("--packs-dir", type=Path, default=Path("packs"), help="directory of the source packs; default packs")
+    parser.add_argument(
+        "--tier", type=tier_override, action="append", default=[], metavar="TIER=ALIAS",
+        help="run a chat tier on another catalog alias; repeat for several tiers",
+    )
     return parser.parse_args(argv)
 
 
-def build_deps(pack: str, reference: date) -> AgentDeps:
+def build_deps(pack: str, reference: date, tiers: TierMap) -> AgentDeps:
     settings = load_settings()
     compiled = load_compiled(Path(settings.compiled_pack_dir), pack)
     return AgentDeps(
-        llm=LiteLLMClient(settings.litellm_base_url, settings.litellm_master_key, temperature=0),
+        llm=LiteLLMClient(settings.litellm_base_url, settings.litellm_master_key, temperature=0, tiers=tiers),
         search=QdrantSearch(settings.qdrant_url),
         # Query vectors must match the indexed ones, so the compiled size wins over the environment.
-        embeddings=LiteLLMEmbeddings(settings.litellm_base_url, settings.litellm_master_key, compiled.embedding_dimensions),
+        embeddings=LiteLLMEmbeddings(
+            settings.litellm_base_url, settings.litellm_master_key, compiled.embedding_dimensions,
+            alias=tiers.alias(EMBED_TIER),
+        ),
         # Each case replaces it with its role's runner (role_runners).
         runner=ClickHouseRunner(agent_client(pack, compiled.pack.policies.roles[0].id), QueryLimits.from_env()),
         compiled=compiled,
@@ -101,7 +124,7 @@ def exit_code(run: EvalRun, diff: BaselineDiff | None) -> int:
     return 0
 
 
-def store_report(deps: AgentDeps, run: EvalRun) -> None:
+def store_report(deps: AgentDeps, run: EvalRun, diff: BaselineDiff | None = None) -> None:
     """Write the JSON report to ``agent_logs.eval_reports``; a failed write is reported and changes nothing else."""
     if deps.logs is None:
         return
@@ -109,7 +132,8 @@ def store_report(deps: AgentDeps, run: EvalRun) -> None:
     record = EvalReportRecord(
         pack=run.pack, ts=utc_now(), report_id=report_id,
         execution_rate=layer_totals(run.cases)["execution"].rate or 0.0, passed=meets_threshold(run),
-        report=run.model_dump_json(),
+        report=run.model_dump_json(), tiers=run.tiers,
+        regressed=None if diff is None else bool(diff.regressed),
     )
     if deps.logs.write_now(record):
         print(f"Stored report {report_id} in agent_logs.eval_reports.", file=sys.stderr)
@@ -117,20 +141,24 @@ def store_report(deps: AgentDeps, run: EvalRun) -> None:
 
 def main(
     argv: list[str] | None = None,
-    deps_factory: Callable[[str, date], AgentDeps] = build_deps,
+    deps_factory: Callable[[str, date, TierMap], AgentDeps] = build_deps,
     runners_factory: Callable[[str], Callable[[str], QueryRunner]] | None = None,
 ) -> int:
     args = parse_args(argv)
     try:
         eval_set = load_eval_set(load_pack(args.packs_dir / args.pack), args.only)
         baseline = load_baseline(args.baseline, args.pack) if args.baseline else None
-        deps = deps_factory(args.pack, eval_set.reference_date)
+        tiers = TierMap({**load_settings().model_tiers, **dict(args.tier)})
+        deps = deps_factory(args.pack, eval_set.reference_date, tiers)
     except (SettingsError, CompileError, PackValidationError, EvalSetError, RuntimeError) as error:
         print(error, file=sys.stderr)
         return 2
     try:
         runner_for = runners_factory(args.pack) if runners_factory is not None else None
-        run = run_eval(args.pack, eval_set, deps, timeout=args.timeout, threshold=args.threshold, runner_for=runner_for)
+        run = run_eval(
+            args.pack, eval_set, deps, timeout=args.timeout, threshold=args.threshold, runner_for=runner_for,
+            tiers=tiers.current(),
+        )
     finally:
         if deps.logs is not None:
             deps.logs.close()
@@ -144,7 +172,7 @@ def main(
             run.model_dump_json(indent=2) + "\n", encoding="utf-8", newline="\n"
         )
     code = exit_code(run, diff)
-    store_report(deps, run)
+    store_report(deps, run, diff)
     return code
 
 

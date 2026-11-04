@@ -51,6 +51,8 @@ class CaseScore(BaseModel):
     seconds: float = 0.0
     # The agent run's trace in agent_logs; empty when the case was not run or the run raised.
     trace_id: str = ""
+    # The model tier of each SQL generation of the run, in order.
+    sql_tiers: list[str] = []
 
 
 def _passed_or(reasons: list[str]) -> LayerScore:

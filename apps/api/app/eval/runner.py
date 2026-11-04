@@ -101,6 +101,8 @@ class EvalRun(BaseModel):
     threshold: float
     cases: list[CaseScore]
     reference_errors: list[str] = []
+    # The tier-to-alias mapping the run used (DECISIONS §2 Model tiers).
+    tiers: dict[str, str] = {}
 
 
 def _failed(case: EvalCase, reference: Result | None, error: str) -> CaseScore:
@@ -148,7 +150,9 @@ def _run_case(case: EvalCase, deps: AgentDeps, timeout: float, reference_errors:
         return _failed(case, reference, str(error))
     except Exception as error:  # noqa: BLE001 - one failing case never aborts the run
         return _failed(case, reference, f"{type(error).__name__}: {error}")
-    score = score_case(case, state, reference, active=True).model_copy(update={"trace_id": state["trace_id"]})
+    score = score_case(case, state, reference, active=True).model_copy(update={
+        "trace_id": state["trace_id"], "sql_tiers": [attempt.tier for attempt in state.get("attempts", [])],
+    })
     if reference_error is not None:
         layers = {**score.layers, "execution": LayerScore(status="fail", reason=f"reference: {reference_error}")}
         score = score.model_copy(update={"layers": layers})
@@ -164,8 +168,12 @@ def run_eval(
     threshold: float,
     clock: Callable[[], float] = time.monotonic,
     runner_for: Callable[[str], QueryRunner] | None = None,
+    tiers: dict[str, str] | None = None,
 ) -> EvalRun:
-    """Run ``eval_set``; ``runner_for(role)`` gives each case's query runner, ``deps.runner`` when None."""
+    """Run ``eval_set``; ``runner_for(role)`` gives each case's query runner, ``deps.runner`` when None.
+
+    ``tiers`` is the tier-to-alias mapping the run uses, recorded with the report.
+    """
     scores: list[CaseScore] = []
     reference_errors: list[str] = []
     for case in eval_set.cases:
@@ -178,5 +186,5 @@ def run_eval(
         scores.append(score.model_copy(update={"seconds": round(clock() - started, 3)}))
     return EvalRun(
         pack=pack, reference_date=eval_set.reference_date, threshold=threshold, cases=scores,
-        reference_errors=reference_errors,
+        reference_errors=reference_errors, tiers=dict(tiers or {}),
     )
