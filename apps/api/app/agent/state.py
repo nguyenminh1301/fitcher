@@ -118,6 +118,8 @@ class AgentState(TypedDict, total=False):
     chart_spec: BaseModel | None
     # The reply of a branch that answers without data: out_of_scope or metadata_qa.
     reply: str | None
+    # The search hits metadata_qa answered from, as "<index>:<id>".
+    sources: list[str]
     extraction: BaseModel | None
     periods: list[Period]
     retrieval: BaseModel | None

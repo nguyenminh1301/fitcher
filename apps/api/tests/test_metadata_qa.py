@@ -32,7 +32,10 @@ def test_the_answer_comes_from_role_filtered_pack_hits_with_the_data_rules():
 
     update = metadata_qa({"question": QUESTION, "language": "en"}, agent)
 
-    assert update == {"reply": "Widget revenue is the money received from widget sales."}
+    assert update == {
+        "reply": "Widget revenue is the money received from widget sales.",
+        "sources": ["glossary_terms:revenue", "metrics:widget_revenue", "kb_docs:policy#1"],
+    }
     assert SEARCHED == ("glossary_terms", "metrics", "datasets", "kb_docs")
     searched = [request.alias for request in agent.search.queries]
     assert searched == [f"minimal_{index}" for index in SEARCHED]

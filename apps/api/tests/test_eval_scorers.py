@@ -12,6 +12,7 @@ from app.eval.scorers import (
     LAYERS, retrieved_candidates, score_case, score_execution, score_extraction, score_retrieval,
 )
 from app.packs.models import EvalCase, EvalExpected, EvalPeriod
+from app.packs.search_indices import value_id
 
 Q1_2024 = EvalPeriod(label="Q1 2024", start="2024-01-01", end="2024-04-01")
 Q1_2025 = EvalPeriod(label="Q1 2025", start="2025-01-01", end="2025-04-01")
@@ -273,3 +274,34 @@ def test_chart_edit_case_fails_when_sql_ran():
     score = score_case(_chart_edit_case(), {**_answered_state(), "intent": "chart_edit"}, None, active=True)
 
     assert score.layers["execution"].reason == "expected the previous result redrawn, but SQL was generated"
+
+
+def _definition(**updates) -> EvalCase:
+    return _case(
+        id="revenue_meaning", question="What does widget revenue mean?", category="definition", expected_sql=None,
+        expected=EvalExpected(intent="metadata_qa", outcome="answer"),
+        expected_sources=["glossary_terms:revenue", "column_values:widget_sales.widget_name=Blue Widget"], **updates,
+    )
+
+
+def test_a_definition_case_scores_its_sources_and_the_reply():
+    value = value_id("widget_sales", "widget_name", "Blue Widget")
+    state = {"intent": "metadata_qa", "reply": "Revenue is ...", "sources": ["glossary_terms:revenue", f"column_values:{value}"]}
+
+    score = score_case(_definition(), state, None, active=True)
+
+    assert {layer: item.status for layer, item in score.layers.items()} == {
+        "intent": "pass", "extraction": "not_scored", "retrieval": "pass", "execution": "pass",
+    }
+    assert score.layers["retrieval"].recall == 1.0
+
+
+def test_a_definition_case_names_the_missing_source_and_fails_on_sql():
+    state = {"intent": "metadata_qa", "reply": "Revenue is ...", "sources": ["glossary_terms:revenue"], "attempts": [object()]}
+
+    score = score_case(_definition(), state, None, active=True)
+
+    retrieval = score.layers["retrieval"]
+    assert (retrieval.status, retrieval.recall) == ("fail", 0.5)
+    assert retrieval.reason == "missing: column_values:widget_sales.widget_name=Blue Widget"
+    assert score.layers["execution"].reason == "expected a definition, but SQL was generated"

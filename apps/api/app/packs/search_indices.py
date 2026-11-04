@@ -137,6 +137,22 @@ class _Roles:
         return sorted(allowed)
 
 
+def value_id(dataset: str, column: str, value: str) -> str:
+    """The document id of one column value."""
+    digest = hashlib.sha1(value.encode(), usedforsecurity=False).hexdigest()[:16]
+    return f"{dataset}.{column}.{digest}"
+
+
+def source_id(source: str) -> tuple[str, str]:
+    """``(index, document id)`` of an eval label ``<index>:<key>``; a column value's key is ``dataset.column=value``."""
+    index, _, key = source.partition(":")
+    if index == "column_values":
+        column, _, value = key.partition("=")
+        dataset, _, name = column.partition(".")
+        return index, value_id(dataset, name, value)
+    return index, key
+
+
 def _document(pack: Pack, doc_type: str, doc_id: str, roles: list[str], title: str, text: str, **extra) -> dict:
     return {"id": doc_id, "type": doc_type, "pack": pack.name, "allowed_roles": roles, "title": title, "text": text, **extra}
 
@@ -191,9 +207,8 @@ def build_documents(pack: Pack, column_values: Sequence[ColumnValue]) -> dict[st
             ))
 
     for item in column_values:
-        digest = hashlib.sha1(item.value.encode(), usedforsecurity=False).hexdigest()[:16]
         documents["column_values"].append(_document(
-            pack, "column_value", f"{item.dataset}.{item.column}.{digest}", roles.column(item.dataset, item.column),
+            pack, "column_value", value_id(item.dataset, item.column, item.value), roles.column(item.dataset, item.column),
             item.value, f"{item.column} {item.dataset}", dataset=item.dataset, column=item.column,
             payload={"column": item.column, "value": item.value, "count": item.count},
         ))

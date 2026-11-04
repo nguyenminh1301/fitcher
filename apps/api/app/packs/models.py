@@ -181,7 +181,7 @@ class EvalCase(Draftable):
     language: str
     category: Literal[
         "two_period_compare", "top_n", "string_filter", "monthly_trend", "ambiguous", "unauthorized", "out_of_scope",
-        "follow_up", "chart_edit",
+        "follow_up", "chart_edit", "definition",
     ]
     role: str
     expected: EvalExpected
@@ -190,6 +190,8 @@ class EvalCase(Draftable):
     active_from_phase: int | None = None
     # Asked first in the same conversation; the case's question follows it up.
     previous_question: str | None = None
+    # Hits retrieval must return, as "<index>:<key>" (see app.packs.search_indices.source_id).
+    expected_sources: list[str] = []
 
 
 class EvalFile(PackModel):

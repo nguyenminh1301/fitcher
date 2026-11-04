@@ -42,19 +42,22 @@ def metadata_qa(state: AgentState, deps: AgentDeps) -> dict:
     question = state["question"]
     try:
         vector = deps.embeddings.embed([question])[0]
-        found = [
-            _entry(index, hit)
+        hits = [
+            (index, hit)
             for index in SEARCHED
             for hit in deps.search.query(alias_name(pack.name, index), question, vector, [deps.role], HITS_PER_INDEX)
         ]
     except (EmbeddingError, SearchError) as error:
         return {"rejection": f"the pack context could not be retrieved: {error}"}
     language = state.get("language") or "en"
+    found = [_entry(index, hit) for index, hit in hits]
     prompt = render(
         PROMPT, language=language, industry=pack.business_profile.industry,
         hits="\n".join(found) or "none: no definitions were found", question=json.dumps(question, ensure_ascii=False),
     )
+    # What the answer was written from, as "<index>:<id>"; the eval scores it against a case's expected_sources.
+    sources = [f"{index}:{hit['id']}" for index, hit in hits]
     try:
-        return {"reply": deps.llm.text(ALIAS, prompt).strip()}
+        return {"reply": deps.llm.text(ALIAS, prompt).strip(), "sources": sources}
     except LLMError:
-        return {"reply": FALLBACK.get(language, FALLBACK["en"])}
+        return {"reply": FALLBACK.get(language, FALLBACK["en"]), "sources": sources}
