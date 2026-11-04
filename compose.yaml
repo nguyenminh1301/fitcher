@@ -80,6 +80,9 @@ services:
     volumes:
       - ./infra/litellm/config.yaml:/app/config.yaml:ro
       - ./infra/litellm/callbacks/clickhouse_logger.py:/app/clickhouse_logger.py:ro
+      # The screening guardrail and its copy of the api's rules (DECISIONS §9).
+      - ./infra/litellm/callbacks/screening_guard.py:/app/screening_guard.py:ro
+      - ./infra/litellm/callbacks/screening_rules.py:/app/screening_rules.py:ro
     healthcheck:
       # Liveliness only checks the proxy process; it never calls OpenAI.
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:4000/health/liveliness', timeout=2)"]
