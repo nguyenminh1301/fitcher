@@ -22,7 +22,7 @@ The OpenAI key belongs to the LiteLLM gateway only; database and gateway credent
 CI validates repository files, Git policy and Actions workflows, runs the API/CLI suite on Linux, and checks/builds the web application.
 Dependabot is configured for GitHub Actions and targets `develop`, but automatic version-update PRs are paused because generated commit bodies violate the one-line commit policy.
 Security-update behavior is controlled separately by GitHub repository settings; this bootstrap does not enable it.
-The Security workflow audits locked npm and Python dependencies, scans Git history with Gitleaks, rebuilds and scans the `api` and `web` images, and scans the ClickHouse, OpenSearch, LiteLLM and Keycloak images by their pinned tags, all with checksum-verified Trivy. It runs for PRs, pushes to integration/production branches, manual dispatch and weekly on the default branch. Tool failures fail their jobs; a scanner outage is not a clean result. Images fail for High/Critical advisories with available fixes. Complete reports, including unfixed findings, are retained as workflow artifacts for 14 days.
+The Security workflow audits locked npm and Python dependencies, scans Git history with Gitleaks, rebuilds and scans the `api` and `web` images, and scans the ClickHouse, Qdrant, LiteLLM and Keycloak images by their pinned tags, all with checksum-verified Trivy. It runs for PRs, pushes to integration/production branches, manual dispatch and weekly on the default branch. Tool failures fail their jobs; a scanner outage is not a clean result. Images fail for High/Critical advisories with available fixes. Complete reports, including unfixed findings, are retained as workflow artifacts for 14 days.
 
 Runtime images apply OS updates during uncached builds. API/web runtimes omit language package managers. Rebuild with `docker compose build --pull --no-cache` to refresh packages, then recreate services while preserving named volumes. Versions in application lockfiles do not cover all OS packages or bundled tooling.
 
@@ -38,7 +38,7 @@ On or before expiry, rescan the newest upstream tag, update the pin if it fixes 
 
 | Image | Advisories | Evidence | Owner | Expires |
 | --- | --- | --- | --- | --- |
-| `opensearchproject/opensearch:3.9.0` | 10 in bundled Jackson, Guava, jsoup, snappy-java and lz4-java JARs ([list](.github/trivy/opensearch.trivyignore.yaml)) | Newest release on 2026-10-30; the JARs ship inside the upstream distribution | @nguyenminh1301 | 2026-12-31 |
+| `qdrant/qdrant:v1.20.0` | 6 in bundled undici and follow-redirects of its web UI ([list](.github/trivy/qdrant.trivyignore.yaml)) | Newest stable release on 2026-11-04; the packages ship inside the upstream image | @nguyenminh1301 | 2026-12-31 |
 | `ghcr.io/berriai/litellm:v1.106.7` | 1 in bundled filelock ([list](.github/trivy/litellm.trivyignore.yaml)) | Newest stable patch release on 2026-11-04; the package is installed by the upstream image build | @nguyenminh1301 | 2026-12-31 |
 | `quay.io/keycloak/keycloak:26.8.1` | 1 in bundled Guava ([list](.github/trivy/keycloak.trivyignore.yaml)) | Newest release on 2026-10-30; the JAR ships inside the upstream distribution | @nguyenminh1301 | 2026-12-31 |
 

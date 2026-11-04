@@ -6,8 +6,8 @@ The planned application answers questions such as "Top 10 best-selling products 
 ## Current status
 
 The repository runs the six lab services and answers `data_query` questions from the command line.
-Docker Compose starts ClickHouse, OpenSearch, LiteLLM, Keycloak, the FastAPI skeleton in `apps/api` (`GET /health`) and the Next.js web app in `apps/web`; their configuration lives in [infra/](infra/README.md).
-`jobs/` loads the e-commerce lab dataset into ClickHouse `raw` and refreshes it, and [dbt/](dbt/README.md) builds the `sales_lines`, `returns_fact` and `sessions_daily` marts; [packs/](packs/README.md) holds the Domain Pack schemas and the hand-written `ecommerce_twin` pack, which `jobs/compile_pack.py` validates, test-runs and indexes into OpenSearch; `jobs/ask.py` runs the LangGraph agent in `apps/api/app/agent` over the compiled pack, with its prompts in `apps/api/prompts/`.
+Docker Compose starts ClickHouse, Qdrant, LiteLLM, Keycloak, the FastAPI skeleton in `apps/api` (`GET /health`) and the Next.js web app in `apps/web`; their configuration lives in [infra/](infra/README.md).
+`jobs/` loads the e-commerce lab dataset into ClickHouse `raw` and refreshes it, and [dbt/](dbt/README.md) builds the `sales_lines`, `returns_fact` and `sessions_daily` marts; [packs/](packs/README.md) holds the Domain Pack schemas and the hand-written `ecommerce_twin` pack, which `jobs/compile_pack.py` validates, test-runs and indexes into Qdrant; `jobs/ask.py` runs the LangGraph agent in `apps/api/app/agent` over the compiled pack, with its prompts in `apps/api/prompts/`.
 
 The architecture is settled in [DECISIONS.md](docs/DECISIONS.md) and delivered in the order of the [master plan](docs/MASTER_PLAN.md), with one [detailed plan per phase](docs/plans/README.md).
 Phases 1 (lab dataset and dbt marts), 2 (hand-written Domain Pack and compiler), 3 (core agent on the CLI) and 4 (eval harness) are complete: `jobs/eval.py` scores a pack's eval set per layer, and the `ecommerce_twin` eval set has a recorded [baseline](docs/eval/ecommerce_twin-baseline.md). Phase 5 (logging and tracing) is complete as well: every `jobs.ask` and `jobs.eval` run writes its run row, node events, SQL attempts and LiteLLM calls to ClickHouse `agent_logs`, and [docs/tracing.md](docs/tracing.md) shows how to read one trace. Phase 6 (RBAC and auth) is complete: `compile_pack` turns `policies.yaml` into per-role ClickHouse roles, column grants, row policies, aggregate-only views and users; every question runs as one pack role (`--role`), a question the role may not read is denied before any SQL and every access decision is written to `agent_logs.audit`; the Keycloak realm carries the pack roles and lab users. Phase 6B (the web app on sample data) is complete: every screen of the [web app design](docs/design/web-app.md) works on the active pack's sample data in English and Vietnamese, light and dark themes, at desktop and phone widths. That covers the chat app with streamed answers, charts, tables and SQL, and the workspace console with each role's sections. Each feature shows a Sample data badge until its backend phase wires it to the api. Phase 7 (API and streaming) is complete: the api verifies Keycloak access tokens and streams answers from `POST /ask`, and the web app signs users in through Keycloak and streams its chat answers from the api; the other web features keep their Sample data badge until their phase. Phase 8 (conversation) is complete: a router sends each question to the data, definition, chart-edit or out-of-scope branch, follow-ups reuse the previous query, ambiguous questions get a clarifying question with options, every turn is stored per user so the chat sidebar lists, searches, renames, pins, groups and deletes conversations from the api, and an earlier question can be edited or retried. Phase 9 (charts) is in progress: the api chooses each answer's chart by the DECISIONS §8 rules, and likes and dislikes in the chat are stored per answer through `POST /feedback`. Phase 9B (input screening) screens every question with EN/VI rules and a local prompt-injection classifier before any LLM call, in `SCREEN_MODE=log` until the measurement shows the enforcement gate holds; the LiteLLM gateway rejects requests the api did not screen.
@@ -22,7 +22,7 @@ Phases 1 (lab dataset and dbt marts), 2 (hand-written Domain Pack and compiler),
 | Agent | LangGraph, sqlglot | Extract, retrieve, generate, guard, execute and summarize |
 | LLM gateway | LiteLLM Proxy (OpenAI) | Aliases `fast`, `sql-gen`, `sql-gen-hard`, `embed` |
 | Data and logs | ClickHouse | `raw`, `marts` and `agent_logs` databases, role-based access |
-| Retrieval | OpenSearch | Hybrid BM25 + kNN over pack indices |
+| Retrieval | Qdrant | Dense `embed` and BM25 sparse vectors per point, fused with RRF on the server |
 | Transform | dbt-clickhouse | Raw tables to wide marts |
 | Packs | YAML + JSON Schema | Per-company profile, datasets, glossary, metrics, policies and eval |
 | Deployment | Docker Compose | Six long-running services plus jobs |
@@ -30,8 +30,7 @@ Phases 1 (lab dataset and dbt marts), 2 (hand-written Domain Pack and compiler),
 
 ## Run locally
 
-Install Docker with Compose v2 (`--wait` support) and give Docker about 8 GB of free memory; OpenSearch alone takes a 1 GB heap.
-On Linux and WSL2 hosts, OpenSearch needs `vm.max_map_count` of at least 262144; see [infra/opensearch](infra/opensearch/README.md).
+Install Docker with Compose v2 (`--wait` support) and give Docker about 8 GB of free memory.
 Host Node/Python are optional when using Docker. Run these commands from the repository root.
 
 Copy [.env.example](.env.example) to `.env` and replace every `change-me` value. Never commit `.env`.
@@ -45,7 +44,7 @@ Copy [.env.example](.env.example) to `.env` and replace every `change-me` value.
 | `make smoke` | `docker compose exec -T api python -m jobs.smoke_llm` |
 | `make down` | `docker compose down` |
 
-`make` is optional; the Makefile only wraps these commands. `make down` never removes volumes, so ClickHouse and OpenSearch data survive restarts.
+`make` is optional; the Makefile only wraps these commands. `make down` never removes volumes, so ClickHouse and Qdrant data survive restarts.
 `make smoke` sends one billable request to the `fast` alias through LiteLLM and prints only the reply length.
 
 ### Load the lab dataset and build the marts
@@ -67,7 +66,7 @@ On Linux hosts, `./data` must be writable by UID 10001, the non-root user of the
 docker compose run --rm jobs python -m jobs.compile_pack --pack ecommerce_twin
 ```
 
-The compile validates the pack against the marts, test-runs every metric, embeds pack items through the `embed` alias (billable, needs `OPENAI_API_KEY`) and publishes the pack's OpenSearch indices and `compiled.json`; see [packs/](packs/README.md#compiling-a-pack).
+The compile validates the pack against the marts, test-runs every metric, embeds pack items through the `embed` alias (billable, needs `OPENAI_API_KEY`) and publishes the pack's Qdrant collections and `compiled.json`; see [packs/](packs/README.md#compiling-a-pack).
 `ACTIVE_PACK` in `.env` names the pack the API serves.
 
 ### Screen questions
@@ -135,7 +134,7 @@ It exits with code 0 when the execution match rate reaches the pack threshold (8
 | api | [localhost:8000](http://localhost:8000/health) | `GET /health` |
 | keycloak | [localhost:8080](http://localhost:8080) (realm `finch`) | management `/health/ready` |
 | litellm | localhost:4000 | `/health/liveliness`, no OpenAI call |
-| opensearch | localhost:9200 | cluster status yellow or green |
+| qdrant | localhost:6333 | `/readyz` |
 | clickhouse | localhost:8123 (HTTP), localhost:9000 (native) | `GET /ping` |
 
 `GET /health` returns `200` and `{"status":"ok"}` as a liveness probe; it calls no other service.
@@ -151,7 +150,7 @@ docker compose up -d --wait
 ```
 
 `--no-cache` ensures the OS update layer is rerun. Dependency versions still come from the committed lockfiles; changes to base image tags and language runtimes need their own compatibility review.
-ClickHouse, OpenSearch, LiteLLM and Keycloak run upstream images pinned to exact tags in `compose.yaml`; `docker compose pull` changes nothing until a tag is updated deliberately.
+ClickHouse, Qdrant, LiteLLM and Keycloak run upstream images pinned to exact tags in `compose.yaml`; `docker compose pull` changes nothing until a tag is updated deliberately.
 
 ## Host development and checks
 

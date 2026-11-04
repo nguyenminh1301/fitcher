@@ -178,6 +178,7 @@
 
 ### Removed
 
+- Remove OpenSearch: the `opensearch` service and volume, `OPENSEARCH_JAVA_OPTS`, its image scan and exceptions (the Security workflow scans `qdrant/qdrant:v1.20.0` instead, with six bundled web-UI advisories recorded as expiring exceptions) and its documentation, after `docs/eval/ecommerce_twin-retrieval.md` showed Qdrant retrieval recall no lower than OpenSearch and the pack eval showed no regression.
 - Remove the TLC HVFHV download, DuckDB views, sample queries, PostgreSQL/pgvector service and OpenAI smoke check, which the domain-neutral ClickHouse architecture replaces.
 - Remove the TLC dataset guide, superseded by the domain-neutral architecture decisions.
 - Remove author, database migration and reviewer checklists from the pull request template.

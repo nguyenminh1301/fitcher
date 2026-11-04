@@ -1,0 +1,22 @@
+# Fixable High/Critical advisories in qdrant/qdrant:v1.20.0 that only an upstream release can fix.
+# The tag was the newest stable release when scanned on 2026-11-04; see SECURITY.md, Image exceptions.
+# Each entry expires; after that date the finding blocks the image audit again.
+vulnerabilities:
+  - id: CVE-2026-87018
+    statement: Bundled undici in the upstream image's web UI; fixed only by a new upstream release.
+    expired_at: 2026-12-31
+  - id: CVE-2026-109383
+    statement: Bundled undici in the upstream image's web UI; fixed only by a new upstream release.
+    expired_at: 2026-12-31
+  - id: CVE-2026-109869
+    statement: Bundled undici in the upstream image's web UI; fixed only by a new upstream release.
+    expired_at: 2026-12-31
+  - id: CVE-2026-111755
+    statement: Bundled follow-redirects in the upstream image's web UI; fixed only by a new upstream release.
+    expired_at: 2026-12-31
+  - id: CVE-2026-111756
+    statement: Bundled follow-redirects in the upstream image's web UI; fixed only by a new upstream release.
+    expired_at: 2026-12-31
+  - id: CVE-2026-116689
+    statement: Bundled follow-redirects in the upstream image's web UI; fixed only by a new upstream release.
+    expired_at: 2026-12-31
