@@ -19,6 +19,29 @@ services:
       CLICKHOUSE_CONVERSATIONS_PASSWORD: ${CLICKHOUSE_CONVERSATIONS_PASSWORD:?set CLICKHOUSE_CONVERSATIONS_PASSWORD in .env}
       # Read by users.d/model_tiers.xml.
       CLICKHOUSE_MODEL_TIERS_PASSWORD: ${CLICKHOUSE_MODEL_TIERS_PASSWORD:?set CLICKHOUSE_MODEL_TIERS_PASSWORD in .env}
+      # Read by users.d/sources.xml for source_loader, the only user of the source named collections.
+      CLICKHOUSE_SOURCES_PASSWORD: ${CLICKHOUSE_SOURCES_PASSWORD:?set CLICKHOUSE_SOURCES_PASSWORD in .env}
+      # Read-only source credentials, read by config.d/sources.xml (DECISIONS §4 Data sources).
+      # They reach no other service; an unset source leaves its collection unusable.
+      FIXTURE_POSTGRES_HOST: ${FIXTURE_POSTGRES_HOST:-}
+      FIXTURE_POSTGRES_PORT: ${FIXTURE_POSTGRES_PORT:-}
+      FIXTURE_POSTGRES_DATABASE: ${FIXTURE_POSTGRES_DATABASE:-}
+      FIXTURE_POSTGRES_USER: ${FIXTURE_POSTGRES_USER:-}
+      FIXTURE_POSTGRES_PASSWORD: ${FIXTURE_POSTGRES_PASSWORD:-}
+      FIXTURE_MYSQL_HOST: ${FIXTURE_MYSQL_HOST:-}
+      FIXTURE_MYSQL_PORT: ${FIXTURE_MYSQL_PORT:-}
+      FIXTURE_MYSQL_DATABASE: ${FIXTURE_MYSQL_DATABASE:-}
+      FIXTURE_MYSQL_USER: ${FIXTURE_MYSQL_USER:-}
+      FIXTURE_MYSQL_PASSWORD: ${FIXTURE_MYSQL_PASSWORD:-}
+      FIXTURE_MONGODB_HOST: ${FIXTURE_MONGODB_HOST:-}
+      FIXTURE_MONGODB_PORT: ${FIXTURE_MONGODB_PORT:-}
+      FIXTURE_MONGODB_DATABASE: ${FIXTURE_MONGODB_DATABASE:-}
+      FIXTURE_MONGODB_USER: ${FIXTURE_MONGODB_USER:-}
+      FIXTURE_MONGODB_PASSWORD: ${FIXTURE_MONGODB_PASSWORD:-}
+      # An S3 collection takes one URL: the store's address and the bucket.
+      FIXTURE_FILES_URL: http://${FIXTURE_FILES_HOST:-}:${FIXTURE_FILES_PORT:-}/${FIXTURE_FILES_DATABASE:-}/
+      FIXTURE_FILES_USER: ${FIXTURE_FILES_USER:-}
+      FIXTURE_FILES_PASSWORD: ${FIXTURE_FILES_PASSWORD:-}
     ports:
       - "127.0.0.1:8123:8123"
       - "127.0.0.1:9000:9000"
@@ -30,6 +53,8 @@ services:
       - ./infra/clickhouse/users.d/agent_query_stopper.xml:/etc/clickhouse-server/users.d/agent_query_stopper.xml:ro
       - ./infra/clickhouse/users.d/agent_conversations.xml:/etc/clickhouse-server/users.d/agent_conversations.xml:ro
       - ./infra/clickhouse/users.d/model_tiers.xml:/etc/clickhouse-server/users.d/model_tiers.xml:ro
+      - ./infra/clickhouse/users.d/sources.xml:/etc/clickhouse-server/users.d/sources.xml:ro
+      - ./infra/clickhouse/config.d/sources.xml:/etc/clickhouse-server/config.d/sources.xml:ro
       - ./infra/clickhouse/initdb:/docker-entrypoint-initdb.d:ro
     ulimits:
       nofile:
@@ -202,6 +227,8 @@ services:
       CLICKHOUSE_HOST: clickhouse
       CLICKHOUSE_ADMIN_USER: ${CLICKHOUSE_ADMIN_USER:?set CLICKHOUSE_ADMIN_USER in .env}
       CLICKHOUSE_ADMIN_PASSWORD: ${CLICKHOUSE_ADMIN_PASSWORD:?set CLICKHOUSE_ADMIN_PASSWORD in .env}
+      # jobs.sync_sources connects as source_loader (infra/clickhouse/users.d/sources.xml).
+      CLICKHOUSE_SOURCES_PASSWORD: ${CLICKHOUSE_SOURCES_PASSWORD:?set CLICKHOUSE_SOURCES_PASSWORD in .env}
       # compile_pack derives the pack's per-role ClickHouse user passwords from it.
       CLICKHOUSE_AGENT_PASSWORD: ${CLICKHOUSE_AGENT_PASSWORD:?set CLICKHOUSE_AGENT_PASSWORD in .env}
       HF_HUB_DISABLE_TELEMETRY: "1"
@@ -267,6 +294,88 @@ services:
       interval: 10s
       timeout: 5s
       retries: 10
+      start_period: 10s
+
+  # Lab-only fixtures that play a company's source systems (DECISIONS §3 and §4);
+  # they are not fitcher services. Start them with
+  # `docker compose --profile sources up -d --wait`. Each seeds the synthetic
+  # widget dataset of infra/sources/fixtures and creates the read-only user
+  # whose credentials ClickHouse holds; FIXTURE_ADMIN_PASSWORD is each system's
+  # own administrator and never leaves its container. No port is published.
+  # Their variables are optional for the default stack, so an unset one makes
+  # only the fixture that needs it fail to start.
+  postgres-fixture:
+    image: postgres:18.4-alpine
+    profiles: ["sources"]
+    environment:
+      POSTGRES_PASSWORD: ${FIXTURE_ADMIN_PASSWORD:-}
+      POSTGRES_DB: ${FIXTURE_POSTGRES_DATABASE:-}
+      FIXTURE_POSTGRES_USER: ${FIXTURE_POSTGRES_USER:-}
+      FIXTURE_POSTGRES_PASSWORD: ${FIXTURE_POSTGRES_PASSWORD:-}
+    volumes:
+      - ./infra/sources/fixtures/widgets:/fixtures:ro
+      - ./infra/sources/fixtures/postgres/init.sh:/docker-entrypoint-initdb.d/init.sh:ro
+    healthcheck:
+      # Passes over TCP as the reader once seeding has finished and the server restarted.
+      test: ["CMD-SHELL", "PGPASSWORD=\"$$FIXTURE_POSTGRES_PASSWORD\" psql -h 127.0.0.1 -U \"$$FIXTURE_POSTGRES_USER\" -d \"$$POSTGRES_DB\" -tAc 'SELECT 1 FROM refunds LIMIT 1' | grep -q 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 10s
+
+  mysql-fixture:
+    image: mysql:8.4.10
+    profiles: ["sources"]
+    environment:
+      MYSQL_ROOT_PASSWORD: ${FIXTURE_ADMIN_PASSWORD:-}
+      MYSQL_DATABASE: ${FIXTURE_MYSQL_DATABASE:-}
+      FIXTURE_MYSQL_USER: ${FIXTURE_MYSQL_USER:-}
+      FIXTURE_MYSQL_PASSWORD: ${FIXTURE_MYSQL_PASSWORD:-}
+    volumes:
+      - ./infra/sources/fixtures/widgets:/fixtures:ro
+      - ./infra/sources/fixtures/mysql/init.sh:/docker-entrypoint-initdb.d/init.sh:ro
+    healthcheck:
+      test: ["CMD-SHELL", "mysql -h 127.0.0.1 -u\"$$FIXTURE_MYSQL_USER\" -p\"$$FIXTURE_MYSQL_PASSWORD\" \"$$MYSQL_DATABASE\" -NBe 'SELECT 1 FROM refunds LIMIT 1' | grep -q 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 40
+      start_period: 20s
+
+  mongodb-fixture:
+    image: mongo:8.0.20
+    profiles: ["sources"]
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: fixture_admin
+      MONGO_INITDB_ROOT_PASSWORD: ${FIXTURE_ADMIN_PASSWORD:-}
+      FIXTURE_MONGODB_DATABASE: ${FIXTURE_MONGODB_DATABASE:-}
+      FIXTURE_MONGODB_USER: ${FIXTURE_MONGODB_USER:-}
+      FIXTURE_MONGODB_PASSWORD: ${FIXTURE_MONGODB_PASSWORD:-}
+    volumes:
+      - ./infra/sources/fixtures/widgets:/fixtures:ro
+      - ./infra/sources/fixtures/mongodb/seed.js:/docker-entrypoint-initdb.d/seed.js:ro
+    healthcheck:
+      test: ["CMD-SHELL", "mongosh --quiet -u \"$$FIXTURE_MONGODB_USER\" -p \"$$FIXTURE_MONGODB_PASSWORD\" --authenticationDatabase \"$$FIXTURE_MONGODB_DATABASE\" \"mongodb://127.0.0.1:27017/$$FIXTURE_MONGODB_DATABASE\" --eval 'quit(db.refunds.countDocuments() > 0 ? 0 : 1)'"]
+      interval: 5s
+      timeout: 10s
+      retries: 30
+      start_period: 20s
+
+  files-fixture:
+    image: chrislusf/seaweedfs:4.05
+    profiles: ["sources"]
+    entrypoint: ["/bin/sh", "/start.sh"]
+    environment:
+      FIXTURE_FILES_DATABASE: ${FIXTURE_FILES_DATABASE:-}
+      FIXTURE_FILES_USER: ${FIXTURE_FILES_USER:-}
+      FIXTURE_FILES_PASSWORD: ${FIXTURE_FILES_PASSWORD:-}
+    volumes:
+      - ./infra/sources/fixtures/widgets:/fixtures:ro
+      - ./infra/sources/fixtures/files/start.sh:/start.sh:ro
+    healthcheck:
+      test: ["CMD-SHELL", "test -f /tmp/seeded"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
       start_period: 10s
 
   web:
