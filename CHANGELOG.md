@@ -97,6 +97,7 @@
 
 ### Changed
 
+- Plan four phases between Phase 9 and Phase 10 and record their decisions: 9B screens every question and indexed document chunk for prompt injection with EN/VI rules and a local classifier before any LLM call; 9C replaces OpenSearch with Qdrant hybrid search; 9D routes SQL generation by query complexity across model tiers and providers with an admin Models page; 9E connects PostgreSQL, MySQL/MariaDB, MongoDB and file sources through ClickHouse, copied or live. Phases 10, 11 and 12 now onboard from a connected source, prove neutrality with a dataset served from PostgreSQL, and show screening verdicts and cost by tier.
 - Mark Phase 6B (the web app on sample data) complete in the README, describe how to explore the chat app and the console with the lab identities, and name Phase 7 as the next step.
 - Mark Phase 6 (RBAC and auth) complete in the README and name Phase 6B (the web app on sample data) as the next step.
 - Run every question as one pack role: retrieval searches only that role's items, the SQL guard checks that role's tables and columns, the SQL prompt shows only its permitted schema (an aggregate-only role gets its view and sums its metric columns), queries run as that role's ClickHouse user, `jobs.ask` takes `--role` and each eval case runs as its own role; the shared `agent_readonly` user is removed.

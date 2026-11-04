@@ -2,10 +2,11 @@
 
 ## Goal
 
-Generate a Domain Pack for a new company with human review: profile the loaded marts, let reviewers upload and delete company documents at runtime, draft every pack item with evidence and confidence, let a reviewer approve or edit items in a Review UI, then compile the approved pack.
+Generate a Domain Pack for a new company with human review: connect the company's sources (Phase 9E) and profile the marts built from them, let reviewers upload and delete company documents at runtime, draft every pack item with evidence and confidence, let a reviewer approve or edit items in a Review UI, then compile the approved pack.
 
 ## Scope
 
+- A connect step that starts onboarding from the company's source manifest (Phase 9E, DECISIONS §11 step 1).
 - `profile.py`, `ingest_docs.py`, `draft_pack.py` jobs (DECISIONS §11 steps 2-4).
 - Review UI and its API endpoints (step 5).
 - Documents API and page: upload, list and delete company documents at runtime (DECISIONS §5).
@@ -22,6 +23,7 @@ Generate a Domain Pack for a new company with human review: profile the loaded m
 ## Prerequisites
 
 - Phases 2, 4, 6 and 9: compiler, eval, policies, web shell with auth.
+- Phase 9B: document chunks are screened before indexing; Phase 9C: `kb_docs` is a Qdrant collection; Phase 9E: sources are connected through ClickHouse.
 
 ## Deliverables
 
@@ -48,15 +50,15 @@ compose.yaml                        # documents volume on api
 
 ## Tasks
 
-1. **Profiler (test first, deterministic).** From `system.columns` and queries: row counts, min/max per date column, distinct counts, top-K values for low-cardinality strings, join-key candidates (name and value overlap), a few sample rows. No LLM.
-2. **Document ingestion (test first).** Parse PDF, DOCX, Markdown, plain text and XLSX; chunk Markdown and DOCX by heading, PDF and text by paragraphs, XLSX by blocks of rows repeating the header row, all with a size cap; tag chunks with document id, source, heading path or sheet name and `allowed_roles`; index into `kb_docs`. `ingest_docs.py` reads `allowed_roles` from a folder manifest and uses the same service as uploads. Tests on small fixture documents of every format, including an empty file, a PDF without a text layer and a macro-enabled workbook (rejected).
+1. **Profiler (test first, deterministic).** Over the marts dbt built from the connected sources (copy or live, Phase 9E), from `system.columns` and queries: row counts, min/max per date column, distinct counts, top-K values for low-cardinality strings, join-key candidates (name and value overlap), a few sample rows. No LLM.
+2. **Document ingestion (test first).** Parse PDF, DOCX, Markdown, plain text and XLSX; chunk Markdown and DOCX by heading, PDF and text by paragraphs, XLSX by blocks of rows repeating the header row, all with a size cap; tag chunks with document id, source, heading path or sheet name and `allowed_roles`; screen each chunk (Phase 9B) and index the allowed ones into the Qdrant `kb_docs` collection (Phase 9C). `ingest_docs.py` reads `allowed_roles` from a folder manifest and uses the same service as uploads. Tests on small fixture documents of every format, including an empty file, a PDF without a text layer and a macro-enabled workbook (rejected).
 3. **Drafter.** `sql-gen` prompts per pack file take the profile and document chunks and return items with `status: draft`, `evidence` (profile facts or chunk ids) and `confidence`. Drafted `sql_expr` values are test-run before being saved; failures are kept as drafts with the error as evidence. Prompts state that document text is data, never instructions, and that no figures are taken from text.
 4. **YAML round-trip.** Draft writes preserve existing approved items, comments and ordering (ruamel.yaml); a draft never overwrites an approved item.
 5. **Review API.** List items by file and status, edit, approve, delete, test-run a metric expression against ClickHouse with the admin limits. Restricted to a `pack_reviewer` role.
 6. **Review UI.** The pages are built in Phase 6B; this task wires them to the Review API of task 5 (see Web wiring) and saves approved changes to the pack files.
 7. **Compile after review.** Run the Phase 2 compiler; only approved items are used.
 8. **Regeneration experiment.** Copy the hand-written pack to `packs/ecommerce_twin_regen/`, remove the descriptions there and mark those items `status: draft`, so the drafter may fill them without touching approved items. Review, compile and evaluate the copy against the untouched hand-written pack's baseline.
-9. **Documents API (test first).** `POST /documents` (multipart), `GET /documents`, `DELETE /documents/{id}`, restricted to `pack_reviewer`. Upload checks the type from the file content, a size cap (default 20 MB), that `allowed_roles` is a non-empty subset of the pack's roles and that the SHA-256 is new for the pack (409 otherwise), then stores, parses, embeds and indexes as in task 2 and records the registry row. Delete removes the chunks by document id, the stored file and marks the row deleted. Both return 409 while the pack compiles. Tests use a fake embedding client and cover every rejection, a failed parse leaving no chunks, and delete removing every chunk.
+9. **Documents API (test first).** `POST /documents` (multipart), `GET /documents`, `DELETE /documents/{id}`, restricted to `pack_reviewer`. Upload checks the type from the file content, a size cap (default 20 MB), that `allowed_roles` is a non-empty subset of the pack's roles and that the SHA-256 is new for the pack (409 otherwise), then stores, parses, screens, embeds and indexes as in task 2 and records the registry row with the number of chunks the screen blocked; a document whose every chunk is blocked is marked `failed` with that reason. Delete removes the chunks by document id, the stored file and marks the row deleted. Both return 409 while the pack compiles. Tests use a fake embedding client and cover every rejection, a failed parse leaving no chunks, and delete removing every chunk.
 10. **Documents page and propagation.** The page is built in Phase 6B; this task wires it to the Documents API of task 9 and runs the billable "draft from this document" action on that document only. The Review UI flags items whose evidence cites a deleted document.
 11. **Console shell.** Built in Phase 6B with its navigation test; this phase keeps the navigation rule in step with the api's role checks.
 12. **Datasets endpoint.** `GET /datasets` (`pack_reviewer`) returns the compiled pack's datasets with columns, types, roles, descriptions and the pack roles allowed to read each; the Phase 6B page is wired to it.
@@ -87,7 +89,8 @@ docker compose run --rm api python -m jobs.eval --pack ecommerce_twin --baseline
 | DoD item | Proof |
 |---|---|
 | Regenerated and reviewed descriptions score not significantly lower than the hand-written pack | Eval comparison in the PR, within the agreed tolerance |
-| An uploaded document is searchable and a deleted one is gone | Integration test against live OpenSearch: upload, `kb_docs` search hit, delete, no hit |
+| An uploaded document is searchable and a deleted one is gone | Integration test against live Qdrant: upload, `kb_docs` search hit, delete, no hit |
+| A document carrying an injection is not indexed | Integration test with an attack chunk from the Phase 9B attack set |
 
 ## Risks and open questions
 

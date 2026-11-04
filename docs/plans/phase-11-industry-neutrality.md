@@ -2,11 +2,12 @@
 
 ## Goal
 
-Show that the engine is industry-neutral: onboard a second dataset from a different industry using only the Phase 10 pipeline, write its eval set, and reach the eval threshold with zero changed lines in `apps/api` and `apps/web`.
+Show that the engine is industry- and source-neutral: serve a second dataset from a different industry out of a PostgreSQL database, connect it through a Phase 9E source manifest, onboard it using only the Phase 10 pipeline, write its eval set, and reach the eval threshold with zero changed lines in `apps/api` and `apps/web`.
 
 ## Scope
 
-- Choose and load the second dataset (Iowa Liquor Sales or `SDataPro/maycee-retail-dataset`).
+- Choose the second dataset (Iowa Liquor Sales or `SDataPro/maycee-retail-dataset`) and place it in the fixture PostgreSQL of the `sources` profile, as a company's own database would hold it.
+- Connect it with a source manifest (`kind: postgres`), in copy mode unless the RBAC test of Phase 9E allows live mode for its policies.
 - dbt marts for it, a pack produced by profile -> draft -> review -> compile, and its `eval.yaml`.
 - Evidence that engine code did not change.
 
@@ -16,12 +17,13 @@ Show that the engine is industry-neutral: onboard a second dataset from a differ
 
 ## Prerequisites
 
-- Phase 10 complete; eval threshold agreed (Phase 4 open question 4).
+- Phases 9E and 10 complete; eval threshold agreed (Phase 4 open question 4).
 
 ## Deliverables
 
 ```text
-jobs/sources/<second_pack>.yaml
+infra/sources/<second_pack>/             # seed script placing the dataset in PostgreSQL (outside the engine)
+jobs/sources/<second_pack>.yaml          # kind: postgres
 dbt/models/<second_pack>/staging/ marts/
 packs/<second_pack>/                # all eight files, approved through review
 docs/eval/<second_pack>-report.md
@@ -29,8 +31,8 @@ docs/eval/<second_pack>-report.md
 
 ## Tasks
 
-1. **Choose the dataset.** Compare licence, size and shape. Iowa Liquor Sales is real, one wide table and large, so its manifest sets a `date_range` (Phase 1 manifest contract) to load a bounded period; Maycee needs its licence and table layout confirmed. Record the choice in DECISIONS §4.
-2. **Load.** Source manifest only; the Phase 1 refresh job and loader are reused unchanged, building only the models tagged with the new pack.
+1. **Choose the dataset.** Compare licence, size and shape. Iowa Liquor Sales is real, one wide table and large, so its seed script places a bounded period in PostgreSQL; Maycee needs its licence and table layout confirmed. Record the choice in DECISIONS §4.
+2. **Connect.** Seed the dataset into PostgreSQL outside the engine, then declare it in a source manifest only; `jobs/sync_sources.py` (copy) or the live engine definition (Phase 9E) is reused unchanged, and dbt builds only the models tagged with the new pack.
 3. **Marts.** dbt models in a separate folder; 1-3 wide marts.
 4. **Onboard.** `profile.py` -> `ingest_docs.py` (if documents exist) -> `draft_pack.py` -> Review UI -> `compile_pack.py`.
 5. **Eval set.** At least 30 cases covering every DECISIONS §12 category, with reference SQL.
@@ -44,7 +46,8 @@ docs/eval/<second_pack>-report.md
 ## Verification
 
 ```bash
-docker compose run --rm api python -m jobs.refresh_data --source <second_pack>   # manifest dbt_tag selects only this pack's models
+docker compose --profile sources up --wait
+docker compose run --rm api python -m jobs.sync_sources --source <second_pack>   # copy mode; the manifest dbt_tag selects only this pack's models
 docker compose run --rm api python -m jobs.compile_pack --pack <second_pack>
 docker compose run --rm api python -m jobs.eval --pack <second_pack>
 docker compose run --rm api python -m jobs.eval --pack ecommerce_twin --baseline packs/ecommerce_twin/eval_baseline.json   # --pack overrides ACTIVE_PACK (Phase 4)
@@ -57,13 +60,14 @@ python scripts/check_pack_isolation.py
 | DoD item | Proof |
 |---|---|
 | New pack runs with 0 changed lines in `apps/api` and `apps/web` | Empty `git diff --stat` output |
+| The data arrives through a source manifest only | No new loader in `jobs/`; the manifest and seed script are the only data-path files |
 | Reaches the eval threshold | Eval report in the PR |
 | The first pack does not regress | `ecommerce_twin` eval report and baseline diff in the PR |
 
 ## Risks and open questions
 
 1. **Dataset choice.** Default: Iowa Liquor Sales, bounded to recent full years, because it is real data from a clearly different domain.
-2. **Active pack switching.** DECISIONS allows one active pack per run. Default: switch with `ACTIVE_PACK` and restart `api`; both packs coexist because Phase 2 indices and aliases are pack-scoped (`<pack>_<index>`), and compiling one pack never touches the other's indices.
+2. **Active pack switching.** DECISIONS allows one active pack per run. Default: switch with `ACTIVE_PACK` and restart `api`; both packs coexist because the search collections and aliases are pack-scoped (`<pack>_<index>`, Phase 9C), and compiling one pack never touches the other's collections.
 3. **dbt selection by pack.** Default: one dbt project with a folder and tag per pack, built with `--select tag:<pack>`.
 
 ## Web wiring
