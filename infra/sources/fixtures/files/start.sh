@@ -1,8 +1,9 @@
 #!/bin/sh
 # Starts the fixture S3-compatible store (SeaweedFS) with one read-only
 # identity, then copies the widget CSV files into its bucket through the
-# filer, which is reachable only inside the Compose network. The store keeps
-# no volume, so every start serves a fresh copy; /tmp/seeded marks the copy done.
+# filer, which is reachable only inside the Compose network. Every start
+# empties /data (the image's volume, which also holds the filer metadata), so
+# the store always serves a fresh copy; /tmp/seeded marks the copy done.
 set -eu
 
 bucket="$FIXTURE_FILES_DATABASE"
@@ -19,8 +20,9 @@ cat > /tmp/s3.json <<EOF
 EOF
 
 rm -f /tmp/seeded
-mkdir -p /tmp/store
-weed server -dir=/tmp/store -master.volumeSizeLimitMB=64 -volume.max=8 \
+rm -rf /data/*
+cd /data
+weed server -dir=/data -master.volumeSizeLimitMB=64 -volume.max=8 \
     -s3 -s3.port=8333 -s3.config=/tmp/s3.json &
 server=$!
 

@@ -59,6 +59,7 @@ Only the `source_loader` user ([`infra/clickhouse/users.d/sources.xml`](../infra
 
 Column grants, row policies and aggregate-only views behave the same on live marts as on copied data: `apps/api/tests/test_sources_live.py` checks them on each live kind and on a copy, so no policy has to force copy mode.
 A MongoDB collection is read live only when it is flat; a nested collection is copied with its documents' top-level fields and flattened in dbt.
+After a PostgreSQL source restarts, ClickHouse's `PostgreSQL` engine fails the first query on each pooled connection with `broken_connection` and reconnects for the next one, so a live question can fail once and succeed when asked again; the MySQL, MongoDB and S3 engines reconnect without an error.
 
 ### Fixture sources
 

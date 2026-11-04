@@ -63,7 +63,7 @@ The admin and dbt read `src_*` tables without the collections, and live marts ar
 Adding a source and choosing its mode are described in [jobs/](../jobs/README.md#data-sources).
 
 The `sources` Compose profile starts the fixture systems `postgres-fixture`, `mysql-fixture`, `mongodb-fixture` and `files-fixture` (SeaweedFS), which publish no port.
-PostgreSQL, MySQL and MongoDB seed on a fresh volume, so recreate one with `docker compose --profile sources rm -sfv <service>` to seed it again; the file store keeps no volume and copies the files on every start.
+PostgreSQL, MySQL and MongoDB seed on a fresh volume, so recreate one with `docker compose --profile sources rm -sfv <service>` to seed it again; the file store empties its volume and copies the files on every start.
 
 ## LiteLLM
 
