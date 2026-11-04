@@ -1,55 +1,7 @@
-# Fixable High/Critical advisories in ghcr.io/berriai/litellm:v1.106.6 that only an upstream release can fix.
-# The tag was the newest stable release when scanned on 2026-10-30 and 2026-11-01; see SECURITY.md, Image exceptions.
+# Fixable High/Critical advisories in ghcr.io/berriai/litellm:v1.106.7 that only an upstream release can fix.
+# The tag was the newest stable release when scanned on 2026-11-04; see SECURITY.md, Image exceptions.
 # Each entry expires; after that date the finding blocks the image audit again.
 vulnerabilities:
-  - id: CVE-2026-111943
-    statement: Bundled py3-pip-wheel in the upstream image; fixed only by a new upstream release.
-    expired_at: 2026-12-31
   - id: CVE-2026-112940
     statement: Bundled filelock in the upstream image; fixed only by a new upstream release.
-    expired_at: 2026-12-31
-  - id: CVE-2026-114605
-    statement: Bundled dnspython in the upstream image; fixed only by a new upstream release.
-    expired_at: 2026-12-31
-  - id: CVE-2026-114613
-    statement: Bundled py3-pip-wheel in the upstream image; fixed only by a new upstream release.
-    expired_at: 2026-12-31
-  - id: CVE-2026-116588
-    statement: Bundled ddtrace in the upstream image; fixed only by a new upstream release.
-    expired_at: 2026-12-31
-  - id: CVE-2026-116589
-    statement: Bundled ddtrace in the upstream image; fixed only by a new upstream release.
-    expired_at: 2026-12-31
-  - id: CVE-2026-119194
-    statement: Bundled pyasn1 in the upstream image; fixed only by a new upstream release.
-    expired_at: 2026-12-31
-  - id: CVE-2026-119195
-    statement: Bundled pyasn1 in the upstream image; fixed only by a new upstream release.
-    expired_at: 2026-12-31
-  - id: CVE-2026-119196
-    statement: Bundled pyasn1 in the upstream image; fixed only by a new upstream release.
-    expired_at: 2026-12-31
-  - id: CVE-2026-119197
-    statement: Bundled pyasn1 in the upstream image; fixed only by a new upstream release.
-    expired_at: 2026-12-31
-  - id: CVE-2026-119203
-    statement: Bundled pypdf in the upstream image; fixed only by a new upstream release.
-    expired_at: 2026-12-31
-  - id: CVE-2026-119204
-    statement: Bundled pypdf in the upstream image; fixed only by a new upstream release.
-    expired_at: 2026-12-31
-  - id: CVE-2026-119205
-    statement: Bundled pypdf in the upstream image; fixed only by a new upstream release.
-    expired_at: 2026-12-31
-  - id: CVE-2026-119206
-    statement: Bundled pypdf in the upstream image; fixed only by a new upstream release.
-    expired_at: 2026-12-31
-  - id: CVE-2026-119207
-    statement: Bundled pypdf in the upstream image; fixed only by a new upstream release.
-    expired_at: 2026-12-31
-  - id: CVE-2026-119208
-    statement: Bundled pypdf in the upstream image; fixed only by a new upstream release.
-    expired_at: 2026-12-31
-  - id: CVE-2026-119209
-    statement: Bundled pypdf in the upstream image; fixed only by a new upstream release.
     expired_at: 2026-12-31
