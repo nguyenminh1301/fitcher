@@ -8,6 +8,7 @@ execution match rate reaches the run's threshold.
 """
 
 from collections.abc import Sequence
+from dataclasses import dataclass
 
 from pydantic import BaseModel
 
@@ -115,6 +116,32 @@ def _mean_recall(cases: Sequence[CaseScore]) -> str:
     return f"{sum(recalls) / len(recalls):.2f}" if recalls else "-"
 
 
+@dataclass(frozen=True)
+class RoutingTotals:
+    """How the run's SQL was routed across model tiers (DECISIONS §6 step 9)."""
+
+    # Cases that generated SQL at least once.
+    generated: int
+    # Of those, cases whose first generation used sql-small.
+    small_first: int
+    # Of those, cases that needed another generation after sql-small.
+    escalated: int
+
+    @property
+    def small_share(self) -> float | None:
+        return self.small_first / self.generated if self.generated else None
+
+    @property
+    def escalation_rate(self) -> float | None:
+        return self.escalated / self.small_first if self.small_first else None
+
+
+def routing_totals(cases: Sequence[CaseScore]) -> RoutingTotals:
+    generated = [case.sql_tiers for case in cases if case.sql_tiers]
+    small = [tiers for tiers in generated if tiers[0] == "sql-small"]
+    return RoutingTotals(len(generated), len(small), sum(1 for tiers in small if len(tiers) > 1))
+
+
 def render_markdown(run: EvalRun, diff: BaselineDiff | None = None) -> str:
     totals = layer_totals(run.cases)
     execution = totals["execution"]
@@ -143,6 +170,16 @@ def render_markdown(run: EvalRun, diff: BaselineDiff | None = None) -> str:
             for item in (layers[layer] for layer in LAYERS)
         ]
         lines.append(f"| {category} | {' | '.join(cells)} |")
+
+    routing = routing_totals(run.cases)
+    lines += [
+        "", "## Model routing", "",
+        f"Cases that generated SQL: {routing.generated}. First generation on sql-small: {routing.small_first} "
+        f"({_percent(routing.small_share)}); escalated after sql-small: {routing.escalated} "
+        f"({_percent(routing.escalation_rate)}).",
+    ]
+    if run.tiers:
+        lines += ["", "| Tier | Alias |", "| --- | --- |", *(f"| {tier} | {alias} |" for tier, alias in run.tiers.items())]
 
     if diff is not None:
         lines += [

@@ -2,7 +2,7 @@
 
 The §8 rules in ``app.agent.chart_rules`` choose from the result and the
 QuerySpec. Only when they tie, a bar or a pie for one category and one measure
-of at most six non-negative groups, does the ``fast`` alias read the question,
+of at most six non-negative groups, does the ``fast`` tier read the question,
 never the rows, to tell whether it asks for a share. An invalid reply or a
 gateway failure keeps the rules' pick.
 """
@@ -17,7 +17,7 @@ from app.agent.state import AgentDeps, AgentState
 from app.contracts.chart_spec import ChartType
 from app.llm.client import LLMError
 
-ALIAS = "fast"
+TIER = "fast"
 PROMPT = "chart_recommender.v2"
 
 
@@ -33,7 +33,7 @@ def chart_recommender(state: AgentState, deps: AgentDeps) -> dict:
         return {"chart_spec": choice.spec}
     prompt = render(PROMPT, question=json.dumps(state["question"], ensure_ascii=False))
     try:
-        pick = deps.llm.structured(ALIAS, prompt, ChartPick).chart_type
+        pick = deps.llm.structured(TIER, prompt, ChartPick).chart_type
     except LLMError:
         pick = None
     return {"chart_spec": choice.drawn_as(pick if pick in choice.tied else None)}

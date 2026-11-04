@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
-from app.api import ask, auth, conversations, feedback, runtime
+from app.api import ask, auth, conversations, feedback, models, runtime
 
 
 @asynccontextmanager
@@ -19,6 +19,7 @@ app.include_router(auth.router)
 app.include_router(ask.router)
 app.include_router(conversations.router)
 app.include_router(feedback.router)
+app.include_router(models.router)
 
 
 @app.get("/health")

@@ -19,7 +19,7 @@ def test_a_tie_asks_the_fast_alias_with_the_question_and_never_the_rows():
     spec, calls = recommend(SHARE, [{"chart_type": "pie"}])
 
     assert spec.type == "pie"
-    assert [(call.alias, call.method) for call in calls] == [("fast", "structured")]
+    assert [(call.tier, call.method) for call in calls] == [("fast", "structured")]
     assert QUESTION in calls[0].prompt and "North" not in calls[0].prompt
 
 

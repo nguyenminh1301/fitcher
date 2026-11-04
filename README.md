@@ -20,9 +20,9 @@ Phases 1 (lab dataset and dbt marts), 2 (hand-written Domain Pack and compiler),
 | Auth | Keycloak (OIDC) | Users and roles carried in JWTs |
 | API | FastAPI, SSE | Authenticated requests and streamed results |
 | Agent | LangGraph, sqlglot | Extract, retrieve, generate, guard, execute and summarize |
-| LLM gateway | LiteLLM Proxy (OpenAI) | Aliases `fast`, `sql-gen`, `sql-gen-hard`, `embed` |
+| LLM gateway | LiteLLM Proxy (OpenAI, Anthropic, Gemini, Ollama) | Model tiers `fast`, `sql-small`, `sql-gen`, `sql-gen-hard`, `embed` mapped to catalog aliases |
 | Data and logs | ClickHouse | `raw`, `marts` and `agent_logs` databases, role-based access |
-| Retrieval | Qdrant | Dense `embed` and BM25 sparse vectors per point, fused with RRF on the server |
+| Retrieval | Qdrant | Dense vectors of the `embed` tier and BM25 sparse vectors per point, fused with RRF on the server |
 | Transform | dbt-clickhouse | Raw tables to wide marts |
 | Packs | YAML + JSON Schema | Per-company profile, datasets, glossary, metrics, policies and eval |
 | Deployment | Docker Compose | Six long-running services plus jobs |
@@ -34,7 +34,7 @@ Install Docker with Compose v2 (`--wait` support) and give Docker about 8 GB of 
 Host Node/Python are optional when using Docker. Run these commands from the repository root.
 
 Copy [.env.example](.env.example) to `.env` and replace every `change-me` value. Never commit `.env`.
-`OPENAI_API_KEY` is needed only for the smoke call; every service reports healthy without it.
+A provider's catalog aliases load only when its key is set (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GEMINI_API_KEY`, or `OLLAMA_URL` with the `local-models` profile); every service reports healthy without any key.
 
 | Make target | Plain command (PowerShell and Bash) |
 | --- | --- |
@@ -45,7 +45,7 @@ Copy [.env.example](.env.example) to `.env` and replace every `change-me` value.
 | `make down` | `docker compose down` |
 
 `make` is optional; the Makefile only wraps these commands. `make down` never removes volumes, so ClickHouse and Qdrant data survive restarts.
-`make smoke` sends one billable request to the `fast` alias through LiteLLM and prints only the reply length.
+`make smoke` sends one tiny billable request to every alias LiteLLM loaded, checking structured output for chat aliases and one vector for `-embed` aliases, and prints only whether each passed; `--alias <name>` limits it.
 
 ### Load the lab dataset and build the marts
 
@@ -66,7 +66,7 @@ On Linux hosts, `./data` must be writable by UID 10001, the non-root user of the
 docker compose run --rm jobs python -m jobs.compile_pack --pack ecommerce_twin
 ```
 
-The compile validates the pack against the marts, test-runs every metric, embeds pack items through the `embed` alias (billable, needs `OPENAI_API_KEY`) and publishes the pack's Qdrant collections and `compiled.json`; see [packs/](packs/README.md#compiling-a-pack).
+The compile validates the pack against the marts, test-runs every metric, embeds pack items through the `embed` tier's alias (billable, needs `OPENAI_API_KEY`) and publishes the pack's Qdrant collections and `compiled.json`; see [packs/](packs/README.md#compiling-a-pack).
 `ACTIVE_PACK` in `.env` names the pack the API serves.
 
 ### Screen questions
@@ -92,7 +92,7 @@ docker compose run --rm api python -m jobs.screen_eval --pack ecommerce_twin
 docker compose run --rm api python -m jobs.ask "Top 10 best-selling products in Q1 2024 compared with Q1 2025"
 ```
 
-The agent extracts the question, resolves its periods, retrieves pack context, builds a QuerySpec, generates SQL through `sql-gen`, guards it, runs `EXPLAIN` and the query as the asking role's read-only ClickHouse user (`--role`, the pack's first role by default), repairs failing SQL up to three times (the third through `sql-gen-hard`) and summarizes the rows in the question's language.
+The agent extracts the question, resolves its periods, retrieves pack context, builds a QuerySpec, generates SQL through `sql-small` for a simple spec (one metric, at most one dimension, one period, no comparison or top N) and `sql-gen` otherwise, guards it, runs `EXPLAIN` and the query as the asking role's read-only ClickHouse user (`--role`, the pack's first role by default), repairs failing SQL up to three times (a retry after `sql-small` moves to `sql-gen`, the third through `sql-gen-hard`) and summarizes the rows in the question's language.
 Each run sends billable requests to the LiteLLM aliases. Pass `--timezone <IANA name>` for relative periods (UTC by default) and `--inject-sql-fault` to watch a broken first query being repaired.
 A question that names no measure or period, ranks by a word no convention defines, or uses a term that fits several metrics or columns prints a clarifying question with its options and exits with code 2, as does a question with a term or value that matches nothing; a question the role may not read exits with code 3 and the denial, before any SQL is generated, and is written to `agent_logs.audit`; a query that cannot be repaired exits with code 1 after printing the last SQL and error.
 
@@ -127,6 +127,11 @@ docker compose run --rm -v ./build/eval:/app/build/eval api python -m jobs.eval 
 Each active case in `packs/<pack>/eval.yaml` runs through the agent at temperature 0 with the eval set's `reference_date` as today, and is scored on the router's intent, extraction, retrieval and execution against its reference result; a case that expects a denial, a clarifying question or an out-of-scope reply scores that decision as its execution, and a `follow_up` or `chart_edit` case asks its `previous_question` first in the same conversation. Cases for branches of later phases are reported as not yet scored.
 The run prints a Markdown report and, with `--output-dir`, also writes `<pack>-eval.md` and `<pack>-eval.json`; `--baseline <json>` compares the run with an earlier one, `--only <ids>` runs selected cases.
 It exits with code 0 when the execution match rate reaches the pack threshold (80% by default) and no layer regressed, 1 otherwise, and 2 when the run cannot start or a reference query fails. Each run sends billable requests to the LiteLLM aliases.
+The report shows the share of SQL first generated by `sql-small` and how often it escalated. `--tier <tier>=<alias>` runs a chat tier on another catalog alias, for example `--tier sql-small=anthropic-small`; the mapping of the tiers the run called and whether it regressed against `--baseline` are stored with the report in `agent_logs.eval_reports`. A run with `--only`, a `--threshold` below 80% or a reference error is stored without tier evidence.
+
+### Map model tiers to aliases
+
+Each tier calls its `MODEL_TIER_<TIER>` default from `.env`. An `admin` changes a chat tier on the console's Models page, backed by `GET /admin/models` and `PUT /admin/models/{tier}`: an alias is offered only when LiteLLM loaded it and is eligible when the latest eval report of the active pack that called the tier with it met the threshold and did not regress against its baseline; a tier no eval case reached, such as `sql-gen-hard` when nothing escalated, gets no evidence from that run. The mapping is stored in `data_meta.model_tiers`, read by the api at most 30 seconds later without a LiteLLM restart, and each change is recorded in `agent_logs.admin_actions`. `embed` changes only in `.env`, followed by a full reindex.
 
 | Service | Host address | Health check |
 | --- | --- | --- |

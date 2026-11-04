@@ -86,7 +86,8 @@ class Attempt(BaseModel):
 
     model_config = ConfigDict(frozen=True)
 
-    alias: str
+    # The model tier the SQL was generated with.
+    tier: str
     sql: str
     query_id: str | None = None
     error: AgentError | None = None
@@ -125,6 +126,8 @@ class AgentState(TypedDict, total=False):
     retrieval: BaseModel | None
     spec: QuerySpec | None
     time_grain: TimeGrain | None
+    # The SQL complexity rule's score of ``spec``: simple or standard.
+    complexity: str | None
     sql: str | None
     attempts: list[Attempt]
     errors: list[AgentError]

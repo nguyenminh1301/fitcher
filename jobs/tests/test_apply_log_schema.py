@@ -6,7 +6,7 @@ from jobs import apply_log_schema
 
 TABLES = [
     "runs", "events", "llm_calls", "sql_runs", "audit",
-    "chat_messages", "feedback", "eval_reports", "example_proposals",
+    "chat_messages", "feedback", "eval_reports", "example_proposals", "admin_actions",
 ]
 # Tables whose rows are replaced on every change and expire 90 days after their last update.
 REPLACED_TABLES = ["conversations", "conversation_groups"]
@@ -53,6 +53,26 @@ def test_chat_messages_columns_added_later_reach_existing_volumes():
         assert f"ALTER TABLE agent_logs.chat_messages ADD COLUMN IF NOT EXISTS {column}" in schema_statements()
 
 
+@pytest.mark.parametrize(("table", "column"), [
+    ("llm_calls", "tier LowCardinality(String)"),
+    ("eval_reports", "tiers Map(String, String)"),
+    ("eval_reports", "regressed Nullable(Bool)"),
+])
+def test_model_routing_columns_reach_existing_volumes(table, column):
+    assert f"    {column}" in table_statement(table)
+    assert any(
+        statement.startswith(f"ALTER TABLE agent_logs.{table} ADD COLUMN IF NOT EXISTS {column}")
+        for statement in schema_statements()
+    )
+
+
+def test_model_tiers_keep_the_latest_change_per_tier():
+    statements = apply_log_schema.split_statements(apply_log_schema.SCHEMA_FILES[1].read_text(encoding="utf-8"))
+    assert len(statements) == 1
+    assert statements[0].startswith("CREATE TABLE IF NOT EXISTS data_meta.model_tiers")
+    assert "ENGINE = ReplacingMergeTree(changed_at)\nORDER BY tier" in statements[0]
+
+
 @pytest.mark.parametrize("table", REPLACED_TABLES)
 def test_replaced_tables_keep_the_latest_row_per_user_and_id(table):
     statement = table_statement(table)
@@ -79,6 +99,7 @@ def test_every_table_expires_after_90_days_and_accepts_dedup_tokens(table):
         ("feedback", "ORDER BY (user_id, ts)"),
         ("eval_reports", "ORDER BY (pack, ts)"),
         ("example_proposals", "ORDER BY (pack, ts)"),
+        ("admin_actions", "ORDER BY (action, ts)"),
         ("conversations", "ORDER BY (user_id, conversation_id)"),
         ("conversation_groups", "ORDER BY (user_id, group_id)"),
     ],
@@ -129,9 +150,12 @@ def test_main_reports_missing_credentials(monkeypatch, capsys):
     assert "CLICKHOUSE_ADMIN_USER" in capsys.readouterr().err
 
 
-def test_main_applies_the_schema_file(monkeypatch, capsys):
+def test_main_applies_every_schema_file_in_order(monkeypatch, capsys):
     client = FakeClient()
     monkeypatch.setattr(apply_log_schema, "admin_client", lambda: client)
+    tiers = apply_log_schema.split_statements(apply_log_schema.SCHEMA_FILES[1].read_text(encoding="utf-8"))
     assert apply_log_schema.main([]) == 0
-    assert client.commands == schema_statements()
-    assert f"{len(client.commands)} statements" in capsys.readouterr().out
+    assert client.commands == [*schema_statements(), *tiers]
+    output = capsys.readouterr().out
+    assert f"{len(schema_statements())} statements from 010-agent-logs.sql" in output
+    assert "1 statements from 020-model-tiers.sql" in output

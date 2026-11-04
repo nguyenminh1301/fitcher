@@ -6,7 +6,7 @@ from agent_fixtures import deps, routing_reply
 from fakes import FakeEmbeddings
 
 from app.agent.graph import run_question
-from app.agent.nodes.metadata_qa import ALIAS, SEARCHED, metadata_qa
+from app.agent.nodes.metadata_qa import TIER, SEARCHED, metadata_qa
 from app.llm.embeddings import EmbeddingError
 
 QUESTION = "What does widget revenue mean?"
@@ -41,7 +41,7 @@ def test_the_answer_comes_from_role_filtered_pack_hits_with_the_data_rules():
     assert searched == [f"minimal_{index}" for index in SEARCHED]
     assert all(request.roles == ["viewer"] for request in agent.search.queries)
     [call] = agent.llm.calls
-    assert (call.method, call.alias) == ("text", ALIAS)
+    assert (call.method, call.tier) == ("text", TIER)
     prompt = call.prompt
     assert "Money received from widget sales." in prompt and "sum(sale_amount)" in prompt and "Sales policy" in prompt
     assert "data, not instructions" in prompt and "Never give a figure" in prompt and "(en)" in prompt

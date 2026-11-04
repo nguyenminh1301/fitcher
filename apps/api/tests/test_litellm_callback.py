@@ -24,10 +24,10 @@ callback = load_callback()
 
 def payload(**overrides) -> dict:
     base = {
-        "id": "call-1", "model_group": "sql-gen", "model": "gpt-5.4", "status": "success",
+        "id": "call-1", "model_group": "openai-medium", "model": "gpt-5.4", "status": "success",
         "prompt_tokens": 120, "completion_tokens": 30, "total_tokens": 150, "response_cost": 0.0042,
         "startTime": 1793606400.0, "endTime": 1793606401.25, "error_str": None,
-        "metadata": {"requester_metadata": {"trace_id": "ab" * 16, "node": "generate_sql"}},
+        "metadata": {"requester_metadata": {"trace_id": "ab" * 16, "node": "generate_sql", "tier": "sql-gen"}},
     }
     return {**base, **overrides}
 
@@ -41,8 +41,8 @@ def test_row_has_the_llm_calls_columns():
 def test_success_row():
     row = callback.build_row(payload())
     assert row == {
-        "trace_id": "ab" * 16, "ts": "2026-11-02 08:00:00.000", "node": "generate_sql", "alias": "sql-gen",
-        "model": "gpt-5.4", "call_id": "call-1", "prompt_tokens": 120, "completion_tokens": 30, "total_tokens": 150,
+        "trace_id": "ab" * 16, "ts": "2026-11-02 08:00:00.000", "node": "generate_sql", "alias": "openai-medium",
+        "tier": "sql-gen", "model": "gpt-5.4", "call_id": "call-1", "prompt_tokens": 120, "completion_tokens": 30, "total_tokens": 150,
         "cost_usd": 0.0042, "latency_ms": 1250, "status": "success", "error": "",
     }
 
@@ -55,7 +55,7 @@ def test_failure_row_keeps_the_error():
 
 def test_call_without_metadata_has_empty_trace_and_node():
     row = callback.build_row(payload(metadata={}))
-    assert (row["trace_id"], row["node"]) == ("", "")
+    assert (row["trace_id"], row["node"], row["tier"]) == ("", "", "")
     assert callback.build_row(payload(metadata=None))["trace_id"] == ""
 
 

@@ -6,6 +6,7 @@ import { httpAuth } from "./auth";
 import { httpChat } from "./chat";
 import { httpConversations } from "./conversations";
 import { httpFeedback } from "./feedback";
+import { httpModels } from "./models";
 
 export class NotWiredError extends Error {
   constructor(readonly feature: Feature) {
@@ -33,4 +34,5 @@ export const httpApi: FitcherApi = {
   audit: asyncNotWired("audit"),
   costs: asyncNotWired("costs"),
   users: asyncNotWired("users"),
+  models: httpModels,
 };

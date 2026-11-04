@@ -17,6 +17,8 @@ services:
       CLICKHOUSE_QUERY_STOPPER_PASSWORD: ${CLICKHOUSE_QUERY_STOPPER_PASSWORD:?set CLICKHOUSE_QUERY_STOPPER_PASSWORD in .env}
       # Read by users.d/agent_conversations.xml.
       CLICKHOUSE_CONVERSATIONS_PASSWORD: ${CLICKHOUSE_CONVERSATIONS_PASSWORD:?set CLICKHOUSE_CONVERSATIONS_PASSWORD in .env}
+      # Read by users.d/model_tiers.xml.
+      CLICKHOUSE_MODEL_TIERS_PASSWORD: ${CLICKHOUSE_MODEL_TIERS_PASSWORD:?set CLICKHOUSE_MODEL_TIERS_PASSWORD in .env}
     ports:
       - "127.0.0.1:8123:8123"
       - "127.0.0.1:9000:9000"
@@ -27,6 +29,7 @@ services:
       - ./infra/clickhouse/users.d/agent_logs.xml:/etc/clickhouse-server/users.d/agent_logs.xml:ro
       - ./infra/clickhouse/users.d/agent_query_stopper.xml:/etc/clickhouse-server/users.d/agent_query_stopper.xml:ro
       - ./infra/clickhouse/users.d/agent_conversations.xml:/etc/clickhouse-server/users.d/agent_conversations.xml:ro
+      - ./infra/clickhouse/users.d/model_tiers.xml:/etc/clickhouse-server/users.d/model_tiers.xml:ro
       - ./infra/clickhouse/initdb:/docker-entrypoint-initdb.d:ro
     ulimits:
       nofile:
@@ -65,22 +68,25 @@ services:
 
   litellm:
     image: ghcr.io/berriai/litellm:v1.106.7
-    command: ["--config", "/app/config.yaml", "--port", "4000"]
+    # build_config.py adds each catalog block whose provider key is set, then starts the proxy.
+    entrypoint: ["python", "/app/build_config.py"]
+    command: ["--port", "4000"]
     environment:
       LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY:?set LITELLM_MASTER_KEY in .env}
-      LITELLM_MODEL_FAST: ${LITELLM_MODEL_FAST:?set LITELLM_MODEL_FAST in .env}
-      LITELLM_MODEL_SQL_GEN: ${LITELLM_MODEL_SQL_GEN:?set LITELLM_MODEL_SQL_GEN in .env}
-      LITELLM_MODEL_SQL_GEN_HARD: ${LITELLM_MODEL_SQL_GEN_HARD:?set LITELLM_MODEL_SQL_GEN_HARD in .env}
-      LITELLM_MODEL_EMBED: ${LITELLM_MODEL_EMBED:?set LITELLM_MODEL_EMBED in .env}
       # callbacks/clickhouse_logger.py writes agent_logs.llm_calls as the log writer.
       CLICKHOUSE_HOST: clickhouse
       CLICKHOUSE_LOGS_WRITER_PASSWORD: ${CLICKHOUSE_LOGS_WRITER_PASSWORD:?set CLICKHOUSE_LOGS_WRITER_PASSWORD in .env}
-      # The OpenAI key is passed to this service only.
+      # Provider keys are passed to this service only.
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      OLLAMA_URL: ${OLLAMA_URL:-}
     ports:
       - "127.0.0.1:4000:4000"
     volumes:
       - ./infra/litellm/config.yaml:/app/config.yaml:ro
+      - ./infra/litellm/build_config.py:/app/build_config.py:ro
+      - ./infra/litellm/catalog:/app/catalog:ro
       - ./infra/litellm/callbacks/clickhouse_logger.py:/app/clickhouse_logger.py:ro
       # The screening guardrail and its copy of the api's rules (DECISIONS §9).
       - ./infra/litellm/callbacks/screening_guard.py:/app/screening_guard.py:ro
@@ -138,6 +144,14 @@ services:
       CLICKHOUSE_QUERY_STOPPER_PASSWORD: ${CLICKHOUSE_QUERY_STOPPER_PASSWORD:?set CLICKHOUSE_QUERY_STOPPER_PASSWORD in .env}
       # Reads and writes the asking user's conversations.
       CLICKHOUSE_CONVERSATIONS_PASSWORD: ${CLICKHOUSE_CONVERSATIONS_PASSWORD:?set CLICKHOUSE_CONVERSATIONS_PASSWORD in .env}
+      # Reads and writes the model tier mapping of the Models page.
+      CLICKHOUSE_MODEL_TIERS_PASSWORD: ${CLICKHOUSE_MODEL_TIERS_PASSWORD:?set CLICKHOUSE_MODEL_TIERS_PASSWORD in .env}
+      # Default catalog alias of each model tier (apps/api/app/llm/tiers.py).
+      MODEL_TIER_FAST: ${MODEL_TIER_FAST:-openai-small}
+      MODEL_TIER_SQL_SMALL: ${MODEL_TIER_SQL_SMALL:-openai-small}
+      MODEL_TIER_SQL_GEN: ${MODEL_TIER_SQL_GEN:-openai-medium}
+      MODEL_TIER_SQL_GEN_HARD: ${MODEL_TIER_SQL_GEN_HARD:-openai-large}
+      MODEL_TIER_EMBED: ${MODEL_TIER_EMBED:-openai-embed}
       LOG_BATCH_SIZE: ${LOG_BATCH_SIZE:-100}
       LOG_FLUSH_INTERVAL_MS: ${LOG_FLUSH_INTERVAL_MS:-1000}
       LOG_QUEUE_MAX: ${LOG_QUEUE_MAX:-10000}
@@ -199,6 +213,12 @@ services:
       LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY:?set LITELLM_MASTER_KEY in .env}
       EMBEDDING_DIMENSIONS: ${EMBEDDING_DIMENSIONS:-1024}
       COLUMN_VALUES_TOP_K: ${COLUMN_VALUES_TOP_K:-10000}
+      # Default catalog alias of each model tier (apps/api/app/llm/tiers.py).
+      MODEL_TIER_FAST: ${MODEL_TIER_FAST:-openai-small}
+      MODEL_TIER_SQL_SMALL: ${MODEL_TIER_SQL_SMALL:-openai-small}
+      MODEL_TIER_SQL_GEN: ${MODEL_TIER_SQL_GEN:-openai-medium}
+      MODEL_TIER_SQL_GEN_HARD: ${MODEL_TIER_SQL_GEN_HARD:-openai-large}
+      MODEL_TIER_EMBED: ${MODEL_TIER_EMBED:-openai-embed}
       # set_lab_passwords signs in as the Keycloak bootstrap administrator.
       KEYCLOAK_URL: http://keycloak:8080
       KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN:?set KEYCLOAK_ADMIN in .env}
@@ -233,6 +253,21 @@ services:
       HF_TOKEN: ${HF_TOKEN:-}
     volumes:
       - guard-models:/models/guard
+
+  # A local model for the local-small alias (DECISIONS §2); optional and off by default.
+  # Start it with `docker compose --profile local-models up -d ollama`, pull the
+  # model named in infra/litellm/catalog/ollama.yaml and set OLLAMA_URL.
+  ollama:
+    image: ollama/ollama:0.40.4
+    profiles: ["local-models"]
+    volumes:
+      - ollama-models:/root/.ollama
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
 
   web:
     build:
@@ -271,3 +306,5 @@ volumes:
   compiled-packs:
   # The screening classifier, written by guard-model and read by api and jobs.
   guard-models:
+  # Models pulled into the optional ollama service.
+  ollama-models:

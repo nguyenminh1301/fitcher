@@ -27,6 +27,7 @@ from clickhouse_connect.driver.exceptions import Error as ClickHouseError
 
 from app.config import SettingsError, load_settings
 from app.llm.embeddings import EmbeddingError, LiteLLMEmbeddings
+from app.llm.tiers import EMBED_TIER
 from app.packs.compiler import CompileError, CompileSummary, compile_pack, load_compiled
 from app.observability.tracing import trusted_pack_calls
 from app.packs.loader import PackValidationError
@@ -116,14 +117,16 @@ def _main(argv: list[str] | None) -> int:
         search = QdrantSearch(settings.qdrant_url)
         if args.check_search is not None:
             embeddings = LiteLLMEmbeddings(
-                settings.litellm_base_url, settings.litellm_master_key, settings.embedding_dimensions
+                settings.litellm_base_url, settings.litellm_master_key, settings.embedding_dimensions,
+                alias=settings.model_tiers[EMBED_TIER],
             )
             return check_search(args, settings, search, embeddings)
 
         embeddings = None
         if not args.skip_index:
             embeddings = LiteLLMEmbeddings(
-                settings.litellm_base_url, settings.litellm_master_key, settings.embedding_dimensions
+                settings.litellm_base_url, settings.litellm_master_key, settings.embedding_dimensions,
+                alias=settings.model_tiers[EMBED_TIER],
             )
         warehouse = ClickHouseWarehouse(admin_client())
         summary = compile_pack(

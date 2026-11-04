@@ -2,7 +2,7 @@
 
 from datetime import date
 
-from app.eval.report import category_totals, diff_baseline, layer_totals, meets_threshold, render_markdown
+from app.eval.report import category_totals, diff_baseline, layer_totals, meets_threshold, render_markdown, routing_totals
 from app.eval.runner import EvalRun
 from app.eval.scorers import LAYERS, CaseScore, LayerScore
 
@@ -131,3 +131,13 @@ def test_threshold_uses_execution_rate():
     assert meets_threshold(four_of_five) is True
     assert meets_threshold(three_of_five) is False
     assert meets_threshold(run(inactive("a"))) is False
+
+
+def test_routing_totals_count_the_small_share_and_its_escalations():
+    def scored(tiers):
+        return CaseScore(case_id="c", category="top_n", question="q", active=True, layers={}, sql_tiers=tiers)
+
+    totals = routing_totals([scored(["sql-small"]), scored(["sql-small", "sql-gen"]), scored(["sql-gen"]), scored([])])
+
+    assert (totals.generated, totals.small_first, totals.escalated) == (3, 2, 1)
+    assert (totals.small_share, totals.escalation_rate) == (2 / 3, 0.5)

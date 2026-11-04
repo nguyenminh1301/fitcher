@@ -36,7 +36,7 @@ def services(monkeypatch, tmp_path):
     monkeypatch.setattr(cli, "admin_client", lambda: object())
     monkeypatch.setattr(cli, "ClickHouseWarehouse", lambda client: fake_warehouse)
     monkeypatch.setattr(cli, "QdrantSearch", lambda url: search)
-    monkeypatch.setattr(cli, "LiteLLMEmbeddings", lambda *args: FakeEmbeddings())
+    monkeypatch.setattr(cli, "LiteLLMEmbeddings", lambda *args, **kwargs: FakeEmbeddings())
     return search
 
 

@@ -2,7 +2,7 @@
 
 The question is embedded once and searched in the glossary, metrics, datasets
 and company documents (``kb_docs``), filtered by the asking role, so an
-answer never describes what the role may not read. The ``fast`` alias answers
+answer never describes what the role may not read. The ``fast`` tier answers
 from those hits only, in the question's language. Figures come only from SQL
 (DECISIONS §5): the prompt forbids quoting numbers from the hits, and states
 that retrieved text is data, not instructions. No SQL is generated.
@@ -17,7 +17,7 @@ from app.llm.embeddings import EmbeddingError
 from app.packs.search_indices import alias_name
 from app.search.client import SearchError
 
-ALIAS = "fast"
+TIER = "fast"
 PROMPT = "metadata_qa.v2"
 SEARCHED = ("glossary_terms", "metrics", "datasets", "kb_docs")
 HITS_PER_INDEX = 3
@@ -58,6 +58,6 @@ def metadata_qa(state: AgentState, deps: AgentDeps) -> dict:
     # What the answer was written from, as "<index>:<id>"; the eval scores it against a case's expected_sources.
     sources = [f"{index}:{hit['id']}" for index, hit in hits]
     try:
-        return {"reply": deps.llm.text(ALIAS, prompt).strip(), "sources": sources}
+        return {"reply": deps.llm.text(TIER, prompt).strip(), "sources": sources}
     except LLMError:
         return {"reply": FALLBACK.get(language, FALLBACK["en"]), "sources": sources}

@@ -33,7 +33,7 @@ def test_question_flows_to_a_result_and_summary():
     assert state["result"].row_count == 7
     assert state["result"].columns[1].format == "currency"
     assert state["summary"] == SUMMARY
-    assert [call.alias for call in agent.llm.calls] == ["fast", "fast", "sql-gen", "fast"]
+    assert [call.tier for call in agent.llm.calls] == ["fast", "fast", "sql-gen", "fast"]
     assert [call[0] for call in agent.runner.calls] == ["explain", "run"]
     assert all(call[2] == state["trace_id"] for call in agent.runner.calls)
     assert state["attempts"][0].query_id == "qid-ok"
@@ -46,7 +46,7 @@ def test_broken_sql_is_repaired_within_the_retry_limit():
     state = run_question(QUESTION, agent)
 
     assert state["result"] is not None
-    assert [attempt.alias for attempt in state["attempts"]] == ["sql-gen", "sql-gen"]
+    assert [attempt.tier for attempt in state["attempts"]] == ["sql-gen", "sql-gen"]
     assert state["attempts"][0].error.category == "sql"
     retry_prompt = agent.llm.calls[3].prompt
     assert "The previous attempt failed" in retry_prompt
@@ -60,10 +60,41 @@ def test_exhausted_retries_return_the_last_sql_and_error_without_a_result():
     state = run_question(QUESTION, agent)
 
     assert state.get("result") is None
-    assert [attempt.alias for attempt in state["attempts"]] == ["sql-gen", "sql-gen", "sql-gen", "sql-gen-hard"]
+    assert [attempt.tier for attempt in state["attempts"]] == ["sql-gen", "sql-gen", "sql-gen", "sql-gen-hard"]
     assert state["attempts"][-1].sql.startswith("SELECT widget_name AS w3")
     assert state["attempts"][-1].error.message.startswith("Code: 47")
     assert len(state["errors"]) == 4
+
+
+SIMPLE = extraction_reply(top_n=None, compare=False, periods=[{"kind": "quarter", "year": 2025, "quarter": 1}])
+
+
+def test_a_simple_question_is_answered_by_the_small_tier():
+    agent = deps([routing_reply(), SIMPLE, GOOD_SQL, SUMMARY])
+
+    state = run_question("Widget revenue in Q1 2025", agent)
+
+    assert state["result"] is not None and state["complexity"] == "simple"
+    assert [call.tier for call in agent.llm.calls] == ["fast", "fast", "sql-small", "fast"]
+
+
+def test_a_failed_small_attempt_escalates_to_sql_gen():
+    runner = FakeRunner(explains=[sql_error()], runs=[good_output()])
+    agent = deps([routing_reply(), SIMPLE, "SELECT nope(widget_name) AS x FROM marts.widget_sales", GOOD_SQL, SUMMARY], runner)
+
+    state = run_question("Widget revenue in Q1 2025", agent)
+
+    assert state["result"] is not None
+    assert [attempt.tier for attempt in state["attempts"]] == ["sql-small", "sql-gen"]
+
+
+def test_a_simple_question_keeps_the_hard_tier_for_the_third_retry():
+    runner = FakeRunner(explains=[sql_error()] * 4)
+    agent = deps([routing_reply(), SIMPLE, *[f"SELECT widget_name AS w{n} FROM marts.widget_sales" for n in range(4)]], runner)
+
+    state = run_question("Widget revenue in Q1 2025", agent)
+
+    assert [attempt.tier for attempt in state["attempts"]] == ["sql-small", "sql-gen", "sql-gen", "sql-gen-hard"]
 
 
 def test_policy_violation_stops_without_retry():
@@ -130,7 +161,7 @@ def test_retrieval_failure_is_rejected_before_sql(error):
     state = run_question(QUESTION, agent)
 
     assert state["rejection"] == f"the pack context could not be retrieved: {error}"
-    assert [call.alias for call in agent.llm.calls] == ["fast", "fast"]
+    assert [call.tier for call in agent.llm.calls] == ["fast", "fast"]
     assert state.get("spec") is None and state["attempts"] == []
 
 
@@ -140,7 +171,7 @@ def test_question_without_a_measure_asks_for_one_before_sql():
     state = run_question("Which widgets in 2024?", agent)
 
     assert state["clarification"].question == "Which measure should I report?"
-    assert [call.alias for call in agent.llm.calls] == ["fast", "fast"]
+    assert [call.tier for call in agent.llm.calls] == ["fast", "fast"]
     assert "attempts" not in state or state["attempts"] == []
 
 
@@ -175,7 +206,7 @@ def test_denied_question_ends_before_any_sql_with_a_deny_audit_row():
 
     assert state["denial"].blocked == ["widget_sales"]
     assert state.get("attempts") == [] and agent.runner.calls == []
-    assert [call.alias for call in agent.llm.calls] == ["fast", "fast"]
+    assert [call.tier for call in agent.llm.calls] == ["fast", "fast"]
     assert [(a.decision, a.dataset) for a in _audits(logs)] == [("DENY", "widget_sales")]
     run = [record for record in logs.written if record.TABLE == "runs"][-1]
     assert run.status == "denied" and "nothing was queried" in run.error

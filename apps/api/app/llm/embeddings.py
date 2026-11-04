@@ -1,6 +1,8 @@
-"""Embeddings through the LiteLLM ``embed`` alias.
+"""Embeddings through the catalog alias of the ``embed`` tier.
 
-Engine code only ever names the alias; LiteLLM maps it to a model. A request
+The alias is the ``embed`` tier's default (``MODEL_TIER_EMBED``); it is never
+changed from the console, because a new embedding model needs a full reindex.
+LiteLLM maps the alias to a model. A request
 the gateway's screening guardrail rejects raises ``GatewayBlocked``. Unit
 tests use a fake client, so no test sends a billable request.
 """
@@ -11,9 +13,9 @@ from typing import Protocol
 import httpx
 
 from app.llm.client import check_gateway
+from app.llm.tiers import BUILT_IN_DEFAULTS, EMBED_TIER
 from app.observability.tracing import llm_metadata
 
-EMBED_ALIAS = "embed"
 BATCH_SIZE = 256
 TIMEOUT_SECONDS = 120
 
@@ -30,12 +32,20 @@ class EmbeddingClient(Protocol):
 
 
 class LiteLLMEmbeddings:
-    """OpenAI-compatible ``/v1/embeddings`` calls to the ``embed`` alias."""
+    """OpenAI-compatible ``/v1/embeddings`` calls to the ``embed`` tier's alias."""
 
-    def __init__(self, base_url: str, api_key: str, dimensions: int, http: httpx.Client | None = None):
+    def __init__(
+        self,
+        base_url: str,
+        api_key: str,
+        dimensions: int,
+        http: httpx.Client | None = None,
+        alias: str = BUILT_IN_DEFAULTS[EMBED_TIER],
+    ):
         if not base_url or not api_key:
             raise EmbeddingError("LITELLM_BASE_URL and LITELLM_MASTER_KEY must be set")
         self.dimensions = dimensions
+        self.alias = alias
         self._url = f"{base_url.rstrip('/')}/v1/embeddings"
         self._headers = {"Authorization": f"Bearer {api_key}"}
         self._http = http or httpx.Client(timeout=TIMEOUT_SECONDS)
@@ -47,23 +57,24 @@ class LiteLLMEmbeddings:
         return vectors
 
     def _embed_batch(self, texts: list[str]) -> list[list[float]]:
-        payload = {"model": EMBED_ALIAS, "input": texts, "dimensions": self.dimensions}
-        if metadata := llm_metadata():
-            payload["metadata"] = metadata
+        payload = {
+            "model": self.alias, "input": texts, "dimensions": self.dimensions,
+            "metadata": {**llm_metadata(), "tier": EMBED_TIER},
+        }
         try:
             response = self._http.post(self._url, json=payload, headers=self._headers)
         except httpx.HTTPError as error:
-            raise EmbeddingError(f"embedding request to alias {EMBED_ALIAS} failed: {type(error).__name__}") from error
+            raise EmbeddingError(f"embedding request to alias {self.alias} failed: {type(error).__name__}") from error
         check_gateway(response)
         if response.status_code != 200:
-            raise EmbeddingError(f"alias {EMBED_ALIAS} returned HTTP {response.status_code}")
+            raise EmbeddingError(f"alias {self.alias} returned HTTP {response.status_code}")
         data = sorted(response.json().get("data", []), key=lambda item: item["index"])
         vectors = [item["embedding"] for item in data]
         if len(vectors) != len(texts):
-            raise EmbeddingError(f"alias {EMBED_ALIAS} returned {len(vectors)} vectors for {len(texts)} texts")
+            raise EmbeddingError(f"alias {self.alias} returned {len(vectors)} vectors for {len(texts)} texts")
         for vector in vectors:
             if len(vector) != self.dimensions:
                 raise EmbeddingError(
-                    f"alias {EMBED_ALIAS} returned {len(vector)} dimensions; EMBEDDING_DIMENSIONS is {self.dimensions}"
+                    f"alias {self.alias} returned {len(vector)} dimensions; EMBEDDING_DIMENSIONS is {self.dimensions}"
                 )
         return vectors

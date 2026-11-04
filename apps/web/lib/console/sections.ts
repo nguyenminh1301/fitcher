@@ -29,6 +29,7 @@ export const SECTIONS: Section[] = [
   { key: "costs", group: "observe", path: "/console/costs", icon: "coins", roles: [ADMIN], feature: "costs" },
   { key: "evaluation", group: "quality", path: "/console/evaluation", icon: "gauge", roles: [REVIEWER, ADMIN], feature: "evaluation" },
   { key: "users", group: "administration", path: "/console/users", icon: "users", roles: [ADMIN], feature: "users" },
+  { key: "models", group: "administration", path: "/console/models", icon: "compass", roles: [ADMIN], feature: "models" },
 ];
 
 /** The sections these roles may open, in navigation order; empty for a role without console access. */

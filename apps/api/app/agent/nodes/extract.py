@@ -1,9 +1,9 @@
 """Extract metric, dimension, period and filter terms from the question (DECISIONS §6 step 4).
 
-The ``fast`` alias returns structured terms, never dates or database names;
+The ``fast`` tier returns structured terms, never dates or database names;
 ``resolve_time`` computes dates and ``build_spec`` maps terms to the pack.
 In a conversation the prompt also shows the recent turns and the previous
-QuerySpec: the alias restates a follow-up as the complete question it means,
+QuerySpec: the model restates a follow-up as the complete question it means,
 and gives its periods as a shift of the previous ones (``previous_periods``)
 when it names none. A question that names no measure or no period is not
 refused here: ``build_spec`` records what is missing and the gate asks.
@@ -20,9 +20,9 @@ from app.agent.state import AgentDeps, AgentState, TimeGrain
 from app.contracts.query_spec import FilterOp, Scalar
 from app.llm.client import LLMError
 
-ALIAS = "fast"
+TIER = "fast"
 PROMPT = "extract.v4"
-# Shown right before the question: the fast alias reads a reply to a clarifying question as the whole
+# Shown right before the question: the fast tier reads a reply to a clarifying question as the whole
 # question unless the instruction to combine them sits next to it.
 CONVERSATION = """
 Earlier turns (JSON lines, oldest first):
@@ -63,7 +63,7 @@ def extract(state: AgentState, deps: AgentDeps) -> dict:
     conversation = CONVERSATION.format(turns=turn_lines(history), spec=spec_json(state.get("previous_spec"))) if history else ""
     try:
         prompt = render(PROMPT, question=json.dumps(state["question"], ensure_ascii=False), conversation=conversation)
-        extraction = deps.llm.structured(ALIAS, prompt, Extraction)
+        extraction = deps.llm.structured(TIER, prompt, Extraction)
     except LLMError as error:
         return {"rejection": f"the question could not be read: {error}"}
     return {"extraction": extraction, "time_grain": extraction.time_grain}

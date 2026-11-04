@@ -1,0 +1,25 @@
+<clickhouse>
+    <!--
+        The api's Models page (DECISIONS §2 Model tiers, §15). It reads and
+        writes the tier mapping in data_meta.model_tiers, reads the eval
+        reports that make an alias eligible for a tier and records each
+        change in agent_logs.admin_actions. The api's tier lookup reads the
+        mapping as this user too. The password comes from the clickhouse
+        container environment.
+    -->
+    <users>
+        <model_tiers_admin>
+            <password from_env="CLICKHOUSE_MODEL_TIERS_PASSWORD"/>
+            <profile>default</profile>
+            <quota>default</quota>
+            <networks>
+                <ip>::/0</ip>
+            </networks>
+            <grants>
+                <query>GRANT SELECT, INSERT ON data_meta.model_tiers</query>
+                <query>GRANT SELECT ON agent_logs.eval_reports</query>
+                <query>GRANT INSERT ON agent_logs.admin_actions</query>
+            </grants>
+        </model_tiers_admin>
+    </users>
+</clickhouse>

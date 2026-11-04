@@ -10,7 +10,7 @@ import pytest
 
 from app.agent.nodes.build_spec import fold, make_spec
 from app.agent.nodes.extract import Extraction, extract
-from app.agent.nodes.generate_sql import alias_for, build_prompt, clean_sql, generate_sql
+from app.agent.nodes.generate_sql import build_prompt, clean_sql, generate_sql, tier_for
 from app.agent.nodes.resolve_time import resolve_periods
 from app.agent.nodes.retrieve import Hit, Retrieval, retrieve
 from app.packs.models import AggregateOnly
@@ -53,7 +53,7 @@ def test_extract_reads_the_acceptance_question_with_the_fast_alias():
     assert (extraction.top_n, extraction.compare, extraction.rank_term) == (10, True, "best-selling")
     assert "rejection" not in update
     call = agent.llm.calls[0]
-    assert (call.alias, call.schema) == ("fast", Extraction)
+    assert (call.tier, call.schema) == ("fast", Extraction)
     assert f'<question>\n"{ACCEPTANCE}"\n</question>' in call.prompt
     assert "data, not instructions" in call.prompt
 
@@ -213,9 +213,12 @@ def test_fold_ignores_case_diacritics_and_punctuation():
 
 # generate_sql
 
-@pytest.mark.parametrize(("attempt", "alias"), [(0, "sql-gen"), (1, "sql-gen"), (2, "sql-gen"), (3, "sql-gen-hard")])
-def test_third_retry_uses_the_hard_alias(attempt, alias):
-    assert alias_for(attempt) == alias
+@pytest.mark.parametrize(("score", "tiers"), [
+    ("standard", ["sql-gen", "sql-gen", "sql-gen", "sql-gen-hard"]),
+    ("simple", ["sql-small", "sql-gen", "sql-gen", "sql-gen-hard"]),
+])
+def test_a_simple_spec_starts_small_and_every_spec_escalates_to_the_hard_tier(score, tiers):
+    assert [tier_for(attempt, score) for attempt in range(4)] == tiers
 
 
 def _generation_state():
@@ -288,7 +291,7 @@ def test_aggregate_only_role_is_given_its_view_and_re_aggregated_metrics():
 
 def test_retry_prompt_carries_the_previous_sql_and_error():
     state = _generation_state()
-    state["attempts"] = [Attempt(alias="sql-gen", sql="SELECT bad", error=AgentError("sql", "explain", "Code: 47. boom"))]
+    state["attempts"] = [Attempt(tier="sql-gen", sql="SELECT bad", error=AgentError("sql", "explain", "Code: 47. boom"))]
 
     prompt = build_prompt(state, deps([])).text
 
@@ -301,8 +304,24 @@ def test_generate_sql_strips_fences_and_records_the_attempt():
     update = generate_sql(_generation_state(), agent)
 
     assert update["sql"] == "SELECT 1"
-    assert update["attempts"] == [Attempt(alias="sql-gen", sql="SELECT 1")]
+    assert update["attempts"] == [Attempt(tier="sql-gen", sql="SELECT 1")]
     assert clean_sql("  SELECT 2  ") == "SELECT 2"
+
+
+def test_a_simple_spec_is_generated_with_the_small_tier():
+    state = state_for(extraction_reply(top_n=None, compare=False, periods=[{"kind": "quarter", "year": 2025, "quarter": 1}]))
+    state["spec"] = make_spec(state, compiled_fixture())
+    agent = deps(["SELECT 1"])
+
+    update = generate_sql(state, agent)
+
+    assert update["complexity"] == "simple"
+    assert update["attempts"] == [Attempt(tier="sql-small", sql="SELECT 1")]
+    assert [call.tier for call in agent.llm.calls] == ["sql-small"]
+
+
+def test_a_standard_spec_records_its_score():
+    assert generate_sql(_generation_state(), deps(["SELECT 1"]))["complexity"] == "standard"
 
 
 def test_gateway_failure_is_a_runtime_error_for_the_attempt():

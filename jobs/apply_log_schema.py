@@ -1,9 +1,9 @@
-"""Create the ``agent_logs`` database and tables on an existing ClickHouse volume.
+"""Create the ``agent_logs`` tables and ``data_meta.model_tiers`` on an existing ClickHouse volume.
 
 Run with ``docker compose run --rm jobs python -m jobs.apply_log_schema``.
 
 The ClickHouse entrypoint runs ``infra/clickhouse/initdb`` only on a fresh
-volume; this job applies the same file to a volume created before it existed.
+volume; this job applies the same files to a volume created before they existed.
 Every statement is ``CREATE ... IF NOT EXISTS`` or ``ALTER TABLE ... ADD
 COLUMN IF NOT EXISTS``, so running it again changes nothing; on a volume that
 predates a column, it adds the column and leaves existing rows in place.
@@ -15,7 +15,10 @@ import sys
 
 from jobs.lib.clickhouse import admin_client
 
-SCHEMA_FILE = Path(__file__).resolve().parents[1] / "infra" / "clickhouse" / "initdb" / "010-agent-logs.sql"
+INITDB = Path(__file__).resolve().parents[1] / "infra" / "clickhouse" / "initdb"
+SCHEMA_FILE = INITDB / "010-agent-logs.sql"
+# Applied in order; 001-databases.sql already created data_meta on every volume.
+SCHEMA_FILES = (SCHEMA_FILE, INITDB / "020-model-tiers.sql")
 
 
 def split_statements(sql: str) -> list[str]:
@@ -34,11 +37,13 @@ def apply_schema(client, sql: str) -> int:
 def main(argv: list[str] | None = None) -> int:
     argparse.ArgumentParser(description=__doc__.splitlines()[0]).parse_args(argv)
     try:
-        count = apply_schema(admin_client(), SCHEMA_FILE.read_text(encoding="utf-8"))
+        client = admin_client()
+        for path in SCHEMA_FILES:
+            count = apply_schema(client, path.read_text(encoding="utf-8"))
+            print(f"Applied {count} statements from {path.name}.")
     except RuntimeError as error:
         print(error, file=sys.stderr)
         return 1
-    print(f"Applied {count} statements from {SCHEMA_FILE.name}.")
     return 0
 
 

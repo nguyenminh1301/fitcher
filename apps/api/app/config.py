@@ -5,8 +5,10 @@ documents them. Nothing here names a pack, table or model.
 """
 
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import os
+
+from app.llm.tiers import BUILT_IN_DEFAULTS, tier_defaults
 
 
 SCREEN_MODES = ("log", "enforce")
@@ -41,6 +43,8 @@ class Settings:
     screen_block_at: float = 0.9
     # Where jobs.fetch_guard_model wrote the classifier; without it every question is refused.
     guard_model_dir: str = "build/guard_model"
+    # Default catalog alias of every model tier, from MODEL_TIER_<TIER> (DECISIONS §2 Model tiers).
+    model_tiers: Mapping[str, str] = field(default_factory=lambda: dict(BUILT_IN_DEFAULTS))
 
 
 def positive_int(env: Mapping[str, str], name: str, default: int) -> int:
@@ -97,4 +101,5 @@ def load_settings(env: Mapping[str, str] | None = None) -> Settings:
         screen_flag_at=screen_flag_at,
         screen_block_at=screen_block_at,
         guard_model_dir=env.get("GUARD_MODEL_DIR", "build/guard_model"),
+        model_tiers=tier_defaults(env),
     )

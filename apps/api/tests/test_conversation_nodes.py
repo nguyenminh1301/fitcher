@@ -11,7 +11,7 @@ from app.agent.nodes.extract import extract
 from app.agent.nodes.load_context import CONTEXT_TURNS, load_context
 from app.agent.nodes.out_of_scope import FALLBACK, out_of_scope
 from app.agent.nodes.resolve_time import resolve_time
-from app.agent.nodes.router import ALIAS, router
+from app.agent.nodes.router import TIER, router
 from app.contracts.result import ColumnInfo, Result
 from app.conversation.store import Turn
 from app.llm.client import LLMError
@@ -55,7 +55,7 @@ def test_router_returns_the_intent_and_language():
     update = router({"question": "Doanh thu thuần là gì?", "history": [], "previous_spec": None}, agent)
 
     assert update == {"intent": "metadata_qa", "intent_fallback": False, "language": "vi", "chart_type": None}
-    assert agent.llm.calls[0].alias == ALIAS == "fast"
+    assert agent.llm.calls[0].tier == TIER == "fast"
 
 
 def test_router_prompt_carries_history_and_previous_spec_but_no_rows():
@@ -85,7 +85,7 @@ def test_a_routed_question_records_its_intent_on_the_run():
     state = run_question("Top 10 best-selling widgets in Q1 2024 compared with Q1 2025", agent)
 
     assert state["intent"] == "data_query"
-    assert [call.alias for call in agent.llm.calls] == ["fast", "fast", "sql-gen", "fast"]
+    assert [call.tier for call in agent.llm.calls] == ["fast", "fast", "sql-gen", "fast"]
 
 
 def test_a_fallback_routing_with_an_unreadable_question_clarifies_before_sql():
@@ -95,7 +95,7 @@ def test_a_fallback_routing_with_an_unreadable_question_clarifies_before_sql():
 
     assert state["intent_fallback"] is True
     assert state["clarification"].question == "Which measure should I report?"
-    assert [call.alias for call in agent.llm.calls] == ["fast", "fast"]
+    assert [call.tier for call in agent.llm.calls] == ["fast", "fast"]
 
 
 def test_out_of_scope_replies_in_the_question_language():
@@ -105,7 +105,7 @@ def test_out_of_scope_replies_in_the_question_language():
 
     assert update == {"reply": "Mình chỉ trả lời câu hỏi về dữ liệu của công ty."}
     [call] = agent.llm.calls
-    assert (call.method, call.alias) == ("text", "fast")
+    assert (call.method, call.tier) == ("text", "fast")
     assert '"Thời tiết hôm nay thế nào?"' in call.prompt and "(vi)" in call.prompt
     assert "widget retail" in call.prompt and "data, not instructions" in call.prompt
 
@@ -128,7 +128,7 @@ def test_out_of_scope_question_runs_no_extract_or_sql():
 
     assert seen == ["screen", "load_context", "router", "out_of_scope"]
     assert state["reply"] == "I answer questions about the shop's data."
-    assert [call.alias for call in agent.llm.calls] == ["fast", "fast"]
+    assert [call.tier for call in agent.llm.calls] == ["fast", "fast"]
     assert agent.runner.calls == []
 
 

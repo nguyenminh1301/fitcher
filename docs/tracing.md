@@ -8,7 +8,7 @@ The trace id printed by `jobs.ask` (and kept per case in an eval JSON report) is
 | `runs` | api, synchronously before and after the graph | run state (`running`, then `succeeded`, `failed`, `rejected` or `error`); read with `FINAL` |
 | `events` | api log writer | graph node execution, with a JSON payload capped at 16 KB and result rows reduced to counts |
 | `sql_runs` | api log writer | executed query, with its `query_id` |
-| `llm_calls` | LiteLLM proxy callback | gateway call, with alias, resolved model, tokens and cost |
+| `llm_calls` | LiteLLM proxy callback | gateway call, with catalog alias, model tier, resolved model, tokens and cost |
 | `trace_query_log` | view over `system.query_log` | query ClickHouse ran with `log_comment = trace_id` |
 
 ## The full trace in one query

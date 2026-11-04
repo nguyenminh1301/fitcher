@@ -5,13 +5,14 @@ from dataclasses import dataclass
 
 from pydantic import BaseModel
 
-from app.llm.client import Prompt, check_alias
+from app.llm.client import Prompt
+from app.llm.tiers import check_chat_tier
 
 
 @dataclass
 class LLMCall:
     method: str
-    alias: str
+    tier: str
     # Both parts of the prompt as one text; ``system`` and ``user`` keep them apart.
     prompt: str
     schema: type[BaseModel] | None = None
@@ -38,15 +39,15 @@ class FakeLLMClient:
             raise reply
         return reply(prompt) if isinstance(reply, Callable) else reply
 
-    def _record(self, method: str, alias: str, prompt: Prompt, schema=None) -> str:
+    def _record(self, method: str, tier: str, prompt: Prompt, schema=None) -> str:
         assert isinstance(prompt, Prompt), "LLM calls send a Prompt with system and user parts"
-        check_alias(alias)
-        self.calls.append(LLMCall(method, alias, prompt.text, schema, prompt.system, prompt.user))
+        check_chat_tier(tier)
+        self.calls.append(LLMCall(method, tier, prompt.text, schema, prompt.system, prompt.user))
         return prompt.text
 
-    def structured(self, alias, prompt, schema):
-        reply = self._next(self._record("structured", alias, prompt, schema))
+    def structured(self, tier, prompt, schema):
+        reply = self._next(self._record("structured", tier, prompt, schema))
         return reply if isinstance(reply, schema) else schema.model_validate(reply)
 
-    def text(self, alias, prompt):
-        return str(self._next(self._record("text", alias, prompt)))
+    def text(self, tier, prompt):
+        return str(self._next(self._record("text", tier, prompt)))
