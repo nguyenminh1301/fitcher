@@ -30,8 +30,8 @@ from app.observability.tracing import trusted_pack_calls
 from app.packs.compiler import CompileError, approved_pack, load_compiled
 from app.packs.loader import PackValidationError, load_pack
 from app.packs.models import EvalCase
-from app.packs.search_indices import INDEX_NAMES, OpenSearchPack, alias_name, source_id
-from app.search.opensearch import OpenSearch, SearchError
+from app.packs.search_indices import INDEX_NAMES, alias_name, source_id
+from app.search.client import QdrantSearch, SearchError
 
 ROOT = Path(__file__).resolve().parents[1]
 TOP_K = 10
@@ -174,8 +174,8 @@ def main(argv: list[str] | None = None) -> int:
         settings = load_settings()
         compiled = load_compiled(Path(settings.compiled_pack_dir), args.pack)
         cases = load_eval_set(approved_pack(load_pack(args.packs_dir / args.pack))).cases
-        backend = "opensearch"
-        search = OpenSearchPack(OpenSearch(settings.opensearch_url))
+        backend = "qdrant"
+        search = QdrantSearch(settings.qdrant_url)
         embeddings = LiteLLMEmbeddings(settings.litellm_base_url, settings.litellm_master_key, compiled.embedding_dimensions)
         with trusted_pack_calls():
             scores = measure(search, embeddings, args.pack, labelled_queries(cases))

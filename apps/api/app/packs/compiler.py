@@ -5,7 +5,7 @@ references and the warehouse catalog; keep approved items only; test-run every
 metric; reconcile the ClickHouse roles, grants, row policies, views and users
 of the pack's policies; read each dataset's date coverage and the top values of
 indexable columns; screen document chunks and column values (DECISIONS §9);
-write a new generation of the six search indices; move all six
+write a new generation of the six Qdrant collections; move all six
 aliases in one request; write ``compiled.json``; and only then delete older
 generations. A failure before the alias move deletes the partial generation
 and leaves the live aliases untouched.
@@ -33,20 +33,9 @@ from app.llm.embeddings import EmbeddingClient
 from app.packs.loader import check_references, load_pack
 from app.packs.models import Pack
 from app.packs.policy_compiler import AccessControl, apply_policies
-from app.packs.search_indices import (
-    HYBRID_PIPELINE,
-    HYBRID_PIPELINE_BODY,
-    INDEX_NAMES,
-    LEXICAL_INDICES,
-    ColumnValue,
-    alias_name,
-    build_documents,
-    generation_of,
-    index_body,
-    physical_name,
-)
+from app.packs.search_indices import INDEX_NAMES, ColumnValue, alias_name, build_documents, generation_of, physical_name, points
 from app.screening.screen import Screener
-from app.search.opensearch import OpenSearch
+from app.search.client import QdrantSearch
 
 MARTS_DATABASE = "marts"
 # readonly=2 allows only reads while still letting the query carry its own settings.
@@ -263,70 +252,59 @@ def screen_documents(documents: dict[str, list[dict]], screener: Screener, summa
         )
 
 
-def _embed(documents: list[dict], embeddings: EmbeddingClient) -> None:
-    texts = [document.pop("embedding_text") for document in documents]
-    for document, vector in zip(documents, embeddings.embed(texts), strict=True):
-        document["embedding"] = vector
-
-
-def _delete_quietly(search: OpenSearch, names: Sequence[str]) -> None:
+def _delete_quietly(search: QdrantSearch, names: Sequence[str]) -> None:
     for name in names:
         try:
-            search.delete_index(name)
+            search.delete_collection(name)
         except Exception:  # noqa: BLE001, S110 - cleanup must not hide the original failure
             pass
 
 
-def next_generation(search: OpenSearch, pack: str) -> int:
-    generations = [parsed[1] for name in search.list_indices(f"{pack}_*") if (parsed := generation_of(pack, name))]
+def next_generation(search: QdrantSearch, pack: str) -> int:
+    generations = [parsed[1] for name in search.list_collections() if (parsed := generation_of(pack, name))]
     return max(generations, default=0) + 1
 
 
 def build_generation(
-    search: OpenSearch, embeddings: EmbeddingClient, pack: str, documents: dict[str, list[dict]]
+    search: QdrantSearch, embeddings: EmbeddingClient, pack: str, documents: dict[str, list[dict]]
 ) -> tuple[int, dict[str, int]]:
-    """Create and fill generation N+1 of every index; delete it again on any failure."""
-    search.put_search_pipeline(HYBRID_PIPELINE, HYBRID_PIPELINE_BODY)
+    """Create and fill generation N+1 of every collection; delete it again on any failure."""
     generation = next_generation(search, pack)
     created: list[str] = []
     counts: dict[str, int] = {}
     try:
         for index in INDEX_NAMES:
             name = physical_name(pack, index, generation)
-            search.create_index(name, index_body(index, embeddings.dimensions))
+            search.create_collection(name, embeddings.dimensions)
             created.append(name)
             docs = documents[index]
-            if index not in LEXICAL_INDICES and docs:
-                _embed(docs, embeddings)
-            search.bulk_index(name, docs)
-            search.refresh(name)
+            vectors = embeddings.embed([document["embedding_text"] for document in docs]) if docs else []
+            search.upsert(name, points(name, docs, vectors))
             counts[index] = search.count(name)
             if counts[index] != len(docs):
-                raise CompileError(f"{name} holds {counts[index]} documents, expected {len(docs)}")
+                raise CompileError(f"{name} holds {counts[index]} points, expected {len(docs)}")
     except Exception as error:
         _delete_quietly(search, created)
         raise CompileError(f"building index generation {generation} failed: {_first_line(error)}") from error
     return generation, counts
 
 
-def swap_aliases(search: OpenSearch, pack: str, generation: int) -> None:
-    """Point all six aliases at ``generation`` in one atomic request."""
-    current = search.alias_targets(f"{pack}_*")
+def swap_aliases(search: QdrantSearch, pack: str, generation: int) -> None:
+    """Point all six aliases at ``generation`` in one atomic request, so a reader never sees a mixed generation."""
+    current = search.alias_targets()
     actions: list[dict] = []
     for index in INDEX_NAMES:
         alias = alias_name(pack, index)
-        actions.extend({"remove": {"index": old, "alias": alias}} for old in current.get(alias, []))
-        actions.append({"add": {"index": physical_name(pack, index, generation), "alias": alias}})
+        if alias in current:
+            actions.append({"delete_alias": {"alias_name": alias}})
+        actions.append({"create_alias": {"collection_name": physical_name(pack, index, generation), "alias_name": alias}})
     search.update_aliases(actions)
 
 
-def delete_older_generations(search: OpenSearch, pack: str, generation: int) -> list[str]:
-    old = [
-        name for name in search.list_indices(f"{pack}_*")
-        if (parsed := generation_of(pack, name)) and parsed[1] < generation
-    ]
+def delete_older_generations(search: QdrantSearch, pack: str, generation: int) -> list[str]:
+    old = [name for name in search.list_collections() if (parsed := generation_of(pack, name)) and parsed[1] < generation]
     for name in old:
-        search.delete_index(name)
+        search.delete_collection(name)
     return old
 
 
@@ -346,7 +324,7 @@ def compile_pack(
     *,
     warehouse: Warehouse,
     top_k: int,
-    search: OpenSearch | None = None,
+    search: QdrantSearch | None = None,
     embeddings: EmbeddingClient | None = None,
     output_dir: Path | None = None,
     schema_dir: Path | None = None,

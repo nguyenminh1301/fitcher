@@ -15,7 +15,7 @@ from app.agent.state import AgentDeps, AgentState
 from app.llm.client import LLMError
 from app.llm.embeddings import EmbeddingError
 from app.packs.search_indices import alias_name
-from app.search.opensearch import SearchError
+from app.search.client import SearchError
 
 ALIAS = "fast"
 PROMPT = "metadata_qa.v2"

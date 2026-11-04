@@ -36,8 +36,7 @@ from app.observability.log_writer import start_log_writer
 from app.packs.compiler import CompileError, load_compiled
 from app.packs.loader import PackValidationError, load_pack
 from app.screening.screen import Screener
-from app.packs.search_indices import OpenSearchPack
-from app.search.opensearch import OpenSearch
+from app.search.client import QdrantSearch
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -57,7 +56,7 @@ def build_deps(pack: str, reference: date) -> AgentDeps:
     compiled = load_compiled(Path(settings.compiled_pack_dir), pack)
     return AgentDeps(
         llm=LiteLLMClient(settings.litellm_base_url, settings.litellm_master_key, temperature=0),
-        search=OpenSearchPack(OpenSearch(settings.opensearch_url)),
+        search=QdrantSearch(settings.qdrant_url),
         # Query vectors must match the indexed ones, so the compiled size wins over the environment.
         embeddings=LiteLLMEmbeddings(settings.litellm_base_url, settings.litellm_master_key, compiled.embedding_dimensions),
         # Each case replaces it with its role's runner (role_runners).

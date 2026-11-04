@@ -19,7 +19,7 @@ class SettingsError(RuntimeError):
 @dataclass(frozen=True)
 class Settings:
     active_pack: str
-    opensearch_url: str
+    qdrant_url: str
     litellm_base_url: str
     litellm_master_key: str
     embedding_dimensions: int
@@ -80,7 +80,7 @@ def load_settings(env: Mapping[str, str] | None = None) -> Settings:
     screen_mode, screen_flag_at, screen_block_at = screen_settings(env)
     return Settings(
         active_pack=env.get("ACTIVE_PACK", ""),
-        opensearch_url=env.get("OPENSEARCH_URL", "http://opensearch:9200").rstrip("/"),
+        qdrant_url=env.get("QDRANT_URL", "http://qdrant:6333").rstrip("/"),
         litellm_base_url=env.get("LITELLM_BASE_URL", "http://litellm:4000").rstrip("/"),
         litellm_master_key=env.get("LITELLM_MASTER_KEY", ""),
         embedding_dimensions=positive_int(env, "EMBEDDING_DIMENSIONS", 1024),

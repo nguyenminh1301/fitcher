@@ -39,8 +39,7 @@ from app.observability.log_writer import start_log_writer
 from app.packs.compiler import CompileError, load_compiled
 from app.packs.models import Pack
 from app.screening.screen import Screener
-from app.packs.search_indices import OpenSearchPack
-from app.search.opensearch import OpenSearch
+from app.search.client import QdrantSearch
 
 TABLE_ROWS = 50
 _CONTROL = re.compile(r"[\x00-\x1f\x7f]")
@@ -162,7 +161,7 @@ def main(argv: list[str] | None = None) -> int:
         embeddings = LiteLLMEmbeddings(settings.litellm_base_url, settings.litellm_master_key, compiled.embedding_dimensions)
         deps = AgentDeps(
             llm=FaultInjectingLLM(llm) if args.inject_sql_fault else llm,
-            search=OpenSearchPack(OpenSearch(settings.opensearch_url)),
+            search=QdrantSearch(settings.qdrant_url),
             embeddings=embeddings,
             runner=ClickHouseRunner(agent_client(compiled.pack.name, role), QueryLimits.from_env()),
             compiled=compiled,

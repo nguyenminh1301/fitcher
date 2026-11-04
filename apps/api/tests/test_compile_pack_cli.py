@@ -35,7 +35,7 @@ def services(monkeypatch, tmp_path):
     monkeypatch.setenv("CLICKHOUSE_AGENT_PASSWORD", "lab-secret")
     monkeypatch.setattr(cli, "admin_client", lambda: object())
     monkeypatch.setattr(cli, "ClickHouseWarehouse", lambda client: fake_warehouse)
-    monkeypatch.setattr(cli, "OpenSearch", lambda url: search)
+    monkeypatch.setattr(cli, "QdrantSearch", lambda url: search)
     monkeypatch.setattr(cli, "LiteLLMEmbeddings", lambda *args: FakeEmbeddings())
     return search
 
@@ -72,7 +72,7 @@ def test_skip_index_touches_no_search_index(packs_dir, services, capsys):
 
     assert code == 0
     assert "indexing skipped" in capsys.readouterr().out
-    assert services.indices == {}
+    assert services.collections == {}
 
 
 def test_broken_pack_exits_nonzero_with_the_reason(packs_dir, services, capsys):
@@ -83,7 +83,7 @@ def test_broken_pack_exits_nonzero_with_the_reason(packs_dir, services, capsys):
 
     assert code == 1
     assert "metrics.yaml: metrics[0].unit" in capsys.readouterr().err
-    assert services.indices == {}
+    assert services.collections == {}
 
 
 def test_check_search_prints_hits_per_index(packs_dir, services, capsys):
