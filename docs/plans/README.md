@@ -46,6 +46,10 @@ Every phase plan has these sections:
 | 7 | [API and streaming](phase-07-api-and-streaming.md) |
 | 8 | [Conversation](phase-08-conversation.md) |
 | 9 | [Chat and chart frontend](phase-09-chat-and-charts-frontend.md) |
+| 9B | [Input screening](phase-09b-input-screening.md) |
+| 9C | [Search on Qdrant](phase-09c-search-on-qdrant.md) |
+| 9D | [Model routing](phase-09d-model-routing.md) |
+| 9E | [Data sources](phase-09e-data-sources.md) |
 | 10 | [Automated onboarding](phase-10-automated-onboarding.md) |
 | 11 | [Industry neutrality proof](phase-11-industry-neutrality.md) |
 | 12 | [Admin, audit and feedback loop](phase-12-admin-audit-feedback.md) |

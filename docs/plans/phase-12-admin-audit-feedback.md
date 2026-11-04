@@ -17,6 +17,7 @@ Let operators observe and improve the system: console sections over `agent_logs`
 ## Prerequisites
 
 - Phases 5, 6, 9 and 10: logs, audit, feedback, Review UI.
+- Phase 9B: `input_screening`; Phase 9D: `llm_calls.tier` and the provider of each alias.
 
 ## Deliverables
 
@@ -38,7 +39,7 @@ infra/clickhouse/                  # agent_logs.admin_actions, fresh-volume init
 
 ## Tasks
 
-1. **Admin API (test first).** Paginated runs filtered by user, date range and status; trace detail combining `events`, `llm_calls`, `sql_runs`, `audit` and the query-log view; denied audit rows; cost by day, alias and model; `GET /admin/conversations?user=` and `GET /admin/conversations/{id}` list and read any user's conversations with their messages and trace ids, including conversations their owner deleted, which are marked as deleted. Restricted to an `admin` role; queries use the logs read user.
+1. **Admin API (test first).** Paginated runs filtered by user, date range and status; trace detail combining `events`, `llm_calls`, `sql_runs`, `audit` and the query-log view; denied audit rows and input-screening verdicts (`input_screening`, filtered by verdict and source); cost by day, alias, model, tier and provider; `GET /admin/conversations?user=` and `GET /admin/conversations/{id}` list and read any user's conversations with their messages and trace ids, including conversations their owner deleted, which are marked as deleted. Restricted to an `admin` role; queries use the logs read user.
 2. **Admin UI.** The run list, trace timeline, audit table and cost chart are built in Phase 6B; this task wires them to the Admin API of task 1 (see Web wiring).
 3. **Proposals (test first).** Eligible runs are disliked or failed `data_query` runs that produced both a QuerySpec and SQL; clarify, deny and policy-rejected runs are excluded. For each, the job stores a proposal in `agent_logs.example_proposals` (90-day TTL, readable only by `pack_reviewer` and `admin`): proposal `id`, `pack`, question, final QuerySpec and SQL, nullable error (absent for disliked successful runs), nullable feedback note and `trace_id`. Before storage, every user-derived value passes a redaction step that masks emails, phone numbers and long digit sequences: question, feedback note, QuerySpec filter values, SQL string literals and echoed error text. Duplicates by `(pack, normalized question)` are skipped.
 4. **Review hand-off.** Proposals appear in the Review UI next to pack drafts. Approving one writes only fields the Phase 2 `examples.yaml` schema supports (`id`, kept from the proposal, question, SQL, `status`, `evidence: [{kind: trace, ref: <trace_id>}]`, `confidence`), with `status: approved`, after the reviewer edits the question, replaces every masked SQL literal with a valid non-personal value, test-runs the SQL through the Review API and confirms that neither contains personal data; feedback notes, errors and QuerySpecs never enter Git. Approval also offers adding an `eval.yaml` case for the question.
@@ -86,7 +87,7 @@ The Phase 6B web app runs every feature on the active pack's sample data until i
 | Feature | Mock to retire | Real endpoint | Contract | Done when |
 |---|---|---|---|---|
 | `runs` | `console.json` runs and traces | the runs and trace detail endpoints of task 1 | `FitcherApi.runs` | `sources.runs` is `http`, its Sample data badge is gone, the http client test passes and its provisional types are deleted |
-| `audit` | `console.json` audit rows | the denied audit endpoint of task 1 | `FitcherApi.audit` | `sources.audit` is `http`, its Sample data badge is gone, the http client test passes and its provisional types are deleted |
+| `audit` | `console.json` audit rows | the denied audit and input-screening endpoints of task 1 | `FitcherApi.audit` | `sources.audit` is `http`, its Sample data badge is gone, the http client test passes and its provisional types are deleted |
 | `costs` | `console.json` cost rows | the cost endpoint of task 1 | `FitcherApi.costs` | `sources.costs` is `http`, its Sample data badge is gone, the http client test passes and its provisional types are deleted |
 | `feedbackReview` | `console.json` feedback rows | `GET /admin/feedback` and the proposal endpoint (task 6) | `FitcherApi.feedbackReview` | `sources.feedbackReview` is `http`, its Sample data badge is gone, the http client test passes and its provisional types are deleted |
 | `evaluation` | `console.json` eval reports and a simulated run | `GET /admin/eval-reports`, `GET /admin/eval-reports/{id}`, `POST /admin/eval-runs` (task 7) | `FitcherApi.evaluation` | `sources.evaluation` is `http`, its Sample data badge is gone, the http client test passes and its provisional types are deleted |

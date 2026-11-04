@@ -211,7 +211,8 @@ The PR size labeler runs for branches within this repository; fork PRs do not re
 
 ## Next steps
 
-- Phase 8: Route questions to the data, metadata, chart edit and out-of-scope branches, answer follow-ups from the stored conversation, and move the conversation sidebar and edit/retry from sample data to the api ([plan](docs/plans/phase-08-conversation.md)).
+- Phase 9B: Screen every question and indexed document chunk for prompt injection before any LLM call, with a local classifier and EN/VI rules ([plan](docs/plans/phase-09b-input-screening.md)).
+- Then Phase 9C (search on Qdrant), 9D (model routing across providers) and 9E (data sources from PostgreSQL, MySQL/MariaDB, MongoDB and files) before onboarding in Phase 10.
 - Later phases follow the [master plan](docs/MASTER_PLAN.md); each starts from its [phase plan](docs/plans/README.md).
 
 See [CHANGELOG.md](CHANGELOG.md) for repository changes and [SECURITY.md](SECURITY.md) for vulnerability reporting.
