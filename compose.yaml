@@ -151,10 +151,16 @@ services:
       KEYCLOAK_JWKS_URL: ${KEYCLOAK_JWKS_URL:-http://keycloak:8080/realms/finch/protocol/openid-connect/certs}
       # Questions per user per minute on /ask; the single api worker keeps the counts.
       RATE_LIMIT_PER_MINUTE: ${RATE_LIMIT_PER_MINUTE:-10}
+      # Input screening (DECISIONS §9); without the classifier every question gets the blocked reply.
+      SCREEN_MODE: ${SCREEN_MODE:-log}
+      SCREEN_FLAG_AT: ${SCREEN_FLAG_AT:-0.5}
+      SCREEN_BLOCK_AT: ${SCREEN_BLOCK_AT:-0.9}
+      GUARD_MODEL_DIR: /app/build/guard_model
     ports:
       - "127.0.0.1:8000:8000"
     volumes:
       - compiled-packs:/app/build/packs:ro
+      - guard-models:/app/build/guard_model:ro
     depends_on:
       clickhouse:
         condition: service_healthy
@@ -196,9 +202,15 @@ services:
       KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN:?set KEYCLOAK_ADMIN in .env}
       KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:?set KEYCLOAK_ADMIN_PASSWORD in .env}
       KEYCLOAK_LAB_USER_PASSWORD: ${KEYCLOAK_LAB_USER_PASSWORD:-}
+      # compile_pack, eval and ask screen like the api.
+      SCREEN_MODE: ${SCREEN_MODE:-log}
+      SCREEN_FLAG_AT: ${SCREEN_FLAG_AT:-0.5}
+      SCREEN_BLOCK_AT: ${SCREEN_BLOCK_AT:-0.9}
+      GUARD_MODEL_DIR: /app/build/guard_model
     volumes:
       - ./data:/app/data
       - compiled-packs:/app/build/packs
+      - guard-models:/app/build/guard_model:ro
     depends_on:
       clickhouse:
         condition: service_healthy
@@ -206,6 +218,19 @@ services:
         condition: service_healthy
       litellm:
         condition: service_healthy
+
+  # Downloads the gated classifier with HF_TOKEN, exports it to ONNX and writes
+  # it to guard-models; start it with `docker compose run --rm guard-model`.
+  # Only this service receives the token.
+  guard-model:
+    build:
+      context: .
+      dockerfile: jobs/fetch_guard_model.Dockerfile
+    profiles: ["jobs"]
+    environment:
+      HF_TOKEN: ${HF_TOKEN:-}
+    volumes:
+      - guard-models:/models/guard
 
   web:
     build:
@@ -242,3 +267,5 @@ volumes:
   opensearch-data:
   # compiled.json of each pack, written by compile_pack in jobs and read by api.
   compiled-packs:
+  # The screening classifier, written by guard-model and read by api and jobs.
+  guard-models:
