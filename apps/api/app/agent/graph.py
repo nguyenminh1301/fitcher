@@ -1,6 +1,7 @@
 """The agent's LangGraph flow (DECISIONS §6).
 
-load_context -> router, then out_of_scope -> end for an out-of-scope
+screen runs first and ends the run with the blocked reply when it stops the
+question (DECISIONS §9); otherwise load_context -> router, then out_of_scope -> end for an out-of-scope
 question, metadata_qa -> end for a definition question, chart_edit -> end
 for a chart edit of a previous result and, otherwise, the data_query flow:
 extract -> resolve_time -> retrieve -> build_spec -> gate -> generate_sql ->
@@ -8,7 +9,8 @@ guard -> explain -> execute -> check, where check loops back to generate_sql
 for repairable errors, stops on policy errors or exhausted retries, and
 otherwise continues to shape_result -> chart_recommender -> summarize. A node that sets
 ``rejection``, or the gate's ``denial`` or ``clarification``, ends the run
-before any SQL is generated.
+before any SQL is generated. A request the LLM gateway rejects ends the run
+with the blocked reply too.
 """
 
 from collections.abc import Callable
@@ -33,15 +35,21 @@ from app.agent.nodes.out_of_scope import out_of_scope
 from app.agent.nodes.resolve_time import resolve_time
 from app.agent.nodes.retrieve import retrieve
 from app.agent.nodes.router import router
+from app.agent.nodes.screen import language_of, screen
 from app.agent.nodes.shape_result import shape_result
 from app.agent.nodes.summarize import summarize
 from app.agent.state import AgentDeps, AgentState, RunCancelled
+from app.llm.client import GatewayBlocked
 from app.observability.instrument import LoggingRunner, instrument
 from app.observability.runs import RunLog
 from app.observability.tracing import run_span
 
 # Four generations of five nodes each plus the fixed nodes stay well inside this.
 RECURSION_LIMIT = 60
+
+
+def _unless_blocked(state: AgentState) -> str:
+    return END if state.get("blocked") else "load_context"
 
 
 def _unless_rejected(next_node: str) -> Callable[[AgentState], str]:
@@ -67,7 +75,7 @@ def _branch(state: AgentState) -> str:
 def build_graph(deps: AgentDeps):
     graph = StateGraph(AgentState)
     nodes = {
-        "load_context": load_context, "router": router, "out_of_scope": out_of_scope, "metadata_qa": metadata_qa,
+        "screen": screen, "load_context": load_context, "router": router, "out_of_scope": out_of_scope, "metadata_qa": metadata_qa,
         "chart_edit": chart_edit,
         "extract": extract, "resolve_time": resolve_time, "retrieve": retrieve, "build_spec": build_spec, "gate": gate,
         "generate_sql": generate_sql, "guard": guard, "explain": explain_node, "execute": execute_node,
@@ -76,7 +84,8 @@ def build_graph(deps: AgentDeps):
     for name, node in nodes.items():
         graph.add_node(name, partial(instrument(name, node), deps=deps))
 
-    graph.add_edge(START, "load_context")
+    graph.add_edge(START, "screen")
+    graph.add_conditional_edges("screen", _unless_blocked, ["load_context", END])
     graph.add_edge("load_context", "router")
     graph.add_conditional_edges("router", _branch, ["out_of_scope", "metadata_qa", "chart_edit", "extract"])
     graph.add_edge("out_of_scope", END)
@@ -103,6 +112,8 @@ def build_graph(deps: AgentDeps):
 def _outcome(state: AgentState) -> tuple[str, str, str]:
     """Status, intent and error of a finished run for its ``runs`` row."""
     intent = state.get("intent", "")
+    if state.get("blocked"):
+        return "blocked", intent, f"blocked: {state['blocked']}"
     if state.get("rejection"):
         return "rejected", intent, state["rejection"]
     if state.get("clarification"):
@@ -113,6 +124,14 @@ def _outcome(state: AgentState) -> tuple[str, str, str]:
         return "succeeded", intent, ""
     errors = state.get("errors", [])
     return "failed", intent, str(errors[-1]) if errors else ""
+
+
+def _invoke(initial: AgentState, deps: AgentDeps) -> AgentState:
+    """Run the graph; a request the gateway rejected ends it with the blocked reply."""
+    try:
+        return build_graph(deps).invoke(initial, config={"recursion_limit": RECURSION_LIMIT})
+    except GatewayBlocked:
+        return {**initial, "blocked": "gateway", "language": language_of(initial["question"])}
 
 
 def run_question(question: str, deps: AgentDeps) -> AgentState:
@@ -128,13 +147,12 @@ def run_question(question: str, deps: AgentDeps) -> AgentState:
             "errors": [],
             "warnings": [],
         }
-        config = {"recursion_limit": RECURSION_LIMIT}
         if deps.logs is None:
-            return build_graph(deps).invoke(initial, config=config)
+            return _invoke(initial, deps)
         log = RunLog(deps.logs, run, user_id=deps.user_id, pack=deps.compiled.pack.name, question=question)
         deps = replace(deps, runner=LoggingRunner(deps.runner, deps.logs))
         try:
-            state = build_graph(deps).invoke(initial, config=config)
+            state = _invoke(initial, deps)
         except RunCancelled:
             log.finish("cancelled", intent="", error="the client stopped the run")
             raise

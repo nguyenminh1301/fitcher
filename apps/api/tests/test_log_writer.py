@@ -11,7 +11,7 @@ import pytest
 from app.config import SettingsError, load_settings
 from app.observability.events import (
     AuditRecord, ChatMessageRecord, ConversationGroupRecord, ConversationRecord, EvalReportRecord, EventRecord, RunRecord,
-    SqlRunRecord,
+    InputScreeningRecord, SqlRunRecord,
 )
 from app.observability.log_writer import ClickHouseLogSink, FlushResult, LogWriter
 
@@ -28,7 +28,7 @@ def table_columns(table: str) -> list[str]:
 @pytest.mark.parametrize(
     "record", [
         RunRecord, EventRecord, SqlRunRecord, EvalReportRecord, AuditRecord, ChatMessageRecord, ConversationRecord,
-        ConversationGroupRecord,
+        ConversationGroupRecord, InputScreeningRecord,
     ],
 )
 def test_records_match_their_table_columns(record):

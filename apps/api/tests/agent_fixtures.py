@@ -5,12 +5,13 @@ from decimal import Decimal
 
 from conftest import FIXTURE_PACK, SCHEMA_DIR
 from fake_llm import FakeLLMClient
-from fakes import FakeEmbeddings, FakeRunner, FakeSearch
+from fakes import FakeClassifier, FakeEmbeddings, FakeRunner, FakeSearch
 
 from app.agent.state import AgentDeps
 from app.data.clickhouse import QueryOutput
 from app.packs.compiler import CompiledPack, DateCoverage, approved_pack
 from app.packs.loader import load_pack
+from app.screening.screen import Screener
 
 TODAY = date(2026, 1, 15)
 
@@ -85,4 +86,5 @@ def deps(llm_replies: list, runner: FakeRunner | None = None, search=default_sea
         compiled=compiled_fixture(),
         today=TODAY,
         role="viewer",
+        screener=Screener(FakeClassifier()),
     )

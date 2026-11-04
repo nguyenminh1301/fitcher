@@ -27,6 +27,7 @@ def store(client):
 
 def answered(store, user="ana", conversation_id=None, question="Top widgets in Q1 2025", text="Blue led."):
     turn = store.open_turn(user, conversation_id, question)
+    store.question(turn)
     events = [
         StatusEvent(**T, node="extract", phase="start"), SqlEvent(**T, sql="SELECT 1", attempt=1),
         ResultEvent(**T, result=RESULT), ChartSpecEvent(**T, spec=table_spec(RESULT)),
@@ -54,6 +55,7 @@ def test_a_thread_shows_each_answer_with_its_events_and_the_result_put_back(stor
 
 def test_a_clarify_keeps_its_options(store):
     turn = store.open_turn("ana", None, "How did we do?")
+    store.question(turn)
     options = [ClarifyOption(id="metric:widget_revenue", label="Widget revenue")]
     clarify = ClarifyEvent(**T, question="Which measure should I report?", options=options, lang="en")
     store.answer(turn, trace_id=T["trace_id"], content=clarify.question, query_spec=None, result=None, events=[clarify, DoneEvent(**T)])
@@ -65,6 +67,7 @@ def test_a_clarify_keeps_its_options(store):
 
 def test_an_answer_stored_without_events_reads_as_its_summary_and_result(store, client):
     turn = store.open_turn("ana", None, "Top widgets")
+    store.question(turn)
     store.answer(turn, trace_id=T["trace_id"], content="Blue led.", query_spec=spec(), result=RESULT)
 
     [shown] = store.thread("ana", turn.conversation_id).turns
@@ -75,6 +78,7 @@ def test_an_answer_stored_without_events_reads_as_its_summary_and_result(store, 
 
 def test_a_question_without_an_answer_shows_no_events(store):
     turn = store.open_turn("ana", None, "Top widgets")
+    store.question(turn)
 
     assert store.thread("ana", turn.conversation_id).turns[0].events == []
 
@@ -99,12 +103,15 @@ def test_editing_turn_one_replaces_the_turns_after_it(store):
     conversation_id = three_turns(store)
 
     edited = store.open_turn("ana", conversation_id, "First question, edited", edit_of_turn=1)
+
+    store.question(edited)
     store.answer(edited, trace_id=T["trace_id"], content="Edited answer.", query_spec=spec(), result=RESULT)
 
     assert (edited.turn, edited.revision, edited.history, edited.question) == (1, 2, [], "First question, edited")
     thread = store.thread("ana", conversation_id)
     assert [(turn.turn, turn.revision, turn.question) for turn in thread.turns] == [(1, 2, "First question, edited")]
     follow_up = store.open_turn("ana", conversation_id, "And then?")
+    store.question(follow_up)
     assert [turn.question for turn in follow_up.history] == ["First question, edited"]
     assert (follow_up.turn, follow_up.revision) == (2, 2)
 
@@ -113,6 +120,8 @@ def test_retrying_a_turn_asks_its_stored_question_again(store):
     conversation_id = three_turns(store)
 
     retried = store.open_turn("ana", conversation_id, "ignored text", retry_of_turn=2)
+
+    store.question(retried)
 
     assert (retried.turn, retried.revision, retried.question) == (2, 2, "Second question")
     assert [turn.question for turn in retried.history] == ["First question"]
@@ -171,6 +180,7 @@ def test_rename_pin_and_group_write_a_new_row(store, client):
 def test_two_changes_in_one_millisecond_keep_their_order(client):
     frozen = ConversationStore(client, clock=lambda: START)
     turn = frozen.open_turn("ana", None, "q")
+    frozen.question(turn)
 
     frozen.update("ana", turn.conversation_id, ConversationPatch(title="first"))
     frozen.update("ana", turn.conversation_id, ConversationPatch(title="second"))

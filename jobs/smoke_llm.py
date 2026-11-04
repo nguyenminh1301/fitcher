@@ -3,6 +3,8 @@
 Run it explicitly with ``make smoke`` or
 ``docker compose exec -T api python -m jobs.smoke_llm``. It never runs from
 tests or health checks. The reply text is not printed; only its length is.
+Its fixed prompt is engine text, so it carries the ``trusted_pack`` screening
+metadata the gateway guardrail requires (DECISIONS §9).
 """
 
 import json
@@ -25,6 +27,7 @@ def main() -> int:
     payload = {
         "model": ALIAS,
         "messages": [{"role": "user", "content": "Reply with the single word: ready"}],
+        "metadata": {"screening": "trusted_pack"},
     }
     request = urllib.request.Request(
         f"{base_url}/v1/chat/completions",

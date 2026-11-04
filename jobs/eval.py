@@ -35,6 +35,7 @@ from app.observability.events import EvalReportRecord, utc_now
 from app.observability.log_writer import start_log_writer
 from app.packs.compiler import CompileError, load_compiled
 from app.packs.loader import PackValidationError, load_pack
+from app.screening.screen import Screener
 from app.search.opensearch import OpenSearch
 
 
@@ -64,6 +65,8 @@ def build_deps(pack: str, reference: date) -> AgentDeps:
         today=reference,
         logs=start_log_writer(settings),
         user_id="eval",
+        screener=Screener.from_settings(settings),
+        screen_mode=settings.screen_mode,
     )
 
 

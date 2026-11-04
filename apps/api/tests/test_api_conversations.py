@@ -37,6 +37,7 @@ def client(store):
 
 def asked(store, user="lab.viewer", question="Doanh thu quý 1") -> str:
     turn = store.open_turn(user, None, question)
+    store.question(turn)
     store.answer(turn, trace_id="t" * 32, content="Blue led.", query_spec=None, result=None)
     return turn.conversation_id
 

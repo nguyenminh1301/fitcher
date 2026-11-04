@@ -7,6 +7,7 @@ from fake_llm import FakeLLMClient
 import pytest
 
 from app.agent.graph import run_question
+from app.llm.client import Prompt
 from jobs.ask import FaultInjectingLLM, choose_role, format_table, inject_fault, parse_args, report
 
 
@@ -58,12 +59,15 @@ def test_failed_run_prints_the_last_sql_and_error_and_exits_1(capsys):
     assert "No result" in captured.err
 
 
+PROMPT = Prompt(system="rules", user="question")
+
+
 def test_fault_injection_breaks_only_the_first_generated_sql():
     llm = FaultInjectingLLM(FakeLLMClient(["SELECT a FROM t", "SELECT a FROM t", "summary"]))
 
-    assert llm.text("sql-gen", "p") == "SELECT fitcherInjectedFault() AS injected_fault, a FROM t"
-    assert llm.text("sql-gen", "p") == "SELECT a FROM t"
-    assert llm.text("fast", "p") == "summary"
+    assert llm.text("sql-gen", PROMPT) == "SELECT fitcherInjectedFault() AS injected_fault, a FROM t"
+    assert llm.text("sql-gen", PROMPT) == "SELECT a FROM t"
+    assert llm.text("fast", PROMPT) == "summary"
 
 
 def test_fault_goes_after_a_select_keyword_not_into_a_literal():

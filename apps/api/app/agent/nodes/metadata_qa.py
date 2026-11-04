@@ -18,7 +18,7 @@ from app.packs.search_indices import HYBRID_PIPELINE, alias_name, hybrid_query
 from app.search.opensearch import SearchError
 
 ALIAS = "fast"
-PROMPT = "metadata_qa.v1"
+PROMPT = "metadata_qa.v2"
 SEARCHED = ("glossary_terms", "metrics", "datasets", "kb_docs")
 HITS_PER_INDEX = 3
 TEXT_LIMIT = 1200

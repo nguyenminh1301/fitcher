@@ -126,7 +126,7 @@ def test_out_of_scope_question_runs_no_extract_or_sql():
 
     state = run_question("Write me a poem", agent)
 
-    assert seen == ["load_context", "router", "out_of_scope"]
+    assert seen == ["screen", "load_context", "router", "out_of_scope"]
     assert state["reply"] == "I answer questions about the shop's data."
     assert [call.alias for call in agent.llm.calls] == ["fast", "fast"]
     assert agent.runner.calls == []

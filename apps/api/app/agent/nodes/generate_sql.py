@@ -20,7 +20,7 @@ from app.llm.client import LLMError
 from app.packs.models import DatasetGrant, Pack
 from app.packs.policy_compiler import ROW_COUNT_COLUMN, Names
 
-PROMPT = "generate_sql.v1"
+PROMPT = "generate_sql.v2"
 MAX_GENERATIONS = 4
 EXAMPLES_IN_PROMPT = 3
 _FENCE = re.compile(r"^```[a-zA-Z]*\s*|\s*```$")

@@ -38,6 +38,7 @@ from app.llm.embeddings import LiteLLMEmbeddings
 from app.observability.log_writer import start_log_writer
 from app.packs.compiler import CompileError, load_compiled
 from app.packs.models import Pack
+from app.screening.screen import Screener
 from app.search.opensearch import OpenSearch
 
 TABLE_ROWS = 50
@@ -168,6 +169,8 @@ def main(argv: list[str] | None = None) -> int:
             logs=start_log_writer(settings),
             user_id="cli",
             role=role,
+            screener=Screener.from_settings(settings),
+            screen_mode=settings.screen_mode,
         )
     except (SettingsError, CompileError, TimeResolutionError, RuntimeError) as error:
         print(error, file=sys.stderr)

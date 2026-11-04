@@ -7,7 +7,12 @@ span per graph node. The provider has no exporter: the lab keeps traces in
 ``agent_logs`` (DECISIONS §10), not in a tracing backend.
 
 The current run travels in a context variable, so the LLM clients can tag
-their requests without any change to node signatures.
+their requests without any change to node signatures. Every gateway request
+also carries ``screening`` metadata, which the LiteLLM guardrail requires
+(DECISIONS §9): inside a run it is the verdict the ``screen`` node recorded
+(``allow`` or ``flag``), and calls on reviewed pack content outside a run
+(compiles, smoke tests) run inside ``trusted_pack_calls``. A request with
+neither is sent without it and the gateway rejects it.
 """
 
 from collections.abc import Iterator
@@ -26,9 +31,13 @@ class RunContext:
     node: str = ""
     # Gateway requests sent during the run, compared with llm_calls rows by the trace query.
     llm_calls: int = 0
+    # The question's screening metadata for the gateway, set by the screen node: allow or flag.
+    screening: str = ""
 
 
 _RUN: ContextVar[RunContext | None] = ContextVar("agent_run", default=None)
+_TRUSTED: ContextVar[bool] = ContextVar("trusted_pack_calls", default=False)
+TRUSTED_PACK = "trusted_pack"
 
 
 def current_run() -> RunContext | None:
@@ -60,10 +69,26 @@ def node_span(name: str) -> Iterator[None]:
                 run.node = previous
 
 
+@contextmanager
+def trusted_pack_calls() -> Iterator[None]:
+    """Mark the gateway requests sent outside a run inside this block as calls on reviewed pack content."""
+    token = _TRUSTED.set(True)
+    try:
+        yield
+    finally:
+        _TRUSTED.reset(token)
+
+
 def llm_metadata() -> dict:
-    """Count one gateway request of the current run and return its LiteLLM metadata; empty outside a run."""
+    """Count one gateway request of the current run and return its LiteLLM metadata.
+
+    Outside a run the metadata is ``trusted_pack`` screening inside ``trusted_pack_calls`` and empty otherwise.
+    """
     run = _RUN.get()
     if run is None:
-        return {}
+        return {"screening": TRUSTED_PACK} if _TRUSTED.get() else {}
     run.llm_calls += 1
-    return {"trace_id": run.trace_id, "node": run.node}
+    metadata = {"trace_id": run.trace_id, "node": run.node}
+    if run.screening:
+        metadata["screening"] = run.screening
+    return metadata

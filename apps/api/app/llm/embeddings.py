@@ -1,7 +1,8 @@
 """Embeddings through the LiteLLM ``embed`` alias.
 
-Engine code only ever names the alias; LiteLLM maps it to a model. Unit tests
-use a fake client, so no test sends a billable request.
+Engine code only ever names the alias; LiteLLM maps it to a model. A request
+the gateway's screening guardrail rejects raises ``GatewayBlocked``. Unit
+tests use a fake client, so no test sends a billable request.
 """
 
 from collections.abc import Sequence
@@ -9,6 +10,7 @@ from typing import Protocol
 
 import httpx
 
+from app.llm.client import check_gateway
 from app.observability.tracing import llm_metadata
 
 EMBED_ALIAS = "embed"
@@ -52,6 +54,7 @@ class LiteLLMEmbeddings:
             response = self._http.post(self._url, json=payload, headers=self._headers)
         except httpx.HTTPError as error:
             raise EmbeddingError(f"embedding request to alias {EMBED_ALIAS} failed: {type(error).__name__}") from error
+        check_gateway(response)
         if response.status_code != 200:
             raise EmbeddingError(f"alias {EMBED_ALIAS} returned HTTP {response.status_code}")
         data = sorted(response.json().get("data", []), key=lambda item: item["index"])

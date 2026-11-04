@@ -63,6 +63,13 @@ class Screener:
     def from_model_dir(cls, model_dir: Path, thresholds: Thresholds = Thresholds()) -> "Screener":
         return cls(load_classifier(model_dir), thresholds, loader=lambda: load_classifier(model_dir))
 
+    @classmethod
+    def from_settings(cls, settings) -> "Screener":
+        """The screener of ``app.config.Settings``: its model directory and thresholds."""
+        return cls.from_model_dir(
+            Path(settings.guard_model_dir), Thresholds(settings.screen_flag_at, settings.screen_block_at),
+        )
+
     @property
     def classifier(self) -> Classifier | None:
         if self._classifier is None and self._loader is not None:

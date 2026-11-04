@@ -4,9 +4,10 @@ Every read and write names the requesting user, so a conversation or group id
 that belongs to another user, or that its owner deleted, is not found. The api
 opens a turn before the graph runs: a first question creates the
 conversation, titled by the question cut to 80 characters; a follow-up checks
-ownership and reads the current thread. The question is written then and the
-answer when the run finishes, synchronously, so the next question of the
-conversation always reads the previous answer. An answer keeps its stream
+ownership and reads the current thread. The question is written once
+screening lets it through, so a blocked question is never a turn (DECISIONS
+§9), and the answer when the run finishes, synchronously, so the next
+question of the conversation always reads the previous answer. An answer keeps its stream
 events (without status events and without the result, whose rows are stored
 once in ``result``), so a thread opened later renders as it did.
 
@@ -184,7 +185,7 @@ class ConversationStore:
         self, user_id: str, conversation_id: str | None, question: str, *,
         edit_of_turn: int | None = None, retry_of_turn: int | None = None,
     ) -> OpenTurn:
-        """Open the next turn, or a new revision of an earlier one, and write the question.
+        """Open the next turn, or a new revision of an earlier one; ``question`` writes the question later.
 
         ``conversation_id`` None starts a conversation. Raises ``ConversationNotFound`` when ``user_id``
         has no such conversation and ``TurnNotFound`` when the edited or retried turn is not in its thread.
@@ -212,9 +213,11 @@ class ConversationStore:
                 revision = max(row.revision for row in rows) + 1
                 if retry_of_turn is not None:
                     question = target.question
-        turn = OpenTurn(user_id, conversation_id, number, revision, history, question)
-        self._write(turn, role="user", content=question, trace_id="")
-        return turn
+        return OpenTurn(user_id, conversation_id, number, revision, history, question)
+
+    def question(self, turn: OpenTurn) -> None:
+        """Write the question of ``turn``, once screening has let it through."""
+        self._write(turn, role="user", content=turn.question, trace_id="")
 
     def answer(
         self, turn: OpenTurn, *, trace_id: str, content: str, query_spec: QuerySpec | None, result: Result | None,

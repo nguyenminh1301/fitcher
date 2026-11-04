@@ -21,7 +21,7 @@ from app.contracts.query_spec import FilterOp, Scalar
 from app.llm.client import LLMError
 
 ALIAS = "fast"
-PROMPT = "extract.v3"
+PROMPT = "extract.v4"
 # Shown right before the question: the fast alias reads a reply to a clarifying question as the whole
 # question unless the instruction to combine them sits next to it.
 CONVERSATION = """

@@ -18,7 +18,7 @@ from app.contracts.chart_spec import ChartType
 from app.llm.client import LLMError
 
 ALIAS = "fast"
-PROMPT = "chart_recommender.v1"
+PROMPT = "chart_recommender.v2"
 
 
 class ChartPick(BaseModel):

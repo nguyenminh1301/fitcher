@@ -20,7 +20,7 @@ from app.contracts.chart_spec import ChartType
 from app.llm.client import LLMError
 
 ALIAS = "fast"
-PROMPT = "router.v2"
+PROMPT = "router.v3"
 MIN_CONFIDENCE = 0.5
 
 Intent = Literal["data_query", "metadata_qa", "chart_edit", "out_of_scope"]
