@@ -15,7 +15,7 @@ from pydantic import BaseModel, ConfigDict
 
 from app.agent.state import AgentDeps, AgentState
 from app.llm.embeddings import EmbeddingError
-from app.packs.search_indices import HYBRID_PIPELINE, alias_name, hybrid_query, value_query
+from app.packs.search_indices import alias_name
 from app.search.opensearch import SearchError
 
 HITS_PER_QUERY = 5
@@ -59,18 +59,15 @@ def _retrieve(state: AgentState, deps: AgentDeps) -> "Retrieval":
         [*extraction.dimension_terms, *(f.column_term for f in extraction.filters if f.column_term)]
     ))
     values = list(dict.fromkeys(str(value) for f in extraction.filters for value in f.values))
-    texts = list(dict.fromkeys([state["question"], *metric_terms, *dimension_terms]))
+    texts = list(dict.fromkeys([state["question"], *metric_terms, *dimension_terms, *values]))
     vectors = dict(zip(texts, deps.embeddings.embed(texts), strict=True))
 
     def semantic(index: str, text: str, roles: list[str]) -> list[Hit]:
-        hits = deps.search.search(
-            alias_name(pack.name, index), hybrid_query(text, vectors[text], roles, HITS_PER_QUERY), pipeline=HYBRID_PIPELINE
-        )
+        hits = deps.search.query(alias_name(pack.name, index), text, vectors[text], roles, HITS_PER_QUERY)
         return [Hit(index=index, **hit) for hit in hits]
 
     def lexical(text: str) -> list[Hit]:
-        hits = deps.search.search(alias_name(pack.name, "column_values"), value_query(text, every_role, HITS_PER_QUERY))
-        return [Hit(index="column_values", **hit) for hit in hits]
+        return semantic("column_values", text, every_role)
 
     def term(index: str, text: str) -> list[Hit]:
         return semantic("glossary_terms", text, every_role) + semantic(index, text, every_role)

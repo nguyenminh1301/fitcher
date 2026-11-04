@@ -5,6 +5,7 @@ fail at a chosen point.
 """
 
 from collections.abc import Iterable, Sequence
+from dataclasses import dataclass
 from datetime import date
 import fnmatch
 import re
@@ -75,6 +76,15 @@ class FakeEmbeddings:
         return [[float(len(text) % 7), 1.0, 0.0, 0.5][: self.dimensions] for text in texts]
 
 
+@dataclass(frozen=True)
+class SearchRequest:
+    alias: str
+    text: str
+    vector: list[float]
+    roles: list[str]
+    size: int
+
+
 class FakeSearch:
     """In-memory OpenSearch: indices, documents, aliases and a call log.
 
@@ -89,6 +99,7 @@ class FakeSearch:
         self.pipelines: dict[str, dict] = {}
         self.alias_updates: list[list[dict]] = []
         self.searches: list[tuple[str, dict, str | None]] = []
+        self.queries: list[SearchRequest] = []
         self.fail_bulk_into = fail_bulk_into
         self.search_results = search_results or {}
 
@@ -138,6 +149,14 @@ class FakeSearch:
         if callable(self.search_results):
             return self.search_results(index, body)
         return self.search_results.get(index, [])
+
+    def query(self, alias: str, text: str, vector, roles, size: int) -> list[dict]:
+        """The agent's search interface; ``search_results`` is called with the alias and the request."""
+        request = SearchRequest(alias, text, list(vector), list(roles), size)
+        self.queries.append(request)
+        if callable(self.search_results):
+            return self.search_results(alias, request)
+        return self.search_results.get(alias, [])
 
 
 class FakeRunner:

@@ -4,7 +4,7 @@ Each node is a function of ``(state, deps)`` that returns the state fields it
 changes, so it can be tested alone with fake dependencies (DECISIONS §13).
 """
 
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date
 from typing import Literal, Protocol, TypedDict
@@ -28,7 +28,8 @@ TimeGrain = Literal["day", "week", "month", "quarter", "year"]
 
 
 class SearchClient(Protocol):
-    def search(self, index: str, body: dict, pipeline: str | None = None) -> list[dict]: ...
+    def query(self, alias: str, text: str, vector: Sequence[float], roles: Sequence[str], size: int) -> list[dict]:
+        """Hybrid keyword and semantic hits of ``alias`` readable by ``roles``, as ``{id, score, source}``."""
 
 
 class LogWriter(Protocol):

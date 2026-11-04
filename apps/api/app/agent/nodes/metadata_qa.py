@@ -14,7 +14,7 @@ from app.agent.prompts import render
 from app.agent.state import AgentDeps, AgentState
 from app.llm.client import LLMError
 from app.llm.embeddings import EmbeddingError
-from app.packs.search_indices import HYBRID_PIPELINE, alias_name, hybrid_query
+from app.packs.search_indices import alias_name
 from app.search.opensearch import SearchError
 
 ALIAS = "fast"
@@ -45,10 +45,7 @@ def metadata_qa(state: AgentState, deps: AgentDeps) -> dict:
         found = [
             _entry(index, hit)
             for index in SEARCHED
-            for hit in deps.search.search(
-                alias_name(pack.name, index), hybrid_query(question, vector, [deps.role], HITS_PER_INDEX),
-                pipeline=HYBRID_PIPELINE,
-            )
+            for hit in deps.search.query(alias_name(pack.name, index), question, vector, [deps.role], HITS_PER_INDEX)
         ]
     except (EmbeddingError, SearchError) as error:
         return {"rejection": f"the pack context could not be retrieved: {error}"}

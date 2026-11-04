@@ -7,6 +7,8 @@ import pytest
 from app.packs.loader import load_pack
 from app.packs.search_indices import (
     HYBRID_PIPELINE,
+    INDEX_NAMES,
+    OpenSearchPack,
     ColumnValue,
     build_documents,
     generation_of,
@@ -143,7 +145,15 @@ def test_search_pack_reads_every_alias_with_one_embedding():
 
     assert results["metrics"] == [{"id": "m1", "score": 1.0, "source": {}}]
     assert embeddings.calls == [["revenue"]]
+    assert [request.alias for request in search.queries] == [f"shop_{index}" for index in INDEX_NAMES]
+
+
+def test_the_opensearch_adapter_sends_values_to_the_lexical_query_and_the_rest_to_the_hybrid_pipeline():
+    search = FakeSearch()
+    pack = OpenSearchPack(search)
+
+    pack.query("shop_column_values", "Blu", [0.1], ["viewer"], 3)
+    pack.query("shop_metrics", "revenue", [0.1], ["viewer"], 3)
+
     pipelines = {index: pipeline for index, _, pipeline in search.searches}
-    assert pipelines["shop_column_values"] is None
-    assert pipelines["shop_metrics"] == HYBRID_PIPELINE
-    assert len(search.searches) == 6
+    assert pipelines == {"shop_column_values": None, "shop_metrics": HYBRID_PIPELINE}

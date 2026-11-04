@@ -30,7 +30,7 @@ from app.llm.embeddings import EmbeddingError, LiteLLMEmbeddings
 from app.packs.compiler import CompileError, CompileSummary, compile_pack, load_compiled
 from app.observability.tracing import trusted_pack_calls
 from app.packs.loader import PackValidationError
-from app.packs.search_indices import search_pack
+from app.packs.search_indices import OpenSearchPack, search_pack
 from app.screening.screen import Screener
 from app.search.opensearch import OpenSearch, SearchError
 from jobs.lib.clickhouse import admin_client
@@ -88,7 +88,7 @@ def print_summary(summary: CompileSummary) -> None:
 def check_search(args: argparse.Namespace, settings, search: OpenSearch, embeddings) -> int:
     compiled = load_compiled(Path(settings.compiled_pack_dir), args.pack)
     roles = args.role or [role.id for role in compiled.pack.policies.roles]
-    results = search_pack(search, embeddings, args.pack, args.check_search, roles, CHECK_SEARCH_SIZE)
+    results = search_pack(OpenSearchPack(search), embeddings, args.pack, args.check_search, roles, CHECK_SEARCH_SIZE)
     print(f"Search {args.check_search!r} in {args.pack} as {', '.join(roles)}:")
     for index, hits in results.items():
         listed = ", ".join(f"{_hit_label(hit)} ({hit['score']:.3f})" for hit in hits) or "no hits"

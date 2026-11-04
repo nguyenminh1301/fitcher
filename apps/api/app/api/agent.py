@@ -29,6 +29,7 @@ from app.observability.log_writer import start_log_writer
 from app.packs.compiler import CompiledPack
 from app.packs.policy_compiler import Names
 from app.screening.screen import Screener
+from app.packs.search_indices import OpenSearchPack
 from app.search.opensearch import OpenSearch
 
 logger = logging.getLogger(__name__)
@@ -78,7 +79,7 @@ class Agent:
         self._screener = screener
         self._screen_mode = settings.screen_mode
         self._llm = LiteLLMClient(settings.litellm_base_url, settings.litellm_master_key)
-        self._search = OpenSearch(settings.opensearch_url)
+        self._search = OpenSearchPack(OpenSearch(settings.opensearch_url))
         # Query vectors must match the indexed ones, so the compiled size wins over the environment.
         self._embeddings = LiteLLMEmbeddings(
             settings.litellm_base_url, settings.litellm_master_key, compiled.embedding_dimensions,

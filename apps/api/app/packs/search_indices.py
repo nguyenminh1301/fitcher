@@ -248,16 +248,19 @@ def value_query(text: str, roles: Sequence[str], size: int) -> dict:
     }
 
 
-def search_pack(
-    search: OpenSearch, embeddings: EmbeddingClient, pack: str, text: str, roles: Sequence[str], size: int
-) -> dict[str, list[dict]]:
-    """Search the live aliases of all six indices of ``pack`` for ``text``."""
+class OpenSearchPack:
+    """The agent's search interface over the OpenSearch aliases of a compiled pack."""
+
+    def __init__(self, search: OpenSearch):
+        self._search = search
+
+    def query(self, alias: str, text: str, vector: Sequence[float], roles: Sequence[str], size: int) -> list[dict]:
+        if alias.endswith("_column_values"):
+            return self._search.search(alias, value_query(text, roles, size))
+        return self._search.search(alias, hybrid_query(text, vector, roles, size), pipeline=HYBRID_PIPELINE)
+
+
+def search_pack(search, embeddings: EmbeddingClient, pack: str, text: str, roles: Sequence[str], size: int) -> dict[str, list[dict]]:
+    """Search the live aliases of all six indices of ``pack`` for ``text`` through ``search.query``."""
     vector = embeddings.embed([text])[0]
-    results: dict[str, list[dict]] = {}
-    for index in INDEX_NAMES:
-        alias = alias_name(pack, index)
-        if index in LEXICAL_INDICES:
-            results[index] = search.search(alias, value_query(text, roles, size))
-        else:
-            results[index] = search.search(alias, hybrid_query(text, vector, roles, size), pipeline=HYBRID_PIPELINE)
-    return results
+    return {index: search.query(alias_name(pack, index), text, vector, roles, size) for index in INDEX_NAMES}
