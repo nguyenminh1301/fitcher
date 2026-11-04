@@ -8,8 +8,9 @@ provider key is set.
 """
 
 from collections.abc import Mapping
-from datetime import datetime
+from datetime import datetime, timedelta
 import os
+import threading
 
 import clickhouse_connect
 import httpx
@@ -21,8 +22,12 @@ from app.observability.events import AdminActionRecord
 USER = "model_tiers_admin"
 PASSWORD_SETTING = "CLICKHOUSE_MODEL_TIERS_PASSWORD"
 TIMEOUT_SECONDS = 10
-# Eval reports read per pack; eligibility needs only the latest report per tier and alias.
-REPORT_LIMIT = 500
+# The latest eval report of every tier and alias of a pack: the only report eligibility reads.
+LATEST_REPORTS = (
+    "SELECT tier, alias, argMax(report_id, ts), max(ts), argMax(passed, ts), argMax(regressed, ts)"
+    " FROM agent_logs.eval_reports ARRAY JOIN mapKeys(tiers) AS tier, mapValues(tiers) AS alias"
+    " WHERE pack = {pack:String} GROUP BY tier, alias"
+)
 
 
 class CatalogError(RuntimeError):
@@ -49,6 +54,8 @@ class ClickHouseModelStore:
 
     def __init__(self, client):
         self._client = client
+        self._last_change: datetime | None = None
+        self._lock = threading.Lock()
 
     def read(self) -> dict[str, str]:
         try:
@@ -60,21 +67,22 @@ class ClickHouseModelStore:
         return {str(tier): str(alias) for tier, alias in rows}
 
     def write(self, tier: str, alias: str, changed_by: str, changed_at: datetime) -> None:
-        self._client.insert(
-            "data_meta.model_tiers", [[tier, alias, changed_by, changed_at]],
-            column_names=["tier", "alias", "changed_by", "changed_at"],
-        )
+        """Insert a mapping row; each row's ``changed_at`` is after the previous one, so the latest always wins."""
+        with self._lock:
+            if self._last_change is not None and changed_at <= self._last_change:
+                changed_at = self._last_change + timedelta(milliseconds=1)
+            self._client.insert(
+                "data_meta.model_tiers", [[tier, alias, changed_by, changed_at]],
+                column_names=["tier", "alias", "changed_by", "changed_at"],
+            )
+            self._last_change = changed_at
 
     def reports(self, pack: str) -> list[ReportSummary]:
-        """The pack's eval reports, newest first."""
-        rows = self._client.query(
-            "SELECT report_id, ts, tiers, passed, regressed FROM agent_logs.eval_reports"
-            " WHERE pack = {pack:String} ORDER BY ts DESC LIMIT {limit:UInt32}",
-            parameters={"pack": pack, "limit": REPORT_LIMIT},
-        ).result_rows
+        """The latest eval report of the pack for every tier and alias, one summary per pair."""
+        rows = self._client.query(LATEST_REPORTS, parameters={"pack": pack}).result_rows
         return [
-            ReportSummary(report_id=report_id, ts=ts, tiers=dict(tiers), passed=bool(passed), regressed=regressed)
-            for report_id, ts, tiers, passed, regressed in rows
+            ReportSummary(report_id=report_id, ts=ts, tiers={tier: alias}, passed=bool(passed), regressed=regressed)
+            for tier, alias, report_id, ts, passed, regressed in rows
         ]
 
     def record_action(self, record: AdminActionRecord) -> None:

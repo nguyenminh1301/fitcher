@@ -19,7 +19,7 @@ from app.config import load_settings
 from app.conversation.store import ConversationStore, conversations_client
 from app.llm.client import LLMError
 from app.llm.model_store import CatalogClient, ClickHouseModelStore, model_tiers_client
-from app.llm.tiers import TierMap
+from app.llm.tiers import TierMap, TierStoreError
 from app.packs.compiler import CompileError, CompiledPack, load_compiled
 from app.screening.screen import Screener
 
@@ -91,16 +91,24 @@ def get_model_store() -> ClickHouseModelStore:
         raise unavailable(f"the model store is unavailable: {error}") from None
 
 
+class LazyTierStore:
+    """The model store, looked up on every read: a store unavailable at startup is used once it is back."""
+
+    def read(self) -> dict[str, str]:
+        try:
+            store = get_model_store()
+        except HTTPException as error:
+            raise TierStoreError(str(error.detail)) from None
+        return store.read()
+
+    def write(self, tier, alias, changed_by, changed_at) -> None:
+        get_model_store().write(tier, alias, changed_by, changed_at)
+
+
 @cache
 def get_tier_map() -> TierMap:
-    """The process's tier lookup; without the model store every tier keeps its ``MODEL_TIER_<TIER>`` default."""
-    settings = load_settings()
-    try:
-        store = get_model_store()
-    except Exception:  # noqa: BLE001 - routing still works on the defaults
-        logger.warning("model tiers use their defaults: the model store is unavailable")
-        store = None
-    return TierMap(settings.model_tiers, store)
+    """The process's tier lookup; while the model store is unavailable, every tier keeps its default."""
+    return TierMap(load_settings().model_tiers, LazyTierStore())
 
 
 @cache

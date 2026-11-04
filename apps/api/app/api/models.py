@@ -7,11 +7,14 @@ gateway loaded with their eligibility from the active pack's eval reports.
 embedding model needs a full reindex), an alias the gateway did not load and
 an ineligible alias, writes the mapping, records the change in
 ``agent_logs.admin_actions`` (when that fails, the previous alias is written
-back, so no change stays unaudited) and makes this process's tier lookup read the new
+back while the tier still holds this change, so no change stays unaudited)
+and makes this process's tier lookup read the new
 mapping at once; other processes read it within the tier cache window.
+Changes run one at a time in the process; the api runs one worker.
 """
 
 import logging
+import threading
 from typing import Annotated, Protocol
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -22,7 +25,7 @@ from app.auth.jwt import Principal
 from app.contracts.model_tiers import AliasOption, ModelTier, ModelTierChange, ModelTiers
 from app.llm.eligibility import eligibility, ReportSummary
 from app.llm.model_store import CatalogError
-from app.llm.tiers import CHAT_TIERS, EMBED_TIER, provider_of, TierMap, TIERS
+from app.llm.tiers import CHAT_TIERS, EMBED_TIER, provider_of, TierMap, TIERS, TierStoreError
 from app.observability.events import AdminActionRecord, utc_now
 from app.packs.compiler import CompiledPack
 
@@ -30,9 +33,12 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 ACTION = "model_tier"
 ADMIN_ROLE = "admin"
+_CHANGES = threading.Lock()
 
 
 class ModelStore(Protocol):
+    def read(self) -> dict[str, str]: ...
+
     def write(self, tier: str, alias: str, changed_by: str, changed_at) -> None: ...
 
     def reports(self, pack: str) -> list[ReportSummary]: ...
@@ -126,24 +132,37 @@ def change_model(
     state = eligibility(reports, tier, body.alias)
     if not state.eligible:
         raise HTTPException(status.HTTP_409_CONFLICT, detail=f"{body.alias} is not eligible for {tier}: {state.reason}")
-    previous = tiers.current()[tier]
-    now = utc_now()
-    try:
-        store.write(tier, body.alias, admin.user_id, now)
-    except Exception:  # noqa: BLE001 - ClickHouse is unreachable or refused the write
-        logger.exception("the model tier change was not written")
-        raise unavailable("the model store is unavailable") from None
-    try:
-        store.record_action(AdminActionRecord(
-            ts=now, actor=admin.user_id, action=ACTION, target=tier, old_value=previous, new_value=body.alias,
-        ))
-    except Exception:  # noqa: BLE001 - an unaudited change is undone
-        logger.exception("the model tier change was not audited; writing back %s", previous)
-        try:
-            store.write(tier, previous, admin.user_id, utc_now())
-        except Exception:  # noqa: BLE001 - reported; the operator restores the mapping from the logs
-            logger.exception("the previous model tier mapping could not be written back")
+    with _CHANGES:
         tiers.invalidate()
-        raise unavailable("the model store is unavailable") from None
-    tiers.invalidate()
-    return _tier(tier, tiers.current(), tiers, reports, aliases)
+        previous = tiers.current()[tier]
+        now = utc_now()
+        try:
+            store.write(tier, body.alias, admin.user_id, now)
+        except Exception:  # noqa: BLE001 - ClickHouse is unreachable or refused the write
+            logger.exception("the model tier change was not written")
+            raise unavailable("the model store is unavailable") from None
+        try:
+            store.record_action(AdminActionRecord(
+                ts=now, actor=admin.user_id, action=ACTION, target=tier, old_value=previous, new_value=body.alias,
+            ))
+        except Exception:  # noqa: BLE001 - an unaudited change is undone
+            logger.exception("the model tier change was not audited; writing back %s", previous)
+            _write_back(store, tier, body.alias, previous, admin.user_id)
+            tiers.invalidate()
+            raise unavailable("the model store is unavailable") from None
+        tiers.invalidate()
+        return _tier(tier, tiers.current(), tiers, reports, aliases)
+
+
+def _write_back(store: ModelStore, tier: str, written: str, previous: str, actor: str) -> None:
+    """Restore ``previous`` unless another process changed the tier after ``written``."""
+    try:
+        if store.read().get(tier, written) != written:
+            logger.warning("tier %s changed again elsewhere; %s is not written back", tier, previous)
+            return
+    except TierStoreError:
+        logger.warning("tier %s could not be read before the write-back; restoring %s", tier, previous)
+    try:
+        store.write(tier, previous, actor, utc_now())
+    except Exception:  # noqa: BLE001 - reported; the operator restores the mapping from the logs
+        logger.exception("the previous model tier mapping could not be written back")

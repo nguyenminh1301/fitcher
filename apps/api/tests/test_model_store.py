@@ -63,14 +63,25 @@ def test_write_and_record_action_insert_one_row_each():
     assert rows == [[NOW, "lab.admin", "model_tier", "sql-gen", "openai-medium", "openai-large"]]
 
 
-def test_reports_are_read_for_one_pack_newest_first():
-    client = FakeClient([("r1", NOW, {"sql-gen": "openai-medium"}, 1, None)])
+def test_reports_are_the_latest_per_tier_and_alias_of_one_pack():
+    client = FakeClient([("sql-gen", "openai-medium", "r1", NOW, 1, None)])
 
     [summary] = ClickHouseModelStore(client).reports("shop")
 
     assert (summary.report_id, summary.tiers, summary.passed, summary.regressed) == ("r1", {"sql-gen": "openai-medium"}, True, None)
     sql, parameters = client.queries[0]
-    assert "ORDER BY ts DESC" in sql and parameters["pack"] == "shop"
+    assert "GROUP BY tier, alias" in sql and "LIMIT" not in sql and parameters["pack"] == "shop"
+
+
+def test_two_changes_in_one_millisecond_keep_their_order():
+    client = FakeClient()
+    store = ClickHouseModelStore(client)
+
+    store.write("sql-gen", "openai-large", "lab.admin", NOW)
+    store.write("sql-gen", "openai-medium", "lab.admin", NOW)
+
+    first, second = (rows[0][3] for _, rows, _ in client.inserts)
+    assert second > first
 
 
 def test_the_client_needs_its_password():

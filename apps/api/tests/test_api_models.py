@@ -224,6 +224,42 @@ def test_an_unaudited_change_is_written_back(client, store, tiers):
     assert tiers.alias("sql-small") == "openai-small"
 
 
+def test_a_write_back_never_replaces_a_newer_change_from_elsewhere(client, store):
+    store.fail_action = True
+    original_write = store.write
+
+    def write_then_another_admin(tier, alias, changed_by, changed_at):
+        original_write(tier, alias, changed_by, changed_at)
+        if alias == "anthropic-small":
+            store.rows[tier] = "openai-medium"  # another api process changed the tier meanwhile
+
+    store.write = write_then_another_admin
+
+    response = client.put("/admin/models/sql-small", json={"alias": "anthropic-small"}, headers=admin_headers())
+
+    assert response.status_code == 503
+    assert store.rows["sql-small"] == "openai-medium"
+
+
+def test_the_tier_map_reads_a_store_that_was_down_at_startup(monkeypatch):
+    calls = {"n": 0}
+    store = FakeModelStore()
+    store.rows["sql-gen"] = "openai-large"
+
+    def flaky():
+        calls["n"] += 1
+        if calls["n"] == 1:
+            raise runtime.unavailable("clickhouse is starting")
+        return store
+
+    monkeypatch.setattr(runtime, "get_model_store", flaky)
+    lazy = runtime.LazyTierStore()
+
+    with pytest.raises(TierStoreError):
+        lazy.read()
+    assert lazy.read() == {"sql-gen": "openai-large"}
+
+
 def test_without_the_catalog_the_listing_has_no_options_and_changes_are_refused():
     app.dependency_overrides[runtime.get_verifier] = lambda: verifier()
     app.dependency_overrides[runtime.get_compiled] = lambda: compiled_fixture()
