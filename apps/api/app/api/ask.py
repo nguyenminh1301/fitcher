@@ -7,25 +7,29 @@ or retry opens a new revision of a turn in its thread, or 404. The
 conversation id is returned in the ``X-Conversation-Id`` header. The graph
 runs in a worker thread over the conversation's thread so far;
 ``AnswerEvents`` turns each node's start and end, and the final state, into
-the events of ``app.contracts.events`` in the fixed order. The answer is
-stored before its last event is sent, so a follow-up can read it at once.
+the events of ``app.contracts.events`` in the fixed order. The question is
+written to the conversation once the ``screen`` node lets the run continue,
+so a question screening stops is never stored as a turn (DECISIONS §9); the
+answer is stored before its last event is sent, so a follow-up can read it
+at once.
 A comment frame keeps the connection open every 15 seconds. When the client
 disconnects, the run stops at its next node and the ClickHouse query it may
 be running is killed.
 """
 
 import asyncio
-from collections.abc import AsyncIterator, Callable, Mapping
+from collections.abc import AsyncIterator, Mapping
 import logging
 import math
 import threading
-from typing import Annotated, Literal
+from typing import Annotated, Literal, Protocol
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import StreamingResponse
 
 from app.agent.nodes.resolve_time import TimeResolutionError, reference_date
+from app.agent.nodes.screen import blocked_message
 from app.agent.state import AgentState, RunCancelled
 from app.api.agent import Agent, AgentRun
 from app.api.auth import current_principal, current_role
@@ -33,8 +37,8 @@ from app.api.rate_limit import RateLimiter
 from app.api.runtime import get_agent, get_conversation_store, get_rate_limiter, unavailable
 from app.auth.jwt import Principal
 from app.contracts.events import (
-    AskRequest, ChartSpecEvent, ClarifyEvent, DenyEvent, DoneEvent, ErrorEvent, EventModel, ResultEvent, SqlEvent,
-    StatusEvent, SummaryEvent,
+    AskRequest, BlockedEvent, ChartSpecEvent, ClarifyEvent, DenyEvent, DoneEvent, ErrorEvent, EventModel, ResultEvent,
+    SqlEvent, StatusEvent, SummaryEvent,
 )
 from app.conversation.store import ConversationNotFound, ConversationStore, OpenTurn, TurnNotFound
 
@@ -92,6 +96,9 @@ class AnswerEvents:
     def _closing(self, state: AgentState) -> list[EventModel]:
         self.trace_id = state["trace_id"]
         trace = {"trace_id": self.trace_id}
+        if state.get("blocked"):
+            lang = state.get("language") or "en"
+            return [BlockedEvent(**trace, message=blocked_message(state["blocked"], lang), lang=lang), DoneEvent(**trace)]
         if state.get("reply") is not None:
             return [SummaryEvent(**trace, text=state["reply"], lang=_language(state)), DoneEvent(**trace)]
         if state.get("clarification"):
@@ -122,8 +129,14 @@ def frame(event: EventModel) -> str:
     return f"event: {event.event}\ndata: {event.model_dump_json()}\n\n"
 
 
-# Stores a finished run's answer; called with the final state and every answer event before the last are sent.
-Record = Callable[[AgentState, list[EventModel]], None]
+class Record(Protocol):
+    """Stores a run's turn: the question once screening lets it through, then the answer."""
+
+    def question(self) -> None:
+        """Write the question; called when the screen node ends without stopping the run."""
+
+    def answer(self, state: AgentState, events: list[EventModel]) -> None:
+        """Write the answer; called with the final state and every answer event before the last are sent."""
 
 
 def answer_text(state: AgentState, events: list[EventModel]) -> str:
@@ -135,19 +148,30 @@ def answer_text(state: AgentState, events: list[EventModel]) -> str:
             return event.text
         if isinstance(event, ClarifyEvent):
             return event.question
-        if isinstance(event, DenyEvent | ErrorEvent):
+        if isinstance(event, DenyEvent | ErrorEvent | BlockedEvent):
             return event.message
     return ""
 
 
-def stored_answer(store: ConversationStore, turn: OpenTurn) -> Record:
-    def record(state: AgentState, events: list[EventModel]) -> None:
-        store.answer(
-            turn, trace_id=state["trace_id"], content=answer_text(state, events), query_spec=state.get("spec"),
+class StoredTurn:
+    """The turn of ``store`` a question opened; an answer is stored only after its question."""
+
+    def __init__(self, store: ConversationStore, turn: OpenTurn):
+        self._store = store
+        self._turn = turn
+        self.asked = False
+
+    def question(self) -> None:
+        self._store.question(self._turn)
+        self.asked = True
+
+    def answer(self, state: AgentState, events: list[EventModel]) -> None:
+        if not self.asked:
+            return
+        self._store.answer(
+            self._turn, trace_id=state["trace_id"], content=answer_text(state, events), query_spec=state.get("spec"),
             result=state.get("result"), events=events,
         )
-
-    return record
 
 
 async def event_stream(
@@ -169,6 +193,11 @@ async def event_stream(
             raise RunCancelled()
         for event in events.node(name, phase, state, update):
             put(event)
+        if record is not None and name == "screen" and phase == "end" and update is not None and not update.get("blocked"):
+            try:
+                record.question()
+            except Exception:  # noqa: BLE001 - the answer still reaches the client; the conversation lacks the turn
+                logger.exception("could not store the question of trace %s", events.trace_id)
 
     def work() -> None:
         try:
@@ -176,7 +205,7 @@ async def event_stream(
             closing = events.finish(state)
             if record is not None:
                 try:
-                    record(state, events.answered)
+                    record.answer(state, events.answered)
                 except Exception:  # noqa: BLE001 - the answer still reaches the client; the next turn lacks it
                     logger.exception("could not store the answer of trace %s", events.trace_id)
             for event in closing:
@@ -255,7 +284,7 @@ def ask(
         logger.exception("cannot prepare a run as role %s", role)
         raise unavailable("the agent cannot reach its data store") from None
     return StreamingResponse(
-        event_stream(run, turn.question, AnswerEvents(role), record=stored_answer(store, turn)),
+        event_stream(run, turn.question, AnswerEvents(role), record=StoredTurn(store, turn)),
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no", "X-Conversation-Id": turn.conversation_id},
     )

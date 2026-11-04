@@ -74,6 +74,6 @@ def test_a_definition_question_runs_no_extract_or_sql():
 
     state = run_question(QUESTION, agent)
 
-    assert seen == ["load_context", "router", "metadata_qa"]
+    assert seen == ["screen", "load_context", "router", "metadata_qa"]
     assert state["reply"] == "It is money received."
     assert agent.runner.calls == []

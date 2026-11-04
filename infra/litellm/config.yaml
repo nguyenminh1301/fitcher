@@ -28,3 +28,13 @@ litellm_settings:
 
 general_settings:
   master_key: os.environ/LITELLM_MASTER_KEY
+
+# Rejects any request without the api's screening metadata and reruns the
+# EN/VI rules on every message (callbacks/screening_guard.py and its rules
+# copy screening_rules.py, mounted next to this file; DECISIONS §9).
+guardrails:
+  - guardrail_name: screening-guard
+    litellm_params:
+      guardrail: screening_guard.ScreeningGuard
+      mode: pre_call
+      default_on: true

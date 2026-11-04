@@ -80,8 +80,9 @@
             }
           },
           "allowed_roles": {"type": "array", "minItems": 1, "items": {"type": "string"}},
-          "kind": {"enum": ["answer", "clarify", "failed", "empty"]},
+          "kind": {"enum": ["answer", "clarify", "failed", "empty", "blocked"]},
           "question": {"$ref": "#/$defs/text"},
+          "screened_message": {"$ref": "#/$defs/text"},
           "sql": {"$ref": "#/$defs/text"},
           "repair": {
             "type": "object",

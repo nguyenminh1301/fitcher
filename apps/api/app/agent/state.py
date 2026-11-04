@@ -22,6 +22,7 @@ from app.observability.events import LogRecord
 from app.observability.log_writer import FlushResult
 from app.packs.compiler import CompiledPack
 from app.packs.models import BusinessProfile
+from app.screening.screen import ScreenMode, Screener, Verdict
 
 TimeGrain = Literal["day", "week", "month", "quarter", "year"]
 
@@ -73,6 +74,10 @@ class AgentDeps:
     progress: Progress | None = None
     # The conversation's current thread before this question, oldest first; empty for a new conversation.
     history: tuple[Turn, ...] = ()
+    # Screens the question before any LLM call; None refuses every question (fail closed).
+    screener: Screener | None = None
+    # log lets a blocked question continue and records it; enforce stops it.
+    screen_mode: ScreenMode = "log"
 
 
 class Attempt(BaseModel):
@@ -86,9 +91,17 @@ class Attempt(BaseModel):
     error: AgentError | None = None
 
 
+# Why a run ended with the blocked reply: the screen blocked the question, screening was
+# unavailable, or the LLM gateway rejected a request.
+BlockedReason = Literal["screened", "unavailable", "gateway"]
+
+
 class AgentState(TypedDict, total=False):
     question: str
     trace_id: str
+    # The screen node's verdict on the question, and why the run was stopped, if it was.
+    screening: Verdict | None
+    blocked: BlockedReason | None
     profile: BusinessProfile
     # The last turns of the conversation and the latest QuerySpec and result among them.
     history: list[Turn]

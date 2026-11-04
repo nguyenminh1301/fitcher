@@ -15,7 +15,7 @@ from app.observability.instrument import PAYLOAD_LIMIT, payload_json
 
 QUESTION = "Top 10 best-selling widgets in Q1 2024 compared with Q1 2025"
 NODES = [
-    "load_context", "router", "extract", "resolve_time", "retrieve", "build_spec", "gate", "generate_sql", "guard", "explain", "execute", "check",
+    "screen", "load_context", "router", "extract", "resolve_time", "retrieve", "build_spec", "gate", "generate_sql", "guard", "explain", "execute", "check",
     "shape_result", "chart_recommender", "summarize",
 ]
 

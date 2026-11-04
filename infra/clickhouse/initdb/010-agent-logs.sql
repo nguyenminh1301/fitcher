@@ -108,6 +108,26 @@ ORDER BY (trace_id, ts)
 TTL toDateTime(ts) + INTERVAL 90 DAY
 SETTINGS non_replicated_deduplication_window = 10000;
 
+-- The screening verdict of each question (DECISIONS §9, Layer 0), written by
+-- the graph's screen node before any LLM call. score is null when the
+-- classifier was unavailable; the question text itself stays in runs.
+CREATE TABLE IF NOT EXISTS agent_logs.input_screening
+(
+    trace_id String,
+    ts DateTime64(3, 'UTC'),
+    user_id String,
+    source LowCardinality(String),
+    verdict LowCardinality(String),
+    mode LowCardinality(String),
+    score Nullable(Float64),
+    rule_hits Array(String),
+    model_version LowCardinality(String)
+)
+ENGINE = MergeTree
+ORDER BY (trace_id, ts)
+TTL toDateTime(ts) + INTERVAL 90 DAY
+SETTINGS non_replicated_deduplication_window = 10000;
+
 -- Conversation turns, read back for follow-up questions. Each question and
 -- its answer share a turn number; an edit or retry of a turn writes it again
 -- under a higher revision. result holds the shaped Result JSON of an answer

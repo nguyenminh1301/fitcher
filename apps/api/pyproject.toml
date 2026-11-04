@@ -9,11 +9,15 @@ dependencies = [
     "httpx==0.28.1",
     "jsonschema==4.26.0",
     "langgraph==1.2.16",
+    # The screening classifier (app/screening/classifier.py) runs on CPU with ONNX Runtime.
+    "numpy==2.5.4",
+    "onnxruntime==1.31.1",
     "opentelemetry-sdk==1.45.1",
     "pydantic==2.14.1",
     "pyjwt[crypto]==2.15.1",
     "pyyaml==6.0.3",
     "sqlglot==30.23.0",
+    "tokenizers==0.23.3",
     # zoneinfo reads IANA zones from this package on Windows, which has no system zone database.
     "tzdata==2026.6; sys_platform == 'win32'",
     "uvicorn==0.54.0",

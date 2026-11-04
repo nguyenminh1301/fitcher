@@ -17,6 +17,7 @@ from app.config import load_settings
 from app.conversation.store import ConversationStore, conversations_client
 from app.llm.client import LLMError
 from app.packs.compiler import CompileError, CompiledPack, load_compiled
+from app.screening.screen import Screener
 
 
 def unavailable(detail: str) -> HTTPException:
@@ -44,9 +45,15 @@ def get_compiled() -> CompiledPack:
 
 
 @cache
+def get_screener() -> Screener:
+    """The question screener; without its model in ``GUARD_MODEL_DIR`` every question is refused."""
+    return Screener.from_settings(load_settings())
+
+
+@cache
 def get_agent() -> Agent:
     try:
-        return Agent(load_settings(), get_compiled())
+        return Agent(load_settings(), get_compiled(), get_screener())
     except LLMError as error:
         raise unavailable(str(error)) from None
 

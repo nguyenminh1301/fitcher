@@ -9,7 +9,7 @@ import type { AskEvent } from "../events";
 import type { Identity, Scenario } from "../provisional";
 import type { SampleData } from "./load";
 
-const BEFORE_SQL = ["extract", "resolve_time", "retrieve", "build_spec", "gate"];
+const BEFORE_SQL = ["screen", "extract", "resolve_time", "retrieve", "build_spec", "gate"];
 const SQL_ATTEMPT = ["generate_sql", "guard", "explain", "execute", "check"];
 const AFTER_SQL = ["shape_result", "chart_recommender", "summarize"];
 
@@ -41,6 +41,10 @@ function plan(scenario: Scenario | null, question: string, identity: Identity | 
   if (scenario === null) {
     const lang = langOf(question);
     return [status("extract"), { event: "summary", text: translate(DICTIONARIES.en, DICTIONARIES[lang], "sample.unmatched"), lang, warnings: [] }, { event: "done" }];
+  }
+  // The input screen runs before anything else, whatever the asking role may read.
+  if (scenario.kind === "blocked") {
+    return [status("screen"), { event: "blocked", message: scenario.screened_message ?? "", lang: scenario.lang }, { event: "done" }];
   }
   const head = BEFORE_SQL.map((node) => status(node));
   const role = identity?.roles.find((item) => scenario.allowed_roles.includes(item));

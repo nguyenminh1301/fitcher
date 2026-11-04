@@ -55,6 +55,7 @@ export function AssistantTurn({ turn, streaming, onStop, onRetry, onFollowUp, on
   const summary = only(events, "summary");
   const sql = only(events, "sql")?.sql;
   const deny = only(events, "deny");
+  const blocked = only(events, "blocked");
   const clarify = only(events, "clarify");
   const error = only(events, "error");
   const traceId = events[0]?.trace_id ?? "";
@@ -63,16 +64,17 @@ export function AssistantTurn({ turn, streaming, onStop, onRetry, onFollowUp, on
   const [pickedOrientation, setOrientation] = useState<"vertical" | "horizontal" | null>(null);
   const type = pickedType ?? spec?.type ?? "table";
   const orientation = pickedOrientation ?? spec?.orientation ?? "horizontal";
-  const steps = stepsOf(events, streaming, error?.kind === "failed", !!deny);
+  const steps = stepsOf(events, streaming, error?.kind === "failed", !!deny || !!blocked);
   const feedback = (rating: "like" | "dislike", note?: string) => onFeedback?.({ trace_id: traceId, rating, ...(note ? { note } : {}) });
 
   if (streaming) return <article className="fc-answer"><ProgressSteps steps={steps} live onStop={onStop} /></article>;
-  const lang = summary?.lang ?? deny?.lang ?? clarify?.lang ?? turn.question_lang;
+  const lang = summary?.lang ?? deny?.lang ?? blocked?.lang ?? clarify?.lang ?? turn.question_lang;
 
   return (
     <article className="fc-answer">
       {steps.length ? <ProgressSteps steps={steps} live={false} /> : null}
       {deny ? <NoticeCard kind="denied" lang={deny.lang} text={deny.message} blocked={deny.blocked} /> : null}
+      {blocked ? <NoticeCard kind="blocked" lang={blocked.lang} text={blocked.message} /> : null}
       {clarify ? <ClarifyOptions question={clarify.question} options={clarify.options} lang={clarify.lang} onPick={onFollowUp} /> : null}
       {error ? (
         <NoticeCard

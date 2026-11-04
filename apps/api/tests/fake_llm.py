@@ -5,22 +5,25 @@ from dataclasses import dataclass
 
 from pydantic import BaseModel
 
-from app.llm.client import check_alias
+from app.llm.client import Prompt, check_alias
 
 
 @dataclass
 class LLMCall:
     method: str
     alias: str
+    # Both parts of the prompt as one text; ``system`` and ``user`` keep them apart.
     prompt: str
     schema: type[BaseModel] | None = None
+    system: str = ""
+    user: str = ""
 
 
 class FakeLLMClient:
     """Returns queued replies in order; a reply may be an exception to raise.
 
     Structured replies are dictionaries validated into the requested schema,
-    or a callable that receives the prompt and returns one.
+    or a callable that receives the prompt text and returns one.
     """
 
     def __init__(self, replies: list[object] | None = None):
@@ -35,13 +38,15 @@ class FakeLLMClient:
             raise reply
         return reply(prompt) if isinstance(reply, Callable) else reply
 
-    def structured(self, alias, prompt, schema):
+    def _record(self, method: str, alias: str, prompt: Prompt, schema=None) -> str:
+        assert isinstance(prompt, Prompt), "LLM calls send a Prompt with system and user parts"
         check_alias(alias)
-        self.calls.append(LLMCall("structured", alias, prompt, schema))
-        reply = self._next(prompt)
+        self.calls.append(LLMCall(method, alias, prompt.text, schema, prompt.system, prompt.user))
+        return prompt.text
+
+    def structured(self, alias, prompt, schema):
+        reply = self._next(self._record("structured", alias, prompt, schema))
         return reply if isinstance(reply, schema) else schema.model_validate(reply)
 
     def text(self, alias, prompt):
-        check_alias(alias)
-        self.calls.append(LLMCall("text", alias, prompt))
-        return str(self._next(prompt))
+        return str(self._next(self._record("text", alias, prompt)))

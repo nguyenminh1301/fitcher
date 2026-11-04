@@ -39,7 +39,7 @@ On or before expiry, rescan the newest upstream tag, update the pin if it fixes 
 | Image | Advisories | Evidence | Owner | Expires |
 | --- | --- | --- | --- | --- |
 | `opensearchproject/opensearch:3.9.0` | 10 in bundled Jackson, Guava, jsoup, snappy-java and lz4-java JARs ([list](.github/trivy/opensearch.trivyignore.yaml)) | Newest release on 2026-10-30; the JARs ship inside the upstream distribution | @nguyenminh1301 | 2026-12-31 |
-| `ghcr.io/berriai/litellm:v1.106.6` | 17 in bundled ddtrace, dnspython, filelock, py3-pip-wheel, pyasn1 and pypdf ([list](.github/trivy/litellm.trivyignore.yaml)) | Newest stable release on 2026-10-30 and 2026-11-01; packages are installed by the upstream image build | @nguyenminh1301 | 2026-12-31 |
+| `ghcr.io/berriai/litellm:v1.106.7` | 1 in bundled filelock ([list](.github/trivy/litellm.trivyignore.yaml)) | Newest stable patch release on 2026-11-04; the package is installed by the upstream image build | @nguyenminh1301 | 2026-12-31 |
 | `quay.io/keycloak/keycloak:26.8.1` | 1 in bundled Guava ([list](.github/trivy/keycloak.trivyignore.yaml)) | Newest release on 2026-10-30; the JAR ships inside the upstream distribution | @nguyenminh1301 | 2026-12-31 |
 
 `clickhouse/clickhouse-server:26.8.36.3` had no fixable High or Critical findings when pinned.

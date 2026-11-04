@@ -283,3 +283,17 @@ class FakeConversationClient:
             return QueryResult([(sum(row["role"] == "assistant" and row["trace_id"] == parameters["trace_id"] for row in messages),)])
         assert sql == store.QUESTIONS_SQL, sql
         return QueryResult([(row["conversation_id"], row["content"]) for row in messages if row["role"] == "user"])
+
+
+class FakeClassifier:
+    """A screening classifier scoring each text by the first marker it contains; 0.0 otherwise."""
+
+    version = "fake-guard@1"
+
+    def __init__(self, marked: dict[str, float] | None = None):
+        self.marked = marked or {}
+        self.calls: list[list[str]] = []
+
+    def scores(self, texts):
+        self.calls.append(list(texts))
+        return [next((score for marker, score in self.marked.items() if marker in text), 0.0) for text in texts]

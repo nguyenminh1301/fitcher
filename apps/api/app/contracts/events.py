@@ -9,6 +9,8 @@ and carries the run's ``trace_id``. Per branch the non-status events are:
 - failure: ``[sql] -> error``
 - out_of_scope and metadata_qa: ``summary -> done``
 - chart_edit: ``result -> chart_spec -> done``, the previous turn's result sent again
+- blocked: ``blocked -> done``, when screening stops the question or is unavailable, or the
+  LLM gateway rejects a request (DECISIONS §9); the message never repeats the question
 
 ``status`` events come before and between them, one at the start and one at
 the end of each graph node. ``sql`` is the checked query that runs, sent when
@@ -81,6 +83,12 @@ class DenyEvent(EventModel):
     lang: str
 
 
+class BlockedEvent(EventModel):
+    event: Literal["blocked"] = "blocked"
+    message: str
+    lang: str
+
+
 class SqlEvent(EventModel):
     event: Literal["sql"] = "sql"
     sql: str
@@ -120,7 +128,8 @@ class ErrorEvent(EventModel):
 
 
 Event = Annotated[
-    StatusEvent | ClarifyEvent | DenyEvent | SqlEvent | ResultEvent | ChartSpecEvent | SummaryEvent | DoneEvent | ErrorEvent,
+    StatusEvent | ClarifyEvent | DenyEvent | BlockedEvent | SqlEvent | ResultEvent | ChartSpecEvent | SummaryEvent
+    | DoneEvent | ErrorEvent,
     Field(discriminator="event"),
 ]
 

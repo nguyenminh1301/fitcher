@@ -27,11 +27,15 @@ export type Role = string;
 export type Blocked = string[];
 export type Lang1 = string;
 export type TraceId3 = string;
-export type Event3 = "sql";
+export type Event3 = "blocked";
+export type Message1 = string;
+export type Lang2 = string;
+export type TraceId4 = string;
+export type Event4 = "sql";
 export type Sql = string;
 export type Attempt1 = number;
-export type TraceId4 = string;
-export type Event4 = "result";
+export type TraceId5 = string;
+export type Event5 = "result";
 /**
  * @minItems 1
  */
@@ -46,8 +50,8 @@ export type Format = ("currency" | "count" | "ratio" | "percent" | "days" | "num
 export type Rows = (string | number | boolean | null)[][];
 export type RowCount = number;
 export type Truncated = boolean;
-export type TraceId5 = string;
-export type Event5 = "chart_spec";
+export type TraceId6 = string;
+export type Event6 = "chart_spec";
 export type Type1 = "bar" | "line" | "pie" | "scatter" | "kpi" | "table" | "grouped_bar";
 export type X = string;
 export type Y = string[];
@@ -62,23 +66,24 @@ export type AllowedTypes = [
   "bar" | "line" | "pie" | "scatter" | "kpi" | "table" | "grouped_bar",
   ...("bar" | "line" | "pie" | "scatter" | "kpi" | "table" | "grouped_bar")[]
 ];
-export type TraceId6 = string;
-export type Event6 = "summary";
-export type Text = string;
-export type Lang2 = string;
-export type Warnings = string[];
 export type TraceId7 = string;
-export type Event7 = "done";
+export type Event7 = "summary";
+export type Text = string;
+export type Lang3 = string;
+export type Warnings = string[];
 export type TraceId8 = string;
-export type Event8 = "error";
+export type Event8 = "done";
+export type TraceId9 = string;
+export type Event9 = "error";
 export type Kind = "failed" | "internal";
-export type Message1 = string;
+export type Message2 = string;
 export type Sql1 = string | null;
 export type Error = string | null;
 export type Events = (
   | StatusEvent
   | ClarifyEvent
   | DenyEvent
+  | BlockedEvent
   | SqlEvent
   | ResultEvent
   | ChartSpecEvent
@@ -131,15 +136,21 @@ export interface DenyEvent {
   blocked: Blocked;
   lang: Lang1;
 }
-export interface SqlEvent {
+export interface BlockedEvent {
   trace_id: TraceId3;
   event: Event3;
+  message: Message1;
+  lang: Lang2;
+}
+export interface SqlEvent {
+  trace_id: TraceId4;
+  event: Event4;
   sql: Sql;
   attempt: Attempt1;
 }
 export interface ResultEvent {
-  trace_id: TraceId4;
-  event: Event4;
+  trace_id: TraceId5;
+  event: Event5;
   result: Result;
 }
 export interface Result {
@@ -155,8 +166,8 @@ export interface ColumnInfo {
   format?: Format;
 }
 export interface ChartSpecEvent {
-  trace_id: TraceId5;
-  event: Event5;
+  trace_id: TraceId6;
+  event: Event6;
   spec: ChartSpec;
 }
 export interface ChartSpec {
@@ -170,24 +181,24 @@ export interface ChartSpec {
   allowed_types: AllowedTypes;
 }
 export interface SummaryEvent {
-  trace_id: TraceId6;
-  event: Event6;
+  trace_id: TraceId7;
+  event: Event7;
   text: Text;
-  lang: Lang2;
+  lang: Lang3;
   warnings: Warnings;
 }
 export interface DoneEvent {
-  trace_id: TraceId7;
-  event: Event7;
+  trace_id: TraceId8;
+  event: Event8;
 }
 /**
  * ``failed``: no SQL attempt produced a result; ``internal``: the run broke, with no detail for the client.
  */
 export interface ErrorEvent {
-  trace_id: TraceId8;
-  event: Event8;
+  trace_id: TraceId9;
+  event: Event9;
   kind: Kind;
-  message: Message1;
+  message: Message2;
   sql: Sql1;
   error: Error;
 }

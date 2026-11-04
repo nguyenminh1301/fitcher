@@ -26,13 +26,15 @@ COPY apps/api/prompts ./prompts
 COPY jobs ./jobs
 COPY dbt ./dbt
 COPY packs ./packs
+# jobs.screen_eval reads the engine-level benign and attack screening sets.
+COPY apps/api/tests/screening ./tests/screening
 # jobs.apply_log_schema applies the same DDL that initdb runs on a fresh volume.
 COPY infra/clickhouse/initdb ./infra/clickhouse/initdb
 # jobs.set_lab_passwords reads the lab users of the realm Keycloak imports.
 COPY infra/keycloak/realm-finch.json ./infra/keycloak/realm-finch.json
 # Compiled packs live in a named volume mounted here; Docker copies this
 # directory's owner into a new volume, so the app user can write to it.
-RUN useradd --create-home --uid 10001 app     && mkdir -p /app/build/packs     && chown app /app/build/packs
+RUN useradd --create-home --uid 10001 app     && mkdir -p /app/build/packs /app/build/guard_model     && chown app /app/build/packs
 USER app
 
 EXPOSE 8000

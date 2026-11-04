@@ -79,3 +79,21 @@ def test_settings_defaults():
 def test_invalid_numeric_setting_is_rejected(value):
     with pytest.raises(SettingsError, match="EMBEDDING_DIMENSIONS"):
         load_settings({"EMBEDDING_DIMENSIONS": value})
+
+
+def test_screening_settings_default_to_log_mode_and_the_plan_thresholds():
+    settings = load_settings({})
+    assert (settings.screen_mode, settings.screen_flag_at, settings.screen_block_at, settings.guard_model_dir) == (
+        "log", 0.5, 0.9, "build/guard_model",
+    )
+
+
+@pytest.mark.parametrize(("env", "message"), [
+    ({"SCREEN_MODE": "strict"}, "SCREEN_MODE must be one of log, enforce"),
+    ({"SCREEN_FLAG_AT": "high"}, "SCREEN_FLAG_AT must be a number"),
+    ({"SCREEN_BLOCK_AT": "1.5"}, "SCREEN_BLOCK_AT must be above 0 and at most 1"),
+    ({"SCREEN_FLAG_AT": "0.95", "SCREEN_BLOCK_AT": "0.9"}, "must not be above SCREEN_BLOCK_AT"),
+])
+def test_invalid_screening_settings_are_rejected(env, message):
+    with pytest.raises(SettingsError, match=message):
+        load_settings(env)

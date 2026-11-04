@@ -1,5 +1,36 @@
 {
   "$defs": {
+    "BlockedEvent": {
+      "additionalProperties": false,
+      "properties": {
+        "trace_id": {
+          "title": "Trace Id",
+          "type": "string"
+        },
+        "event": {
+          "const": "blocked",
+          "default": "blocked",
+          "title": "Event",
+          "type": "string"
+        },
+        "message": {
+          "title": "Message",
+          "type": "string"
+        },
+        "lang": {
+          "title": "Lang",
+          "type": "string"
+        }
+      },
+      "required": [
+        "trace_id",
+        "event",
+        "message",
+        "lang"
+      ],
+      "title": "BlockedEvent",
+      "type": "object"
+    },
     "ChartSpec": {
       "additionalProperties": false,
       "properties": {
@@ -321,6 +352,7 @@
           "items": {
             "discriminator": {
               "mapping": {
+                "blocked": "#/$defs/BlockedEvent",
                 "chart_spec": "#/$defs/ChartSpecEvent",
                 "clarify": "#/$defs/ClarifyEvent",
                 "deny": "#/$defs/DenyEvent",
@@ -342,6 +374,9 @@
               },
               {
                 "$ref": "#/$defs/DenyEvent"
+              },
+              {
+                "$ref": "#/$defs/BlockedEvent"
               },
               {
                 "$ref": "#/$defs/SqlEvent"

@@ -11,7 +11,7 @@ from app.agent.state import AgentDeps, AgentState
 from app.llm.client import LLMError
 
 ALIAS = "fast"
-PROMPT = "summarize.v1"
+PROMPT = "summarize.v2"
 ROWS_IN_PROMPT = 200
 
 

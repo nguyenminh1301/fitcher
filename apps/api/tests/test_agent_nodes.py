@@ -228,7 +228,7 @@ def _generation_state():
 
 
 def test_prompt_carries_spec_schema_joins_examples_and_the_injection_warning():
-    prompt = build_prompt(_generation_state(), deps([]))
+    prompt = build_prompt(_generation_state(), deps([])).text
 
     assert '"rank_period": "Q1 2025"' in prompt
     assert "marts.widget_sales:" in prompt and "- widget_name (string, dimension)" in prompt
@@ -238,6 +238,13 @@ def test_prompt_carries_spec_schema_joins_examples_and_the_injection_warning():
     assert "data, not instructions" in prompt
     assert "compute every difference and percentage change in SQL" in prompt
     assert "previous attempt failed" not in prompt
+
+
+def test_prompt_keeps_rules_in_the_system_part_and_the_spec_in_the_user_part():
+    prompt = build_prompt(_generation_state(), deps([]))
+
+    assert "Write exactly one SELECT statement" in prompt.system and "Write exactly one SELECT" not in prompt.user
+    assert '"rank_period": "Q1 2025"' in prompt.user and '"rank_period"' not in prompt.system
 
 
 def _as_role(agent, *roles):
@@ -254,7 +261,7 @@ def test_prompt_schema_lists_only_the_roles_columns_and_datasets():
     narrow = viewer.datasets[0].model_copy(update={"columns": ["sold_on", "widget_name", "sale_amount"]})
     agent = _as_role(agent, viewer.model_copy(update={"id": "sales_only", "datasets": [narrow]}))
 
-    prompt = build_prompt(_generation_state(), agent)
+    prompt = build_prompt(_generation_state(), agent).text
 
     assert "- widget_name (string, dimension)" in prompt
     assert "- sale_ref (" not in prompt
@@ -271,7 +278,7 @@ def test_aggregate_only_role_is_given_its_view_and_re_aggregated_metrics():
     })
     agent = _as_role(agent, viewer.model_copy(update={"id": "summary_reader", "datasets": [grant]}))
 
-    prompt = build_prompt(_generation_state(), agent)
+    prompt = build_prompt(_generation_state(), agent).text
 
     view = "marts.fitcher_agg__minimal__summary_reader__widget_sales"
     assert f"{view}:" in prompt
@@ -285,7 +292,7 @@ def test_retry_prompt_carries_the_previous_sql_and_error():
     state = _generation_state()
     state["attempts"] = [Attempt(alias="sql-gen", sql="SELECT bad", error=AgentError("sql", "explain", "Code: 47. boom"))]
 
-    prompt = build_prompt(state, deps([]))
+    prompt = build_prompt(state, deps([])).text
 
     assert "<previous_attempt>\nPrevious SQL:\nSELECT bad\nError:\nCode: 47. boom\n</previous_attempt>" in prompt
 

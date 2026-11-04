@@ -60,7 +60,7 @@ def test_draw_it_as_a_line_runs_no_sql_node():
 
     state = run_question("Draw it as a line", agent)
 
-    assert seen == ["load_context", "router", "chart_edit"]
+    assert seen == ["screen", "load_context", "router", "chart_edit"]
     assert not {"generate_sql", "guard", "explain", "execute"} & set(seen)
     assert agent.runner.calls == [] and [call.alias for call in agent.llm.calls] == ["fast"]
     assert state["result"] == previous_turn().result and state.get("attempts") == []

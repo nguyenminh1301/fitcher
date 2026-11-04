@@ -87,6 +87,26 @@ class AuditRecord(LogRecord):
     reason: str
 
 
+class InputScreeningRecord(LogRecord):
+    """The screening verdict of one question, written by the graph's ``screen`` node."""
+
+    TABLE: ClassVar[str] = "input_screening"
+
+    trace_id: str
+    ts: datetime
+    user_id: str
+    # question; document chunks and column values are screened at compile time and reported there.
+    source: str
+    # allow, flag, block or unavailable
+    verdict: str
+    # log or enforce
+    mode: str
+    # The classifier's highest malicious probability; null without a classifier.
+    score: float | None
+    rule_hits: list[str]
+    model_version: str
+
+
 class EvalReportRecord(LogRecord):
     TABLE: ClassVar[str] = "eval_reports"
 

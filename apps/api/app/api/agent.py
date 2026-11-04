@@ -1,6 +1,7 @@
 """The agent behind ``/ask``: clients shared by every request, and one run per question.
 
-``Agent`` holds the LLM, search, embedding and log clients of the active pack
+``Agent`` holds the LLM, search, embedding and log clients and the question
+screener of the active pack
 and one ClickHouse client per pack role, created on that role's first
 question. ``Agent.start`` prepares a run as one user and role over the
 conversation's thread so far; the run records
@@ -27,6 +28,7 @@ from app.llm.embeddings import LiteLLMEmbeddings
 from app.observability.log_writer import start_log_writer
 from app.packs.compiler import CompiledPack
 from app.packs.policy_compiler import Names
+from app.screening.screen import Screener
 from app.search.opensearch import OpenSearch
 
 logger = logging.getLogger(__name__)
@@ -71,8 +73,10 @@ class GraphRun:
 
 
 class Agent:
-    def __init__(self, settings: Settings, compiled: CompiledPack):
+    def __init__(self, settings: Settings, compiled: CompiledPack, screener: Screener):
         self.compiled = compiled
+        self._screener = screener
+        self._screen_mode = settings.screen_mode
         self._llm = LiteLLMClient(settings.litellm_base_url, settings.litellm_master_key)
         self._search = OpenSearch(settings.opensearch_url)
         # Query vectors must match the indexed ones, so the compiled size wins over the environment.
@@ -103,6 +107,7 @@ class Agent:
         deps = AgentDeps(
             llm=self._llm, search=self._search, embeddings=self._embeddings, runner=runner,
             compiled=self.compiled, today=today, logs=self._logs, user_id=user_id, role=role, history=tuple(history),
+            screener=self._screener, screen_mode=self._screen_mode,
         )
         return GraphRun(deps, query_ids, partial(self._stopper_for, role))
 

@@ -12,9 +12,9 @@ import pytest
 from app.agent.graph import run_question
 from app.agent.state import RunCancelled
 from app.data.clickhouse import QueryError
-from app.llm.client import LiteLLMClient
+from app.llm.client import LiteLLMClient, Prompt
 from app.llm.embeddings import LiteLLMEmbeddings
-from app.observability.tracing import current_run, node_span, run_span
+from app.observability.tracing import current_run, node_span, run_span, trusted_pack_calls
 
 QUESTION = "Top 10 best-selling widgets in Q1 2024 compared with Q1 2025"
 
@@ -128,16 +128,24 @@ def test_llm_calls_carry_the_trace_and_node_and_are_counted():
     llm = LiteLLMClient("http://litellm:4000", "sk-test", http=httpx.Client(transport=transport))
     embeddings = LiteLLMEmbeddings("http://litellm:4000", "sk-test", 2, http=httpx.Client(transport=transport))
 
-    llm.text("fast", "outside")
+    prompt = Prompt(system="rules", user="question")
+    llm.text("fast", prompt)
+    with trusted_pack_calls():
+        embeddings.embed(["pack text"])
     with run_span() as run:
+        llm.text("fast", prompt)
+        run.screening = "flag"
         with node_span("extract"):
-            llm.text("fast", "inside")
+            llm.text("fast", prompt)
             embeddings.embed(["text"])
-        llm.text("fast", "between nodes")
-        assert run.llm_calls == 3
+        llm.text("fast", prompt)
+        assert run.llm_calls == 4
     assert current_run() is None
 
+    # Outside a run and outside trusted pack calls nothing marks the request as screened; the gateway rejects it.
     assert "metadata" not in sent[0]
-    assert sent[1]["metadata"] == {"trace_id": run.trace_id, "node": "extract"}
-    assert sent[2]["metadata"] == {"trace_id": run.trace_id, "node": "extract"}
-    assert sent[3]["metadata"] == {"trace_id": run.trace_id, "node": ""}
+    assert sent[1]["metadata"] == {"screening": "trusted_pack"}
+    assert sent[2]["metadata"] == {"trace_id": run.trace_id, "node": ""}
+    assert sent[3]["metadata"] == {"trace_id": run.trace_id, "node": "extract", "screening": "flag"}
+    assert sent[4]["metadata"] == {"trace_id": run.trace_id, "node": "extract", "screening": "flag"}
+    assert sent[5]["metadata"] == {"trace_id": run.trace_id, "node": "", "screening": "flag"}

@@ -2,7 +2,10 @@
 
 Run with ``docker compose run --rm jobs python -m jobs.compile_pack --pack <name>``.
 Indexing embeds every glossary term, metric, dataset, column and example
-through the ``embed`` alias, which is a billable request; ``--skip-index``
+through the ``embed`` alias, which is a billable request sent with
+``trusted_pack`` screening metadata; document chunks and column values are
+screened first with the classifier in ``GUARD_MODEL_DIR`` and the report lists
+what screening kept out or flagged; ``--skip-index``
 stops after validation, the metric test-run and the access policies and calls
 neither LiteLLM nor OpenSearch.
 
@@ -25,8 +28,10 @@ from clickhouse_connect.driver.exceptions import Error as ClickHouseError
 from app.config import SettingsError, load_settings
 from app.llm.embeddings import EmbeddingError, LiteLLMEmbeddings
 from app.packs.compiler import CompileError, CompileSummary, compile_pack, load_compiled
+from app.observability.tracing import trusted_pack_calls
 from app.packs.loader import PackValidationError
 from app.packs.search_indices import search_pack
+from app.screening.screen import Screener
 from app.search.opensearch import OpenSearch, SearchError
 from jobs.lib.clickhouse import admin_client
 
@@ -70,6 +75,12 @@ def print_summary(summary: CompileSummary) -> None:
     print(f"  generation v{summary.generation} is live:")
     for index, count in summary.documents.items():
         print(f"    {index}: {count} documents")
+    print(f"  screening: {len(summary.blocked_chunks)} document chunks not indexed, "
+          f"{len(summary.flagged_values)} column values flagged and still indexed")
+    for item in summary.blocked_chunks:
+        print(f"    not indexed: {item}")
+    for item in summary.flagged_values:
+        print(f"    flagged: {item}")
     for warning in summary.warnings:
         print(f"  warning: {warning}")
 
@@ -93,6 +104,12 @@ def _hit_label(hit: dict) -> str:
 
 
 def main(argv: list[str] | None = None) -> int:
+    # Every gateway request of a compile embeds reviewed pack content or screened chunks (DECISIONS §9).
+    with trusted_pack_calls():
+        return _main(argv)
+
+
+def _main(argv: list[str] | None) -> int:
     args = parse_args(argv)
     try:
         settings = load_settings()
@@ -119,6 +136,7 @@ def main(argv: list[str] | None = None) -> int:
             embeddings=embeddings,
             output_dir=Path(settings.compiled_pack_dir),
             skip_index=args.skip_index,
+            screener=Screener.from_settings(settings),
         )
     except (PackValidationError, CompileError, SettingsError, SearchError, EmbeddingError, ClickHouseError) as error:
         print(error, file=sys.stderr)

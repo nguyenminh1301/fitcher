@@ -47,6 +47,8 @@ def test_first_turn_creates_a_conversation_titled_by_the_question(store, client)
 
     turn = store.open_turn("ana", None, question)
 
+    store.question(turn)
+
     assert uuid.UUID(turn.conversation_id).version == 4
     assert (turn.turn, turn.revision, turn.history) == (1, 1, [])
     [conversation] = client.tables["conversations"]
@@ -59,6 +61,7 @@ def test_first_turn_creates_a_conversation_titled_by_the_question(store, client)
 
 def test_answer_writes_the_assistant_row_with_spec_and_result_json(store, client):
     turn = store.open_turn("ana", None, "Top widgets in Q1 2025")
+    store.question(turn)
 
     store.answer(turn, trace_id="t1", content="Blue led.", query_spec=spec(), result=RESULT)
 
@@ -72,9 +75,12 @@ def test_answer_writes_the_assistant_row_with_spec_and_result_json(store, client
 
 def test_follow_up_continues_the_thread_with_the_next_turn(store, client):
     first = store.open_turn("ana", None, "Top widgets in Q1 2025")
+    store.question(first)
     store.answer(first, trace_id="t1", content="Blue led.", query_spec=spec(), result=RESULT)
 
     second = store.open_turn("ana", first.conversation_id, "What about last year?")
+
+    store.question(second)
 
     assert (second.conversation_id, second.turn, second.revision) == (first.conversation_id, 2, 1)
     [previous] = second.history
@@ -87,6 +93,7 @@ def test_follow_up_continues_the_thread_with_the_next_turn(store, client):
 
 def test_a_foreign_conversation_is_not_found(store, client):
     mine = store.open_turn("ana", None, "Top widgets")
+    store.question(mine)
 
     with pytest.raises(ConversationNotFound):
         store.open_turn("bao", mine.conversation_id, "Show me the other answer")
@@ -100,6 +107,7 @@ def test_an_unknown_conversation_is_not_found(store):
 
 def test_a_deleted_conversation_is_not_found(store, client):
     turn = store.open_turn("ana", None, "Top widgets")
+    store.question(turn)
     row = client.tables["conversations"][0]
     client.tables["conversations"].append({**row, "deleted": True, "updated_at": START + timedelta(days=1)})
 
@@ -109,8 +117,11 @@ def test_a_deleted_conversation_is_not_found(store, client):
 
 def test_a_turn_without_an_answer_keeps_its_place(store):
     first = store.open_turn("ana", None, "Top widgets")
+    store.question(first)
 
     second = store.open_turn("ana", first.conversation_id, "Top widgets again")
+
+    store.question(second)
 
     assert second.turn == 2
     assert [(turn.question, turn.answer, turn.query_spec, turn.result) for turn in second.history] == [
@@ -141,9 +152,12 @@ def test_current_thread_keeps_turns_asked_after_an_edit():
 
 def test_a_new_turn_takes_the_threads_highest_revision(store, client):
     first = store.open_turn("ana", None, "Top widgets")
+    store.question(first)
     edited = message(1, 2, "user", "edited", seconds=10).model_copy(update={"conversation_id": first.conversation_id})
     client.tables["chat_messages"].append(edited.model_dump())
 
     second = store.open_turn("ana", first.conversation_id, "Next")
+
+    store.question(second)
 
     assert (second.turn, second.revision) == (2, 2)

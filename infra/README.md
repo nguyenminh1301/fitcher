@@ -13,6 +13,8 @@ See [DECISIONS §3](../docs/DECISIONS.md#3-docker-compose) and the [Phase 0 plan
 | `clickhouse/initdb/010-agent-logs.sql` | Creates the `agent_logs` database and its run log tables |
 | `litellm/config.yaml` | Aliases `fast`, `sql-gen`, `sql-gen-hard` and `embed`, with models from `LITELLM_MODEL_*` |
 | `litellm/callbacks/clickhouse_logger.py` | Proxy callback writing one `agent_logs.llm_calls` row per call as `agent_logs_writer` |
+| `litellm/callbacks/screening_guard.py` | `pre_call` guardrail rejecting requests without the api's `screening` metadata and rerunning the EN/VI rules |
+| `litellm/callbacks/screening_rules.py` | Byte-identical copy of `apps/api/app/screening/rules.py` for the guardrail |
 | `keycloak/realm-finch.json` | Realm `finch`: the active pack's policy roles and the console roles `pack_reviewer` and `admin`, one lab user per role without credentials, the public `finch-web` client whose access tokens carry the realm roles and the api audience, and the lab-only `finch-cli` password-grant client |
 | `opensearch/` | Host requirements; no custom JVM or plugin settings |
 
@@ -50,6 +52,8 @@ With the stack running, `AGENT_LOGS_LIVE_TEST=1` and the five passwords in the e
 Change a model by editing its `LITELLM_MODEL_*` value in `.env` and running `docker compose up -d --wait litellm`.
 The proxy requires `LITELLM_MASTER_KEY`; `OPENAI_API_KEY` reaches only this container.
 Every call, successful or failed, is written to `agent_logs.llm_calls` with its alias, resolved model, tokens, cost, latency and error; the api's `trace_id` and graph node arrive as request `metadata`, and calls outside a traced run have an empty trace id. A failed write is printed to the proxy log and never affects the reply.
+
+The `screening-guard` guardrail runs before every call (DECISIONS §9). A request whose metadata has no `screening` value of `allow`, `flag` or `trusted_pack` is rejected with HTTP 400 `screening_guard: ...`, and so is one whose messages or embedding inputs trip the EN/VI rules; the api turns that rejection into the `blocked` reply. It closes code paths that forgot to screen and is not an authentication boundary. Change a rule in `apps/api/app/screening/rules.py`, copy the file over `callbacks/screening_rules.py` and restart litellm; a test fails while the copies differ.
 
 ## Keycloak
 

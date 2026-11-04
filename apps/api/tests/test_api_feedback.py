@@ -27,6 +27,7 @@ def tables():
 def client(tables):
     store = ConversationStore(tables)
     turn = store.open_turn("lab.viewer", None, "Top widgets")
+    store.question(turn)
     store.answer(turn, trace_id=TRACE, content="Blue led.", query_spec=None, result=None)
     app.dependency_overrides[runtime.get_verifier] = lambda: verifier()
     app.dependency_overrides[runtime.get_compiled] = lambda: compiled_fixture()
