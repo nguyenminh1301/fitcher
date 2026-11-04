@@ -10,8 +10,8 @@ def test_vietnamese_tokens_are_kept_as_written_and_folded():
 
 
 def test_identifiers_and_column_names_match_whole_and_in_parts():
-    assert terms("net_sales") == ["net_sales", "net", "sales"]
-    assert {"customer_segment", "customer", "segment"} <= set(terms("sales_lines.customer_segment"))
+    assert terms("widget_revenue") == ["widget_revenue", "widget", "revenue"]
+    assert {"widget_name", "widget", "name"} <= set(terms("widget_sales.widget_name"))
 
 
 def test_english_terms_are_lower_case_words():

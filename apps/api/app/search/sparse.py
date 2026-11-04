@@ -3,7 +3,7 @@
 ``terms`` reads NFKC, lower-cased text as word tokens (Vietnamese syllables
 are space-separated words) and keeps each token both as written and with its
 diacritics removed (``đ`` becomes ``d``), so "doanh thu", "Doanh Thu" and
-"doanh thú" share terms. An identifier such as ``net_sales`` is kept whole and
+"doanh thú" share terms. An identifier such as ``widget_revenue`` is kept whole and
 also split at its underscores.
 
 A document vector holds each term's BM25 term-frequency part, normalised by

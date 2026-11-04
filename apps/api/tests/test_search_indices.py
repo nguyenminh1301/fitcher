@@ -113,14 +113,14 @@ def test_a_query_without_words_searches_the_dense_vector_only():
 
 
 def test_points_keep_the_document_as_payload_and_weigh_the_title_twice():
-    documents = [{"id": "net_sales", "title": "net sales", "text": "Money", "embedding_text": "net sales. Money", "allowed_roles": ["viewer"]}]
+    documents = [{"id": "widget_revenue", "title": "widget revenue", "text": "Money", "embedding_text": "widget revenue. Money", "allowed_roles": ["viewer"]}]
 
     [point] = points("shop_metrics_v1", documents, [[0.5, 0.5]])
 
-    assert point["id"] == point_id("net_sales")
-    assert point["payload"] == {"id": "net_sales", "title": "net sales", "text": "Money", "allowed_roles": ["viewer"]}
+    assert point["id"] == point_id("widget_revenue")
+    assert point["payload"] == {"id": "widget_revenue", "title": "widget revenue", "text": "Money", "allowed_roles": ["viewer"]}
     assert set(point["vector"]) == {"dense", "bm25"}
-    assert bm25_tokens(documents[0]).count("net") == 2
+    assert bm25_tokens(documents[0]).count("widget") == 2
 
 
 def test_search_pack_reads_every_alias_with_one_embedding():

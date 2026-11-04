@@ -67,12 +67,12 @@ def test_points_are_written_in_batches_and_wait_until_searchable():
 
 
 def test_query_returns_pack_ids_scores_and_payloads():
-    payload = {"id": "net_sales", "title": "net sales", "allowed_roles": ["viewer"]}
-    search, sent = client(lambda request, body: ok({"points": [{"id": point_id("net_sales"), "score": 0.5, "payload": payload}]}))
+    payload = {"id": "widget_revenue", "title": "widget revenue", "allowed_roles": ["viewer"]}
+    search, sent = client(lambda request, body: ok({"points": [{"id": point_id("widget_revenue"), "score": 0.5, "payload": payload}]}))
 
-    hits = search.query("shop_metrics", "net sales", [0.1], ["viewer"], 3)
+    hits = search.query("shop_metrics", "widget revenue", [0.1], ["viewer"], 3)
 
-    assert hits == [{"id": "net_sales", "score": 0.5, "source": payload}]
+    assert hits == [{"id": "widget_revenue", "score": 0.5, "source": payload}]
     assert sent[0][1] == "/collections/shop_metrics/points/query"
 
 
@@ -85,8 +85,8 @@ def test_a_failed_request_names_the_status_and_qdrant_error():
 
 
 def test_point_ids_are_stable_uuids_of_the_document_id():
-    assert point_id("net_sales") == point_id("net_sales") != point_id("net_sales_2")
-    assert uuid.UUID(point_id("net_sales")).version == 5
+    assert point_id("widget_revenue") == point_id("widget_revenue") != point_id("widget_revenue_2")
+    assert uuid.UUID(point_id("widget_revenue")).version == 5
 
 
 LIVE_URL = os.environ.get("QDRANT_LIVE_URL", "")
@@ -97,7 +97,7 @@ def test_live_a_role_never_receives_a_point_it_may_not_read():
     search = QdrantSearch(LIVE_URL)
     name = f"rolecheck_metrics_v{uuid.uuid4().int % 10_000}"
     documents = [
-        {"id": f"m{number}", "type": "metric", "title": f"net sales {number}", "text": "net sales revenue",
+        {"id": f"m{number}", "type": "metric", "title": f"widget revenue {number}", "text": "widget revenue revenue",
          "allowed_roles": roles}
         for number, roles in enumerate([["analyst"], ["marketing"], ["analyst", "marketing"], ["partner"]] * 5)
     ]
@@ -107,7 +107,7 @@ def test_live_a_role_never_receives_a_point_it_may_not_read():
     try:
         search.upsert(name, points(name, documents, [[1.0, 0.0]] * len(documents)))
         for role in ("analyst", "marketing", "partner", "nobody"):
-            hits = search.query(name, "net sales", [1.0, 0.0], [role], 50)
+            hits = search.query(name, "widget revenue", [1.0, 0.0], [role], 50)
             readable = [document["id"] for document in documents if role in document["allowed_roles"]]
             assert sorted(hit["id"] for hit in hits) == sorted(readable)
             assert all(role in hit["source"]["allowed_roles"] for hit in hits)
