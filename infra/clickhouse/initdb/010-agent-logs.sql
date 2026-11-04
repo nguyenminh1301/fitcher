@@ -53,13 +53,15 @@ ORDER BY (trace_id, ts)
 TTL toDateTime(ts) + INTERVAL 90 DAY
 SETTINGS non_replicated_deduplication_window = 10000;
 
--- Written by the LiteLLM proxy callback, one row per gateway call.
+-- Written by the LiteLLM proxy callback, one row per gateway call. tier is the
+-- model tier the engine called and alias the catalog alias it resolved to.
 CREATE TABLE IF NOT EXISTS agent_logs.llm_calls
 (
     trace_id String,
     ts DateTime64(3, 'UTC'),
     node LowCardinality(String),
     alias LowCardinality(String),
+    tier LowCardinality(String),
     model LowCardinality(String),
     call_id String,
     prompt_tokens UInt32,
@@ -74,6 +76,9 @@ ENGINE = MergeTree
 ORDER BY (trace_id, ts)
 TTL toDateTime(ts) + INTERVAL 90 DAY
 SETTINGS non_replicated_deduplication_window = 10000;
+
+-- Column added after llm_calls was first created; a no-op on a fresh volume.
+ALTER TABLE agent_logs.llm_calls ADD COLUMN IF NOT EXISTS tier LowCardinality(String) AFTER alias;
 
 -- One row per executed SQL attempt; query_id joins system.query_log.
 CREATE TABLE IF NOT EXISTS agent_logs.sql_runs
@@ -204,7 +209,9 @@ ORDER BY (user_id, ts)
 TTL toDateTime(ts) + INTERVAL 90 DAY
 SETTINGS non_replicated_deduplication_window = 10000;
 
--- One row per eval run; report holds the full JSON report.
+-- One row per eval run; report holds the full JSON report, tiers the
+-- tier-to-alias mapping the run used and regressed whether it regressed
+-- against the baseline it was compared with (NULL without a baseline).
 CREATE TABLE IF NOT EXISTS agent_logs.eval_reports
 (
     pack LowCardinality(String),
@@ -212,10 +219,33 @@ CREATE TABLE IF NOT EXISTS agent_logs.eval_reports
     report_id String,
     execution_rate Float64,
     passed Bool,
-    report String
+    report String,
+    tiers Map(String, String),
+    regressed Nullable(Bool)
 )
 ENGINE = MergeTree
 ORDER BY (pack, ts)
+TTL toDateTime(ts) + INTERVAL 90 DAY
+SETTINGS non_replicated_deduplication_window = 10000;
+
+-- Columns added after eval_reports was first created; no-ops on a fresh volume.
+ALTER TABLE agent_logs.eval_reports ADD COLUMN IF NOT EXISTS tiers Map(String, String);
+ALTER TABLE agent_logs.eval_reports ADD COLUMN IF NOT EXISTS regressed Nullable(Bool);
+
+-- One row per change an admin makes from the console, such as a model tier
+-- mapping (DECISIONS §15). target names what changed; old_value and new_value
+-- hold its value before and after.
+CREATE TABLE IF NOT EXISTS agent_logs.admin_actions
+(
+    ts DateTime64(3, 'UTC'),
+    actor String,
+    action LowCardinality(String),
+    target String,
+    old_value String,
+    new_value String
+)
+ENGINE = MergeTree
+ORDER BY (action, ts)
 TTL toDateTime(ts) + INTERVAL 90 DAY
 SETTINGS non_replicated_deduplication_window = 10000;
 

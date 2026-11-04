@@ -1,6 +1,6 @@
 """Summarize the returned rows in the question's language (DECISIONS §6 step 16).
 
-The ``fast`` alias sees only the question, the spec and the returned rows;
+The ``fast`` tier sees only the question, the spec and the returned rows;
 every figure it may quote is already a column computed in SQL.
 """
 
@@ -10,7 +10,7 @@ from app.agent.prompts import render
 from app.agent.state import AgentDeps, AgentState
 from app.llm.client import LLMError
 
-ALIAS = "fast"
+TIER = "fast"
 PROMPT = "summarize.v2"
 ROWS_IN_PROMPT = 200
 
@@ -30,6 +30,6 @@ def summarize(state: AgentState, deps: AgentDeps) -> dict:
         rows="\n".join(json.dumps(row, ensure_ascii=False) for row in rows) or "no rows",
     )
     try:
-        return {"summary": deps.llm.text(ALIAS, prompt).strip()}
+        return {"summary": deps.llm.text(TIER, prompt).strip()}
     except LLMError as error:
         return {"summary": None, "warnings": [*state.get("warnings", []), f"no summary: {error}"]}

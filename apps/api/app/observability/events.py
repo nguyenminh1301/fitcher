@@ -116,6 +116,22 @@ class EvalReportRecord(LogRecord):
     execution_rate: float
     passed: bool
     report: str
+    # The tier-to-alias mapping of the run, and whether it regressed against its baseline (None without one).
+    tiers: dict[str, str] = {}
+    regressed: bool | None = None
+
+
+class AdminActionRecord(LogRecord):
+    """One change an admin made from the console, such as a model tier mapping."""
+
+    TABLE: ClassVar[str] = "admin_actions"
+
+    ts: datetime
+    actor: str
+    action: str
+    target: str
+    old_value: str
+    new_value: str
 
 
 class ChatMessageRecord(LogRecord):

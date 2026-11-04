@@ -13,7 +13,7 @@ def client(handler, dimensions: int = 3) -> LiteLLMEmbeddings:
     return LiteLLMEmbeddings("http://litellm:4000/", "sk-test", dimensions, http=httpx.Client(transport=httpx.MockTransport(handler)))
 
 
-def test_embeddings_call_the_embed_alias_with_the_configured_dimensions():
+def test_embeddings_call_the_embed_tiers_alias_with_the_configured_dimensions():
     requests: list[dict] = []
 
     def handler(request: httpx.Request) -> httpx.Response:
@@ -27,7 +27,7 @@ def test_embeddings_call_the_embed_alias_with_the_configured_dimensions():
     assert vectors == [[0.0, 0.0, 0.0], [1.0, 1.0, 1.0]]
     assert requests == [{
         "url": "http://litellm:4000/v1/embeddings", "auth": "Bearer sk-test",
-        "model": "embed", "input": ["a", "b"], "dimensions": 3,
+        "model": "openai-embed", "input": ["a", "b"], "dimensions": 3, "metadata": {"tier": "embed"},
     }]
 
 
@@ -58,7 +58,7 @@ def test_http_error_names_the_alias_and_status_only():
     with pytest.raises(EmbeddingError) as raised:
         client(handler).embed(["a"])
 
-    assert str(raised.value) == "alias embed returned HTTP 401"
+    assert str(raised.value) == "alias openai-embed returned HTTP 401"
 
 
 def test_missing_gateway_settings_are_rejected():

@@ -135,3 +135,21 @@ def test_the_conversation_store_cannot_read_run_logs():
     client.query("SELECT count() FROM agent_logs.chat_messages")
     client.query("SELECT count() FROM agent_logs.conversation_groups")
     assert_denied(client, "SELECT count() FROM agent_logs.runs")
+
+
+def test_the_models_page_user_reaches_only_the_tier_mapping_reports_and_admin_actions():
+    assert grants("model_tiers.xml", "model_tiers_admin") == [
+        "GRANT SELECT, INSERT ON data_meta.model_tiers", "GRANT SELECT ON agent_logs.eval_reports",
+        "GRANT INSERT ON agent_logs.admin_actions",
+    ]
+    root = ElementTree.parse(USERS_DIR / "model_tiers.xml").getroot()
+    assert root.find("users/model_tiers_admin/password").get("from_env") == "CLICKHOUSE_MODEL_TIERS_PASSWORD"
+
+
+@live
+def test_the_models_page_user_cannot_read_run_logs_or_marts():
+    client = connect("model_tiers_admin", "CLICKHOUSE_MODEL_TIERS_PASSWORD")
+    client.query("SELECT count() FROM data_meta.model_tiers")
+    client.query("SELECT count() FROM agent_logs.eval_reports")
+    assert_denied(client, "SELECT count() FROM agent_logs.runs")
+    assert_denied(client, "SELECT count() FROM agent_logs.admin_actions")

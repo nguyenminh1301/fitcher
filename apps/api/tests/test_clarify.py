@@ -171,7 +171,7 @@ def test_clarify_ends_the_run_before_sql():
 
     assert state["clarification"].question == 'Which measure do you mean by "best"?'
     assert state.get("attempts") == [] and agent.runner.calls == []
-    assert [call.alias for call in agent.llm.calls] == ["fast", "fast"]
+    assert [call.tier for call in agent.llm.calls] == ["fast", "fast"]
 
 
 def test_a_question_without_a_period_asks_for_one():

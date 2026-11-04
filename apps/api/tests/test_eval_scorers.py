@@ -147,7 +147,7 @@ def test_execution_fails_with_rejection_reason():
 
 def test_execution_fails_with_last_sql_error():
     error = AgentError("sql", "execute", "Unknown identifier")
-    state = {"attempts": [Attempt(alias="sql-gen", sql="SELECT x", error=error)], "result": None}
+    state = {"attempts": [Attempt(tier="sql-gen", sql="SELECT x", error=error)], "result": None}
 
     score = score_execution(_case(), state, _reference([["Widget 0", 10.5]]))
 

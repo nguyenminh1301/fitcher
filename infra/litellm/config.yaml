@@ -1,22 +1,6 @@
-# Model aliases called by the engine. Model names come from the environment,
-# so changing a model needs only an .env change and a litellm restart.
-model_list:
-  - model_name: fast
-    litellm_params:
-      model: os.environ/LITELLM_MODEL_FAST
-      api_key: os.environ/OPENAI_API_KEY
-  - model_name: sql-gen
-    litellm_params:
-      model: os.environ/LITELLM_MODEL_SQL_GEN
-      api_key: os.environ/OPENAI_API_KEY
-  - model_name: sql-gen-hard
-    litellm_params:
-      model: os.environ/LITELLM_MODEL_SQL_GEN_HARD
-      api_key: os.environ/OPENAI_API_KEY
-  - model_name: embed
-    litellm_params:
-      model: os.environ/LITELLM_MODEL_EMBED
-      api_key: os.environ/OPENAI_API_KEY
+# Gateway settings shared by every catalog block. The model list is not here:
+# build_config.py adds each block of catalog/ whose provider key is set and
+# writes the merged file LiteLLM starts with (DECISIONS §2 Model tiers).
 
 # A model that rejects a request parameter, such as a fixed temperature,
 # receives the request without it instead of failing.

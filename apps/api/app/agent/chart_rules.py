@@ -8,7 +8,7 @@ the §8 table the data matches, with every type the same ``x``, ``y`` and
 type without changing them. A bar and a pie both suit one category and one
 measure of at most six non-negative groups; only the question can tell whether
 it asks for a share, so ``tied`` names both and the ``chart_recommender`` node
-asks the ``fast`` alias.
+asks the ``fast`` tier.
 """
 
 from dataclasses import dataclass

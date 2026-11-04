@@ -1,6 +1,6 @@
 """Classify each question by intent (DECISIONS §6 step 2).
 
-The ``fast`` alias reads the question, the conversation's recent questions and
+The ``fast`` tier reads the question, the conversation's recent questions and
 answers and the previous QuerySpec, never result rows, and returns one of four
 intents with its confidence, the question's language and, for a chart edit,
 the chart type asked for. An invalid reply or
@@ -19,7 +19,7 @@ from app.agent.state import AgentDeps, AgentState
 from app.contracts.chart_spec import ChartType
 from app.llm.client import LLMError
 
-ALIAS = "fast"
+TIER = "fast"
 PROMPT = "router.v3"
 MIN_CONFIDENCE = 0.5
 
@@ -46,7 +46,7 @@ def router(state: AgentState, deps: AgentDeps) -> dict:
         question=json.dumps(state["question"], ensure_ascii=False),
     )
     try:
-        routing = deps.llm.structured(ALIAS, prompt, Routing)
+        routing = deps.llm.structured(TIER, prompt, Routing)
     except LLMError:
         routing = None
     if routing is None or routing.confidence < MIN_CONFIDENCE:

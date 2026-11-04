@@ -50,6 +50,7 @@ def build_row(payload: dict) -> dict:
         "ts": _timestamp(start),
         "node": str(requester.get("node") or ""),
         "alias": payload.get("model_group") or "",
+        "tier": str(requester.get("tier") or ""),
         "model": payload.get("model") or "",
         "call_id": payload.get("id") or "",
         "prompt_tokens": _count(payload.get("prompt_tokens")),

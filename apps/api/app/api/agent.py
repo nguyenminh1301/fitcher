@@ -25,6 +25,7 @@ from app.conversation.store import Turn
 from app.data.clickhouse import ClickHouseRunner, QueryLimits, QueryStopper, agent_client, stopper_client
 from app.llm.client import LiteLLMClient
 from app.llm.embeddings import LiteLLMEmbeddings
+from app.llm.tiers import EMBED_TIER, TierMap
 from app.observability.log_writer import start_log_writer
 from app.packs.compiler import CompiledPack
 from app.packs.policy_compiler import Names
@@ -73,15 +74,16 @@ class GraphRun:
 
 
 class Agent:
-    def __init__(self, settings: Settings, compiled: CompiledPack, screener: Screener):
+    def __init__(self, settings: Settings, compiled: CompiledPack, screener: Screener, tiers: TierMap):
         self.compiled = compiled
         self._screener = screener
         self._screen_mode = settings.screen_mode
-        self._llm = LiteLLMClient(settings.litellm_base_url, settings.litellm_master_key)
+        self._llm = LiteLLMClient(settings.litellm_base_url, settings.litellm_master_key, tiers=tiers)
         self._search = QdrantSearch(settings.qdrant_url)
         # Query vectors must match the indexed ones, so the compiled size wins over the environment.
         self._embeddings = LiteLLMEmbeddings(
             settings.litellm_base_url, settings.litellm_master_key, compiled.embedding_dimensions,
+            alias=tiers.alias(EMBED_TIER),
         )
         self._limits = QueryLimits.from_env()
         self._logs = start_log_writer(settings)

@@ -109,7 +109,7 @@ def test_a_cancelled_run_stops_before_its_next_node_and_records_it():
         run_question(QUESTION, agent)
 
     assert seen[-1] == ("retrieve", "start")
-    assert agent.llm.calls[-1].alias == "fast" and len(agent.llm.calls) == 2
+    assert agent.llm.calls[-1].tier == "fast" and len(agent.llm.calls) == 2
     final = agent.logs.runs()[-1]
     assert final.status == "cancelled"
 
@@ -143,9 +143,9 @@ def test_llm_calls_carry_the_trace_and_node_and_are_counted():
     assert current_run() is None
 
     # Outside a run and outside trusted pack calls nothing marks the request as screened; the gateway rejects it.
-    assert "metadata" not in sent[0]
-    assert sent[1]["metadata"] == {"screening": "trusted_pack"}
-    assert sent[2]["metadata"] == {"trace_id": run.trace_id, "node": ""}
-    assert sent[3]["metadata"] == {"trace_id": run.trace_id, "node": "extract", "screening": "flag"}
-    assert sent[4]["metadata"] == {"trace_id": run.trace_id, "node": "extract", "screening": "flag"}
-    assert sent[5]["metadata"] == {"trace_id": run.trace_id, "node": "", "screening": "flag"}
+    assert sent[0]["metadata"] == {"tier": "fast"}
+    assert sent[1]["metadata"] == {"screening": "trusted_pack", "tier": "embed"}
+    assert sent[2]["metadata"] == {"trace_id": run.trace_id, "node": "", "tier": "fast"}
+    assert sent[3]["metadata"] == {"trace_id": run.trace_id, "node": "extract", "screening": "flag", "tier": "fast"}
+    assert sent[4]["metadata"] == {"trace_id": run.trace_id, "node": "extract", "screening": "flag", "tier": "embed"}
+    assert sent[5]["metadata"] == {"trace_id": run.trace_id, "node": "", "screening": "flag", "tier": "fast"}

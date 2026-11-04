@@ -18,6 +18,8 @@ from app.auth.jwt import JwksCache, TokenSettings, TokenVerifier
 from app.config import load_settings
 from app.conversation.store import ConversationStore, conversations_client
 from app.llm.client import LLMError
+from app.llm.model_store import CatalogClient, ClickHouseModelStore, model_tiers_client
+from app.llm.tiers import TierMap
 from app.packs.compiler import CompileError, CompiledPack, load_compiled
 from app.screening.screen import Screener
 
@@ -82,9 +84,35 @@ def build_screener_in_background() -> None:
 
 
 @cache
+def get_model_store() -> ClickHouseModelStore:
+    try:
+        return ClickHouseModelStore(model_tiers_client())
+    except Exception as error:  # noqa: BLE001 - a missing password or unreachable ClickHouse
+        raise unavailable(f"the model store is unavailable: {error}") from None
+
+
+@cache
+def get_tier_map() -> TierMap:
+    """The process's tier lookup; without the model store every tier keeps its ``MODEL_TIER_<TIER>`` default."""
+    settings = load_settings()
+    try:
+        store = get_model_store()
+    except Exception:  # noqa: BLE001 - routing still works on the defaults
+        logger.warning("model tiers use their defaults: the model store is unavailable")
+        store = None
+    return TierMap(settings.model_tiers, store)
+
+
+@cache
+def get_catalog() -> CatalogClient:
+    settings = load_settings()
+    return CatalogClient(settings.litellm_base_url, settings.litellm_master_key)
+
+
+@cache
 def get_agent() -> Agent:
     try:
-        return Agent(load_settings(), get_compiled(), get_screener())
+        return Agent(load_settings(), get_compiled(), get_screener(), get_tier_map())
     except LLMError as error:
         raise unavailable(str(error)) from None
 

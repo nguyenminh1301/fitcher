@@ -8,6 +8,7 @@ from pydantic import BaseModel
 import pytest
 
 from app.llm.client import GatewayBlocked, LiteLLMClient, LLMError, Prompt
+from app.llm.tiers import BUILT_IN_DEFAULTS, TierMap
 
 
 class Answer(BaseModel):
@@ -18,15 +19,16 @@ class Answer(BaseModel):
 PROMPT = Prompt(system="Reply in JSON.", user="Say ready twice")
 
 
-def client(handler) -> LiteLLMClient:
-    return LiteLLMClient("http://litellm:4000/", "sk-test", http=httpx.Client(transport=httpx.MockTransport(handler)))
+def client(handler, tiers: TierMap | None = None) -> LiteLLMClient:
+    http = httpx.Client(transport=httpx.MockTransport(handler))
+    return LiteLLMClient("http://litellm:4000/", "sk-test", http=http, tiers=tiers)
 
 
 def reply(content: str) -> httpx.Response:
     return httpx.Response(200, json={"choices": [{"message": {"content": content}}]})
 
 
-def test_structured_sends_the_alias_and_json_schema_then_validates():
+def test_structured_sends_the_tiers_alias_and_json_schema_then_validates():
     sent: list[dict] = []
 
     def handler(request: httpx.Request) -> httpx.Response:
@@ -39,7 +41,8 @@ def test_structured_sends_the_alias_and_json_schema_then_validates():
     request = sent[0]
     assert request["url"] == "http://litellm:4000/v1/chat/completions"
     assert request["auth"] == "Bearer sk-test"
-    assert request["model"] == "fast"
+    assert request["model"] == "openai-small"
+    assert request["metadata"] == {"tier": "fast"}
     assert request["messages"] == [
         {"role": "system", "content": "Reply in JSON."}, {"role": "user", "content": "Say ready twice"},
     ]
@@ -58,13 +61,26 @@ def test_text_returns_the_reply_without_a_response_format():
     assert "response_format" not in sent[0]
 
 
-@pytest.mark.parametrize("alias", ["gpt-5.4", "openai/gpt-5.4-mini", "embed", ""])
-def test_only_chat_alias_names_are_accepted(alias):
+@pytest.mark.parametrize("tier", ["gpt-5.4", "openai-small", "embed", ""])
+def test_only_chat_tier_names_are_accepted(tier):
     def handler(request: httpx.Request) -> httpx.Response:
         raise AssertionError("no request may be sent")
 
-    with pytest.raises(ValueError, match="unknown LLM alias"):
-        client(handler).text(alias, "hi")
+    with pytest.raises(ValueError, match="unknown chat tier"):
+        client(handler).text(tier, PROMPT)
+
+
+def test_the_tier_map_picks_the_alias_sent_to_the_gateway():
+    sent: list[dict] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        sent.append(json.loads(request.content))
+        return reply("SELECT 1")
+
+    tiers = TierMap({**BUILT_IN_DEFAULTS, "sql-small": "anthropic-small"})
+    client(handler, tiers).text("sql-small", PROMPT)
+
+    assert (sent[0]["model"], sent[0]["metadata"]) == ("anthropic-small", {"tier": "sql-small"})
 
 
 @pytest.mark.parametrize(("response", "message"), [
@@ -96,12 +112,12 @@ def test_missing_gateway_settings_are_rejected():
         LiteLLMClient("", "sk-test")
 
 
-def test_fake_client_records_calls_and_checks_aliases():
+def test_fake_client_records_calls_and_checks_tiers():
     fake = FakeLLMClient([{"word": "a", "count": 1}, "plain"])
 
     assert fake.structured("fast", PROMPT, Answer) == Answer(word="a", count=1)
     assert fake.text("sql-gen-hard", PROMPT) == "plain"
-    assert [(call.method, call.alias, call.prompt) for call in fake.calls] == [
+    assert [(call.method, call.tier, call.prompt) for call in fake.calls] == [
         ("structured", "fast", PROMPT.text), ("text", "sql-gen-hard", PROMPT.text),
     ]
     assert (fake.calls[0].system, fake.calls[0].user) == ("Reply in JSON.", "Say ready twice")

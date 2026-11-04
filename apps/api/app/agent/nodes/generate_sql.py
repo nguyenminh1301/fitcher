@@ -6,13 +6,16 @@ retrieved examples and, on a retry, the previous SQL and its error. The schema
 is the asking role's: only its datasets and columns. For an aggregate-only
 grant it is the role's view, whose metric columns hold one value per group and
 are summed again, with no joins and no examples (their SQL reads the table).
-One initial generation and up to three retries run in total; the third retry uses
-``sql-gen-hard`` (DECISIONS §2 and §6).
+One initial generation and up to three retries run in total. The first
+generation uses ``sql-small`` when the complexity rule scores the spec as
+simple and ``sql-gen`` otherwise; a retry after a ``sql-small`` attempt moves to
+``sql-gen`` and the third retry uses ``sql-gen-hard`` (DECISIONS §2 and §6).
 """
 
 import json
 import re
 
+from app.agent.complexity import Complexity, complexity
 from app.agent.errors import AgentError
 from app.agent.prompts import render
 from app.agent.state import AgentDeps, AgentState, Attempt
@@ -26,9 +29,11 @@ EXAMPLES_IN_PROMPT = 3
 _FENCE = re.compile(r"^```[a-zA-Z]*\s*|\s*```$")
 
 
-def alias_for(attempt: int) -> str:
-    """LLM alias for the zero-based generation ``attempt``."""
-    return "sql-gen-hard" if attempt >= MAX_GENERATIONS - 1 else "sql-gen"
+def tier_for(attempt: int, score: Complexity) -> str:
+    """Model tier for the zero-based generation ``attempt`` of a spec scored ``score``."""
+    if attempt >= MAX_GENERATIONS - 1:
+        return "sql-gen-hard"
+    return "sql-small" if attempt == 0 and score == "simple" else "sql-gen"
 
 
 def _related_datasets(pack: Pack, dataset: str) -> list[str]:
@@ -125,13 +130,14 @@ def clean_sql(reply: str) -> str:
 
 def generate_sql(state: AgentState, deps: AgentDeps) -> dict:
     attempts = list(state.get("attempts", []))
-    alias = alias_for(len(attempts))
+    score = complexity(state["spec"])
+    tier = tier_for(len(attempts), score)
     try:
-        sql = clean_sql(deps.llm.text(alias, build_prompt(state, deps)))
+        sql = clean_sql(deps.llm.text(tier, build_prompt(state, deps)))
     except LLMError as error:
         failed = AgentError("runtime", "generate_sql", str(error))
         return {
-            "attempts": [*attempts, Attempt(alias=alias, sql="", error=failed)],
+            "attempts": [*attempts, Attempt(tier=tier, sql="", error=failed)], "complexity": score,
             "errors": [*state.get("errors", []), failed], "sql": None, "output": None,
         }
-    return {"attempts": [*attempts, Attempt(alias=alias, sql=sql)], "sql": sql, "output": None}
+    return {"attempts": [*attempts, Attempt(tier=tier, sql=sql)], "complexity": score, "sql": sql, "output": None}
