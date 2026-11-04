@@ -98,6 +98,20 @@ describe("models", () => {
     await waitFor(() => expect(api.models.set).toHaveBeenCalledWith("sql-small", "anthropic-small"));
   });
 
+  it("disables every choice while a change saves", async () => {
+    let finish: (tier: ModelTier) => void = () => undefined;
+    api.models.set = vi.fn(() => new Promise<ModelTier>((resolve) => { finish = resolve; }));
+    show();
+    const small = await screen.findByRole("region", { name: "Tier sql-small" });
+
+    fireEvent.click(within(small).getByRole("button", { name: "anthropic-small" }));
+    await act(async () => fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Change model" })));
+
+    expect((within(small).getByRole("button", { name: "anthropic-small" }) as HTMLButtonElement).disabled).toBe(true);
+    await act(async () => finish(tier("sql-small", "anthropic-small")));
+    await waitFor(() => expect((within(small).getByRole("button", { name: "anthropic-small" }) as HTMLButtonElement).disabled).toBe(false));
+  });
+
   it("offers no change for the embedding tier", async () => {
     show();
     const embed = await screen.findByRole("region", { name: "Tier embed" });

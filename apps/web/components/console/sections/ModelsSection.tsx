@@ -3,7 +3,8 @@
 // Models (DECISIONS §2 Model tiers, §15): each model tier with its catalog alias, provider and the eval
 // report that made the alias eligible. An admin maps a chat tier to another alias the gateway loaded; an
 // alias whose latest eval report did not pass without regression is disabled, with the reason beside it.
-// embed is shown but never changed here, because a new embedding model needs a full reindex.
+// embed is shown but never changed here, because a new embedding model needs a full reindex. While a
+// change saves, every choice stays disabled until the page has reloaded the tiers.
 
 import { useCallback, useState } from "react";
 
@@ -19,7 +20,7 @@ import { useI18n } from "@/lib/i18n/react";
 
 type Change = { tier: ModelTier; option: AliasOption };
 
-function TierCard({ tier, onChoose }: { tier: ModelTier; onChoose: (option: AliasOption) => void }) {
+function TierCard({ tier, busy, onChoose }: { tier: ModelTier; busy: boolean; onChoose: (option: AliasOption) => void }) {
   const { t, formatDate } = useI18n();
   const options = tier.options ?? [];
   const blocked = options.filter((option) => !option.eligible && option.alias !== tier.alias);
@@ -51,7 +52,7 @@ function TierCard({ tier, onChoose }: { tier: ModelTier; onChoose: (option: Alia
             <div className="fc-row" role="group" aria-label={t("ui.aliasesFor", { tier: tier.tier })} style={{ gap: "var(--base-size-4)" }}>
               {options.map((option) => (
                 <Chip key={option.alias} size="sm" selected={option.alias === tier.alias}
-                  disabled={!option.eligible || option.alias === tier.alias} title={option.reason}
+                  disabled={busy || !option.eligible || option.alias === tier.alias} title={option.reason}
                   onClick={() => onChoose(option)}>
                   {option.alias}
                 </Chip>
@@ -78,19 +79,23 @@ export function ModelsSection() {
   const { data, failed, reload } = useLoad(useCallback(() => api.models.list(), [api]));
   const [change, setChange] = useState<Change | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
 
   async function confirm() {
     const pending = change;
     setChange(null);
-    if (!pending) return;
+    if (!pending || saving) return;
+    setSaving(true);
     try {
       await api.models.set(pending.tier.tier, pending.option.alias);
       setError(null);
       toast(t("ui.tierChanged", { tier: pending.tier.tier, alias: pending.option.alias }));
     } catch (refused) {
       setError(refused instanceof Error ? refused.message : String(refused));
+    } finally {
+      await reload();
+      setSaving(false);
     }
-    await reload();
   }
 
   return (
@@ -100,7 +105,7 @@ export function ModelsSection() {
       {error ? <WarningBanner tone="danger">{error}</WarningBanner> : null}
       <div className="fc-role-grid">
         {(data?.tiers ?? []).map((tier) => (
-          <TierCard key={tier.tier} tier={tier} onChoose={(option) => setChange({ tier, option })} />
+          <TierCard key={tier.tier} tier={tier} busy={saving} onChoose={(option) => setChange({ tier, option })} />
         ))}
       </div>
       <Dialog open={!!change} title={t("ui.changeTierTitle", { tier: change?.tier.tier ?? "" })} onClose={() => setChange(null)}
