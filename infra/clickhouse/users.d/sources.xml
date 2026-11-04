@@ -16,7 +16,9 @@
             <profile>default</profile>
             <quota>default</quota>
             <grants>
-                <query>GRANT NAMED COLLECTION ON *</query>
+                <!-- Lists the collections; without SHOW NAMED COLLECTIONS SECRETS their values stay hidden. -->
+                <query>GRANT NAMED COLLECTION, SHOW NAMED COLLECTIONS ON *</query>
+                <query>GRANT SELECT ON system.named_collections</query>
                 <query>GRANT READ ON POSTGRES, READ ON MYSQL, READ ON MONGO, READ ON S3</query>
                 <query>GRANT TABLE ENGINE ON PostgreSQL, TABLE ENGINE ON MySQL, TABLE ENGINE ON MongoDB, TABLE ENGINE ON S3, TABLE ENGINE ON MergeTree</query>
                 <query>GRANT CREATE TEMPORARY TABLE ON *.*</query>

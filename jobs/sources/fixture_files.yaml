@@ -1,0 +1,15 @@
+# Lab fixture: the synthetic widget dataset of infra/sources/fixtures served by
+# the S3-compatible fixture store of the `sources` Compose profile. Its credentials are the
+# FIXTURE_FILES_* variables, read by the fixture_files named collection in
+# infra/clickhouse/config.d/sources.xml. The four fixture manifests feed the
+# same fixture_widgets dbt models, one source at a time.
+# Paths are object keys in the fixture bucket; column types are inferred from the CSV files.
+name: fixture_files
+kind: files
+mode: copy
+connection_env: FIXTURE_FILES
+dbt_tag: fixture_widgets
+tables:
+  - {name: widgets, path: widgets.csv, format: csv, expected_rows: 40}
+  - {name: sales, path: sales.csv, format: csv, expected_rows: 3000}
+  - {name: refunds, path: refunds.csv, format: csv, expected_rows: 300}

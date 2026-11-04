@@ -38,13 +38,15 @@ class LoadError(RuntimeError):
 
 @dataclass(frozen=True)
 class TableResult:
+    """Rows found in one table; a table without an expected count only records it."""
+
     name: str
-    expected_rows: int
+    expected_rows: int | None
     loaded_rows: int
 
     @property
     def ok(self) -> bool:
-        return self.loaded_rows == self.expected_rows
+        return self.expected_rows is None or self.loaded_rows == self.expected_rows
 
 
 def clickhouse_type(field: pa.Field) -> str:
@@ -102,7 +104,7 @@ def load_source(
         for table in manifest.tables:
             path = download(manifest, table, data_dir, revision)
             _load_table(client, table, path)
-            loaded = int(client.command(f"SELECT count() FROM {_loading(table.name)}"))
+            loaded = int(client.command(f"SELECT count() FROM {loading_table(table.name)}"))
             results.append(TableResult(table.name, table.expected_rows, loaded))
     except Exception as error:
         _drop_loading(client, manifest)
@@ -115,7 +117,7 @@ def load_source(
         raise LoadError(f"row counts do not match the manifest for {mismatched}", results)
 
     for table in manifest.tables:
-        _publish(client, table.name)
+        publish_raw_table(client, table.name)
     return results
 
 
@@ -123,7 +125,7 @@ def _load_table(client, table: TableSpec, path: Path) -> None:
     parquet = pq.ParquetFile(path)
     schema = parquet.schema_arrow
     columns = ", ".join(f"{_quote(field.name)} {clickhouse_type(field)}" for field in schema)
-    client.command(f"CREATE TABLE {_loading(table.name)} ({columns}) ENGINE = MergeTree ORDER BY tuple()")
+    client.command(f"CREATE TABLE {loading_table(table.name)} ({columns}) ENGINE = MergeTree ORDER BY tuple()")
     bounds = _bounds(table, schema)
     for batch in parquet.iter_batches(batch_size=BATCH_ROWS):
         if bounds is not None:
@@ -131,7 +133,7 @@ def _load_table(client, table: TableSpec, path: Path) -> None:
             values = batch.column(index)
             batch = batch.filter(pc.and_(pc.greater_equal(values, start), pc.less(values, end)))
         if batch.num_rows:
-            client.insert_arrow(_loading(table.name), pa.Table.from_batches([batch]))
+            client.insert_arrow(loading_table(table.name), pa.Table.from_batches([batch]))
 
 
 def _bounds(table: TableSpec, schema: pa.Schema):
@@ -147,8 +149,8 @@ def _bounds(table: TableSpec, schema: pa.Schema):
     return schema.get_field_index(column), start, end
 
 
-def _publish(client, name: str) -> None:
-    loading, target = _loading(name), _target(name)
+def publish_raw_table(client, name: str) -> None:
+    loading, target = loading_table(name), _target(name)
     if int(client.command(f"EXISTS TABLE {target}")):
         client.command(f"EXCHANGE TABLES {loading} AND {target}")
         client.command(f"DROP TABLE {loading}")
@@ -158,14 +160,14 @@ def _publish(client, name: str) -> None:
 
 def _drop_loading(client, manifest: SourceManifest) -> None:
     for table in manifest.tables:
-        client.command(f"DROP TABLE IF EXISTS {_loading(table.name)}")
+        client.command(f"DROP TABLE IF EXISTS {loading_table(table.name)}")
 
 
 def _target(name: str) -> str:
     return f"{_quote(RAW_DATABASE)}.{_quote(name)}"
 
 
-def _loading(name: str) -> str:
+def loading_table(name: str) -> str:
     return f"{_quote(RAW_DATABASE)}.{_quote(name + LOADING_SUFFIX)}"
 
 
@@ -177,7 +179,8 @@ def print_summary(results: list[TableResult]) -> None:
     print(f"{'table':<24} {'expected':>12} {'loaded':>12}  status")
     for result in results:
         status = "ok" if result.ok else "MISMATCH"
-        print(f"{result.name:<24} {result.expected_rows:>12} {result.loaded_rows:>12}  {status}")
+        expected = "-" if result.expected_rows is None else result.expected_rows
+        print(f"{result.name:<24} {expected:>12} {result.loaded_rows:>12}  {status}")
 
 
 def main(argv: list[str] | None = None) -> int:

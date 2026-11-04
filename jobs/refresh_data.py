@@ -1,6 +1,9 @@
-"""Refresh one source: load its raw tables, then build its dbt models and tests.
+"""Refresh one source: load or attach its tables, then build its dbt models and tests.
 
 Run with ``docker compose run --rm jobs python -m jobs.refresh_data --source <name>``.
+A Hugging Face source is downloaded by ``jobs.load_data``; any other source is
+copied into ``raw`` or attached live by ``jobs.sync_sources``, and dbt receives
+the relations of its tables in that mode as variables (DECISIONS §4 Data sources).
 
 ClickHouse cannot swap several tables atomically, so consistency comes from
 ``data_meta.refresh_log``. Each refresh takes the next generation for its
@@ -16,13 +19,16 @@ no refresh is active.
 """
 
 import argparse
+import json
 import subprocess
 import sys
 from pathlib import Path
 
-from jobs.lib.clickhouse import admin_client
-from jobs.lib.source_manifest import ManifestError, SourceManifest, load_manifest
+from jobs.lib.clickhouse import admin_client, sources_client
+from jobs.lib.source_engines import relations
+from jobs.lib.source_manifest import HUGGINGFACE, ManifestError, SourceManifest, load_manifest
 from jobs.load_data import DEFAULT_DATA_DIR, LoadError, load_source, print_summary
+from jobs.sync_sources import sync_source, with_mode
 
 META_DATABASE = "data_meta"
 LOG_TABLE = "refresh_log"
@@ -48,10 +54,25 @@ def lock_table(source: str) -> str:
     return f"`{META_DATABASE}`.`refresh_lock_{source}`"
 
 
-def run_dbt_build(dbt_tag: str) -> int:
+def dbt_vars(manifest: SourceManifest) -> dict | None:
+    """Variables that point the source's staging models at its tables; None for a Hugging Face source."""
+    if manifest.kind == HUGGINGFACE:
+        return None
+    return {"source_name": manifest.name, "source_mode": manifest.mode, "source_tables": relations(manifest)}
+
+
+def run_dbt_build(manifest: SourceManifest) -> int:
     # The leading + selects upstream staging models, so changed raw data reaches the marts.
-    command = ["dbt", "build", "--project-dir", "dbt", "--profiles-dir", "dbt", "--select", f"+tag:{dbt_tag}"]
+    command = ["dbt", "build", "--project-dir", "dbt", "--profiles-dir", "dbt", "--select", f"+tag:{manifest.dbt_tag}"]
+    variables = dbt_vars(manifest)
+    if variables is not None:
+        command += ["--vars", json.dumps(variables)]
     return subprocess.run(command, check=False).returncode
+
+
+def sync_as_source_loader(manifest: SourceManifest, client, data_dir: Path, revision: str | None = None):
+    """Sync with the source_loader connection; ``client`` stays the admin one that writes the refresh log."""
+    return sync_source(manifest, sources_client())
 
 
 def refresh(
@@ -73,7 +94,7 @@ def refresh(
             except LoadError as error:
                 print_summary(error.results)
                 raise
-            code = build(manifest.dbt_tag)
+            code = build(manifest)
             if code != 0:
                 raise RefreshError(f"dbt build for tag {manifest.dbt_tag!r} exited with code {code}")
         except Exception as error:
@@ -118,12 +139,14 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Load one source and build its dbt models and tests.")
     parser.add_argument("--source", required=True, help="manifest name under jobs/sources")
     parser.add_argument("--revision", help="override the manifest's pinned revision")
+    parser.add_argument("--mode", choices=["copy", "live"], help="override the manifest's mode")
     parser.add_argument("--data-dir", type=Path, default=DEFAULT_DATA_DIR)
     args = parser.parse_args(argv)
 
     try:
-        manifest = load_manifest(args.source)
-        generation = refresh(manifest, admin_client(), args.data_dir, args.revision, load=load_source, build=run_dbt_build)
+        manifest = with_mode(load_manifest(args.source), args.mode)
+        load = load_source if manifest.kind == HUGGINGFACE else sync_as_source_loader
+        generation = refresh(manifest, admin_client(), args.data_dir, args.revision, load=load, build=run_dbt_build)
     except (ManifestError, RuntimeError) as error:
         print(error, file=sys.stderr)
         return 1
