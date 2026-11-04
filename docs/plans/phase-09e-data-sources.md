@@ -62,7 +62,8 @@ apps/api/tests/                      # live tests per kind and mode, RBAC on liv
 uv run --project apps/api pytest -c apps/api/pyproject.toml
 docker compose --profile sources config --quiet
 docker compose --profile sources up --build --wait
-docker compose run --rm api python -m jobs.sync_sources --source fixture_postgres
+docker compose run --rm jobs python -m jobs.sync_sources --source fixture_postgres
+SOURCES_LIVE_TEST=1 CLICKHOUSE_HOST=localhost uv run --project apps/api pytest -c apps/api/pyproject.toml apps/api/tests/test_sources_live.py
 docker compose run --rm api python -m jobs.eval --pack ecommerce_twin --baseline packs/ecommerce_twin/eval_baseline.json
 ```
 

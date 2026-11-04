@@ -28,6 +28,13 @@ No dbt packages are used, so builds need no network access.
 Staging types the source's `YYYY-MM-DD` strings as `Date` without timezone conversion and converts float money to `Decimal(18, 2)` through integer cents.
 Net sales is `sum(line_amount)` over lines whose `order_status` is not `cancelled`; returns are not netted.
 
+## Fixture widget marts
+
+The `fixture_widgets` models build `widget_sales` (one row per sale) and `widget_refunds` (one row per refund) over whichever fixture source of that tag `jobs.refresh_data` synced last.
+Their staging reads `{{ source_table('<table>') }}` (`macros/source_table.sql`), the relation `jobs.refresh_data` passes in the `source_tables` variable: `raw.<source>__<table>` in copy mode or a table of `src_<source>` in live mode.
+In copy mode the marts are MergeTree tables; with `source_mode: live` they are views with `SQL SECURITY DEFINER`, so an agent role granted a mart reads the live source through it without any grant on `src_*` or `raw`.
+Building these models without the variables fails with a message naming `jobs.refresh_data`.
+
 ## Commands
 
 Builds normally run through the refresh job, which also loads the raw tables and records the refresh state:
