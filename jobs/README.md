@@ -5,7 +5,7 @@ They share the `api` image, which copies this directory to `/app/jobs`, and run 
 
 | Job | Command | Notes |
 | --- | --- | --- |
-| `smoke_llm.py` | `docker compose exec -T api python -m jobs.smoke_llm` | One billable request to the `fast` alias; prints only the reply length |
+| `smoke_llm.py` | `docker compose exec -T api python -m jobs.smoke_llm [--alias <name>]` | One tiny billable request per loaded catalog alias, checking structured output; prints only pass or fail |
 | `load_data.py` | `docker compose run --rm jobs python -m jobs.load_data --source <name>` | Loads the source described by `sources/<name>.yaml` into ClickHouse `raw`; publishes all tables or none |
 
 | `refresh_data.py` | `docker compose run --rm jobs python -m jobs.refresh_data --source <name>` | Loads the source, then runs `dbt build --select +tag:<dbt_tag>`; records the generation in `data_meta.refresh_log` |

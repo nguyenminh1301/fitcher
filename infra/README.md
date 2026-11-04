@@ -9,9 +9,13 @@ See [DECISIONS §3](../docs/DECISIONS.md#3-docker-compose) and the [Phase 0 plan
 | `clickhouse/users.d/users.xml` | Removes the passwordless `default` user |
 | `clickhouse/users.d/agent_logs.xml` | Insert-only `agent_logs_writer`, trace reader and review reader users for `agent_logs` |
 | `clickhouse/users.d/agent_query_stopper.xml` | `agent_query_stopper`, which may only list and stop running queries; the api stops the query of an answer whose client disconnected |
+| `clickhouse/users.d/model_tiers.xml` | `model_tiers_admin`, which reads and writes the model tier mapping, reads eval reports and records admin actions for the Models page |
 | `clickhouse/initdb/001-databases.sql` | Creates `raw`, `marts` and `data_meta` |
 | `clickhouse/initdb/010-agent-logs.sql` | Creates the `agent_logs` database and its run log tables |
-| `litellm/config.yaml` | Aliases `fast`, `sql-gen`, `sql-gen-hard` and `embed`, with models from `LITELLM_MODEL_*` |
+| `clickhouse/initdb/020-model-tiers.sql` | Creates `data_meta.model_tiers`, the model tier mapping of the Models page |
+| `litellm/config.yaml` | Gateway settings shared by every model: callbacks, guardrail and master key |
+| `litellm/catalog/*.yaml` | One file per provider (OpenAI, Anthropic, Gemini, Ollama) with its aliases, named `<provider>-<size>`, and the variables it needs |
+| `litellm/build_config.py` | Container entrypoint: adds each catalog file whose variables are set to the settings and starts the proxy |
 | `litellm/callbacks/clickhouse_logger.py` | Proxy callback writing one `agent_logs.llm_calls` row per call as `agent_logs_writer` |
 | `litellm/callbacks/screening_guard.py` | `pre_call` guardrail rejecting requests without the api's `screening` metadata and rerunning the EN/VI rules |
 | `litellm/callbacks/screening_rules.py` | Byte-identical copy of `apps/api/app/screening/rules.py` for the guardrail |
@@ -33,8 +37,8 @@ The agent runs every generated query as the ClickHouse user of the asking role, 
 `compile_pack` creates these users, their roles, column grants, row policies, aggregate-only views and the shared read-only profile from the pack's `policies.yaml` (see [packs/](../packs/README.md#compiling-a-pack)); they live in the data volume and are reconciled on every compile.
 Their passwords derive from `CLICKHOUSE_AGENT_PASSWORD`; after changing it, run `compile_pack` again.
 
-Run logs live in `agent_logs`. On a volume created before `010-agent-logs.sql` existed, or before one of its tables or columns was added, create what is missing with `docker compose run --rm jobs python -m jobs.apply_log_schema`.
-Four configuration users reach it, each with its own password:
+Run logs live in `agent_logs`. On a volume created before `010-agent-logs.sql` or `020-model-tiers.sql` existed, or before one of their tables or columns was added, create what is missing with `docker compose run --rm jobs python -m jobs.apply_log_schema`.
+Five configuration users reach it, each with its own password:
 
 | User | Password | Access |
 | --- | --- | --- |
@@ -42,15 +46,17 @@ Four configuration users reach it, each with its own password:
 | `agent_logs_trace_reader` | `CLICKHOUSE_TRACE_READER_PASSWORD` | `SELECT` on `runs`, `events`, `llm_calls`, `sql_runs`, `audit`, `eval_reports` and `system.query_log` |
 | `agent_logs_review_reader` | `CLICKHOUSE_REVIEW_READER_PASSWORD` | `SELECT` on `example_proposals`, `feedback` and `chat_messages` for the `pack_reviewer` and `admin` paths |
 | `agent_conversations` | `CLICKHOUSE_CONVERSATIONS_PASSWORD` | `SELECT` and `INSERT` on `chat_messages`, `conversations` and `conversation_groups`; the api's conversation store, which filters every query by the requesting user |
+| `model_tiers_admin` | `CLICKHOUSE_MODEL_TIERS_PASSWORD` | `SELECT` and `INSERT` on `data_meta.model_tiers`, `SELECT` on `eval_reports` and `INSERT` on `admin_actions`; the api's tier lookup and Models page |
 
 The agent's role users have no access to `agent_logs`.
-With the stack running, `AGENT_LOGS_LIVE_TEST=1` and the five passwords in the environment, `jobs/tests/test_agent_log_users.py` checks these grants against the server.
+With the stack running, `AGENT_LOGS_LIVE_TEST=1` and the six passwords in the environment, `jobs/tests/test_agent_log_users.py` checks these grants against the server.
 
 ## LiteLLM
 
-Change a model by editing its `LITELLM_MODEL_*` value in `.env` and running `docker compose up -d --wait litellm`.
-The proxy requires `LITELLM_MASTER_KEY`; `OPENAI_API_KEY` reaches only this container.
-Every call, successful or failed, is written to `agent_logs.llm_calls` with its alias, resolved model, tokens, cost, latency and error; the api's `trace_id` and graph node arrive as request `metadata`, and calls outside a traced run have an empty trace id. A failed write is printed to the proxy log and never affects the reply.
+The engine calls a model tier; the api maps it to a catalog alias (DECISIONS §2 Model tiers). The proxy starts through `build_config.py`, which loads a provider's aliases only when its variables are set (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GEMINI_API_KEY`, `OLLAMA_URL`); with none it starts with an empty catalog and stays healthy. Add or change a model in its `catalog/` file and run `docker compose up -d --wait litellm`; a new alias serves a tier only after `make smoke` and a passing eval with `--tier`.
+The proxy requires `LITELLM_MASTER_KEY`; the provider keys reach only this container.
+For a local model, start `docker compose --profile local-models up -d --wait ollama`, pull the model named in `catalog/ollama.yaml` with `docker compose exec ollama ollama pull <model>`, set `OLLAMA_URL=http://ollama:11434` and restart litellm. The profile is off by default; the model needs several GB of RAM and disk.
+Every call, successful or failed, is written to `agent_logs.llm_calls` with its alias, tier, resolved model, tokens, cost, latency and error; the api's `trace_id`, graph node and tier arrive as request `metadata`, and calls outside a traced run have an empty trace id. A failed write is printed to the proxy log and never affects the reply.
 
 The `screening-guard` guardrail runs before every call (DECISIONS §9). A request whose metadata has no `screening` value of `allow`, `flag` or `trusted_pack` is rejected with HTTP 400 `screening_guard: ...`, and so is one whose messages or embedding inputs trip the EN/VI rules; the api turns that rejection into the `blocked` reply. It closes code paths that forgot to screen and is not an authentication boundary. Change a rule in `apps/api/app/screening/rules.py`, copy the file over `callbacks/screening_rules.py` and restart litellm; a test fails while the copies differ.
 
