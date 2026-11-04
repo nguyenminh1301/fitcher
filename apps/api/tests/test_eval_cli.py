@@ -141,6 +141,12 @@ def test_run_report_is_stored_in_agent_logs(packs_dir):
     assert json.loads(stored.report)["cases"][0]["case_id"] == CASE_ID
 
 
+@pytest.fixture(autouse=True)
+def default_tiers(monkeypatch):
+    for name in ("FAST", "SQL_SMALL", "SQL_GEN", "SQL_GEN_HARD", "EMBED"):
+        monkeypatch.delenv(f"MODEL_TIER_{name}", raising=False)
+
+
 def test_the_report_records_the_tier_mapping_and_its_overrides(packs_dir, tmp_path):
     logs = FakeLogWriter()
     output = tmp_path / "out"
@@ -150,10 +156,11 @@ def test_the_report_records_the_tier_mapping_and_its_overrides(packs_dir, tmp_pa
 
     assert code == 0
     (stored,) = [record for record in logs.written if record.TABLE == "eval_reports"]
-    assert stored.tiers["sql-small"] == "anthropic-small" and stored.tiers["sql-gen"] == "openai-medium"
+    # Only the tiers the run called are evidence; the case generated its SQL on sql-gen, never sql-small.
+    assert stored.tiers == {"fast": "openai-small", "sql-gen": "openai-medium", "embed": "openai-embed"}
     assert stored.regressed is None
     report = EvalRun.model_validate_json((output / "minimal-eval.json").read_text(encoding="utf-8"))
-    assert report.tiers == stored.tiers
+    assert report.tiers["sql-small"] == "anthropic-small" and report.tiers["sql-gen-hard"] == "openai-large"
     assert report.cases[0].sql_tiers == ["sql-gen"]
     assert "## Model routing" in (output / "minimal-eval.md").read_text(encoding="utf-8")
 
@@ -167,6 +174,17 @@ def test_a_run_compared_with_its_baseline_records_whether_it_regressed(packs_dir
 
     (stored,) = [record for record in logs.written if record.TABLE == "eval_reports"]
     assert stored.regressed is False
+
+
+@pytest.mark.parametrize("args", [("--only", CASE_ID), ("--threshold", "0.5")])
+def test_a_partial_or_lenient_run_is_no_eligibility_evidence(packs_dir, args, capsys):
+    logs = FakeLogWriter()
+
+    _main(packs_dir, *args, factory=_factory(_matching(), logs=logs))
+
+    (stored,) = [record for record in logs.written if record.TABLE == "eval_reports"]
+    assert stored.tiers == {}
+    assert "makes no alias eligible" in capsys.readouterr().err
 
 
 @pytest.mark.parametrize("value", ["embed=openai-embed", "sql-small", "sql-small=", "gpt=openai-small"])

@@ -14,6 +14,9 @@ overrides a chat tier for this run, for example ``--tier sql-small=openai-medium
 The mapping is stored with the report together with whether the run regressed
 against ``--baseline``: an alias becomes eligible for a tier on the Models page
 once its latest report passes without regression (DECISIONS §2 Model tiers).
+Only the tiers the run called count as evidence, and only for a run of the whole
+eval set at no less than the default threshold without reference errors; any
+other run is stored with no tier evidence.
 
 Exit codes: 0 when no layer regressed against ``--baseline`` and the execution
 match rate meets ``--threshold``; 1 on a regression or below the threshold; 2
@@ -46,6 +49,9 @@ from app.screening.screen import Screener
 from app.search.client import QdrantSearch
 
 
+DEFAULT_THRESHOLD = 0.8
+
+
 def tier_override(value: str) -> tuple[str, str]:
     tier, separator, alias = value.partition("=")
     if not separator or not alias:
@@ -62,7 +68,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--baseline", type=Path, help="JSON report of an earlier run to compare with")
     parser.add_argument("--output-dir", type=Path, help="directory for <pack>-eval.md and <pack>-eval.json")
     parser.add_argument("--timeout", type=float, default=180.0, help="seconds allowed per case; default 180")
-    parser.add_argument("--threshold", type=float, default=0.8, help="execution match rate the pack must reach; default 0.8")
+    parser.add_argument("--threshold", type=float, default=DEFAULT_THRESHOLD, help="execution match rate the pack must reach; default 0.8")
     parser.add_argument("--packs-dir", type=Path, default=Path("packs"), help="directory of the source packs; default packs")
     parser.add_argument(
         "--tier", type=tier_override, action="append", default=[], metavar="TIER=ALIAS",
@@ -124,15 +130,38 @@ def exit_code(run: EvalRun, diff: BaselineDiff | None) -> int:
     return 0
 
 
-def store_report(deps: AgentDeps, run: EvalRun, diff: BaselineDiff | None = None) -> None:
-    """Write the JSON report to ``agent_logs.eval_reports``; a failed write is reported and changes nothing else."""
+def used_tiers(run: EvalRun) -> set[str]:
+    """The tiers the run called: ``fast`` and ``embed`` in every case that ran, and each SQL generation's tier."""
+    ran = any(case.trace_id for case in run.cases)
+    return ({"fast", EMBED_TIER} if ran else set()) | {tier for case in run.cases for tier in case.sql_tiers}
+
+
+def evidence(run: EvalRun, args: argparse.Namespace) -> tuple[dict[str, str], str | None]:
+    """The tier mapping the report proves eligible, or none with the reason the run does not qualify."""
+    if args.only:
+        return {}, "--only runs part of the eval set"
+    if args.threshold < DEFAULT_THRESHOLD:
+        return {}, f"--threshold is below the default {DEFAULT_THRESHOLD:.0%}"
+    if run.reference_errors:
+        return {}, "a reference query failed"
+    used = used_tiers(run)
+    return {tier: alias for tier, alias in run.tiers.items() if tier in used}, None
+
+
+def store_report(
+    deps: AgentDeps, run: EvalRun, diff: BaselineDiff | None = None, tiers: dict[str, str] | None = None,
+) -> None:
+    """Write the JSON report to ``agent_logs.eval_reports``; a failed write is reported and changes nothing else.
+
+    ``tiers`` is the eligibility evidence: the mapping of the tiers the run called, empty when it does not qualify.
+    """
     if deps.logs is None:
         return
     report_id = uuid4().hex
     record = EvalReportRecord(
         pack=run.pack, ts=utc_now(), report_id=report_id,
         execution_rate=layer_totals(run.cases)["execution"].rate or 0.0, passed=meets_threshold(run),
-        report=run.model_dump_json(), tiers=run.tiers,
+        report=run.model_dump_json(), tiers=tiers or {},
         regressed=None if diff is None else bool(diff.regressed),
     )
     if deps.logs.write_now(record):
@@ -172,7 +201,10 @@ def main(
             run.model_dump_json(indent=2) + "\n", encoding="utf-8", newline="\n"
         )
     code = exit_code(run, diff)
-    store_report(deps, run, diff)
+    proven, not_qualified = evidence(run, args)
+    if not_qualified:
+        print(f"The report makes no alias eligible: {not_qualified}.", file=sys.stderr)
+    store_report(deps, run, diff, proven)
     return code
 
 
