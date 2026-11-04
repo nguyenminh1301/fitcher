@@ -59,7 +59,13 @@ def check_chat(base_url: str, master_key: str, alias: str) -> None:
         reply = json.loads(content)
     except json.JSONDecodeError:
         raise SmokeError("the reply is not JSON") from None
-    if not isinstance(reply, dict) or not isinstance(reply.get("word"), str) or not isinstance(reply.get("count"), int):
+    if (
+        not isinstance(reply, dict)
+        or set(reply) != set(SCHEMA["required"])
+        or not isinstance(reply["word"], str)
+        or not isinstance(reply["count"], int)
+        or isinstance(reply["count"], bool)
+    ):
         raise SmokeError("the reply does not match the schema")
 
 

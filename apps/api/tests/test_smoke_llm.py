@@ -82,6 +82,14 @@ def test_an_alias_without_structured_output_fails_without_printing_the_reply(env
     assert "private prose reply" not in captured.out + captured.err
 
 
+@pytest.mark.parametrize("content", ['{"word": "ready", "count": true}', '{"word": "ready", "count": 2, "extra": 1}', '{"word": 1, "count": 2}'])
+def test_a_reply_outside_the_schema_fails(env, monkeypatch, capsys, content):
+    monkeypatch.setattr(smoke_llm.urllib.request, "urlopen", Gateway(["openai-small"], {"openai-small": chat(content)}))
+
+    assert smoke_llm.main([]) == 1
+    assert "does not match the schema" in capsys.readouterr().err
+
+
 def test_alias_limits_the_calls_and_an_unloaded_alias_is_refused(env, monkeypatch, capsys):
     gateway = Gateway(["openai-small", "openai-medium"])
     monkeypatch.setattr(smoke_llm.urllib.request, "urlopen", gateway)
