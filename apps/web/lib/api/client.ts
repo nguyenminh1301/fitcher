@@ -1,7 +1,7 @@
 // The web app's whole view of the backend, one group per feature. Each feature has a sample
 // implementation (lib/api/mock) and a real one (lib/api/http); lib/api/sources.ts picks per feature.
 
-import type { AskRequest, ConversationPatch, FeedbackInput } from "@/lib/contracts";
+import type { AskRequest, ConversationPatch, FeedbackInput, ModelTier, ModelTiers } from "@/lib/contracts";
 
 import type { Conversation, ConversationGroup, ConversationThread } from "./conversations";
 import type { AskEvent } from "./events";
@@ -82,6 +82,11 @@ export interface FitcherApi {
     list(): Promise<UserRow[]>;
     setRoles(id: string, roles: string[]): Promise<void>;
     setEnabled(id: string, enabled: boolean): Promise<void>;
+  };
+  models: {
+    list(): Promise<ModelTiers>;
+    /** Map a chat tier to an eligible alias; the api refuses embed and any ineligible alias. */
+    set(tier: string, alias: string): Promise<ModelTier>;
   };
 }
 

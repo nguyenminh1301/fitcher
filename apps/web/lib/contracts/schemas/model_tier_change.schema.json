@@ -1,0 +1,16 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "alias": {
+      "maxLength": 100,
+      "minLength": 1,
+      "title": "Alias",
+      "type": "string"
+    }
+  },
+  "required": [
+    "alias"
+  ],
+  "title": "ModelTierChange",
+  "type": "object"
+}

@@ -133,5 +133,10 @@ export function createMockApi(options: { latencyMs?: number; identity?: () => Pr
         find((await load()).console.users, id).enabled = enabled;
       },
     },
+    // The Models page has no sample data: it reads the gateway catalog and eval reports from the api.
+    models: {
+      list: () => Promise.reject(new Error("The Models page needs the api; it has no sample data.")),
+      set: () => Promise.reject(new Error("The Models page needs the api; it has no sample data.")),
+    },
   };
 }
