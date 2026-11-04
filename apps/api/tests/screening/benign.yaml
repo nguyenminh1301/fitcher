@@ -19,8 +19,8 @@ items:
   - {lang: en, text: "What is the conversion rate of the developer plan?"}
   - {lang: en, text: "Display the original order value and the discounted one."}
   - {lang: en, text: "How many admin users signed up in 2025?"}
-  - {lang: en, text: "Which promo codes were used in dark mode sessions?"}
-  - {lang: en, text: "Break down sessions by device for the last 30 days."}
+  - {lang: en, text: "Which promo codes were redeemed by customers who use dark mode?"}
+  - {lang: en, text: "Break down visits by platform for the last 30 days."}
   - {lang: en, text: "What share of revenue came from the mobile app?"}
   - {lang: en, text: "Compare this year to date with the same period last year."}
   - {lang: en, text: "Top 5 customers by lifetime value."}
