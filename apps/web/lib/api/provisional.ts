@@ -112,8 +112,10 @@ export interface Scenario {
   lang: string;
   match: { any: string[]; all?: string[] };
   allowed_roles: string[];
-  kind: "answer" | "clarify" | "failed" | "empty";
+  kind: "answer" | "clarify" | "failed" | "empty" | "blocked";
   question: string;
+  /** The blocked notice of a question the input screen stops (kind "blocked"). */
+  screened_message?: string;
   sql?: string;
   repair?: { sql: string; error: string };
   result?: Result;
