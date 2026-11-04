@@ -4,10 +4,16 @@ The order is fixed: load and validate the pack against its schemas, its own
 references and the warehouse catalog; keep approved items only; test-run every
 metric; reconcile the ClickHouse roles, grants, row policies, views and users
 of the pack's policies; read each dataset's date coverage and the top values of
-indexable columns; write a new generation of the six search indices; move all six
+indexable columns; screen document chunks and column values (DECISIONS §9);
+write a new generation of the six search indices; move all six
 aliases in one request; write ``compiled.json``; and only then delete older
 generations. A failure before the alias move deletes the partial generation
 and leaves the live aliases untouched.
+
+Screening drops a ``kb_docs`` chunk whose verdict is ``block`` or, without
+the classifier, ``unavailable``, and lists it in the summary; a column value
+that is flagged or blocked is listed and still indexed, because it is real
+data the filters need. Reviewed pack content is trusted and not screened.
 """
 
 from collections.abc import Callable, Sequence
@@ -39,6 +45,7 @@ from app.packs.search_indices import (
     index_body,
     physical_name,
 )
+from app.screening.screen import Screener
 from app.search.opensearch import OpenSearch
 
 MARTS_DATABASE = "marts"
@@ -47,6 +54,8 @@ METRIC_TEST_SETTINGS = {"max_execution_time": 30, "readonly": 2}
 # Catalog, coverage and top-value scans read whole tables, so they get more time but a memory cap.
 SCAN_SETTINGS = {"max_execution_time": 300, "max_memory_usage": 2_000_000_000, "readonly": 2}
 ERROR_LIMIT = 500
+# Characters of a flagged column value shown in the compile report.
+SHOWN_VALUE = 80
 _IDENTIFIER = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
 
 
@@ -108,6 +117,9 @@ class CompileSummary:
     generation: int | None = None
     documents: dict[str, int] = field(default_factory=dict)
     warnings: list[str] = field(default_factory=list)
+    # Document chunks screening kept out of kb_docs, and column values it flagged or blocked (still indexed).
+    blocked_chunks: list[str] = field(default_factory=list)
+    flagged_values: list[str] = field(default_factory=list)
 
 
 def quote(identifier: str) -> str:
@@ -222,6 +234,35 @@ def read_column_values(pack: Pack, warehouse: Warehouse, top_k: int) -> list[Col
     return values
 
 
+def _screen_note(verdict) -> str:
+    return f"{verdict.verdict}" + (f": {', '.join(verdict.rule_hits)}" if verdict.rule_hits else "") + (
+        f", score {verdict.score:.3f}" if verdict.score is not None else ""
+    )
+
+
+def screen_documents(documents: dict[str, list[dict]], screener: Screener, summary: CompileSummary) -> None:
+    """Drop blocked kb_docs chunks and report flagged column values, recording both in ``summary``."""
+    chunks = documents["kb_docs"]
+    kept: list[dict] = []
+    for chunk, verdict in zip(chunks, screener.screen_many([chunk["text"] for chunk in chunks], "document"), strict=True):
+        if verdict.verdict in ("block", "unavailable"):
+            summary.blocked_chunks.append(f"{chunk['id']} ({_screen_note(verdict)})")
+        else:
+            kept.append(chunk)
+    documents["kb_docs"] = kept
+    values = documents["column_values"]
+    texts = [value["payload"]["value"] for value in values]
+    for value, verdict in zip(values, screener.screen_many(texts, "column_value"), strict=True):
+        if verdict.verdict in ("flag", "block") or verdict.rule_hits:
+            shown = value["payload"]["value"][:SHOWN_VALUE]
+            summary.flagged_values.append(f"{value['dataset']}.{value['column']}={shown!r} ({_screen_note(verdict)})")
+    if screener.classifier is None:
+        summary.warnings.append(
+            "the screening classifier is unavailable: column values were checked by the rules only "
+            "and no document chunk was indexed"
+        )
+
+
 def _embed(documents: list[dict], embeddings: EmbeddingClient) -> None:
     texts = [document.pop("embedding_text") for document in documents]
     for document, vector in zip(documents, embeddings.embed(texts), strict=True):
@@ -313,11 +354,13 @@ def compile_pack(
     access: AccessControl | None = None,
     agent_secret: str = "",
     clock: Callable[[], datetime] = lambda: datetime.now(UTC),
+    screener: Screener | None = None,
 ) -> CompileSummary:
     """Compile ``pack_dir``; with ``skip_index`` stop after the metric test-run and the access policies.
 
     With ``access``, the admin connection, the pack's policies are applied to
-    ClickHouse; its users' passwords derive from ``agent_secret``.
+    ClickHouse; its users' passwords derive from ``agent_secret``. Without
+    ``screener`` indexing screens with no classifier, so no document chunk is indexed.
     """
     pack = approved_pack(load_pack(pack_dir, schema_dir=schema_dir, catalog=WarehouseCatalog(warehouse)))
     metrics_tested = test_metrics(pack, warehouse)
@@ -337,6 +380,7 @@ def compile_pack(
         raise CompileError("indexing needs a search client, an embedding client and an output directory")
 
     documents = build_documents(pack, read_column_values(pack, warehouse, top_k))
+    screen_documents(documents, screener or Screener(None), summary)
     generation, counts = build_generation(search, embeddings, pack.name, documents)
     compiled = CompiledPack(
         pack=pack, generation=generation, embedding_dimensions=embeddings.dimensions,
