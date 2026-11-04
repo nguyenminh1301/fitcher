@@ -20,7 +20,7 @@ import pyarrow.parquet as pq
 from huggingface_hub import hf_hub_download
 
 from jobs.lib.clickhouse import admin_client
-from jobs.lib.manifest import ManifestError, SourceManifest, TableSpec, load_manifest
+from jobs.lib.source_manifest import ManifestError, SourceManifest, TableSpec, load_manifest
 
 RAW_DATABASE = "raw"
 LOADING_SUFFIX = "__loading"

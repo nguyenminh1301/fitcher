@@ -4,7 +4,7 @@ import pytest
 
 from jobs import refresh_data
 from jobs.load_data import LoadError, TableResult
-from jobs.lib.manifest import SourceManifest, TableSpec
+from jobs.lib.source_manifest import SourceManifest, TableSpec
 
 LOCK = "`data_meta`.`refresh_lock_shop`"
 

@@ -3,7 +3,7 @@ from pathlib import Path
 
 import yaml
 
-from jobs.lib.manifest import SOURCES_DIR, load_manifest
+from jobs.lib.source_manifest import SOURCES_DIR, load_manifest
 
 DBT_DIR = Path(__file__).resolve().parents[2] / "dbt"
 

@@ -21,7 +21,7 @@ import sys
 from pathlib import Path
 
 from jobs.lib.clickhouse import admin_client
-from jobs.lib.manifest import ManifestError, SourceManifest, load_manifest
+from jobs.lib.source_manifest import ManifestError, SourceManifest, load_manifest
 from jobs.load_data import DEFAULT_DATA_DIR, LoadError, load_source, print_summary
 
 META_DATABASE = "data_meta"
