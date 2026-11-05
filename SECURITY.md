@@ -38,8 +38,8 @@ On or before expiry, rescan the newest upstream tag, update the pin if it fixes 
 
 | Image | Advisories | Evidence | Owner | Expires |
 | --- | --- | --- | --- | --- |
-| `qdrant/qdrant:v1.20.0` | 6 in bundled undici and follow-redirects of its web UI ([list](.github/trivy/qdrant.trivyignore.yaml)) | Newest stable release on 2026-11-04; the packages ship inside the upstream image | @nguyenminh1301 | 2026-12-31 |
+| `qdrant/qdrant:v1.20.0` | 6 in bundled undici and follow-redirects of its web UI, and CVE-2026-109518 in the base image's apt ([list](.github/trivy/qdrant.trivyignore.yaml)) | Newest stable release on 2026-11-05; the packages ship inside the upstream image and the server never runs apt | @nguyenminh1301 | 2026-12-31 |
+| `clickhouse/clickhouse-server:26.8.36.3` | CVE-2026-109518 in the base image's apt ([list](.github/trivy/clickhouse.trivyignore.yaml)) | Newest 26.8 release on 2026-11-05; apt ships in the upstream Ubuntu base and the server never runs it | @nguyenminh1301 | 2026-12-31 |
 | `ghcr.io/berriai/litellm:v1.106.7` | 1 in bundled filelock ([list](.github/trivy/litellm.trivyignore.yaml)) | Newest stable patch release on 2026-11-04; the package is installed by the upstream image build | @nguyenminh1301 | 2026-12-31 |
 | `quay.io/keycloak/keycloak:26.8.1` | 1 in bundled Guava ([list](.github/trivy/keycloak.trivyignore.yaml)) | Newest release on 2026-10-30; the JAR ships inside the upstream distribution | @nguyenminh1301 | 2026-12-31 |
 
-`clickhouse/clickhouse-server:26.8.36.3` had no fixable High or Critical findings when pinned.
