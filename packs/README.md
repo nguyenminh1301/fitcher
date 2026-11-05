@@ -72,6 +72,7 @@ Drafts land in `packs/<name>/` with `status: draft`, evidence (`profile` facts, 
 With `ACTIVE_PACK=<name>` a `pack_reviewer` signs in to the console before the first compile (the api reads the pack's name and roles from its files until then) and uses Review to edit, test-run, approve or delete each item, Documents to upload or delete documents and draft from one of them, and, once compiled, Datasets.
 The api writes reviewed YAML into the bind-mounted `packs/` working tree and never runs Git: commit the approved files through a branch and pull request, then compile.
 
+[`iowa_liquor/`](iowa_liquor/README.md) is a second industry's pack onboarded this way from a PostgreSQL source; [its report](../docs/eval/iowa_liquor-report.md) records the review and the eval.
 [`ecommerce_twin_regen/`](ecommerce_twin_regen/) is the hand-written pack with its dataset, column and metric descriptions and glossary definitions regenerated this way; [its report](../docs/eval/ecommerce_twin_regen-report.md) compares its eval with the hand-written baseline.
 
 See [DECISIONS §5](../docs/DECISIONS.md#5-domain-pack) and the [Phase 2 plan](../docs/plans/phase-02-domain-pack-and-compiler.md).
