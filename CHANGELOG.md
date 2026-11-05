@@ -210,4 +210,5 @@
 
 ### Tests
 
+- Prove company documents on a running Qdrant with `QDRANT_LIVE_URL` set: an uploaded document is found by search only for its roles and is gone once deleted, and a document whose only chunk carries a prompt injection from the screening attack set is marked failed and adds no chunk to `kb_docs`.
 - Prove data sources against the fixtures with `SOURCES_LIVE_TEST=1`, where four fixture manifests feed the new `fixture_widgets` dbt marts `widget_sales` and `widget_refunds`: every kind in both modes builds the same marts row for row, column grants, row policies and aggregate-only views behave on live marts as on copied data, no role but `source_loader` is granted `src_*`, and no fixture password appears in DDL, the query log, dbt's files or `system.named_collections`. Unit tests cover the manifest contract, the generated engine SQL, the copy and live sync paths and the wiring of each source through `sources.xml`, `compose.yaml` and `.env.example`.
