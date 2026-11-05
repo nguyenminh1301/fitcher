@@ -244,6 +244,8 @@ def test_files_manifest_lists_paths_and_formats(tmp_path):
         (MONGODB, "    columns:" + NL, "    fields:" + NL, "columns|fields"),
         (MONGODB, "type: Int32", "type: 'Int32) ENGINE = Memory --'", "type"),
         (MONGODB, "{name: order_id, type: String}", "{name: order_id, type: Array(String)}", "type"),
+        (MONGODB, "{name: order_id, type: String}", "{name: order_id, type: 'String)'}", "type"),
+        (MONGODB, "{name: order_id, type: String}", "{name: order_id, type: 'Nullable(String'}", "type"),
         (FILES, "format: csv", "format: json", "format"),
         (FILES, "path: exports/orders.csv", "path: ../orders.csv", "path"),
         (FILES, "path: exports/orders.csv", "path: \"orders'.csv\"", "path"),
