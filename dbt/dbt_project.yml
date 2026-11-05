@@ -11,9 +11,15 @@ macro-paths: ["macros"]
 flags:
   send_anonymous_usage_stats: false
 
-# One folder per source under models/. Each folder carries its manifest's
-# dbt_tag so `dbt build --select +tag:<dbt_tag>` rebuilds that source's staging
-# views and marts only. Staging views live in raw; agent-facing marts in marts.
+# One folder per dbt_tag under models/. Each folder carries its tag, so
+# `dbt build --select +tag:<dbt_tag>` rebuilds that tag's staging views and
+# marts only. Staging views live in raw; agent-facing marts in marts.
+#
+# A non-Hugging Face source reaches its staging through the source_tables
+# variable (macros/source_table.sql). In live mode its marts are views over
+# the live src_<source> tables that run with the privileges of their definer,
+# the dbt user: an agent role is granted the mart and never src_* or raw
+# (DECISIONS §4 Data sources).
 models:
   fitcher:
     ecommerce_twin:
@@ -24,3 +30,13 @@ models:
       marts:
         +schema: marts
         +materialized: table
+    fixture_widgets:
+      +tags: ["fixture_widgets"]
+      staging:
+        +schema: raw
+        +materialized: view
+      marts:
+        +schema: marts
+        +materialized: "{{ 'view' if var('source_mode', 'copy') == 'live' else 'table' }}"
+        +sql_security: definer
+        +definer: CURRENT_USER

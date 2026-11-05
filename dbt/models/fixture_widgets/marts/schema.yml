@@ -1,0 +1,19 @@
+version: 2
+
+# Fixture marts of the synthetic widget dataset; their columns cover the
+# datasets of the minimal test pack (apps/api/tests/fixtures/packs/minimal).
+models:
+  - name: widget_sales
+    description: One row per widget sale.
+    columns:
+      - {name: sale_ref, data_tests: [unique, not_null]}
+      - {name: sold_on, data_tests: [not_null]}
+      - {name: sale_amount, data_tests: [not_null]}
+  - name: widget_refunds
+    description: One row per refunded widget sale.
+    columns:
+      - {name: refund_ref, data_tests: [unique, not_null]}
+      - name: sale_ref
+        data_tests:
+          - relationships:
+              arguments: {to: ref('widget_sales'), field: sale_ref}

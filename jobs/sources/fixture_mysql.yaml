@@ -1,0 +1,14 @@
+# Lab fixture: the synthetic widget dataset of infra/sources/fixtures served by
+# the MySQL fixture of the `sources` Compose profile. Its credentials are the
+# FIXTURE_MYSQL_* variables, read by the fixture_mysql named collection in
+# infra/clickhouse/config.d/sources.xml. The four fixture manifests feed the
+# same fixture_widgets dbt models, one source at a time.
+name: fixture_mysql
+kind: mysql
+mode: copy
+connection_env: FIXTURE_MYSQL
+dbt_tag: fixture_widgets
+tables:
+  - {name: widgets, expected_rows: 40}
+  - {name: sales, expected_rows: 3000}
+  - {name: refunds, expected_rows: 300}

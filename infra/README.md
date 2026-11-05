@@ -6,10 +6,12 @@ See [DECISIONS §3](../docs/DECISIONS.md#3-docker-compose) and the [Phase 0 plan
 | Path | Purpose |
 | --- | --- |
 | `clickhouse/config.d/listen.xml` | Listen on container interfaces; Compose publishes ports on host loopback only |
+| `clickhouse/config.d/sources.xml` | One named collection per data source, named after its manifest, reading the source's read-only credentials from the environment |
 | `clickhouse/users.d/users.xml` | Removes the passwordless `default` user |
 | `clickhouse/users.d/agent_logs.xml` | Insert-only `agent_logs_writer`, trace reader and review reader users for `agent_logs` |
 | `clickhouse/users.d/agent_query_stopper.xml` | `agent_query_stopper`, which may only list and stop running queries; the api stops the query of an answer whose client disconnected |
 | `clickhouse/users.d/model_tiers.xml` | `model_tiers_admin`, which reads and writes the model tier mapping, reads eval reports and records admin actions for the Models page |
+| `clickhouse/users.d/sources.xml` | `source_loader`, the only user that may use the source named collections; copies sources into `raw` and defines the live `src_<source>` databases |
 | `clickhouse/initdb/001-databases.sql` | Creates `raw`, `marts` and `data_meta` |
 | `clickhouse/initdb/010-agent-logs.sql` | Creates the `agent_logs` database and its run log tables |
 | `clickhouse/initdb/020-model-tiers.sql` | Creates `data_meta.model_tiers`, the model tier mapping of the Models page |
@@ -19,6 +21,7 @@ See [DECISIONS §3](../docs/DECISIONS.md#3-docker-compose) and the [Phase 0 plan
 | `litellm/callbacks/clickhouse_logger.py` | Proxy callback writing one `agent_logs.llm_calls` row per call as `agent_logs_writer` |
 | `litellm/callbacks/screening_guard.py` | `pre_call` guardrail rejecting requests without the api's `screening` metadata and rerunning the EN/VI rules |
 | `litellm/callbacks/screening_rules.py` | Byte-identical copy of `apps/api/app/screening/rules.py` for the guardrail |
+| `sources/fixtures/` | Lab-only fixture source systems of the `sources` Compose profile: the synthetic widget dataset (`widgets/`, written by `generate.py`) and one seed script per PostgreSQL, MySQL, MongoDB and the S3-compatible store |
 | `keycloak/realm-finch.json` | Realm `finch`: the active pack's policy roles and the console roles `pack_reviewer` and `admin`, one lab user per role without credentials, the public `finch-web` client whose access tokens carry the realm roles and the api audience, and the lab-only `finch-cli` password-grant client |
 
 ## ClickHouse users and databases
@@ -50,6 +53,17 @@ Five configuration users reach it, each with its own password:
 
 The agent's role users have no access to `agent_logs`.
 With the stack running, `AGENT_LOGS_LIVE_TEST=1` and the six passwords in the environment, `jobs/tests/test_agent_log_users.py` checks these grants against the server.
+
+### Data sources
+
+Source credentials reach ClickHouse only: `config.d/sources.xml` defines one named collection per source manifest whose values come from the clickhouse service's environment, and `system.named_collections` hides them.
+`source_loader` (`CLICKHOUSE_SOURCES_PASSWORD`) is the only user granted the collections; it may create, fill, exchange and drop tables in `raw` and create the `src_*` databases and their table engines.
+ClickHouse requires `INSERT` to create a table on a writable engine, so it holds `INSERT` on `src_*`; the source system's read-only user still refuses every write.
+The admin and dbt read `src_*` tables without the collections, and live marts are views that run with their definer's privileges, so no agent role is granted `raw` or `src_*`.
+Adding a source and choosing its mode are described in [jobs/](../jobs/README.md#data-sources).
+
+The `sources` Compose profile starts the fixture systems `postgres-fixture`, `mysql-fixture`, `mongodb-fixture` and `files-fixture` (SeaweedFS), which publish no port.
+PostgreSQL, MySQL and MongoDB seed on a fresh volume, so recreate one with `docker compose --profile sources rm -sfv <service>` to seed it again; the file store empties its volume and copies the files on every start.
 
 ## LiteLLM
 

@@ -1,0 +1,13 @@
+version: 2
+
+# Staging over the source chosen by jobs.refresh_data: raw copies or live src_ tables.
+models:
+  - name: stg_fixture_widgets__widgets
+    columns:
+      - {name: widget_id, data_tests: [unique, not_null]}
+  - name: stg_fixture_widgets__sales
+    columns:
+      - {name: sale_id, data_tests: [unique, not_null]}
+  - name: stg_fixture_widgets__refunds
+    columns:
+      - {name: refund_id, data_tests: [unique, not_null]}

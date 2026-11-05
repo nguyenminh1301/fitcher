@@ -1,10 +1,11 @@
+import json
 import re
 
 import pytest
 
 from jobs import refresh_data
 from jobs.load_data import LoadError, TableResult
-from jobs.lib.manifest import SourceManifest, TableSpec
+from jobs.lib.source_manifest import SourceManifest, TableSpec
 
 LOCK = "`data_meta`.`refresh_lock_shop`"
 
@@ -63,8 +64,8 @@ class Steps:
             raise self.load_error
         return self.results
 
-    def build(self, dbt_tag):
-        self.calls.append(("build", dbt_tag))
+    def build(self, manifest):
+        self.calls.append(("build", manifest.dbt_tag))
         return self.build_code
 
 
@@ -150,10 +151,46 @@ def test_dbt_build_command_selects_tag_with_upstream(monkeypatch):
         returncode = 3
 
     monkeypatch.setattr(refresh_data.subprocess, "run", lambda args, check: calls.append(args) or Done())
-    assert refresh_data.run_dbt_build("shop_tag") == 3
+    assert refresh_data.run_dbt_build(MANIFEST) == 3
     assert calls == [
         ["dbt", "build", "--project-dir", "dbt", "--profiles-dir", "dbt", "--select", "+tag:shop_tag"]
     ]
+
+
+@pytest.mark.parametrize(
+    ("mode", "relation"), [("copy", "`raw`.`pg_shop__a`"), ("live", "`src_pg_shop`.`a`")]
+)
+def test_dbt_build_points_other_sources_at_their_tables(monkeypatch, mode, relation):
+    calls = []
+
+    class Done:
+        returncode = 0
+
+    manifest = SourceManifest(
+        name="pg_shop", dbt_tag="shop_tag", tables=(TableSpec(name="a"),), kind="postgres", mode=mode, connection_env="PG"
+    )
+    monkeypatch.setattr(refresh_data.subprocess, "run", lambda args, check: calls.append(args) or Done())
+    refresh_data.run_dbt_build(manifest)
+
+    assert calls[0][:8] == ["dbt", "build", "--project-dir", "dbt", "--profiles-dir", "dbt", "--select", "+tag:shop_tag"]
+    assert calls[0][8] == "--vars"
+    assert json.loads(calls[0][9]) == {"source_name": "pg_shop", "source_mode": mode, "source_tables": {"a": relation}}
+
+
+def test_main_syncs_other_sources_as_source_loader(monkeypatch, capsys):
+    manifest = SourceManifest(
+        name="shop", dbt_tag="shop_tag", tables=(TableSpec(name="a"),), kind="postgres", connection_env="PG"
+    )
+    synced, built = [], []
+    loader = object()
+    monkeypatch.setattr(refresh_data, "load_manifest", lambda name: manifest)
+    monkeypatch.setattr(refresh_data, "admin_client", lambda: FakeClient())
+    monkeypatch.setattr(refresh_data, "sources_client", lambda: loader)
+    monkeypatch.setattr(refresh_data, "sync_source", lambda m, client: synced.append((m.mode, client)) or [])
+    monkeypatch.setattr(refresh_data, "run_dbt_build", lambda m: built.append(m.mode) or 0)
+
+    assert refresh_data.main(["--source", "shop", "--mode", "live"]) == 0
+    assert synced == [("live", loader)] and built == ["live"]
 
 
 @pytest.fixture

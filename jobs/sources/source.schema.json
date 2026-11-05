@@ -1,0 +1,130 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://fitcher.local/schemas/source.schema.json",
+  "title": "Source manifest",
+  "description": "One data source of a pack under jobs/sources/<name>.yaml (DECISIONS §4 Data sources). Checks that span several manifests are made by jobs/lib/source_manifest.py.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["name", "dbt_tag", "tables"],
+  "properties": {
+    "name": {"$ref": "#/$defs/identifier", "description": "Source name; equals the file name, names its named collection and its raw.<name>__<table> and src_<name> objects."},
+    "kind": {"enum": ["huggingface", "postgres", "mysql", "mongodb", "files"], "default": "huggingface"},
+    "mode": {"enum": ["copy", "live"], "default": "copy", "description": "copy loads raw tables on each sync; live reads the source through a ClickHouse database or table engine."},
+    "connection_env": {"type": "string", "pattern": "^[A-Z][A-Z0-9_]*$", "description": "Prefix of the <PREFIX>_HOST, _PORT, _DATABASE, _USER and _PASSWORD variables read by the named collection."},
+    "hf_repo": {"$ref": "#/$defs/text"},
+    "revision": {"$ref": "#/$defs/text"},
+    "dbt_tag": {"$ref": "#/$defs/identifier", "description": "Tag of the dbt models this source feeds; sources that share it declare the same tables."},
+    "tables": {"type": "array", "minItems": 1, "items": {"type": "object"}}
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"kind": {"const": "huggingface"}}},
+      "then": {
+        "required": ["hf_repo", "revision"],
+        "properties": {
+          "mode": {"const": "copy", "description": "A Hugging Face dataset is downloaded, never read live."},
+          "connection_env": false,
+          "tables": {"items": {"$ref": "#/$defs/huggingface_table"}}
+        }
+      },
+      "else": {
+        "required": ["connection_env"],
+        "properties": {"hf_repo": false, "revision": false}
+      }
+    },
+    {
+      "if": {"required": ["kind"], "properties": {"kind": {"enum": ["postgres", "mysql"]}}},
+      "then": {"properties": {"tables": {"items": {"$ref": "#/$defs/database_table"}}}}
+    },
+    {
+      "if": {"required": ["kind"], "properties": {"kind": {"const": "mongodb"}}},
+      "then": {"properties": {"tables": {"items": {"$ref": "#/$defs/collection"}}}}
+    },
+    {
+      "if": {"required": ["kind"], "properties": {"kind": {"const": "files"}}},
+      "then": {"properties": {"tables": {"items": {"$ref": "#/$defs/file"}}}}
+    }
+  ],
+  "$defs": {
+    "text": {"type": "string", "minLength": 1, "pattern": "\\S"},
+    "identifier": {"type": "string", "pattern": "^[a-z][a-z0-9_]*$"},
+    "source_identifier": {"type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"},
+    "count": {"type": "integer", "minimum": 0},
+    "column": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "type"],
+      "properties": {
+        "name": {"$ref": "#/$defs/source_identifier"},
+        "type": {
+          "description": "ClickHouse type: a number, String, Bool, a date or time, or a Decimal, optionally Nullable.",
+          "type": "string",
+          "anyOf": [
+            {"pattern": "^(String|Bool|U?Int(8|16|32|64)|Float(32|64)|Date|Date32|DateTime|DateTime64\\([0-9](, ?'[A-Za-z0-9_/+-]+')?\\)|Decimal\\([0-9]{1,2}, ?[0-9]{1,2}\\))$"},
+            {"pattern": "^Nullable\\((String|Bool|U?Int(8|16|32|64)|Float(32|64)|Date|Date32|DateTime|DateTime64\\([0-9](, ?'[A-Za-z0-9_/+-]+')?\\)|Decimal\\([0-9]{1,2}, ?[0-9]{1,2}\\))\\)$"}
+          ]
+        }
+      }
+    },
+    "huggingface_table": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "file", "format", "expected_rows"],
+      "properties": {
+        "name": {"$ref": "#/$defs/identifier"},
+        "file": {"$ref": "#/$defs/text"},
+        "format": {"enum": ["parquet"]},
+        "expected_rows": {"$ref": "#/$defs/count"},
+        "date_range": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["column", "start", "end"],
+          "properties": {
+            "column": {"$ref": "#/$defs/text"},
+            "start": {"$ref": "#/$defs/text"},
+            "end": {"$ref": "#/$defs/text"}
+          }
+        },
+        "card_rows": {"$ref": "#/$defs/count"}
+      },
+      "dependentRequired": {"date_range": ["card_rows"], "card_rows": ["date_range"]}
+    },
+    "database_table": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name"],
+      "properties": {
+        "name": {"$ref": "#/$defs/identifier"},
+        "source": {"$ref": "#/$defs/source_identifier", "description": "Table name in the source database; defaults to name."},
+        "expected_rows": {"$ref": "#/$defs/count"}
+      }
+    },
+    "collection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "columns"],
+      "properties": {
+        "name": {"$ref": "#/$defs/identifier"},
+        "source": {"$ref": "#/$defs/source_identifier", "description": "Collection name; defaults to name."},
+        "columns": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/column"}},
+        "expected_rows": {"$ref": "#/$defs/count"}
+      }
+    },
+    "file": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "path", "format"],
+      "properties": {
+        "name": {"$ref": "#/$defs/identifier"},
+        "path": {
+          "description": "Object key inside the bucket of the source's named collection.",
+          "type": "string",
+          "pattern": "^(?!.*\\.\\.)[A-Za-z0-9_][A-Za-z0-9_./-]*$"
+        },
+        "format": {"enum": ["csv", "parquet"]},
+        "columns": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/column"}},
+        "expected_rows": {"$ref": "#/$defs/count"}
+      }
+    }
+  }
+}

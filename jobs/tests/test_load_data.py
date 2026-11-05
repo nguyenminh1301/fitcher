@@ -6,7 +6,7 @@ import pytest
 
 from jobs import load_data
 from jobs.lib import clickhouse
-from jobs.lib.manifest import DateRange, ManifestError, SourceManifest, TableSpec
+from jobs.lib.source_manifest import DateRange, ManifestError, SourceManifest, TableSpec
 
 
 class FakeClient:
