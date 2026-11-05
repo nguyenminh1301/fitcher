@@ -199,6 +199,7 @@
 ### Security
 
 - Pin `pypdf` 6.21.4, which fixes the denial-of-service advisories (CVE-2026-115572 and nine others) reported against 6.21.1 for crafted PDF uploads.
+- Record CVE-2026-109518 in the base images' `apt` as an image exception for `clickhouse/clickhouse-server:26.8.36.3` and `qdrant/qdrant:v1.20.0` until 2026-12-31: no newer upstream image fixes it and neither server runs apt.
 - Pin LiteLLM to `v1.106.7`, which fixes the libexpat advisory CVE-2026-113351 that failed the image audit of `v1.106.6`, and the bundled ddtrace, dnspython, py3-pip-wheel, pyasn1 and pypdf advisories; only the bundled filelock advisory remains as an expiring image exception.
 - Record verified false positives of the Git secret scan in `.gitleaksignore` by their gitleaks fingerprint: the first entry is a test URL that the `generic-api-key` rule reads as a key, and that test now compares the URL's path instead.
 - Stop agent queries from lifting their limits with 0, which ClickHouse reads as unlimited: the `agent_readonly` profile now requires `max_execution_time`, `max_result_rows` and `max_memory_usage` of at least 1, the runner no longer sends `max_result_rows = 0` when it describes an empty result, and `QUERY_MAX_*` values must be positive integers.

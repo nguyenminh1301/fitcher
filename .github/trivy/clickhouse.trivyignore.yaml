@@ -1,0 +1,7 @@
+# Fixable High/Critical advisories in clickhouse/clickhouse-server:26.8.36.3 that only an upstream release can fix.
+# The tag was the newest 26.8 release when scanned on 2026-11-05; see SECURITY.md, Image exceptions.
+# Each entry expires; after that date the finding blocks the image audit again.
+vulnerabilities:
+  - id: CVE-2026-109518
+    statement: apt and libapt-pkg of the upstream Ubuntu 22.04 base; the server never runs apt, and only a new upstream image updates it.
+    expired_at: 2026-12-31
