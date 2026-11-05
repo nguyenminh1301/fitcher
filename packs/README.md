@@ -47,7 +47,7 @@ It then applies `policies.yaml` to ClickHouse as the admin user (`app.packs.poli
 Each role gets a login user `fitcher_agent__<pack>__<role>` whose password is derived from `CLICKHOUSE_AGENT_PASSWORD` (ClickHouse stores only its hash), and all of them share the settings profile `fitcher_agent__<pack>` (read-only, per-query limits that can be lowered but never raised or set to 0).
 Applying is a reconciliation: objects of the pack that the policies no longer contain are revoked or dropped, so a shrunk policy is denied by ClickHouse after the next compile.
 A row filter is one boolean condition over the dataset's columns without subqueries, aggregates or functions the SQL guard forbids.
-It then writes generation `v<N+1>` of the six Qdrant collections `<pack>_<index>_v<N>`, each point with a dense `embed` vector and a BM25 sparse vector, and column values also with character trigrams (`glossary_terms`, `metrics`, `datasets` with one document per column, `column_values` with the top `COLUMN_VALUES_TOP_K` values of indexable columns, `examples`, and `kb_docs`, which stays empty until runtime documents arrive in Phase 10).
+It then writes generation `v<N+1>` of the six Qdrant collections `<pack>_<index>_v<N>`, each point with a dense `embed` vector and a BM25 sparse vector, and column values also with character trigrams (`glossary_terms`, `metrics`, `datasets` with one document per column, `column_values` with the top `COLUMN_VALUES_TOP_K` values of indexable columns, `examples`, and `kb_docs`, rebuilt from the document registry: the live chunks of every indexed document are copied with their vectors while `compiled.json` names the same `embed` alias, and the stored files are parsed, screened and embedded again otherwise).
 Before indexing it screens every `kb_docs` chunk and every column value with the input screener (DECISIONS §9): a blocked chunk, or any chunk while the classifier is unavailable, is left out and listed in the report; a flagged or blocked column value is listed and still indexed. Its embedding requests carry `trusted_pack` screening metadata, which the LiteLLM guardrail requires.
 Every document carries the roles that `policies.yaml` grants its dataset or column; an aggregate-only role sees its grouped columns and listed metrics but no examples.
 Keyword terms keep each word both as written and without diacritics, so "doanh thu" matches "Doanh Thu" and "doanh thú"; every point carries an `EMBEDDING_DIMENSIONS`-sized vector from the `embed` alias, and a search prefetches each vector filtered by the asking roles and fuses them with RRF on the server, so a misspelled value still matches through its trigrams.
@@ -55,5 +55,23 @@ Once every collection is filled and its point count checked, one request moves t
 
 Indexing sends billable embedding requests; `--skip-index` stops after the metric test-run and the access policies without calling LiteLLM or Qdrant.
 `--check-search` searches the live aliases as every role of the pack, or as each `--role` given.
+
+While it compiles, `compile_pack` holds `build/packs/<pack>/compiling`, so the api refuses document uploads and deletes; it first waits up to two minutes for uploads still processing.
+
+## Onboarding a company
+
+A new pack is drafted from the company's data and documents and reviewed by a person before it compiles (DECISIONS §11):
+
+```bash
+docker compose run --rm jobs python -m jobs.profile --pack <name> --tables <mart>,<mart>
+docker compose run --rm jobs python -m jobs.ingest_docs --pack <name> --folder data/docs/<name>   # optional
+docker compose run --rm jobs python -m jobs.draft_pack --pack <name> --allow-billable
+```
+
+Drafts land in `packs/<name>/` with `status: draft`, evidence (`profile` facts, `doc` chunk ids, an `error` from a failed test-run) and a confidence; an approved item is never replaced, and an existing draft only gets its text filled.
+With `ACTIVE_PACK=<name>` a `pack_reviewer` signs in to the console before the first compile (the api reads the pack's name and roles from its files until then) and uses Review to edit, test-run, approve or delete each item, Documents to upload or delete documents and draft from one of them, and, once compiled, Datasets.
+The api writes reviewed YAML into the bind-mounted `packs/` working tree and never runs Git: commit the approved files through a branch and pull request, then compile.
+
+[`ecommerce_twin_regen/`](ecommerce_twin_regen/) is the hand-written pack with its dataset, column and metric descriptions and glossary definitions regenerated this way; [its report](../docs/eval/ecommerce_twin_regen-report.md) compares its eval with the hand-written baseline.
 
 See [DECISIONS §5](../docs/DECISIONS.md#5-domain-pack) and the [Phase 2 plan](../docs/plans/phase-02-domain-pack-and-compiler.md).
