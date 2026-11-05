@@ -1,0 +1,34 @@
+{
+  "additionalProperties": false,
+  "description": "Review ids (``<file stem>.<item id>``) of the items a draft added, refreshed or left because they are approved.",
+  "properties": {
+    "added": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Added",
+      "type": "array"
+    },
+    "updated": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Updated",
+      "type": "array"
+    },
+    "skipped_approved": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Skipped Approved",
+      "type": "array"
+    }
+  },
+  "required": [
+    "added",
+    "updated",
+    "skipped_approved"
+  ],
+  "title": "DraftResult",
+  "type": "object"
+}

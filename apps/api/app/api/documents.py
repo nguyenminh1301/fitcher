@@ -105,7 +105,7 @@ def draft_from_document(
         with trusted_pack_calls():
             results = draft_files(drafter, PackFiles(pack_dir), read_profile(service.compiled_dir, service.pack), chunks)
     except PackValidationError as error:
-        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(error)) from None
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(error)) from None
     except (DraftError, LLMError) as error:
         raise unavailable(f"drafting failed: {error}") from None
     except Exception as error:  # noqa: BLE001 - search or ClickHouse unreachable

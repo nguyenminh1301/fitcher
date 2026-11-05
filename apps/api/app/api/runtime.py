@@ -17,13 +17,14 @@ from app.api.rate_limit import RateLimiter
 from app.auth.jwt import JwksCache, TokenSettings, TokenVerifier
 from app.config import load_settings
 from app.conversation.store import ConversationStore, conversations_client
-from app.data.clickhouse import ClientWarehouse
+from app.data.clickhouse import ClientWarehouse, QueryLimits
 from app.llm.client import LiteLLMClient, LLMError
 from app.llm.embeddings import LiteLLMEmbeddings
 from app.llm.model_store import CatalogClient, ClickHouseModelStore, model_tiers_client
 from app.llm.tiers import EMBED_TIER, TierMap, TierStoreError
 from app.onboarding.documents import ClickHouseDocumentRegistry, DocumentService, pack_review_client
 from app.onboarding.drafter import Drafter
+from app.onboarding.review import ReviewService
 from app.packs.compiler import CompileError, CompiledPack, load_compiled
 from app.screening.screen import Screener
 from app.search.client import QdrantSearch
@@ -181,6 +182,15 @@ def get_drafter() -> Drafter:
     except LLMError as error:
         raise unavailable(str(error)) from None
     return Drafter(llm, get_review_warehouse())
+
+
+def get_review_service() -> ReviewService:
+    """Built per request: it reads the pack files fresh each time."""
+    settings = load_settings()
+    return ReviewService(
+        pack=get_compiled().pack.name, pack_dir=get_pack_dir(), registry=get_document_service().registry,
+        warehouse=get_review_warehouse(), limits=QueryLimits.from_env(), compiled_dir=Path(settings.compiled_pack_dir),
+    )
 
 
 @cache

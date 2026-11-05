@@ -17,11 +17,13 @@ from app.contracts.chart_spec import ChartSpec  # noqa: E402 - needs apps/api on
 from app.contracts.conversations import (  # noqa: E402
     Conversation, ConversationGroup, ConversationPatch, ConversationThread, GroupInput,
 )
+from app.contracts.documents import DocumentList, DocumentRolesChange, DocumentView, DraftResult  # noqa: E402
 from app.contracts.events import AskEvent, AskRequest  # noqa: E402
 from app.contracts.feedback import FeedbackInput  # noqa: E402
 from app.contracts.model_tiers import ModelTierChange, ModelTiers  # noqa: E402
 from app.contracts.query_spec import QuerySpec  # noqa: E402
 from app.contracts.result import Result  # noqa: E402
+from app.contracts.review import DatasetView, ReviewItem, ReviewItemPatch  # noqa: E402
 
 # Each contract with the JSON Schema mode of its direction: what the api accepts ("validation") or
 # what it sends ("serialization", where every field is present).
@@ -39,6 +41,13 @@ CONTRACTS = {
     "feedback_input": (FeedbackInput, "validation"),
     "model_tiers": (ModelTiers, "serialization"),
     "model_tier_change": (ModelTierChange, "validation"),
+    "dataset_view": (DatasetView, "serialization"),
+    "review_item": (ReviewItem, "serialization"),
+    "review_item_patch": (ReviewItemPatch, "validation"),
+    "document_view": (DocumentView, "serialization"),
+    "document_list": (DocumentList, "serialization"),
+    "document_roles_change": (DocumentRolesChange, "validation"),
+    "draft_result": (DraftResult, "serialization"),
 }
 SCHEMAS = ROOT / "apps" / "web" / "lib" / "contracts" / "schemas"
 

@@ -162,6 +162,11 @@ class ClientWarehouse:
     def query(self, sql: str, settings: dict | None = None):
         return self._client.query(sql, settings=settings).result_rows
 
+    def query_table(self, sql: str, settings: dict | None = None):
+        """Column names, ClickHouse type names and rows of one SELECT."""
+        result = self._client.query(sql, settings=settings)
+        return list(result.column_names), [column.name for column in result.column_types], result.result_rows
+
 
 class QueryStopper:
     """Stops a running agent query by its id and user.
