@@ -5,7 +5,9 @@
 import { readStored, writeStored } from "@/lib/storage";
 
 import type { FitcherApi } from "../client";
-import type { DocumentRow, EvalReport, Identity, ReviewItem } from "../provisional";
+import type { DocumentView, ReviewItem } from "@/lib/contracts";
+
+import type { EvalReport, Identity, SampleDocument } from "../provisional";
 import { createMockChat } from "./chat";
 import { createMockConversations } from "./conversations";
 import { sampleLoader, type SampleStatus } from "./load";
@@ -13,6 +15,11 @@ import { sampleLoader, type SampleStatus } from "./load";
 const IDENTITY_KEY = "fitcher.demo.identity";
 
 export type MockApi = FitcherApi & { sampleStatus(): Promise<SampleStatus> };
+
+/** A sample document as the api would list it; only the api knows its type, chunks and uploader. */
+function documentView(row: SampleDocument): DocumentView {
+  return { media_type: "", chunk_count: 0, blocked_chunks: 0, uploaded_by: "sample", ...row };
+}
 
 function delay<T>(value: T, ms = 150): Promise<T> {
   return new Promise((resolve) => setTimeout(() => resolve(value), ms));
@@ -76,16 +83,16 @@ export function createMockApi(options: { latencyMs?: number; identity?: () => Pr
       testRun: async (id): Promise<ReviewItem> => delay(find((await load()).console.review_items, id), 900),
     },
     documents: {
-      list: async () => wait((await load()).console.documents),
+      list: async () => wait({ compiling: false, documents: (await load()).console.documents.map(documentView) }),
       upload: async (file, roles) => {
         const state = (await load()).console;
-        const row: DocumentRow = {
+        const row: SampleDocument = {
           id: `doc-${Date.now()}`, name: file.name, size: file.size, status: "processing", roles,
           uploaded_at: new Date().toISOString(),
         };
         state.documents = [row, ...state.documents];
         setTimeout(() => (row.status = "indexed"), 2500);
-        return row;
+        return documentView(row);
       },
       remove: async (id) => {
         const state = (await load()).console;
@@ -94,7 +101,7 @@ export function createMockApi(options: { latencyMs?: number; identity?: () => Pr
       setRoles: async (id, roles) => {
         find((await load()).console.documents, id).roles = roles;
       },
-      draft: async () => delay(undefined, 1200),
+      draft: async () => delay({ added: [], updated: [], skipped_approved: [] }, 1200),
     },
     feedbackReview: {
       list: async () => wait((await load()).console.feedback),

@@ -171,7 +171,7 @@ describe("documents", () => {
     await act(async () => fireEvent.click(within(row).getByRole("button", { name: "viewer" })));
 
     await waitFor(() => expect(within(row).getByRole("button", { name: "viewer" }).getAttribute("aria-pressed")).toBe("true"));
-    expect((await api.documents.list()).find((doc) => doc.id === "d1")?.roles).toEqual(["analyst", "viewer"]);
+    expect((await api.documents.list()).documents.find((doc) => doc.id === "d1")?.roles).toEqual(["analyst", "viewer"]);
   });
 
   it("labels Draft pack items as paid AI and asks before drafting", async () => {

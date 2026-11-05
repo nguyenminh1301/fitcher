@@ -3,7 +3,7 @@
 export type Id = string;
 export type File = string;
 export type Name = string;
-export type Kind = "item";
+export type Kind = "item" | "proposal";
 export type Status = "draft" | "approved";
 export type Confidence = number;
 export type Body = string;

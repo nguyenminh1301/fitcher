@@ -11,6 +11,10 @@ import { GET as list } from "@/app/api/conversations/route";
 import { DELETE as remove, GET as read, PATCH as update } from "@/app/api/conversations/[id]/route";
 import { GET as search } from "@/app/api/conversations/search/route";
 import { POST as feedback } from "@/app/api/feedback/route";
+import { POST as upload } from "@/app/api/documents/route";
+import { POST as draft } from "@/app/api/documents/[id]/draft/route";
+import { GET as reviewItems } from "@/app/api/review/items/route";
+import { POST as approve } from "@/app/api/review/items/[id]/approve/route";
 import { GET as callback } from "@/app/auth/callback/route";
 import { GET as signIn } from "@/app/auth/sign-in/route";
 import { LOGIN_COOKIE, SESSION_COOKIE } from "@/lib/server/auth";
@@ -116,5 +120,38 @@ describe("conversation routes", () => {
   it("is a 401 without a session and never calls the api", async () => {
     expect((await list(request("/api/conversations"))).status).toBe(401);
     expect(calls).toEqual([]);
+  });
+});
+
+
+describe("onboarding routes", () => {
+  it("forwards a multipart upload with its own content type and the session's token", async () => {
+    await signedIn();
+    replies.push(Response.json({ id: "d1" }, { status: 201 }));
+    const form = new FormData();
+    form.append("file", new File(["# Notes"], "notes.md"));
+    form.append("allowed_roles", "analyst");
+    const incoming = new Request("http://app.test/api/documents", { method: "POST", body: form });
+
+    const response = await upload(incoming);
+
+    expect(response.status).toBe(201);
+    const call = calls.at(-1) as Call;
+    expect(call.url).toBe("http://api:8000/documents");
+    expect(new Headers(call.init.headers).get("content-type")).toMatch(/^multipart\/form-data; boundary=/);
+    expect(new TextDecoder().decode(call.init.body as ArrayBuffer)).toContain('name="allowed_roles"');
+    expect(new Headers(call.init.headers).get("authorization")).toBe("Bearer access-1");
+  });
+
+  it("passes the review filters on and names the item in approve and draft paths", async () => {
+    await signedIn();
+    replies.push(Response.json([]), Response.json({ id: "metrics.x" }), Response.json({ added: [] }));
+
+    await reviewItems(request("/api/review/items?file=metrics.yaml&status=draft"));
+    expect(last().url).toBe("http://api:8000/review/items?file=metrics.yaml&status=draft");
+    await approve(request("/api/review/items/metrics.x/approve", "POST", {}), params({ id: "metrics.x" }));
+    expect(last()).toMatchObject({ url: "http://api:8000/review/items/metrics.x/approve", method: "POST" });
+    await draft(request("/api/documents/d%201/draft", "POST", {}), params({ id: "d 1" }));
+    expect(last().url).toBe("http://api:8000/documents/d%201/draft");
   });
 });

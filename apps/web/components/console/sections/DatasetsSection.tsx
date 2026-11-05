@@ -8,7 +8,7 @@ import { useCallback, useState } from "react";
 import { Icon } from "@/components/brand/Icon";
 import { DetailPage } from "@/components/console/DetailPage";
 import { ListPage, ListRow, RecordTable } from "@/components/console/ListPage";
-import type { DatasetView } from "@/lib/api/provisional";
+import type { DatasetView } from "@/lib/contracts";
 import { useChat } from "@/lib/chat/ChatContext";
 import { useLoad } from "@/lib/console/useLoad";
 import { useI18n } from "@/lib/i18n/react";

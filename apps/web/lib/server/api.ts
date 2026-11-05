@@ -25,6 +25,21 @@ export async function forwardJson(request: Request, path: string): Promise<Respo
 }
 
 /**
+ * Forward a request body as it came, with its own content type (a multipart upload), and pass the api's
+ * JSON answer back unchanged.
+ */
+export async function forwardBody(request: Request, path: string): Promise<Response> {
+  const contentType = request.headers.get("content-type");
+  const response = await callApi(path, {
+    method: request.method, body: await request.arrayBuffer(),
+    headers: contentType ? { "content-type": contentType } : undefined,
+  });
+  return new Response(response.body, {
+    status: response.status, headers: { "content-type": "application/json", "cache-control": "no-store" },
+  });
+}
+
+/**
  * Send a request to the api as the signed-in user. Without a session, or when the api refuses the
  * token, the user is signed out and the answer is a 401.
  */

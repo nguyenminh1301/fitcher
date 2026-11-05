@@ -15,7 +15,7 @@ import { DetailPage } from "@/components/console/DetailPage";
 import { ListPage, ListRow } from "@/components/console/ListPage";
 import { Button, Segmented, Tabs, TextField } from "@/components/ui/controls";
 import { EmptyState, Skeleton, StatusPill, WarningBanner } from "@/components/ui/feedback";
-import type { ReviewItem } from "@/lib/api/provisional";
+import type { ReviewItem } from "@/lib/contracts";
 import { useChat } from "@/lib/chat/ChatContext";
 import { useLoad } from "@/lib/console/useLoad";
 import type { Result } from "@/lib/contracts";
@@ -123,7 +123,7 @@ function ItemDetail({ item, loading, reload }: { item?: ReviewItem; loading: boo
   async function test(target: ReviewItem) {
     setRun({ state: "running" });
     const tested = await api.review.testRun(target.id);
-    setRun({ state: "done", result: tested.test_result });
+    setRun({ state: "done", result: tested.test_result ?? undefined });
   }
 
   const evidence = item?.evidence;
@@ -181,7 +181,7 @@ function ItemDetail({ item, loading, reload }: { item?: ReviewItem; loading: boo
                   <dt>{t("ui.formula")}</dt>
                   <dd className="fc-kv-ctl">
                     {editing ? <TextField multiline aria-label={t("ui.formula")} value={formula} onChange={(event) => setFormula(event.target.value)} />
-                      : <pre className="fc-formula"><code>{highlight(item.formula)}</code></pre>}
+                      : <pre className="fc-formula"><code>{highlight(item.formula ?? "")}</code></pre>}
                   </dd>
                 </>
               ) : null}
@@ -239,7 +239,7 @@ function ProposalDetail({ item, reload }: { item: ReviewItem; reload: () => Prom
           <Button icon={run.state === "running" ? "loader" : "play"} disabled={!filled || run.state === "running"} onClick={async () => {
             setRun({ state: "running" });
             const tested = await api.review.testRun(item.id);
-            setRun({ state: "done", result: tested.test_result });
+            setRun({ state: "done", result: tested.test_result ?? undefined });
           }}>{t("ui.testRun")}</Button>
           <Button variant="primary" icon="check" disabled={run.state !== "done"} onClick={async () => {
             await api.review.update(item.id, { body: fill(item.body, false), formula: sql });

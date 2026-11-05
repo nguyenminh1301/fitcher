@@ -25,7 +25,8 @@ class ReviewItem(ContractModel):
     id: str
     file: str
     name: str
-    kind: Literal["item"]
+    # The api lists pack items; examples proposed from feedback join them in Phase 12.
+    kind: Literal["item", "proposal"]
     status: Literal["draft", "approved"]
     confidence: float
     # The item's text: a description, definition or question.
