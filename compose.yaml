@@ -30,6 +30,11 @@ services:
       FIXTURE_POSTGRES_DATABASE: ${FIXTURE_POSTGRES_DATABASE:-}
       FIXTURE_POSTGRES_USER: ${FIXTURE_POSTGRES_USER:-}
       FIXTURE_POSTGRES_PASSWORD: ${FIXTURE_POSTGRES_PASSWORD:-}
+      IOWA_LIQUOR_POSTGRES_HOST: ${IOWA_LIQUOR_POSTGRES_HOST:-}
+      IOWA_LIQUOR_POSTGRES_PORT: ${IOWA_LIQUOR_POSTGRES_PORT:-}
+      IOWA_LIQUOR_POSTGRES_DATABASE: ${IOWA_LIQUOR_POSTGRES_DATABASE:-}
+      IOWA_LIQUOR_POSTGRES_USER: ${IOWA_LIQUOR_POSTGRES_USER:-}
+      IOWA_LIQUOR_POSTGRES_PASSWORD: ${IOWA_LIQUOR_POSTGRES_PASSWORD:-}
       FIXTURE_MYSQL_HOST: ${FIXTURE_MYSQL_HOST:-}
       FIXTURE_MYSQL_PORT: ${FIXTURE_MYSQL_PORT:-}
       FIXTURE_MYSQL_DATABASE: ${FIXTURE_MYSQL_DATABASE:-}
@@ -328,9 +333,14 @@ services:
       POSTGRES_DB: ${FIXTURE_POSTGRES_DATABASE:-}
       FIXTURE_POSTGRES_USER: ${FIXTURE_POSTGRES_USER:-}
       FIXTURE_POSTGRES_PASSWORD: ${FIXTURE_POSTGRES_PASSWORD:-}
+      # Iowa Liquor Sales (infra/sources/iowa_liquor), seeded on demand by seed.sh.
+      IOWA_LIQUOR_POSTGRES_USER: ${IOWA_LIQUOR_POSTGRES_USER:-}
+      IOWA_LIQUOR_POSTGRES_PASSWORD: ${IOWA_LIQUOR_POSTGRES_PASSWORD:-}
     volumes:
       - ./infra/sources/fixtures/widgets:/fixtures:ro
       - ./infra/sources/fixtures/postgres/init.sh:/docker-entrypoint-initdb.d/init.sh:ro
+      - ./infra/sources/iowa_liquor:/seed/iowa_liquor:ro
+      - ./data/sources/iowa_liquor:/sources/iowa_liquor:ro
     healthcheck:
       # Passes over TCP as the reader once seeding has finished and the server restarted.
       test: ["CMD-SHELL", "PGPASSWORD=\"$$FIXTURE_POSTGRES_PASSWORD\" psql -h 127.0.0.1 -U \"$$FIXTURE_POSTGRES_USER\" -d \"$$POSTGRES_DB\" -tAc 'SELECT 1 FROM refunds LIMIT 1' | grep -q 1"]

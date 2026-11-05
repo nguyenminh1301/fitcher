@@ -19,6 +19,14 @@
             <user from_env="FIXTURE_POSTGRES_USER"/>
             <password from_env="FIXTURE_POSTGRES_PASSWORD"/>
         </fixture_postgres>
+        <!-- Iowa Liquor Sales 2025 in the fixture PostgreSQL (infra/sources/iowa_liquor). -->
+        <iowa_liquor>
+            <host from_env="IOWA_LIQUOR_POSTGRES_HOST"/>
+            <port from_env="IOWA_LIQUOR_POSTGRES_PORT"/>
+            <database from_env="IOWA_LIQUOR_POSTGRES_DATABASE"/>
+            <user from_env="IOWA_LIQUOR_POSTGRES_USER"/>
+            <password from_env="IOWA_LIQUOR_POSTGRES_PASSWORD"/>
+        </iowa_liquor>
         <fixture_mysql>
             <host from_env="FIXTURE_MYSQL_HOST"/>
             <port from_env="FIXTURE_MYSQL_PORT"/>
