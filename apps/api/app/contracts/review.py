@@ -21,7 +21,7 @@ class EvidenceRef(ContractModel):
 
 
 class ReviewItem(ContractModel):
-    # ``<file stem>.<item id>``, for example ``metrics.net_sales``.
+    # ``<file stem>.<item id>``, for example ``metrics.gross_total``.
     id: str
     file: str
     name: str

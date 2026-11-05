@@ -28,11 +28,11 @@ class ScriptedWarehouse:
 
 
 COLUMNS = [
-    ("orders", "order_id", "String"),
+    ("orders", "ticket_ref", "String"),
     ("orders", "placed_on", "Date"),
-    ("orders", "channel", "LowCardinality(String)"),
+    ("orders", "venue", "LowCardinality(String)"),
     ("orders", "amount", "Nullable(Float64)"),
-    ("lines", "order_id", "String"),
+    ("lines", "ticket_ref", "String"),
     ("lines", "note", "String"),
 ]
 
@@ -41,18 +41,18 @@ def standard_answers(order_rows=3):
     return [
         (r"SELECT count\(\) FROM `marts`\.`orders`", [(order_rows,)]),
         (r"SELECT count\(\) FROM `marts`\.`lines`", [(5,)]),
-        (r"uniqExact\(`order_id`\) FROM `marts`\.`orders`", [(3,)]),
+        (r"uniqExact\(`ticket_ref`\) FROM `marts`\.`orders`", [(3,)]),
         (r"uniqExact\(`placed_on`\)", [(2,)]),
-        (r"uniqExact\(`channel`\)", [(2,)]),
+        (r"uniqExact\(`venue`\)", [(2,)]),
         (r"uniqExact\(`amount`\)", [(3,)]),
-        (r"uniqExact\(`order_id`\) FROM `marts`\.`lines`", [(3,)]),
+        (r"uniqExact\(`ticket_ref`\) FROM `marts`\.`lines`", [(3,)]),
         (r"uniqExact\(`note`\)", [(400,)]),
         (r"min\(`placed_on`\), max\(`placed_on`\)", [(date(2024, 1, 1), date(2024, 3, 31))]),
-        (r"toString\(`channel`\)", [("web", 2), ("store", 1)]),
-        (r"toString\(`order_id`\) AS value.*`orders`", [("o1", 1), ("o2", 1), ("o3", 1)]),
-        (r"toString\(`order_id`\) AS value.*`lines`", [("o1", 2), ("o2", 2), ("o3", 1)]),
-        (r"uniqExactIf\(`order_id`, `order_id` IN \(SELECT `order_id` FROM `marts`\.`lines`\)\)", [(1.0,)]),
-        (r"uniqExactIf\(`order_id`, `order_id` IN \(SELECT `order_id` FROM `marts`\.`orders`\)\)", [(1.0,)]),
+        (r"toString\(`venue`\)", [("web", 2), ("store", 1)]),
+        (r"toString\(`ticket_ref`\) AS value.*`orders`", [("o1", 1), ("o2", 1), ("o3", 1)]),
+        (r"toString\(`ticket_ref`\) AS value.*`lines`", [("o1", 2), ("o2", 2), ("o3", 1)]),
+        (r"uniqExactIf\(`ticket_ref`, `ticket_ref` IN \(SELECT `ticket_ref` FROM `marts`\.`lines`\)\)", [(1.0,)]),
+        (r"uniqExactIf\(`ticket_ref`, `ticket_ref` IN \(SELECT `ticket_ref` FROM `marts`\.`orders`\)\)", [(1.0,)]),
         (r"SELECT \* FROM `marts`\.`orders` LIMIT 3", [("o1", date(2024, 1, 1), "web", 10.5)]),
         (r"SELECT \* FROM `marts`\.`lines` LIMIT 3", [("o1", "gift")]),
     ]
@@ -67,12 +67,12 @@ def test_profile_reads_rows_dates_distincts_top_values_samples_and_join_candidat
     orders = profile["tables"]["orders"]
     assert orders["rows"] == 3
     assert orders["columns"]["placed_on"] == {"type": "date", "distinct": 2, "min": "2024-01-01", "max": "2024-03-31"}
-    assert orders["columns"]["channel"] == {"type": "string", "distinct": 2, "top_values": [["web", 2], ["store", 1]]}
+    assert orders["columns"]["venue"] == {"type": "string", "distinct": 2, "top_values": [["web", 2], ["store", 1]]}
     assert orders["columns"]["amount"] == {"type": "number", "distinct": 3}
     assert orders["sample_rows"] == [["o1", "2024-01-01", "web", 10.5]]
     # A string column above the low-cardinality limit gets no top values.
     assert "top_values" not in profile["tables"]["lines"]["columns"]["note"]
-    assert profile["join_candidates"] == [{"left": "lines.order_id", "right": "orders.order_id", "overlap": 1.0}]
+    assert profile["join_candidates"] == [{"left": "lines.ticket_ref", "right": "orders.ticket_ref", "overlap": 1.0}]
 
 
 def test_every_profile_query_carries_the_scan_limits():
@@ -90,9 +90,9 @@ def test_an_empty_table_has_no_dates_values_or_samples():
     assert profile["tables"]["orders"] == {
         "rows": 0,
         "columns": {
-            "order_id": {"type": "string", "distinct": 0},
+            "ticket_ref": {"type": "string", "distinct": 0},
             "placed_on": {"type": "date", "distinct": 0},
-            "channel": {"type": "string", "distinct": 0},
+            "venue": {"type": "string", "distinct": 0},
             "amount": {"type": "number", "distinct": 0},
         },
         "sample_rows": [],

@@ -21,22 +21,22 @@ describe("http datasets", () => {
 
 describe("http review", () => {
   it("lists, edits, approves, test-runs and deletes items by their review id", async () => {
-    const fetch = fetcher(200, { id: "metrics.net_sales" });
+    const fetch = fetcher(200, { id: "metrics.gross_total" });
     const review = createHttpReview(fetch);
 
     await review.items();
-    await review.update("metrics.net_sales", { body: "Net." });
-    await review.approve("metrics.net_sales");
-    expect(await review.testRun("metrics.net_sales")).toEqual({ id: "metrics.net_sales" });
-    await review.remove("metrics.net_sales");
+    await review.update("metrics.gross_total", { body: "Net." });
+    await review.approve("metrics.gross_total");
+    expect(await review.testRun("metrics.gross_total")).toEqual({ id: "metrics.gross_total" });
+    await review.remove("metrics.gross_total");
 
     const calls = fetch.mock.calls.map(([url, init]) => [url, init?.method ?? "GET"]);
     expect(calls).toEqual([
       ["/api/review/items", "GET"],
-      ["/api/review/items/metrics.net_sales", "PATCH"],
-      ["/api/review/items/metrics.net_sales/approve", "POST"],
-      ["/api/review/items/metrics.net_sales/test-run", "POST"],
-      ["/api/review/items/metrics.net_sales", "DELETE"],
+      ["/api/review/items/metrics.gross_total", "PATCH"],
+      ["/api/review/items/metrics.gross_total/approve", "POST"],
+      ["/api/review/items/metrics.gross_total/test-run", "POST"],
+      ["/api/review/items/metrics.gross_total", "DELETE"],
     ]);
     expect(JSON.parse(fetch.mock.calls[1][1]?.body as string)).toEqual({ body: "Net." });
   });
