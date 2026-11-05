@@ -1,0 +1,170 @@
+metrics:
+  - id: net_sales
+    name: Net sales
+    description: Total line amount of order lines in orders that were not cancelled. Returns are not deducted; see refund_total for refunded value.
+    dataset: sales_lines
+    sql_expr: sumIf(line_amount, order_status != 'cancelled')
+    grain: day
+    unit: currency
+    owner: sales analytics
+    status: approved
+    evidence:
+      - kind: profile
+        ref: sales_lines.line_amount
+      - kind: profile
+        ref: sales_lines.order_status
+    confidence: 0.98
+
+  - id: units_sold
+    name: Units sold
+    description: Total quantity sold for sales line items whose orders were not cancelled. This measure excludes cancelled order lines from unit volume.
+    dataset: sales_lines
+    sql_expr: sumIf(quantity, order_status != 'cancelled')
+    grain: day
+    unit: count
+    owner: sales analytics
+    status: approved
+    evidence:
+      - kind: profile
+        ref: sales_lines.quantity
+      - kind: profile
+        ref: sales_lines.order_status
+    confidence: 0.98
+
+  - id: order_count
+    name: Orders
+    description: Count of distinct orders with status other than cancelled. This measures completed, shipped, delivered, or returned orders that remain valid for sales reporting.
+    dataset: sales_lines
+    sql_expr: uniqExactIf(order_id, order_status != 'cancelled')
+    grain: day
+    unit: count
+    owner: sales analytics
+    status: approved
+    evidence:
+      - kind: profile
+        ref: sales_lines.order_id
+      - kind: profile
+        ref: sales_lines.order_status
+    confidence: 0.97
+
+  - id: average_order_value
+    name: Average order value
+    description: Average sales amount per non-cancelled order, calculated as total non-cancelled line amount divided by distinct non-cancelled orders.
+    dataset: sales_lines
+    sql_expr: >-
+      sumIf(line_amount, order_status != 'cancelled')
+      / nullIf(uniqExactIf(order_id, order_status != 'cancelled'), 0)
+    grain: day
+    unit: currency
+    owner: sales analytics
+    status: approved
+    evidence:
+      - kind: profile
+        ref: sales_lines.line_amount
+      - kind: profile
+        ref: sales_lines.order_id
+      - kind: profile
+        ref: sales_lines.order_status
+    confidence: 0.96
+
+  - id: line_return_rate
+    name: Line return rate
+    description: Share of non-cancelled sales line items that were marked as returned. The numerator counts returned line items and the denominator counts all non-cancelled line items.
+    dataset: sales_lines
+    sql_expr: countIf(is_returned AND order_status != 'cancelled') / nullIf(countIf(order_status != 'cancelled'), 0)
+    grain: day
+    unit: ratio
+    owner: sales analytics
+    status: approved
+    evidence:
+      - kind: profile
+        ref: sales_lines.is_returned
+      - kind: profile
+        ref: sales_lines.order_status
+      - kind: profile
+        ref: sales_lines.order_item_id
+    confidence: 0.94
+
+  - id: refund_total
+    name: Refunds
+    description: Total refund amount recorded for returned items. This measures the gross value refunded across return records.
+    dataset: returns_fact
+    sql_expr: sum(refund_amount)
+    grain: day
+    unit: currency
+    owner: customer operations
+    status: approved
+    evidence:
+      - kind: profile
+        ref: returns_fact.refund_amount
+      - kind: profile
+        ref: returns_fact.return_id
+    confidence: 0.98
+
+  - id: return_count
+    name: Returns
+    description: Count of return records logged in the returns dataset. Each row represents a distinct returned order item.
+    dataset: returns_fact
+    sql_expr: count()
+    grain: day
+    unit: count
+    owner: customer operations
+    status: approved
+    evidence:
+      - kind: profile
+        ref: returns_fact
+      - kind: profile
+        ref: returns_fact.return_id
+      - kind: profile
+        ref: returns_fact.order_item_id
+    confidence: 0.96
+
+  - id: average_days_to_return
+    name: Average days to return
+    description: Average number of days between the original order date and the recorded return date for return records.
+    dataset: returns_fact
+    sql_expr: avg(days_to_return)
+    grain: day
+    unit: days
+    owner: customer operations
+    status: approved
+    evidence:
+      - kind: profile
+        ref: returns_fact.days_to_return
+      - kind: profile
+        ref: returns_fact.order_date
+      - kind: profile
+        ref: returns_fact.return_date
+    confidence: 0.98
+
+  - id: session_count
+    name: Sessions
+    description: Total number of sessions recorded in the daily sessions dataset.
+    dataset: sessions_daily
+    sql_expr: sum(sessions)
+    grain: day
+    unit: count
+    owner: marketing
+    status: approved
+    evidence:
+      - kind: profile
+        ref: sessions_daily.sessions
+      - kind: profile
+        ref: sessions_daily.session_date
+    confidence: 0.99
+
+  - id: conversion_rate
+    name: Conversion rate
+    description: Share of sessions that converted, calculated as converted sessions divided by total sessions.
+    dataset: sessions_daily
+    sql_expr: sum(converted_sessions) / nullIf(sum(sessions), 0)
+    grain: day
+    unit: ratio
+    owner: marketing
+    status: approved
+    evidence:
+      - kind: profile
+        ref: sessions_daily.converted_sessions
+      - kind: profile
+        ref: sessions_daily.sessions
+    confidence: 0.98

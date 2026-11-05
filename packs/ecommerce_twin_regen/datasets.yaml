@@ -1,0 +1,287 @@
+datasets:
+  - id: sales_lines
+    description: >-
+      Line-level sales fact table for orders, combining order, customer, product, pricing, and return flag details for each purchased item.
+    grain: one row per order line
+    time_column: order_date
+    allowed_roles: [analyst, northwest_sales, category_partner]
+    status: approved
+    evidence:
+      - kind: profile
+        ref: sales_lines
+      - kind: profile
+        ref: sales_lines.order_item_id
+      - kind: profile
+        ref: sales_lines.order_date
+      - kind: profile
+        ref: sales_lines.order_status
+      - kind: profile
+        ref: sales_lines.payment_method
+      - kind: profile
+        ref: sales_lines.customer_region
+      - kind: profile
+        ref: sales_lines.customer_segment
+      - kind: profile
+        ref: sales_lines.product_category
+      - kind: profile
+        ref: sales_lines.product_subcategory
+      - kind: profile
+        ref: sales_lines.product_brand
+      - kind: profile
+        ref: sales_lines.is_returned
+    confidence: 0.98
+    columns:
+      - name: order_item_id
+        type: string
+        role: dimension
+        description: Unique identifier for the individual order line item.
+      - name: order_id
+        type: string
+        role: dimension
+        description: Identifier for the order that contains this line item.
+      - name: order_date
+        type: date
+        role: time
+        description: Date the order containing this line item was placed.
+      - name: order_status
+        type: string
+        role: dimension
+        indexable: true
+        description: Current fulfillment status of the order line, such as delivered, shipped, cancelled, or returned.
+      - name: payment_method
+        type: string
+        role: dimension
+        indexable: true
+        description: Payment method used for the order associated with this line item.
+      - name: customer_id
+        type: string
+        role: dimension
+        description: Identifier for the customer who placed the order.
+      - name: customer_region
+        type: string
+        role: dimension
+        indexable: true
+        description: Geographic sales region associated with the customer.
+      - name: customer_segment
+        type: string
+        role: dimension
+        indexable: true
+        description: Customer lifecycle or value segment for the purchaser.
+      - name: customer_signup_date
+        type: date
+        role: time
+        description: Date the customer originally signed up or registered.
+      - name: product_id
+        type: string
+        role: dimension
+        indexable: true
+        description: Identifier for the product sold on this order line.
+      - name: product_category
+        type: string
+        role: dimension
+        indexable: true
+        description: Top-level category of the product sold.
+      - name: product_subcategory
+        type: string
+        role: dimension
+        indexable: true
+        description: More detailed product grouping within the product category.
+      - name: product_brand
+        type: string
+        role: dimension
+        indexable: true
+        description: Brand associated with the product sold.
+      - name: product_list_price
+        type: number
+        role: measure
+        description: Listed catalog price of the product before any order-line pricing adjustments.
+      - name: product_unit_cost
+        type: number
+        role: measure
+        description: Unit cost of the product for the business on this order line.
+      - name: quantity
+        type: number
+        role: measure
+        description: Number of units purchased for this order line.
+      - name: unit_price
+        type: number
+        role: measure
+        description: Per-unit selling price charged on this order line.
+      - name: line_amount
+        type: number
+        role: measure
+        description: Extended sales amount for the order line based on quantity and unit price.
+      - name: is_returned
+        type: boolean
+        role: dimension
+        description: Flag indicating whether this order line was returned.
+  - id: returns_fact
+    description: Return-level fact table capturing refunded order items, including return timing, reason, customer, product, and original order context.
+    grain: one row per return
+    time_column: return_date
+    allowed_roles: [analyst, northwest_sales]
+    status: approved
+    evidence:
+      - kind: profile
+        ref: returns_fact
+      - kind: profile
+        ref: returns_fact.return_id
+      - kind: profile
+        ref: returns_fact.return_date
+      - kind: profile
+        ref: returns_fact.return_reason
+      - kind: profile
+        ref: returns_fact.order_item_id
+      - kind: profile
+        ref: returns_fact.order_date
+      - kind: profile
+        ref: returns_fact.product_category
+      - kind: profile
+        ref: returns_fact.customer_region
+      - kind: profile
+        ref: returns_fact.days_to_return
+    confidence: 0.98
+    columns:
+      - name: return_id
+        type: string
+        role: dimension
+        description: Unique identifier for the return record.
+      - name: return_date
+        type: date
+        role: time
+        description: Date the return was recorded or processed.
+      - name: return_reason
+        type: string
+        role: dimension
+        indexable: true
+        description: Customer-stated or assigned reason for the return.
+      - name: refund_amount
+        type: number
+        role: measure
+        description: Amount refunded for the returned order item.
+      - name: order_item_id
+        type: string
+        role: dimension
+        description: Identifier for the specific order line item that was returned.
+      - name: order_id
+        type: string
+        role: dimension
+        description: Identifier for the original order containing the returned item.
+      - name: order_date
+        type: date
+        role: time
+        description: Date the original order for the returned item was placed.
+      - name: order_status
+        type: string
+        role: dimension
+        indexable: true
+        description: Status associated with the original order or line at the time represented in this table.
+      - name: product_id
+        type: string
+        role: dimension
+        indexable: true
+        description: Identifier for the product that was returned.
+      - name: product_category
+        type: string
+        role: dimension
+        indexable: true
+        description: Top-level category of the returned product.
+      - name: product_subcategory
+        type: string
+        role: dimension
+        indexable: true
+        description: More detailed grouping of the returned product within its category.
+      - name: product_brand
+        type: string
+        role: dimension
+        indexable: true
+        description: Brand associated with the returned product.
+      - name: customer_id
+        type: string
+        role: dimension
+        description: Identifier for the customer who returned the item.
+      - name: customer_region
+        type: string
+        role: dimension
+        indexable: true
+        description: Geographic region associated with the customer who made the return.
+      - name: customer_segment
+        type: string
+        role: dimension
+        indexable: true
+        description: Customer lifecycle or value segment for the customer who made the return.
+      - name: quantity
+        type: number
+        role: measure
+        description: Number of units included in the returned order line.
+      - name: line_amount
+        type: number
+        role: measure
+        description: Original sales amount of the returned order line.
+      - name: days_to_return
+        type: number
+        role: measure
+        description: Elapsed time between the original order date and the return date, expressed in days.
+  - id: sessions_daily
+    description: Daily web sessions aggregate segmented by device, acquisition channel, customer region, and customer segment, with conversion and engagement measures.
+    grain: one row per day, device, channel, customer region and customer segment
+    time_column: session_date
+    allowed_roles: [analyst, marketing]
+    status: approved
+    evidence:
+      - kind: profile
+        ref: sessions_daily
+      - kind: profile
+        ref: sessions_daily.session_date
+      - kind: profile
+        ref: sessions_daily.device
+      - kind: profile
+        ref: sessions_daily.channel
+      - kind: profile
+        ref: sessions_daily.customer_region
+      - kind: profile
+        ref: sessions_daily.customer_segment
+      - kind: profile
+        ref: sessions_daily.sessions
+      - kind: profile
+        ref: sessions_daily.converted_sessions
+      - kind: profile
+        ref: sessions_daily.pages_viewed
+    confidence: 0.98
+    columns:
+      - name: session_date
+        type: date
+        role: time
+        description: Date of the aggregated session activity.
+      - name: device
+        type: string
+        role: dimension
+        indexable: true
+        description: Device type used for the sessions, such as mobile, desktop, or tablet.
+      - name: channel
+        type: string
+        role: dimension
+        indexable: true
+        description: Marketing or traffic acquisition channel attributed to the sessions.
+      - name: customer_region
+        type: string
+        role: dimension
+        indexable: true
+        description: Geographic region associated with the customer or visitor segment in the aggregate.
+      - name: customer_segment
+        type: string
+        role: dimension
+        indexable: true
+        description: Customer lifecycle or value segment represented in the aggregated sessions.
+      - name: sessions
+        type: number
+        role: measure
+        description: Count of sessions in the aggregate for the given date and segment combination.
+      - name: converted_sessions
+        type: number
+        role: measure
+        description: Count of sessions in the aggregate that resulted in a conversion.
+      - name: pages_viewed
+        type: number
+        role: measure
+        description: Total pages viewed across sessions in the aggregate.
