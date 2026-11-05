@@ -139,7 +139,7 @@ function ItemDetail({ item, loading, reload }: { item?: ReviewItem; loading: boo
         <>
           <Button variant="ghost" onClick={() => { setBody(item.body); setFormula(item.formula ?? ""); setEditing(false); }}>{t("ui.cancel")}</Button>
           <Button variant="primary" onClick={async () => {
-            await api.review.update(item.id, item.formula === undefined ? { body } : { body, formula });
+            await api.review.update(item.id, item.formula == null ? { body } : { body, formula });
             setEditing(false);
             await reload();
           }}>{t("ui.save")}</Button>
@@ -176,7 +176,7 @@ function ItemDetail({ item, loading, reload }: { item?: ReviewItem; loading: boo
                 {editing ? <TextField multiline aria-label={t("ui.body")} value={body} onChange={(event) => setBody(event.target.value)} />
                   : <p className="fc-review-body" lang={langOf(item.body)}>{item.body}</p>}
               </dd>
-              {item.formula !== undefined ? (
+              {item.formula != null ? (
                 <>
                   <dt>{t("ui.formula")}</dt>
                   <dd className="fc-kv-ctl">

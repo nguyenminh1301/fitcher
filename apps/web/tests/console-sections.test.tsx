@@ -31,6 +31,8 @@ const CONSOLE: Partial<ConsoleFile> = {
   review_items: [
     { id: "m1", file: "metrics.yaml", name: "metric_one", kind: "item", status: "draft", confidence: 0.82, body: "Units returned over units sold.", formula: "sum(a) / sum(b)", evidence: { source: "Handbook.pdf, page 2", quote: "Measured in units." }, test_result: TEST_RESULT },
     { id: "g1", file: "glossary.yaml", name: "term_one", kind: "item", status: "approved", confidence: 0.95, body: "A plain definition.", evidence: { source: "Old guide.docx", deleted: true } },
+    // The api sends a null formula for an item that has none.
+    { id: "g2", file: "glossary.yaml", name: "term_two", kind: "item", status: "draft", confidence: 0.7, body: "Second definition.", formula: null },
     { id: "p1", file: "examples.yaml", name: "Proposal one", kind: "proposal", status: "draft", confidence: 0.6, body: "Total for [MASKED_NAME] in 2025?", formula: "SELECT sum(x) FROM marts.t WHERE name = '[MASKED_NAME]'", evidence: { source: "Disliked chat" }, test_result: TEST_RESULT },
   ],
   documents: [
@@ -113,6 +115,18 @@ describe("review", () => {
 
     expect(await screen.findByText("Test run returned 2 rows")).toBeTruthy();
     expect(screen.getByText("2026-09")).toBeTruthy();
+  });
+
+  it("edits only the text of an item whose formula is null", async () => {
+    const update = vi.spyOn(api.review, "update");
+    show("review", <ReviewDetail id="g2" />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Edit" }));
+    expect(screen.queryByRole("textbox", { name: "Formula" })).toBeNull();
+    fireEvent.change(screen.getByRole("textbox", { name: "Definition" }), { target: { value: "Edited." } });
+    await act(async () => fireEvent.click(screen.getByRole("button", { name: "Save" })));
+
+    expect(update).toHaveBeenCalledWith("g2", { body: "Edited." });
   });
 
   it("flags evidence that cites a deleted document", async () => {
