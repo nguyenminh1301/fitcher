@@ -5,12 +5,17 @@ uncompiled pack makes the endpoints that need it answer 503, while ``/health``
 keeps working; a failure is not cached, so the next request tries again.
 """
 
+from dataclasses import dataclass
 from functools import cache
 import logging
 from pathlib import Path
 import threading
 
-from fastapi import HTTPException, status
+import yaml
+
+from typing import Annotated
+
+from fastapi import Depends, HTTPException, status
 
 from app.api.agent import Agent
 from app.api.rate_limit import RateLimiter
@@ -55,6 +60,55 @@ def get_compiled() -> CompiledPack:
         return load_compiled(Path(settings.compiled_pack_dir), settings.active_pack)
     except CompileError as error:
         raise unavailable(str(error)) from None
+
+
+def get_compiled_or_none() -> CompiledPack | None:
+    """The compiled active pack, or None while it was never compiled (a pack still under onboarding)."""
+    try:
+        return get_compiled()
+    except HTTPException:
+        return None
+
+
+@dataclass(frozen=True)
+class PackIdentity:
+    name: str
+    display_name: str
+    # The pack's policy roles, in policies.yaml order.
+    roles: list[str]
+
+
+def _read(path: Path) -> dict:
+    return (yaml.safe_load(path.read_text(encoding="utf-8")) or {}) if path.is_file() else {}
+
+
+def pack_identity(compiled: CompiledPack | None) -> PackIdentity:
+    """Name, display name and roles of the active pack: from ``compiled.json``, else from its pack files.
+
+    A new company's pack is reviewed before its first compile, so sign-in, Review and Documents read the
+    pack files until ``compile_pack`` has run; questions still need the compiled pack.
+    """
+    if compiled is not None:
+        return PackIdentity(
+            compiled.pack.name, compiled.pack.business_profile.display_name,
+            [role.id for role in compiled.pack.policies.roles],
+        )
+    settings = load_settings()
+    if not settings.active_pack:
+        raise unavailable("ACTIVE_PACK must be set")
+    pack_dir = Path(settings.packs_dir) / settings.active_pack
+    if not (pack_dir / "policies.yaml").is_file():
+        raise unavailable(
+            f"pack {settings.active_pack} has no compiled.json and no pack files under {settings.packs_dir}; "
+            "compile the pack first"
+        )
+    profile = _read(pack_dir / "business_profile.yaml")
+    roles = [role["id"] for role in _read(pack_dir / "policies.yaml").get("roles") or [] if isinstance(role, dict)]
+    return PackIdentity(settings.active_pack, str(profile.get("display_name") or settings.active_pack), roles)
+
+
+def get_pack_identity(compiled: Annotated[CompiledPack | None, Depends(get_compiled_or_none)]) -> PackIdentity:
+    return pack_identity(compiled)
 
 
 _screener: Screener | None = None
@@ -143,7 +197,7 @@ def get_conversation_store() -> ConversationStore:
 def get_document_service() -> DocumentService:
     """The active pack's documents; chunks are screened and embedded like a compile does."""
     settings = load_settings()
-    compiled = get_compiled()
+    identity = pack_identity(get_compiled_or_none())
     try:
         registry = ClickHouseDocumentRegistry(pack_review_client())
         embeddings = LiteLLMEmbeddings(
@@ -153,7 +207,7 @@ def get_document_service() -> DocumentService:
     except Exception as error:  # noqa: BLE001 - a missing password or gateway key, or ClickHouse unreachable
         raise unavailable(f"the document store is unavailable: {error}") from None
     return DocumentService(
-        pack=compiled.pack.name, pack_roles=[role.id for role in compiled.pack.policies.roles], registry=registry,
+        pack=identity.name, pack_roles=identity.roles, registry=registry,
         search=QdrantSearch(settings.qdrant_url), embeddings=embeddings, screener=get_screener(),
         store_dir=Path(settings.documents_dir), compiled_dir=Path(settings.compiled_pack_dir),
         max_bytes=settings.document_max_bytes,
@@ -162,7 +216,7 @@ def get_document_service() -> DocumentService:
 
 def get_pack_dir() -> Path:
     """The active pack's working tree, where reviewed and drafted YAML is written (never committed by the app)."""
-    return Path(load_settings().packs_dir) / get_compiled().pack.name
+    return Path(load_settings().packs_dir) / pack_identity(get_compiled_or_none()).name
 
 
 @cache
@@ -188,7 +242,7 @@ def get_review_service() -> ReviewService:
     """Built per request: it reads the pack files fresh each time."""
     settings = load_settings()
     return ReviewService(
-        pack=get_compiled().pack.name, pack_dir=get_pack_dir(), registry=get_document_service().registry,
+        pack=pack_identity(get_compiled_or_none()).name, pack_dir=get_pack_dir(), registry=get_document_service().registry,
         warehouse=get_review_warehouse(), limits=QueryLimits.from_env(), compiled_dir=Path(settings.compiled_pack_dir),
     )
 

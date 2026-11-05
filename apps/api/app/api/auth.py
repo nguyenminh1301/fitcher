@@ -11,7 +11,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Header, HTTPException, status
 from pydantic import BaseModel
 
-from app.api.runtime import get_compiled, get_verifier, unavailable
+from app.api.runtime import PackIdentity, get_compiled, get_pack_identity, get_verifier, unavailable
 from app.auth.jwt import AuthError, AuthUnavailable, Principal, TokenVerifier
 from app.auth.roles import RoleError, active_role, known_roles
 from app.packs.compiler import CompiledPack
@@ -69,11 +69,11 @@ class PackInfo(BaseModel):
 @router.get("/me")
 def me(
     principal: Annotated[Principal, Depends(current_principal)],
-    compiled: Annotated[CompiledPack, Depends(get_compiled)],
+    identity: Annotated[PackIdentity, Depends(get_pack_identity)],
     x_active_role: Annotated[str | None, Header()] = None,
 ) -> Me:
     """The signed-in user; ``active_role`` is null for a user who holds console roles only."""
-    roles = pack_roles(compiled)
+    roles = identity.roles
     try:
         role = active_role(principal.roles, roles, x_active_role)
     except RoleError as error:
@@ -87,6 +87,6 @@ def me(
 
 
 @router.get("/pack")
-def pack(compiled: Annotated[CompiledPack, Depends(get_compiled)]) -> PackInfo:
-    profile = compiled.pack.business_profile
-    return PackInfo(name=compiled.pack.name, display_name=profile.display_name, roles=pack_roles(compiled))
+def pack(identity: Annotated[PackIdentity, Depends(get_pack_identity)]) -> PackInfo:
+    """The active pack, from its pack files while it was never compiled."""
+    return PackInfo(name=identity.name, display_name=identity.display_name, roles=identity.roles)
