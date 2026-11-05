@@ -31,5 +31,13 @@ class DocumentList(ContractModel):
     documents: list[DocumentView]
 
 
+class DraftResult(ContractModel):
+    """Review ids (``<file stem>.<item id>``) of the items a draft added, refreshed or left because they are approved."""
+
+    added: list[str]
+    updated: list[str]
+    skipped_approved: list[str]
+
+
 class DocumentRolesChange(ContractModel):
     allowed_roles: list[str] = Field(min_length=1)

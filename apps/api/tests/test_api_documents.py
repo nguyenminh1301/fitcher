@@ -111,3 +111,52 @@ def test_only_a_pack_reviewer_reaches_documents(client, method, path):
     response = client.request(method.upper(), path, headers=VIEWER, json={"allowed_roles": ["viewer"]})
     assert response.status_code == 403
     assert upload(client, headers=VIEWER).status_code == 403
+
+
+class StubDrafter:
+    def __init__(self):
+        self.chunks = []
+
+    def draft(self, file, files, profile, chunks):
+        self.chunks.append([chunk["document_id"] for chunk in chunks])
+        if file != "glossary.yaml":
+            return []
+        return [{"id": "revenue", "term": "x", "definition": "x", "aliases": {"vi": ["x"], "en": ["x"]},
+                 "targets": [{"kind": "metric", "metric": "widget_revenue"}], "evidence": [{"kind": "doc", "ref": "a"}],
+                 "confidence": 0.5, "status": "draft"},
+                {"id": "widget_term", "term": "widget", "definition": "A thing sold.", "aliases": {"vi": ["hàng"], "en": ["widget"]},
+                 "targets": [{"kind": "metric", "metric": "widget_revenue"}], "evidence": [{"kind": "doc", "ref": "a"}],
+                 "confidence": 0.5, "status": "draft"}]
+
+
+@pytest.fixture
+def drafting(client, tmp_path):
+    import shutil
+
+    from conftest import FIXTURE_PACK, SCHEMA_DIR
+
+    pack_dir = tmp_path / "packs" / "minimal"
+    shutil.copytree(FIXTURE_PACK, pack_dir)
+    shutil.copytree(SCHEMA_DIR, tmp_path / "packs" / "_schema")
+    drafter = StubDrafter()
+    app.dependency_overrides[runtime.get_drafter] = lambda: drafter
+    app.dependency_overrides[runtime.get_pack_dir] = lambda: pack_dir
+    return drafter, pack_dir
+
+
+def test_draft_from_one_document_writes_drafts_and_reports_review_ids(client, drafting):
+    drafter, pack_dir = drafting
+    first = upload(client).json()
+    upload(client, data=b"Another document.", name="other.txt")
+
+    response = client.post(f"/documents/{first['id']}/draft", headers=REVIEWER)
+
+    assert response.status_code == 200
+    assert response.json() == {"added": ["glossary.widget_term"], "updated": [], "skipped_approved": ["glossary.revenue"]}
+    assert all(ids == [first["id"]] * 3 for ids in drafter.chunks)
+    assert "id: widget_term" in (pack_dir / "glossary.yaml").read_text(encoding="utf-8")
+
+
+def test_draft_needs_an_indexed_document(client, drafting):
+    assert client.post("/documents/nope/draft", headers=REVIEWER).status_code == 404
+    assert client.post("/documents/nope/draft", headers=VIEWER).status_code == 403

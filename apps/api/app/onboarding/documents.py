@@ -179,6 +179,13 @@ def _first_line(error: BaseException) -> str:
     return (" ".join(str(error).split()) or type(error).__name__)[:ERROR_LIMIT]
 
 
+def live_chunks(search, pack: str, document_id: str | None = None) -> list[dict]:
+    """Payloads of the live ``kb_docs`` chunks, of one document or of all, in document and chunk order."""
+    flt = document_filter(document_id) if document_id else None
+    payloads = [point["payload"] for point in search.scroll(alias_name(pack, KB_DOCS), flt)]
+    return sorted(payloads, key=lambda payload: (payload["document_id"], int(payload["id"].rsplit("#", 1)[1])))
+
+
 def chunk_payloads(record: DocumentRecord, chunks: Sequence[Chunk]) -> list[dict]:
     """The ``kb_docs`` documents of a record's chunks; ``embedding_text`` is embedded and not stored."""
     documents = []
@@ -339,9 +346,7 @@ class DocumentService:
 
     def chunks(self, document_id: str | None = None) -> list[dict]:
         """Payloads of the live ``kb_docs`` chunks, of one document or of all, in document and chunk order."""
-        flt = document_filter(document_id) if document_id else None
-        payloads = [point["payload"] for point in self.search.scroll(self.alias, flt)]
-        return sorted(payloads, key=lambda payload: (payload["document_id"], int(payload["id"].rsplit("#", 1)[1])))
+        return live_chunks(self.search, self.pack, document_id)
 
     def list(self) -> list[DocumentRecord]:
         return self.registry.list(self.pack)

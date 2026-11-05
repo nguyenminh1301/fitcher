@@ -153,6 +153,16 @@ class ClickHouseRunner:
         )
 
 
+class ClientWarehouse:
+    """The compiler's and drafter's ``Warehouse`` over a clickhouse-connect client; settings travel per query."""
+
+    def __init__(self, client):
+        self._client = client
+
+    def query(self, sql: str, settings: dict | None = None):
+        return self._client.query(sql, settings=settings).result_rows
+
+
 class QueryStopper:
     """Stops a running agent query by its id and user.
 

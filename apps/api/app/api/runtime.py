@@ -17,11 +17,13 @@ from app.api.rate_limit import RateLimiter
 from app.auth.jwt import JwksCache, TokenSettings, TokenVerifier
 from app.config import load_settings
 from app.conversation.store import ConversationStore, conversations_client
-from app.llm.client import LLMError
+from app.data.clickhouse import ClientWarehouse
+from app.llm.client import LiteLLMClient, LLMError
 from app.llm.embeddings import LiteLLMEmbeddings
 from app.llm.model_store import CatalogClient, ClickHouseModelStore, model_tiers_client
 from app.llm.tiers import EMBED_TIER, TierMap, TierStoreError
 from app.onboarding.documents import ClickHouseDocumentRegistry, DocumentService, pack_review_client
+from app.onboarding.drafter import Drafter
 from app.packs.compiler import CompileError, CompiledPack, load_compiled
 from app.screening.screen import Screener
 from app.search.client import QdrantSearch
@@ -155,6 +157,30 @@ def get_document_service() -> DocumentService:
         store_dir=Path(settings.documents_dir), compiled_dir=Path(settings.compiled_pack_dir),
         max_bytes=settings.document_max_bytes,
     )
+
+
+def get_pack_dir() -> Path:
+    """The active pack's working tree, where reviewed and drafted YAML is written (never committed by the app)."""
+    return Path(load_settings().packs_dir) / get_compiled().pack.name
+
+
+@cache
+def get_review_warehouse() -> ClientWarehouse:
+    """Reads marts as ``pack_review`` for drafts and reviewer test-runs; each query sends its own limits."""
+    try:
+        return ClientWarehouse(pack_review_client())
+    except Exception as error:  # noqa: BLE001 - a missing password or ClickHouse unreachable
+        raise unavailable(f"the warehouse is unavailable: {error}") from None
+
+
+@cache
+def get_drafter() -> Drafter:
+    settings = load_settings()
+    try:
+        llm = LiteLLMClient(settings.litellm_base_url, settings.litellm_master_key, tiers=get_tier_map())
+    except LLMError as error:
+        raise unavailable(str(error)) from None
+    return Drafter(llm, get_review_warehouse())
 
 
 @cache

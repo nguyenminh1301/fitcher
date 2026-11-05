@@ -35,6 +35,7 @@ from collections.abc import Callable, Sequence
 from datetime import UTC, date, datetime
 from decimal import Decimal
 from itertools import combinations
+import json
 from pathlib import Path
 import re
 
@@ -45,6 +46,12 @@ _WRAPPER = re.compile(r"^(Nullable|LowCardinality)\((.*)\)$")
 
 def profile_path(output_dir: Path, pack: str) -> Path:
     return output_dir / pack / "profile.json"
+
+
+def read_profile(output_dir: Path, pack: str) -> dict | None:
+    """The pack's last profile, or None before ``jobs.profile`` ran."""
+    path = profile_path(output_dir, pack)
+    return json.loads(path.read_text(encoding="utf-8")) if path.is_file() else None
 
 
 def base_type(clickhouse_type: str) -> str:
