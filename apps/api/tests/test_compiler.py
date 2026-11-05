@@ -392,3 +392,68 @@ def test_queries_during_a_recompile_never_see_a_mixed_generation(pack_dir, tmp_p
     assert seen[0] == {1} and seen[-1] == {2}
     assert all(len(generations) == 1 for generations in seen)
     assert len(search.alias_updates) == 2
+
+
+# kb_docs from the document registry (DECISIONS §5 Compile)
+
+def _documents(tmp_path, search, embeddings):
+    from app.onboarding.documents import DocumentService, InMemoryDocumentRegistry
+
+    return DocumentService(
+        pack=PACK, pack_roles=["viewer"], registry=InMemoryDocumentRegistry(), search=search, embeddings=embeddings,
+        screener=Screener(FakeClassifier()), store_dir=tmp_path / "documents", compiled_dir=tmp_path / "build",
+        max_bytes=10_000, clock=lambda: datetime(2026, 1, 1, tzinfo=UTC),
+    )
+
+
+def _kb_docs(search) -> list[dict]:
+    return search.points[search.aliases[f"{PACK}_kb_docs"]]
+
+
+def test_recompile_copies_live_chunks_of_indexed_documents_without_embedding_them(pack_dir, tmp_path):
+    search, embeddings = FakeSearch(), FakeEmbeddings()
+    run(pack_dir, tmp_path, search, embeddings, embedding_alias="embed-a")
+    documents = _documents(tmp_path, search, embeddings)
+    kept = documents.upload("kept.md", b"# Kept\n\nRefunds are counted when approved.", ["viewer"], "u")
+    gone = documents.upload("gone.md", b"# Gone\n\nAn older policy.", ["viewer"], "u")
+    documents.delete(gone.id)
+    live_vectors = {point["id"]: point["vector"] for point in _kb_docs(search)}
+    embeddings.calls.clear()
+
+    summary = run(pack_dir, tmp_path, search, embeddings, embedding_alias="embed-a",
+                  registry=documents.registry, documents_dir=tmp_path / "documents")
+
+    assert summary.generation == 2 and summary.documents["kb_docs"] == 1
+    [point] = _kb_docs(search)
+    assert point["payload"]["document_id"] == kept.id and point["vector"] == live_vectors[point["id"]]
+    assert not any("Refunds are counted" in text for call in embeddings.calls for text in call)
+    assert load_compiled(tmp_path / "build", PACK).embedding_alias == "embed-a"
+
+
+def test_a_new_embedding_model_reembeds_the_stored_files(pack_dir, tmp_path):
+    search, embeddings = FakeSearch(), FakeEmbeddings()
+    run(pack_dir, tmp_path, search, embeddings, embedding_alias="embed-a")
+    documents = _documents(tmp_path, search, embeddings)
+    kept = documents.upload("kept.md", b"# Kept\n\nRefunds are counted when approved.", ["viewer"], "u")
+    embeddings.calls.clear()
+
+    summary = run(pack_dir, tmp_path, search, embeddings, embedding_alias="embed-b",
+                  registry=documents.registry, documents_dir=tmp_path / "documents")
+
+    assert summary.documents["kb_docs"] == 1
+    [point] = _kb_docs(search)
+    assert point["payload"]["id"] == f"{kept.id}#0" and point["payload"]["allowed_roles"] == ["viewer"]
+    assert any("Refunds are counted" in text for call in embeddings.calls for text in call)
+
+
+def test_a_missing_stored_file_is_reported_and_left_out(pack_dir, tmp_path):
+    search, embeddings = FakeSearch(), FakeEmbeddings()
+    documents = _documents(tmp_path, search, embeddings)
+    record = documents.upload("kept.md", b"# Kept\n\nText.", ["viewer"], "u")
+    documents.stored_path(record.id).unlink()
+
+    summary = run(pack_dir, tmp_path, search, embeddings, embedding_alias="embed-a",
+                  registry=documents.registry, documents_dir=tmp_path / "documents")
+
+    assert summary.documents["kb_docs"] == 0
+    assert summary.warnings == [f"document {record.id} (kept.md) has no stored file and was not indexed"]

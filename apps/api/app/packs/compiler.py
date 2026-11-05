@@ -10,6 +10,11 @@ aliases in one request; write ``compiled.json``; and only then delete older
 generations. A failure before the alias move deletes the partial generation
 and leaves the live aliases untouched.
 
+``kb_docs`` is rebuilt from the document registry: the chunks of every
+``indexed`` document are copied with their vectors from the live generation
+when ``compiled.json`` names the same embedding alias and dimensions, and
+otherwise each stored file is parsed, chunked, screened and embedded again.
+
 Screening drops a ``kb_docs`` chunk whose verdict is ``block`` or, without
 the classifier, ``unavailable``, and lists it in the summary; a column value
 that is flagged or blocked is listed and still indexed, because it is real
@@ -29,6 +34,9 @@ import sqlglot
 from sqlglot import exp
 
 from app.data.forbidden_functions import forbidden_function
+from app.onboarding.chunker import chunk_sections
+from app.onboarding.docs_parser import DocumentRejected, parse_document
+from app.onboarding.documents import KB_DOCS, DocumentRegistry, chunk_payloads
 from app.llm.embeddings import EmbeddingClient
 from app.packs.loader import check_references, load_pack
 from app.packs.models import Pack
@@ -95,6 +103,8 @@ class CompiledPack(BaseModel):
     embedding_dimensions: int
     coverage: dict[str, DateCoverage]
     compiled_at: str
+    # The embed tier's alias the vectors came from; a recompile with another alias re-embeds documents.
+    embedding_alias: str = ""
 
 
 @dataclass
@@ -265,10 +275,56 @@ def next_generation(search: QdrantSearch, pack: str) -> int:
     return max(generations, default=0) + 1
 
 
+def _live_compiled(output_dir: Path, pack: str) -> CompiledPack | None:
+    try:
+        return load_compiled(output_dir, pack)
+    except (CompileError, ValueError):
+        return None
+
+
+def registry_chunks(
+    search: QdrantSearch, pack: str, registry: DocumentRegistry, documents_dir: Path, live: CompiledPack | None,
+    embedding_alias: str, dimensions: int, summary: "CompileSummary",
+) -> tuple[list[dict], list[dict]]:
+    """``(points copied from the live kb_docs, chunk documents to screen and embed)`` of the indexed documents."""
+    indexed = {record.id: record for record in registry.list(pack) if record.status == "indexed"}
+    if not indexed:
+        return [], []
+    alias = alias_name(pack, KB_DOCS)
+    same_model = (
+        live is not None and live.embedding_alias == embedding_alias and live.embedding_dimensions == dimensions
+        and alias in search.alias_targets()
+    )
+    if same_model:
+        live_points = search.scroll(alias, with_vectors=True)
+        return [
+            {"id": point["id"], "vector": point["vector"], "payload": point["payload"]}
+            for point in live_points if point["payload"].get("document_id") in indexed
+        ], []
+    fresh: list[dict] = []
+    for record in indexed.values():
+        path = documents_dir / pack / record.id
+        if not path.is_file():
+            summary.warnings.append(f"document {record.id} ({record.file_name}) has no stored file and was not indexed")
+            continue
+        try:
+            chunks = chunk_sections(parse_document(path.read_bytes(), record.media_type), record.media_type)
+        except DocumentRejected as error:
+            summary.warnings.append(f"document {record.id} ({record.file_name}) cannot be parsed again: {error}")
+            continue
+        fresh.extend(chunk_payloads(record, chunks))
+    return [], fresh
+
+
 def build_generation(
-    search: QdrantSearch, embeddings: EmbeddingClient, pack: str, documents: dict[str, list[dict]]
+    search: QdrantSearch, embeddings: EmbeddingClient, pack: str, documents: dict[str, list[dict]],
+    carried: dict[str, list[dict]] | None = None,
 ) -> tuple[int, dict[str, int]]:
-    """Create and fill generation N+1 of every collection; delete it again on any failure."""
+    """Create and fill generation N+1 of every collection; delete it again on any failure.
+
+    ``carried`` holds ready points per index, copied with their vectors and not embedded again.
+    """
+    carried = carried or {}
     generation = next_generation(search, pack)
     created: list[str] = []
     counts: dict[str, int] = {}
@@ -279,10 +335,11 @@ def build_generation(
             created.append(name)
             docs = documents[index]
             vectors = embeddings.embed([document["embedding_text"] for document in docs]) if docs else []
-            search.upsert(name, points(name, docs, vectors))
+            search.upsert(name, [*points(name, docs, vectors), *carried.get(index, [])])
             counts[index] = search.count(name)
-            if counts[index] != len(docs):
-                raise CompileError(f"{name} holds {counts[index]} points, expected {len(docs)}")
+            expected = len(docs) + len(carried.get(index, []))
+            if counts[index] != expected:
+                raise CompileError(f"{name} holds {counts[index]} points, expected {expected}")
     except Exception as error:
         _delete_quietly(search, created)
         raise CompileError(f"building index generation {generation} failed: {_first_line(error)}") from error
@@ -333,12 +390,16 @@ def compile_pack(
     agent_secret: str = "",
     clock: Callable[[], datetime] = lambda: datetime.now(UTC),
     screener: Screener | None = None,
+    registry: DocumentRegistry | None = None,
+    documents_dir: Path | None = None,
+    embedding_alias: str = "",
 ) -> CompileSummary:
     """Compile ``pack_dir``; with ``skip_index`` stop after the metric test-run and the access policies.
 
     With ``access``, the admin connection, the pack's policies are applied to
     ClickHouse; its users' passwords derive from ``agent_secret``. Without
     ``screener`` indexing screens with no classifier, so no document chunk is indexed.
+    With ``registry`` and ``documents_dir``, ``kb_docs`` holds the pack's indexed documents.
     """
     pack = approved_pack(load_pack(pack_dir, schema_dir=schema_dir, catalog=WarehouseCatalog(warehouse)))
     metrics_tested = test_metrics(pack, warehouse)
@@ -358,11 +419,18 @@ def compile_pack(
         raise CompileError("indexing needs a search client, an embedding client and an output directory")
 
     documents = build_documents(pack, read_column_values(pack, warehouse, top_k))
+    carried: list[dict] = []
+    if registry is not None and documents_dir is not None:
+        carried, fresh = registry_chunks(
+            search, pack.name, registry, documents_dir, _live_compiled(output_dir, pack.name), embedding_alias,
+            embeddings.dimensions, summary,
+        )
+        documents[KB_DOCS].extend(fresh)
     screen_documents(documents, screener or Screener(None), summary)
-    generation, counts = build_generation(search, embeddings, pack.name, documents)
+    generation, counts = build_generation(search, embeddings, pack.name, documents, {KB_DOCS: carried})
     compiled = CompiledPack(
         pack=pack, generation=generation, embedding_dimensions=embeddings.dimensions,
-        coverage=summary.coverage, compiled_at=clock().isoformat(),
+        coverage=summary.coverage, compiled_at=clock().isoformat(), embedding_alias=embedding_alias,
     )
     target = compiled_path(output_dir, pack.name)
     staged = target.with_suffix(".json.tmp")
