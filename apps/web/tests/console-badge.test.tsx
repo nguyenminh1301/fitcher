@@ -75,7 +75,7 @@ afterEach(() => {
 
 describe("Sample data badge in the console", () => {
   it.each(SURFACES)("marks the %s page while its feature runs on sample data", async (_name, section, page) => {
-    show(section, page);
+    show(section, page, Object.fromEntries(FEATURES.map((feature) => [feature, "mock"])) as Sources);
 
     expect(await screen.findByText("Sample data")).toBeTruthy();
   });

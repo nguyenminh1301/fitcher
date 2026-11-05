@@ -12,6 +12,13 @@ export type { GroupInput } from "./group_input";
 export type { FeedbackInput } from "./feedback_input";
 export type { AliasOption, ModelTier, ModelTiers } from "./model_tiers";
 export type { ModelTierChange } from "./model_tier_change";
+export type { DatasetView } from "./dataset_view";
+export type { EvidenceRef, ReviewEvidence, ReviewItem } from "./review_item";
+export type { ReviewItemPatch } from "./review_item_patch";
+export type { DocumentView } from "./document_view";
+export type { DocumentList } from "./document_list";
+export type { DocumentRolesChange } from "./document_roles_change";
+export type { DraftResult } from "./draft_result";
 export type {
   AskEvent as StreamEvent,
   ChartSpecEvent,

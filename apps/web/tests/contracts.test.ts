@@ -11,9 +11,11 @@ describe("generated contract types", () => {
   it("covers the backend contracts", () => {
     expect(schemas.sort()).toEqual([
       "ask_event.schema.json", "ask_request.schema.json", "chart_spec.schema.json", "conversation.schema.json",
-      "conversation_group.schema.json", "conversation_patch.schema.json", "conversation_thread.schema.json", "feedback_input.schema.json",
+      "conversation_group.schema.json", "conversation_patch.schema.json", "conversation_thread.schema.json",
+      "dataset_view.schema.json", "document_list.schema.json", "document_roles_change.schema.json",
+      "document_view.schema.json", "draft_result.schema.json", "feedback_input.schema.json",
       "group_input.schema.json", "model_tier_change.schema.json", "model_tiers.schema.json", "query_spec.schema.json",
-      "result.schema.json",
+      "result.schema.json", "review_item.schema.json", "review_item_patch.schema.json",
     ]);
   });
 

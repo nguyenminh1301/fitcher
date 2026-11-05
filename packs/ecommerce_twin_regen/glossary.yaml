@@ -1,0 +1,360 @@
+# Vietnamese aliases are drafted for owner review.
+terms:
+  - id: net_sales
+    term: net sales
+    definition: 'The amount sold in orders that were not cancelled, before returns: returns are not deducted.'
+    aliases:
+      vi:
+        - doanh thu thuần
+        - doanh thu
+        - doanh số
+        - tiền bán hàng
+      en:
+        - net sales
+        - revenue
+        - sales
+        - sales amount
+    targets: [{kind: metric, metric: net_sales}]
+    status: approved
+    evidence:
+      - kind: profile
+        ref: sales_lines.line_amount
+      - kind: profile
+        ref: sales_lines.order_status
+    confidence: 0.96
+
+  - id: best_selling
+    term: best-selling
+    definition: Products, categories or brands ranked by net sales, unless the question names another measure such as units sold; see the best_selling convention.
+    aliases:
+      vi: [bán chạy, bán chạy nhất, sản phẩm bán chạy, top sản phẩm]
+      en: [best-selling, best sellers, top-selling, top products]
+    targets: [{kind: metric, metric: net_sales}]
+    status: approved
+    evidence:
+      - kind: profile
+        ref: sales_lines.product_id
+      - kind: profile
+        ref: sales_lines.quantity
+      - kind: profile
+        ref: sales_lines.line_amount
+    confidence: 0.72
+
+  - id: units_sold
+    term: units sold
+    definition: The total number of product units sold from non-cancelled order lines. This term refers to sales volume in units rather than money.
+    aliases:
+      vi: [số lượng bán, sản lượng bán, số đơn vị bán ra]
+      en: [units sold, quantity sold, units, volume]
+    targets: [{kind: metric, metric: units_sold}]
+    status: approved
+    evidence:
+      - kind: profile
+        ref: sales_lines.quantity
+      - kind: profile
+        ref: sales_lines.order_status
+    confidence: 0.97
+
+  - id: order_count
+    term: orders
+    definition: The count of distinct orders excluding cancelled orders. It represents how many customer orders were placed and kept, not how many line items were sold.
+    aliases:
+      vi: [số đơn hàng, số đơn, đơn hàng]
+      en: [orders, order count, number of orders]
+    targets: [{kind: metric, metric: order_count}]
+    status: approved
+    evidence:
+      - kind: profile
+        ref: sales_lines.order_id
+      - kind: profile
+        ref: sales_lines.order_status
+    confidence: 0.97
+
+  - id: average_order_value
+    term: average order value
+    definition: The average sales amount per non-cancelled order. It shows the typical monetary value of an order after aggregating line amounts at the order level.
+    aliases:
+      vi: [giá trị đơn hàng trung bình, giá trị trung bình mỗi đơn]
+      en: [average order value, AOV, average basket]
+    targets: [{kind: metric, metric: average_order_value}]
+    status: approved
+    evidence:
+      - kind: profile
+        ref: sales_lines.order_id
+      - kind: profile
+        ref: sales_lines.line_amount
+      - kind: profile
+        ref: sales_lines.order_status
+    confidence: 0.97
+
+  - id: return_rate
+    term: return rate
+    definition: The share of non-cancelled sales lines that were returned. It expresses how frequently sold items end up being returned.
+    aliases:
+      vi: [tỉ lệ hoàn trả, tỷ lệ trả hàng, tỉ lệ đổi trả]
+      en: [return rate, returns rate]
+    targets: [{kind: metric, metric: line_return_rate}]
+    status: approved
+    evidence:
+      - kind: profile
+        ref: sales_lines.is_returned
+      - kind: profile
+        ref: sales_lines.order_status
+    confidence: 0.95
+
+  - id: refunds
+    term: refunds
+    definition: The total amount of money refunded for returned items. This term refers to refunded value, not the count of return transactions.
+    aliases:
+      vi: [tiền hoàn, tiền hoàn trả, số tiền hoàn lại]
+      en: [refunds, refund amount, refunded amount]
+    targets: [{kind: metric, metric: refund_total}]
+    status: approved
+    evidence:
+      - kind: profile
+        ref: returns_fact.refund_amount
+    confidence: 0.98
+
+  - id: returns
+    term: returns
+    definition: The count of return records or returned items captured in the returns dataset. It refers to how many returns occurred, not the refund amount.
+    aliases:
+      vi: [số lượt trả hàng, lượt hoàn trả, hàng trả lại]
+      en: [returns, number of returns, returned items]
+    targets: [{kind: metric, metric: return_count}]
+    status: approved
+    evidence:
+      - kind: profile
+        ref: returns_fact
+    confidence: 0.96
+
+  - id: days_to_return
+    term: days to return
+    definition: The average time between the original order date and the return date, measured in days. It indicates how long customers typically take to send items back.
+    aliases:
+      vi: [số ngày trả hàng trung bình, thời gian trả hàng]
+      en: [average days to return, time to return]
+    targets: [{kind: metric, metric: average_days_to_return}]
+    status: approved
+    evidence:
+      - kind: profile
+        ref: returns_fact.days_to_return
+    confidence: 0.98
+
+  - id: sessions
+    term: sessions
+    definition: The total number of website or app sessions recorded in the traffic data. It represents visits, not unique users or conversions.
+    aliases:
+      vi: [phiên truy cập, lượt truy cập, lưu lượng truy cập]
+      en: [sessions, visits, traffic]
+    targets: [{kind: metric, metric: session_count}]
+    status: approved
+    evidence:
+      - kind: profile
+        ref: sessions_daily.sessions
+    confidence: 0.98
+
+  - id: conversion_rate
+    term: conversion rate
+    definition: The proportion of sessions that resulted in a conversion. It measures how efficiently traffic turns into successful converted sessions.
+    aliases:
+      vi: [tỉ lệ chuyển đổi, tỷ lệ chuyển đổi]
+      en: [conversion rate, CVR, conversion]
+    targets: [{kind: metric, metric: conversion_rate}]
+    status: approved
+    evidence:
+      - kind: profile
+        ref: sessions_daily.converted_sessions
+      - kind: profile
+        ref: sessions_daily.sessions
+    confidence: 0.98
+
+  - id: product
+    term: product
+    definition: The product identifier used to track a specific item or SKU in sales and returns data. People may use this term to refer either to the item itself or its code.
+    aliases:
+      vi: [sản phẩm, mã sản phẩm, mặt hàng]
+      en: [product, SKU, item]
+    targets:
+      - {kind: column, dataset: sales_lines, column: product_id}
+      - {kind: column, dataset: returns_fact, column: product_id}
+    status: approved
+    evidence:
+      - kind: profile
+        ref: sales_lines.product_id
+      - kind: profile
+        ref: returns_fact.product_id
+    confidence: 0.98
+
+  - id: product_category
+    term: category
+    definition: The higher-level grouping of products such as a merchandise category. It is used to analyze sales and returns across broad product families.
+    aliases:
+      vi: [danh mục, ngành hàng, loại sản phẩm]
+      en: [category, product category]
+    targets:
+      - {kind: column, dataset: sales_lines, column: product_category}
+      - {kind: column, dataset: returns_fact, column: product_category}
+    status: approved
+    evidence:
+      - kind: profile
+        ref: sales_lines.product_category
+      - kind: profile
+        ref: returns_fact.product_category
+    confidence: 0.98
+
+  - id: product_subcategory
+    term: subcategory
+    definition: A more detailed grouping within a product category that describes a narrower product type. It helps break down performance below the main category level.
+    aliases:
+      vi: [danh mục con, nhóm sản phẩm, dòng sản phẩm]
+      en: [subcategory, product type]
+    targets:
+      - {kind: column, dataset: sales_lines, column: product_subcategory}
+      - {kind: column, dataset: returns_fact, column: product_subcategory}
+    status: approved
+    evidence:
+      - kind: profile
+        ref: sales_lines.product_subcategory
+      - kind: profile
+        ref: returns_fact.product_subcategory
+    confidence: 0.98
+
+  - id: brand
+    term: brand
+    definition: The brand associated with a product in sales and returns records. People use it to compare performance across manufacturers or labels.
+    aliases:
+      vi: [thương hiệu, nhãn hàng, hãng]
+      en: [brand, label]
+    targets:
+      - {kind: column, dataset: sales_lines, column: product_brand}
+      - {kind: column, dataset: returns_fact, column: product_brand}
+    status: approved
+    evidence:
+      - kind: profile
+        ref: sales_lines.product_brand
+      - kind: profile
+        ref: returns_fact.product_brand
+    confidence: 0.98
+
+  - id: region
+    term: region
+    definition: The geographic region assigned to the customer or traffic record. It is used to compare activity and performance across areas.
+    aliases:
+      vi: [khu vực, vùng, miền]
+      en: [region, area]
+    targets:
+      - {kind: column, dataset: sales_lines, column: customer_region}
+      - {kind: column, dataset: returns_fact, column: customer_region}
+      - {kind: column, dataset: sessions_daily, column: customer_region}
+    status: approved
+    evidence:
+      - kind: profile
+        ref: sales_lines.customer_region
+      - kind: profile
+        ref: returns_fact.customer_region
+      - kind: profile
+        ref: sessions_daily.customer_region
+    confidence: 0.98
+
+  - id: customer_segment
+    term: customer segment
+    definition: "The customer classification used to group customers into segments such as loyalty or value tiers. It supports analysis by customer type across sales, returns, and traffic."
+    aliases:
+      vi: [phân khúc khách hàng, nhóm khách hàng, phân khúc]
+      en: [customer segment, segment, customer group]
+    targets:
+      - {kind: column, dataset: sales_lines, column: customer_segment}
+      - {kind: column, dataset: returns_fact, column: customer_segment}
+      - {kind: column, dataset: sessions_daily, column: customer_segment}
+    status: approved
+    evidence:
+      - kind: profile
+        ref: sales_lines.customer_segment
+      - kind: profile
+        ref: returns_fact.customer_segment
+      - kind: profile
+        ref: sessions_daily.customer_segment
+    confidence: 0.98
+
+  - id: channel
+    term: channel
+    definition: The acquisition or marketing source associated with a session. It is used to break down traffic and conversion performance by source.
+    aliases:
+      vi: [kênh, kênh truy cập, nguồn truy cập]
+      en: [channel, traffic source, marketing channel]
+    targets: [{kind: column, dataset: sessions_daily, column: channel}]
+    status: approved
+    evidence:
+      - kind: profile
+        ref: sessions_daily.channel
+    confidence: 0.98
+
+  - id: device
+    term: device
+    definition: The type of device used for a session, such as mobile, desktop, or tablet. It helps compare user behavior and outcomes by device type.
+    aliases:
+      vi: [thiết bị, loại thiết bị]
+      en: [device, device type]
+    targets: [{kind: column, dataset: sessions_daily, column: device}]
+    status: approved
+    evidence:
+      - kind: profile
+        ref: sessions_daily.device
+    confidence: 0.98
+
+  - id: payment_method
+    term: payment method
+    definition: The payment option used to complete an order line. It identifies how the customer paid, such as card, wallet, or gift card.
+    aliases:
+      vi: [phương thức thanh toán, hình thức thanh toán]
+      en: [payment method, payment type]
+    targets: [{kind: column, dataset: sales_lines, column: payment_method}]
+    status: approved
+    evidence:
+      - kind: profile
+        ref: sales_lines.payment_method
+    confidence: 0.98
+
+  - id: return_reason
+    term: return reason
+    definition: The stated reason why an item was returned. It is used to analyze the causes of returns across products and customers.
+    aliases:
+      vi: [lý do trả hàng, lý do hoàn trả]
+      en: [return reason, reason for return]
+    targets: [{kind: column, dataset: returns_fact, column: return_reason}]
+    status: approved
+    evidence:
+      - kind: profile
+        ref: returns_fact.return_reason
+    confidence: 0.98
+
+  - id: vip_customers
+    term: VIP customers
+    definition: Customers classified in the VIP segment. This term maps to records where the customer segment is marked as vip.
+    aliases:
+      vi: [khách VIP, khách hàng VIP]
+      en: [VIP customers, VIPs]
+    targets:
+      - {kind: value, dataset: sales_lines, column: customer_segment, value: vip}
+      - {kind: value, dataset: sessions_daily, column: customer_segment, value: vip}
+    status: approved
+    evidence:
+      - kind: profile
+        ref: sales_lines.customer_segment
+      - kind: profile
+        ref: sessions_daily.customer_segment
+    confidence: 0.97
+
+  - id: cancelled_orders
+    term: cancelled orders
+    definition: Orders or order lines whose status is marked as cancelled. People use this term to refer to sales that did not complete.
+    aliases:
+      vi: [đơn bị hủy, đơn hủy, đơn hàng đã hủy]
+      en: [cancelled orders, canceled orders, cancellations]
+    targets: [{kind: value, dataset: sales_lines, column: order_status, value: cancelled}]
+    status: approved
+    evidence:
+      - kind: profile
+        ref: sales_lines.order_status
+    confidence: 0.97

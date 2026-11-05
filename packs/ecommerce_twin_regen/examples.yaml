@@ -1,0 +1,74 @@
+# Few-shot examples. Periods are half-open date ranges [start, end).
+examples:
+  - id: top_products_two_quarters
+    question: Top 10 sản phẩm bán chạy nhất quý 1/2025 so với quý 1/2024
+    language: vi
+    sql: |-
+      SELECT
+          product_id,
+          sumIf(line_amount, order_date >= toDate('2025-01-01') AND order_date < toDate('2025-04-01')) AS net_sales_q1_2025,
+          sumIf(line_amount, order_date >= toDate('2024-01-01') AND order_date < toDate('2024-04-01')) AS net_sales_q1_2024,
+          net_sales_q1_2025 - net_sales_q1_2024 AS net_sales_change
+      FROM marts.sales_lines
+      WHERE order_status != 'cancelled'
+        AND order_date >= toDate('2024-01-01')
+        AND order_date < toDate('2025-04-01')
+      GROUP BY product_id
+      ORDER BY net_sales_q1_2025 DESC, product_id
+      LIMIT 10
+    datasets: [sales_lines]
+    metrics: [net_sales]
+    status: approved
+    evidence: &owner [{kind: manual, ref: dbt/macros/top_products_q1_compare.sql}]
+    confidence: 1.0
+
+  - id: monthly_net_sales
+    question: Monthly net sales in 2024
+    language: en
+    sql: |-
+      SELECT
+          toStartOfMonth(order_date) AS month,
+          sumIf(line_amount, order_status != 'cancelled') AS net_sales
+      FROM marts.sales_lines
+      WHERE order_date >= toDate('2024-01-01') AND order_date < toDate('2025-01-01')
+      GROUP BY month
+      ORDER BY month
+    datasets: [sales_lines]
+    metrics: [net_sales]
+    status: approved
+    evidence: &manual [{kind: manual, ref: packs/ecommerce_twin/metrics.yaml}]
+    confidence: 1.0
+
+  - id: conversion_rate_by_channel
+    question: Tỉ lệ chuyển đổi theo kênh truy cập năm 2025
+    language: vi
+    sql: |-
+      SELECT
+          channel,
+          sum(converted_sessions) / nullIf(sum(sessions), 0) AS conversion_rate
+      FROM marts.sessions_daily
+      WHERE session_date >= toDate('2025-01-01') AND session_date < toDate('2026-01-01')
+      GROUP BY channel
+      ORDER BY conversion_rate DESC
+    datasets: [sessions_daily]
+    metrics: [conversion_rate]
+    status: approved
+    evidence: *manual
+    confidence: 1.0
+
+  - id: refunds_by_reason
+    question: Refunds by return reason in Q1 2025
+    language: en
+    sql: |-
+      SELECT
+          return_reason,
+          sum(refund_amount) AS refund_total
+      FROM marts.returns_fact
+      WHERE return_date >= toDate('2025-01-01') AND return_date < toDate('2025-04-01')
+      GROUP BY return_reason
+      ORDER BY refund_total DESC
+    datasets: [returns_fact]
+    metrics: [refund_total]
+    status: approved
+    evidence: *manual
+    confidence: 1.0

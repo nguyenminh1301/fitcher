@@ -1,7 +1,7 @@
 // Contracts the backend has no Pydantic model for yet (DECISIONS §7 and §15): the sample-data mode uses
 // them until the phase named on each type adds its model and generated type, then deletes it here.
 
-import type { ChartSpec, Result } from "@/lib/contracts";
+import type { ChartSpec, DatasetView, DocumentView, Result, ReviewItem } from "@/lib/contracts";
 
 import type { ConversationThread } from "./conversations";
 import type { AskEvent } from "./events";
@@ -13,36 +13,11 @@ export interface Identity {
   roles: string[];
 }
 
-/** Console rows; Datasets, Review and Documents in Phase 10, the rest in Phase 12. */
-export interface DatasetView {
-  id: string;
-  description: string;
-  grain: string;
-  time_column: string;
-  readable_roles: string[];
-  columns: { name: string; type: string; role: string; description: string }[];
-}
-export interface ReviewItem {
-  id: string;
-  file: string;
-  name: string;
-  kind: "item" | "proposal";
-  status: "draft" | "approved";
-  confidence: number;
-  body: string;
-  formula?: string;
-  evidence?: { source: string; quote?: string; deleted?: boolean };
-  test_result?: Result;
-}
-export interface DocumentRow {
-  id: string;
-  name: string;
-  size: number;
-  status: "processing" | "indexed" | "failed";
+/** A sample document row; the mock fills the rest of DocumentView, which only the api knows. */
+export type SampleDocument = Pick<DocumentView, "id" | "name" | "size" | "status" | "roles" | "uploaded_at"> & {
   error?: string;
-  roles: string[];
-  uploaded_at: string;
-}
+};
+/** Console rows the backend serves in Phase 12. */
 export interface FeedbackRow {
   trace_id: string;
   ts: string;
@@ -140,7 +115,7 @@ export interface ConsoleFile {
   conversations: ConversationThread[];
   datasets: DatasetView[];
   review_items: ReviewItem[];
-  documents: DocumentRow[];
+  documents: SampleDocument[];
   feedback: FeedbackRow[];
   eval_reports: EvalReport[];
   runs: RunRow[];

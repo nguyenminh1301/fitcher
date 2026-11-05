@@ -7,7 +7,7 @@ import uuid
 import httpx
 import pytest
 
-from app.search.client import QdrantSearch, SearchError, point_id
+from app.search.client import QdrantSearch, SearchError, document_filter, point_id
 
 
 def client(handler) -> tuple[QdrantSearch, list[tuple[str, str, dict | None]]]:
@@ -113,3 +113,32 @@ def test_live_a_role_never_receives_a_point_it_may_not_read():
             assert all(role in hit["source"]["allowed_roles"] for hit in hits)
     finally:
         search.delete_collection(name)
+
+
+def test_scroll_pages_until_there_is_no_next_offset():
+    pages = iter([
+        {"points": [{"id": "a", "payload": {"id": "d#0"}, "vector": {"dense": [1.0]}}], "next_page_offset": "b"},
+        {"points": [{"id": "b", "payload": {"id": "d#1"}, "vector": {"dense": [2.0]}}], "next_page_offset": None},
+    ])
+    search, sent = client(lambda request, body: ok(next(pages)))
+
+    points = search.scroll("shop_kb_docs", document_filter("d"), with_vectors=True)
+
+    assert [point["payload"]["id"] for point in points] == ["d#0", "d#1"]
+    assert [path for _, path, _ in sent] == ["/collections/shop_kb_docs/points/scroll"] * 2
+    first, second = sent[0][2], sent[1][2]
+    assert first["filter"] == {"must": [{"key": "document_id", "match": {"value": "d"}}]}
+    assert first["with_vector"] is True and first["with_payload"] is True and "offset" not in first
+    assert second["offset"] == "b"
+
+
+def test_points_are_deleted_and_payload_set_by_filter_and_wait():
+    search, sent = client(lambda request, body: ok({"status": "completed"}))
+
+    search.delete_points("shop_kb_docs", document_filter("d"))
+    search.set_payload("shop_kb_docs", {"allowed_roles": ["analyst"]}, document_filter("d"))
+
+    assert sent[0][:2] == ("POST", "/collections/shop_kb_docs/points/delete")
+    assert sent[0][2] == {"filter": {"must": [{"key": "document_id", "match": {"value": "d"}}]}}
+    assert sent[1][:2] == ("POST", "/collections/shop_kb_docs/points/payload")
+    assert sent[1][2] == {"payload": {"allowed_roles": ["analyst"]}, "filter": document_filter("d")}

@@ -13,7 +13,7 @@ import { ALLOWED_EXTENSIONS, MAX_UPLOAD_BYTES, UploadDropzone } from "@/componen
 import { Button } from "@/components/ui/controls";
 import { WarningBanner } from "@/components/ui/feedback";
 import { Dialog } from "@/components/ui/overlay";
-import type { DocumentRow as Document } from "@/lib/api/provisional";
+import type { DocumentView as Document } from "@/lib/contracts";
 import { useChat } from "@/lib/chat/ChatContext";
 import { useLoad } from "@/lib/console/useLoad";
 import { useI18n } from "@/lib/i18n/react";
@@ -27,10 +27,12 @@ export function DocumentsSection() {
   const { toast } = useConsole();
   const { data, failed, reload } = useLoad(useCallback(() => api.documents.list(), [api]));
   const [error, setError] = useState<string | null>(null);
-  const [compiling, setCompiling] = useState(false);
+  const [draftRunning, setDraftRunning] = useState(false);
   const [deleting, setDeleting] = useState<Document | null>(null);
   const [drafting, setDrafting] = useState<Document | null>(null);
-  const documents = data ?? [];
+  const documents = data?.documents ?? [];
+  // Uploads and deletes wait while the pack compiles; drafting runs one document at a time.
+  const compiling = (data?.compiling ?? false) || draftRunning;
   const processing = documents.some((document) => document.status === "processing");
 
   useEffect(() => {
@@ -42,25 +44,31 @@ export function DocumentsSection() {
   async function upload(files: File[]) {
     for (const file of files) {
       const extension = file.name.split(".").pop()?.toLowerCase() ?? "";
-      if (documents.some((document) => document.name === file.name)) setError(t("ui.duplicate", { name: file.name }));
-      else if (!ALLOWED_EXTENSIONS.includes(extension)) setError(t("ui.badType", { name: file.name }));
+      if (!ALLOWED_EXTENSIONS.includes(extension)) setError(t("ui.badType", { name: file.name }));
       else if (file.size > MAX_UPLOAD_BYTES) setError(t("ui.tooBig", { name: file.name }));
       else {
         setError(null);
-        await api.documents.upload({ name: file.name, size: file.size }, []);
-        toast(t("ui.uploaded", { name: file.name }));
+        try {
+          // Every pack role may read a new document until the reviewer narrows it with the role chips.
+          await api.documents.upload(file, pack?.roles ?? []);
+          toast(t("ui.uploaded", { name: file.name }));
+        } catch (reason) {
+          setError(reason instanceof Error ? reason.message : String(reason));
+        }
       }
     }
     await reload();
   }
 
   async function draft(document: Document) {
-    setCompiling(true);
+    setDraftRunning(true);
     toast(t("ui.drafting", { name: document.name }));
     try {
       await api.documents.draft(document.id);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : String(reason));
     } finally {
-      setCompiling(false);
+      setDraftRunning(false);
     }
   }
 

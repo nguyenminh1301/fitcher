@@ -3,7 +3,7 @@
 import { Icon } from "@/components/brand/Icon";
 import { Button, Chip } from "@/components/ui/controls";
 import { StatusPill } from "@/components/ui/feedback";
-import type { DocumentRow as Document } from "@/lib/api/provisional";
+import type { DocumentView as Document } from "@/lib/contracts";
 import { useI18n } from "@/lib/i18n/react";
 
 type Props = {

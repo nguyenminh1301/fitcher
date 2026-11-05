@@ -8,6 +8,7 @@ from conftest import FIXTURE_PACK, SCHEMA_DIR, fixture_catalog
 from fakes import FakeEmbeddings, FakeSearch, FakeWarehouse
 import pytest
 
+from app.onboarding.documents import DocumentRecord, InMemoryDocumentRegistry, compile_lock_path
 from jobs import compile_pack as cli
 
 
@@ -37,7 +38,11 @@ def services(monkeypatch, tmp_path):
     monkeypatch.setattr(cli, "ClickHouseWarehouse", lambda client: fake_warehouse)
     monkeypatch.setattr(cli, "QdrantSearch", lambda url: search)
     monkeypatch.setattr(cli, "LiteLLMEmbeddings", lambda *args, **kwargs: FakeEmbeddings())
+    monkeypatch.setattr(cli, "ClickHouseDocumentRegistry", lambda client: registry)
     return search
+
+
+registry = InMemoryDocumentRegistry()
 
 
 def test_compile_prints_the_live_generation(packs_dir, services, capsys):
@@ -105,3 +110,35 @@ def test_check_search_before_any_compile_fails_clearly(services, capsys):
 
     assert code == 1
     assert "compile the pack first" in capsys.readouterr().err
+
+
+def test_compile_holds_the_lock_while_it_runs_and_releases_it(packs_dir, services, tmp_path, monkeypatch):
+    seen = []
+    original = cli.compile_pack
+
+    def spy(*args, **kwargs):
+        seen.append(compile_lock_path(tmp_path / "build", "minimal").exists())
+        raise cli.CompileError("boom")
+
+    monkeypatch.setattr(cli, "compile_pack", spy)
+    assert cli.main(["--pack", "minimal", "--packs-dir", str(packs_dir)]) == 1
+    assert seen == [True]
+    assert not compile_lock_path(tmp_path / "build", "minimal").exists()
+    assert original is not spy
+
+
+def test_compile_waits_for_documents_still_processing(packs_dir, services, tmp_path, monkeypatch, capsys):
+    from datetime import UTC, datetime
+
+    now = datetime(2026, 11, 5, tzinfo=UTC)
+    registry.write(DocumentRecord(
+        id="d1", pack="minimal", file_name="a.md", media_type="text/markdown", size_bytes=1, sha256="x",
+        uploaded_by="u", allowed_roles=["viewer"], status="processing", uploaded_at=now, updated_at=now,
+    ))
+    monkeypatch.setattr(cli, "UPLOAD_WAIT_SECONDS", 0)
+    try:
+        assert cli.main(["--pack", "minimal", "--packs-dir", str(packs_dir)]) == 1
+    finally:
+        registry.rows.clear()
+    assert "documents are still processing: a.md" in capsys.readouterr().err
+    assert not compile_lock_path(tmp_path / "build", "minimal").exists()

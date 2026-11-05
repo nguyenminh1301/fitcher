@@ -84,6 +84,19 @@ class SearchRequest:
     size: int
 
 
+def matches(payload: dict, flt: dict | None) -> bool:
+    """Whether a payload passes a Qdrant ``must`` filter of ``match.value`` or ``match.any`` conditions."""
+    for condition in (flt or {}).get("must", []):
+        value = payload.get(condition["key"])
+        expected = condition["match"]
+        values = value if isinstance(value, list) else [value]
+        if "value" in expected and expected["value"] not in values:
+            return False
+        if "any" in expected and not set(values) & set(expected["any"]):
+            return False
+    return True
+
+
 class FakeSearch:
     """In-memory Qdrant: collections, points, aliases and a call log.
 
@@ -126,15 +139,38 @@ class FakeSearch:
             else:
                 self.aliases[action["create_alias"]["alias_name"]] = action["create_alias"]["collection_name"]
 
+    def _resolve(self, name: str) -> str:
+        """The collection a name or alias points at."""
+        name = self.aliases.get(name, name)
+        if name not in self.points:
+            raise SearchError(f"collection {name} does not exist")
+        return name
+
     def upsert(self, name: str, points: Iterable[dict]) -> int:
         if self.fail_upsert_into and self.fail_upsert_into in name:
             raise SearchError(f"PUT /collections/{name}/points returned HTTP 500")
         points = list(points)
-        self.points[name].extend(points)
+        stored = self.points[self._resolve(name)]
+        ids = {point["id"] for point in points}
+        stored[:] = [point for point in stored if point["id"] not in ids] + points
         return len(points)
 
     def count(self, name: str) -> int:
-        return len(self.points[name])
+        return len(self.points[self._resolve(name)])
+
+    def scroll(self, name: str, flt: dict | None = None, with_vectors: bool = False) -> list[dict]:
+        found = [point for point in self.points[self._resolve(name)] if matches(point["payload"], flt)]
+        return [{"id": point["id"], "payload": dict(point["payload"]),
+                 **({"vector": point["vector"]} if with_vectors else {})} for point in found]
+
+    def delete_points(self, name: str, flt: dict) -> None:
+        collection = self._resolve(name)
+        self.points[collection] = [point for point in self.points[collection] if not matches(point["payload"], flt)]
+
+    def set_payload(self, name: str, payload: dict, flt: dict) -> None:
+        for point in self.points[self._resolve(name)]:
+            if matches(point["payload"], flt):
+                point["payload"].update(payload)
 
     def query(self, alias: str, text: str, vector, roles, size: int) -> list[dict]:
         """The agent's search interface; ``search_results`` is called with the alias and the request."""

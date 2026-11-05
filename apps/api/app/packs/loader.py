@@ -107,6 +107,15 @@ def _schema_issues(file: str, data: object, validator: Draft202012Validator) -> 
             yield PackIssue(file, item_path(path), error.message)
 
 
+def file_issues(file: str, text: str, schema_dir: Path) -> list[PackIssue]:
+    """Schema issues of one pack file's text, read with the pack YAML rules."""
+    try:
+        data = yaml.load(text, Loader=_PackYamlLoader)  # noqa: S506 - SafeLoader subclass
+    except yaml.YAMLError as error:
+        return [PackIssue(file, "", f"invalid YAML: {error}")]
+    return list(_schema_issues(file, data, _validators(schema_dir)[file]))
+
+
 def read_yaml(path: Path) -> object:
     """Parse one pack file with the pack YAML rules."""
     return yaml.load(path.read_text(encoding="utf-8"), Loader=_PackYamlLoader)  # noqa: S506 - SafeLoader subclass

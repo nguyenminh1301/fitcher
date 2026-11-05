@@ -48,7 +48,7 @@ class ColumnValue:
     count: int
 
 
-class _Roles:
+class PackRoles:
     """Roles allowed to see each dataset, column and metric, from policies.yaml grants.
 
     An aggregate-only grant shows its grouped columns and listed metrics only,
@@ -115,7 +115,7 @@ def build_documents(pack: Pack, column_values: Sequence[ColumnValue]) -> dict[st
     Every document carries an ``embedding_text``, which the compiler embeds
     into the point's dense vector and leaves out of the payload.
     """
-    roles = _Roles(pack)
+    roles = PackRoles(pack)
     metric_dataset = {metric.id: metric.dataset for metric in pack.metrics.metrics}
     documents: dict[str, list[dict]] = {name: [] for name in INDEX_NAMES}
 

@@ -42,6 +42,11 @@ def role_filter(roles: Sequence[str]) -> dict:
     return {"must": [{"key": "allowed_roles", "match": {"any": list(roles)}}]}
 
 
+def document_filter(document_id: str) -> dict:
+    """Every ``kb_docs`` chunk of one company document."""
+    return {"must": [{"key": "document_id", "match": {"value": document_id}}]}
+
+
 def uses_trigrams(name: str) -> bool:
     """Column value collections, and their aliases, also carry character trigrams."""
     return "_column_values" in name
@@ -121,6 +126,29 @@ class QdrantSearch:
     def _upsert(self, name: str, points: list[dict]) -> int:
         self._request("PUT", f"/collections/{name}/points", params={"wait": "true"}, json={"points": points})
         return len(points)
+
+    def scroll(self, name: str, flt: dict | None = None, with_vectors: bool = False) -> list[dict]:
+        """Every point of ``name`` (a collection or alias) matching ``flt``, page by page."""
+        points: list[dict] = []
+        offset = None
+        while True:
+            body: dict = {"limit": UPSERT_BATCH, "with_payload": True, "with_vector": with_vectors}
+            if flt is not None:
+                body["filter"] = flt
+            if offset is not None:
+                body["offset"] = offset
+            result = self._request("POST", f"/collections/{name}/points/scroll", json=body) or {}
+            points.extend(result.get("points", []))
+            offset = result.get("next_page_offset")
+            if offset is None:
+                return points
+
+    def delete_points(self, name: str, flt: dict) -> None:
+        self._request("POST", f"/collections/{name}/points/delete", params={"wait": "true"}, json={"filter": flt})
+
+    def set_payload(self, name: str, payload: dict, flt: dict) -> None:
+        self._request("POST", f"/collections/{name}/points/payload", params={"wait": "true"},
+                      json={"payload": payload, "filter": flt})
 
     def count(self, name: str) -> int:
         return self._request("POST", f"/collections/{name}/points/count", json={"exact": True})["count"]

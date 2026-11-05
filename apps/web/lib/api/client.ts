@@ -1,19 +1,28 @@
 // The web app's whole view of the backend, one group per feature. Each feature has a sample
 // implementation (lib/api/mock) and a real one (lib/api/http); lib/api/sources.ts picks per feature.
 
-import type { AskRequest, ConversationPatch, FeedbackInput, ModelTier, ModelTiers } from "@/lib/contracts";
+import type {
+  AskRequest,
+  ConversationPatch,
+  DatasetView,
+  DocumentList,
+  DocumentView,
+  DraftResult,
+  FeedbackInput,
+  ModelTier,
+  ModelTiers,
+  ReviewItem,
+  ReviewItemPatch,
+} from "@/lib/contracts";
 
 import type { Conversation, ConversationGroup, ConversationThread } from "./conversations";
 import type { AskEvent } from "./events";
 import type {
   AuditRow,
   CostRow,
-  DatasetView,
-  DocumentRow,
   EvalReport,
   FeedbackRow,
   Identity,
-  ReviewItem,
   RunRow,
   TraceItem,
   UserRow,
@@ -51,17 +60,21 @@ export interface FitcherApi {
   datasets: { list(): Promise<DatasetView[]> };
   review: {
     items(): Promise<ReviewItem[]>;
-    update(id: string, patch: Partial<Pick<ReviewItem, "body" | "formula">>): Promise<void>;
+    /** Edit an item's text or formula; it returns to draft until approved again. */
+    update(id: string, patch: ReviewItemPatch): Promise<void>;
+    /** Approve an item; one with a formula is approved only after a clean test-run. */
     approve(id: string): Promise<void>;
     remove(id: string): Promise<void>;
     testRun(id: string): Promise<ReviewItem>;
   };
   documents: {
-    list(): Promise<DocumentRow[]>;
-    upload(file: { name: string; size: number }, roles: string[]): Promise<DocumentRow>;
+    /** The pack's documents, and whether it compiles, which blocks uploads and deletes. */
+    list(): Promise<DocumentList>;
+    upload(file: File, roles: string[]): Promise<DocumentView>;
     remove(id: string): Promise<void>;
     setRoles(id: string, roles: string[]): Promise<void>;
-    draft(id: string): Promise<void>;
+    /** Draft pack items from one indexed document; it uses paid AI. */
+    draft(id: string): Promise<DraftResult>;
   };
   feedbackReview: {
     list(): Promise<FeedbackRow[]>;

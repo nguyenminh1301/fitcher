@@ -5,8 +5,11 @@ import type { Feature, FitcherApi } from "../client";
 import { httpAuth } from "./auth";
 import { httpChat } from "./chat";
 import { httpConversations } from "./conversations";
+import { httpDatasets } from "./datasets";
+import { httpDocuments } from "./documents";
 import { httpFeedback } from "./feedback";
 import { httpModels } from "./models";
+import { httpReview } from "./review";
 
 export class NotWiredError extends Error {
   constructor(readonly feature: Feature) {
@@ -25,9 +28,9 @@ export const httpApi: FitcherApi = {
   chat: httpChat,
   conversations: httpConversations,
   feedback: httpFeedback,
-  datasets: asyncNotWired("datasets"),
-  review: asyncNotWired("review"),
-  documents: asyncNotWired("documents"),
+  datasets: httpDatasets,
+  review: httpReview,
+  documents: httpDocuments,
   feedbackReview: asyncNotWired("feedbackReview"),
   evaluation: asyncNotWired("evaluation"),
   runs: asyncNotWired("runs"),

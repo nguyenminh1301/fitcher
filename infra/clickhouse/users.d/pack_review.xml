@@ -1,0 +1,24 @@
+<clickhouse>
+    <!--
+        The api's Review, Documents and Datasets paths (DECISIONS §5, §15).
+        It writes the document registry data_meta.documents, which no other
+        api user can reach, and reads marts to test-run metric expressions
+        and example SQL for a reviewer; those queries send readonly=2 and the
+        QUERY_MAX_* limits as settings. The password comes from the
+        clickhouse container environment.
+    -->
+    <users>
+        <pack_review>
+            <password from_env="CLICKHOUSE_PACK_REVIEW_PASSWORD"/>
+            <profile>default</profile>
+            <quota>default</quota>
+            <networks>
+                <ip>::/0</ip>
+            </networks>
+            <grants>
+                <query>GRANT SELECT, INSERT ON data_meta.documents</query>
+                <query>GRANT SELECT ON marts.*</query>
+            </grants>
+        </pack_review>
+    </users>
+</clickhouse>

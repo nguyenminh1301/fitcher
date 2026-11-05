@@ -73,6 +73,15 @@ def test_settings_defaults():
     assert settings.embedding_dimensions == 1024
     assert settings.column_values_top_k == 10_000
     assert settings.compiled_pack_dir == "build/packs"
+    assert settings.documents_dir == "build/documents"
+    assert settings.document_max_bytes == 20 * 1024 * 1024
+    assert settings.packs_dir == "packs"
+
+
+@pytest.mark.parametrize("value", ["abc", "0"])
+def test_invalid_document_size_cap_is_rejected(value):
+    with pytest.raises(SettingsError, match="DOCUMENT_MAX_BYTES"):
+        load_settings({"DOCUMENT_MAX_BYTES": value})
 
 
 @pytest.mark.parametrize("value", ["abc", "0", "-5"])

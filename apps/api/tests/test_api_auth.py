@@ -13,6 +13,7 @@ from app.main import app
 def client():
     app.dependency_overrides[runtime.get_verifier] = lambda: verifier()
     app.dependency_overrides[runtime.get_compiled] = compiled_fixture
+    app.dependency_overrides[runtime.get_compiled_or_none] = compiled_fixture
     with TestClient(app) as test_client:
         yield test_client
     app.dependency_overrides.clear()
@@ -76,11 +77,27 @@ def test_pack_names_the_active_pack_and_its_roles_without_a_token(client):
     }
 
 
+def test_a_pack_under_onboarding_signs_in_from_its_pack_files(client, monkeypatch, tmp_path):
+    from conftest import FIXTURE_PACK
+
+    del app.dependency_overrides[runtime.get_compiled_or_none]
+    runtime.get_compiled.cache_clear()
+    monkeypatch.setenv("ACTIVE_PACK", "minimal")
+    monkeypatch.setenv("COMPILED_PACK_DIR", str(tmp_path / "build"))
+    monkeypatch.setenv("PACKS_DIR", str(FIXTURE_PACK.parent))
+
+    assert client.get("/pack").json() == {"name": "minimal", "display_name": "Minimal widget shop", "roles": ["viewer"]}
+    me = client.get("/me", headers=bearer(token(realm_access={"roles": ["viewer", "pack_reviewer"]}))).json()
+    assert me["roles"] == ["viewer", "pack_reviewer"] and me["active_role"] == "viewer"
+
+
 def test_an_uncompiled_pack_makes_the_endpoints_unavailable(client, monkeypatch, tmp_path):
     del app.dependency_overrides[runtime.get_compiled]
+    del app.dependency_overrides[runtime.get_compiled_or_none]
     runtime.get_compiled.cache_clear()
     monkeypatch.setenv("ACTIVE_PACK", "demo")
     monkeypatch.setenv("COMPILED_PACK_DIR", str(tmp_path))
+    monkeypatch.setenv("PACKS_DIR", str(tmp_path / "packs"))
 
     response = client.get("/pack")
 

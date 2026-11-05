@@ -19,6 +19,7 @@ Versions without that line are kept only so earlier eval results stay comparable
 | `generate_sql.v2.md` | `sql-gen`, `sql-gen-hard` on the third retry | One ClickHouse SELECT for the QuerySpec over the permitted schema, metric expressions, declared joins and examples, with the previous SQL and error on a retry |
 | `chart_recommender.v2.md` | `fast` | `bar` or `pie` for a question whose rows suit both, from the question only, never the rows |
 | `summarize.v2.md` | `fast` | Two to four sentences in the question's language from the returned rows only |
+| `draft_datasets.v1.md`, `draft_glossary.v1.md`, `draft_metrics.v1.md`, `draft_examples.v1.md` | `sql-gen` | Draft items of one pack file for review, with evidence and confidence, from the mart profile, the pack's existing items and document chunks; never an approved id, no figures from document text (`app.onboarding.drafter`) |
 
 Change a prompt by adding a new version file and pointing its node at it, so earlier eval results stay comparable.
 

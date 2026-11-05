@@ -51,8 +51,8 @@ describe("api client", () => {
   });
 
   it("an http feature that is not wired yet says which one", async () => {
-    await expect(httpApi.datasets.list()).rejects.toBeInstanceOf(NotWiredError);
-    await expect(httpApi.datasets.list()).rejects.toThrow("datasets");
+    await expect(httpApi.runs.list()).rejects.toBeInstanceOf(NotWiredError);
+    await expect(httpApi.runs.list()).rejects.toThrow("runs");
   });
 
   it("missing sample data yields empty lists, not an exception", async () => {
