@@ -19,6 +19,8 @@ services:
       CLICKHOUSE_CONVERSATIONS_PASSWORD: ${CLICKHOUSE_CONVERSATIONS_PASSWORD:?set CLICKHOUSE_CONVERSATIONS_PASSWORD in .env}
       # Read by users.d/model_tiers.xml.
       CLICKHOUSE_MODEL_TIERS_PASSWORD: ${CLICKHOUSE_MODEL_TIERS_PASSWORD:?set CLICKHOUSE_MODEL_TIERS_PASSWORD in .env}
+      # Read by users.d/pack_review.xml.
+      CLICKHOUSE_PACK_REVIEW_PASSWORD: ${CLICKHOUSE_PACK_REVIEW_PASSWORD:?set CLICKHOUSE_PACK_REVIEW_PASSWORD in .env}
       # Read by users.d/sources.xml for source_loader, the only user of the source named collections.
       CLICKHOUSE_SOURCES_PASSWORD: ${CLICKHOUSE_SOURCES_PASSWORD:?set CLICKHOUSE_SOURCES_PASSWORD in .env}
       # Read-only source credentials, read by config.d/sources.xml (DECISIONS §4 Data sources).
@@ -53,6 +55,7 @@ services:
       - ./infra/clickhouse/users.d/agent_query_stopper.xml:/etc/clickhouse-server/users.d/agent_query_stopper.xml:ro
       - ./infra/clickhouse/users.d/agent_conversations.xml:/etc/clickhouse-server/users.d/agent_conversations.xml:ro
       - ./infra/clickhouse/users.d/model_tiers.xml:/etc/clickhouse-server/users.d/model_tiers.xml:ro
+      - ./infra/clickhouse/users.d/pack_review.xml:/etc/clickhouse-server/users.d/pack_review.xml:ro
       - ./infra/clickhouse/users.d/sources.xml:/etc/clickhouse-server/users.d/sources.xml:ro
       - ./infra/clickhouse/config.d/sources.xml:/etc/clickhouse-server/config.d/sources.xml:ro
       - ./infra/clickhouse/initdb:/docker-entrypoint-initdb.d:ro
@@ -171,6 +174,12 @@ services:
       CLICKHOUSE_CONVERSATIONS_PASSWORD: ${CLICKHOUSE_CONVERSATIONS_PASSWORD:?set CLICKHOUSE_CONVERSATIONS_PASSWORD in .env}
       # Reads and writes the model tier mapping of the Models page.
       CLICKHOUSE_MODEL_TIERS_PASSWORD: ${CLICKHOUSE_MODEL_TIERS_PASSWORD:?set CLICKHOUSE_MODEL_TIERS_PASSWORD in .env}
+      # Writes the document registry and test-runs reviewed metrics (users.d/pack_review.xml).
+      CLICKHOUSE_PACK_REVIEW_PASSWORD: ${CLICKHOUSE_PACK_REVIEW_PASSWORD:?set CLICKHOUSE_PACK_REVIEW_PASSWORD in .env}
+      # Company documents (DECISIONS §5) and the pack working tree the Review UI writes (never committed by the app).
+      DOCUMENTS_DIR: /app/build/documents
+      DOCUMENT_MAX_BYTES: ${DOCUMENT_MAX_BYTES:-20971520}
+      PACKS_DIR: /app/packs
       # Default catalog alias of each model tier (apps/api/app/llm/tiers.py).
       MODEL_TIER_FAST: ${MODEL_TIER_FAST:-openai-small}
       MODEL_TIER_SQL_SMALL: ${MODEL_TIER_SQL_SMALL:-openai-small}
@@ -202,6 +211,8 @@ services:
     volumes:
       - compiled-packs:/app/build/packs:ro
       - guard-models:/app/build/guard_model:ro
+      - documents:/app/build/documents
+      - ./packs:/app/packs
     depends_on:
       clickhouse:
         condition: service_healthy
@@ -256,10 +267,15 @@ services:
       SCREEN_FLAG_AT: ${SCREEN_FLAG_AT:-0.5}
       SCREEN_BLOCK_AT: ${SCREEN_BLOCK_AT:-0.9}
       GUARD_MODEL_DIR: /app/build/guard_model
+      DOCUMENTS_DIR: /app/build/documents
+      DOCUMENT_MAX_BYTES: ${DOCUMENT_MAX_BYTES:-20971520}
+      PACKS_DIR: /app/packs
     volumes:
       - ./data:/app/data
       - compiled-packs:/app/build/packs
       - guard-models:/app/build/guard_model:ro
+      - documents:/app/build/documents
+      - ./packs:/app/packs
     depends_on:
       clickhouse:
         condition: service_healthy
@@ -415,5 +431,7 @@ volumes:
   compiled-packs:
   # The screening classifier, written by guard-model and read by api and jobs.
   guard-models:
+  # Original company documents, written by the api and ingest_docs and re-read by compile_pack.
+  documents:
   # Models pulled into the optional ollama service.
   ollama-models:

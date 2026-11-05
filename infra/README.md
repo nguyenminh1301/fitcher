@@ -40,8 +40,8 @@ The agent runs every generated query as the ClickHouse user of the asking role, 
 `compile_pack` creates these users, their roles, column grants, row policies, aggregate-only views and the shared read-only profile from the pack's `policies.yaml` (see [packs/](../packs/README.md#compiling-a-pack)); they live in the data volume and are reconciled on every compile.
 Their passwords derive from `CLICKHOUSE_AGENT_PASSWORD`; after changing it, run `compile_pack` again.
 
-Run logs live in `agent_logs`. On a volume created before `010-agent-logs.sql` or `020-model-tiers.sql` existed, or before one of their tables or columns was added, create what is missing with `docker compose run --rm jobs python -m jobs.apply_log_schema`.
-Five configuration users reach it, each with its own password:
+Run logs live in `agent_logs`. On a volume created before `010-agent-logs.sql`, `020-model-tiers.sql` or `030-documents.sql` existed, or before one of their tables or columns was added, create what is missing with `docker compose run --rm jobs python -m jobs.apply_log_schema`.
+Six configuration users reach it and the registries in `data_meta`, each with its own password:
 
 | User | Password | Access |
 | --- | --- | --- |
@@ -50,9 +50,10 @@ Five configuration users reach it, each with its own password:
 | `agent_logs_review_reader` | `CLICKHOUSE_REVIEW_READER_PASSWORD` | `SELECT` on `example_proposals`, `feedback` and `chat_messages` for the `pack_reviewer` and `admin` paths |
 | `agent_conversations` | `CLICKHOUSE_CONVERSATIONS_PASSWORD` | `SELECT` and `INSERT` on `chat_messages`, `conversations` and `conversation_groups`; the api's conversation store, which filters every query by the requesting user |
 | `model_tiers_admin` | `CLICKHOUSE_MODEL_TIERS_PASSWORD` | `SELECT` and `INSERT` on `data_meta.model_tiers`, `SELECT` on `eval_reports` and `INSERT` on `admin_actions`; the api's tier lookup and Models page |
+| `pack_review` | `CLICKHOUSE_PACK_REVIEW_PASSWORD` | `SELECT` and `INSERT` on the document registry `data_meta.documents` and `SELECT` on `marts`; the api's Documents and Review paths, whose test-runs send `readonly=2` and the `QUERY_MAX_*` limits |
 
 The agent's role users have no access to `agent_logs`.
-With the stack running, `AGENT_LOGS_LIVE_TEST=1` and the six passwords in the environment, `jobs/tests/test_agent_log_users.py` checks these grants against the server.
+With the stack running, `AGENT_LOGS_LIVE_TEST=1` and the seven passwords in the environment, `jobs/tests/test_agent_log_users.py` checks these grants against the server.
 
 ### Data sources
 

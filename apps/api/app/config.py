@@ -45,6 +45,10 @@ class Settings:
     guard_model_dir: str = "build/guard_model"
     # Default catalog alias of every model tier, from MODEL_TIER_<TIER> (DECISIONS §2 Model tiers).
     model_tiers: Mapping[str, str] = field(default_factory=lambda: dict(BUILT_IN_DEFAULTS))
+    # Company documents (DECISIONS §5): stored originals, upload size cap and the pack working tree reviews write.
+    documents_dir: str = "build/documents"
+    document_max_bytes: int = 20 * 1024 * 1024
+    packs_dir: str = "packs"
 
 
 def positive_int(env: Mapping[str, str], name: str, default: int) -> int:
@@ -102,4 +106,7 @@ def load_settings(env: Mapping[str, str] | None = None) -> Settings:
         screen_block_at=screen_block_at,
         guard_model_dir=env.get("GUARD_MODEL_DIR", "build/guard_model"),
         model_tiers=tier_defaults(env),
+        documents_dir=env.get("DOCUMENTS_DIR", "build/documents"),
+        document_max_bytes=positive_int(env, "DOCUMENT_MAX_BYTES", 20 * 1024 * 1024),
+        packs_dir=env.get("PACKS_DIR", "packs"),
     )

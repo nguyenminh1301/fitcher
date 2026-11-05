@@ -1,4 +1,4 @@
-"""Create the ``agent_logs`` tables and ``data_meta.model_tiers`` on an existing ClickHouse volume.
+"""Create the ``agent_logs`` tables and the ``data_meta`` registries on an existing ClickHouse volume.
 
 Run with ``docker compose run --rm jobs python -m jobs.apply_log_schema``.
 
@@ -18,7 +18,7 @@ from jobs.lib.clickhouse import admin_client
 INITDB = Path(__file__).resolve().parents[1] / "infra" / "clickhouse" / "initdb"
 SCHEMA_FILE = INITDB / "010-agent-logs.sql"
 # Applied in order; 001-databases.sql already created data_meta on every volume.
-SCHEMA_FILES = (SCHEMA_FILE, INITDB / "020-model-tiers.sql")
+SCHEMA_FILES = (SCHEMA_FILE, INITDB / "020-model-tiers.sql", INITDB / "030-documents.sql")
 
 
 def split_statements(sql: str) -> list[str]:

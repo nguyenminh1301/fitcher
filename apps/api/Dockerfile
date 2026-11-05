@@ -34,7 +34,7 @@ COPY infra/clickhouse/initdb ./infra/clickhouse/initdb
 COPY infra/keycloak/realm-finch.json ./infra/keycloak/realm-finch.json
 # Compiled packs live in a named volume mounted here; Docker copies this
 # directory's owner into a new volume, so the app user can write to it.
-RUN useradd --create-home --uid 10001 app     && mkdir -p /app/build/packs /app/build/guard_model     && chown app /app/build/packs
+RUN useradd --create-home --uid 10001 app     && mkdir -p /app/build/packs /app/build/guard_model /app/build/documents     && chown app /app/build/packs /app/build/documents
 USER app
 
 EXPOSE 8000

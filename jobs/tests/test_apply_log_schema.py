@@ -154,8 +154,27 @@ def test_main_applies_every_schema_file_in_order(monkeypatch, capsys):
     client = FakeClient()
     monkeypatch.setattr(apply_log_schema, "admin_client", lambda: client)
     tiers = apply_log_schema.split_statements(apply_log_schema.SCHEMA_FILES[1].read_text(encoding="utf-8"))
+    documents = apply_log_schema.split_statements(apply_log_schema.SCHEMA_FILES[2].read_text(encoding="utf-8"))
     assert apply_log_schema.main([]) == 0
-    assert client.commands == [*schema_statements(), *tiers]
+    assert client.commands == [*schema_statements(), *tiers, *documents]
     output = capsys.readouterr().out
     assert f"{len(schema_statements())} statements from 010-agent-logs.sql" in output
     assert "1 statements from 020-model-tiers.sql" in output
+    assert "1 statements from 030-documents.sql" in output
+
+
+def test_document_registry_is_applied_to_existing_volumes():
+    assert apply_log_schema.SCHEMA_FILES[-1].name == "030-documents.sql"
+    statements = apply_log_schema.split_statements(apply_log_schema.SCHEMA_FILES[-1].read_text(encoding="utf-8"))
+    assert len(statements) == 1
+    statement = statements[0]
+    assert statement.startswith("CREATE TABLE IF NOT EXISTS data_meta.documents")
+    for column in (
+        "id String", "pack LowCardinality(String)", "file_name String", "media_type LowCardinality(String)",
+        "size_bytes UInt64", "sha256 String", "uploaded_by String", "allowed_roles Array(String)",
+        "status LowCardinality(String)", "error String", "chunk_count UInt32", "blocked_chunks UInt32",
+        "uploaded_at DateTime64(3, 'UTC')", "deleted_at Nullable(DateTime64(3, 'UTC'))",
+        "updated_at DateTime64(3, 'UTC')",
+    ):
+        assert f"    {column}" in statement, column
+    assert "ENGINE = ReplacingMergeTree(updated_at)\nORDER BY (pack, id)" in statement

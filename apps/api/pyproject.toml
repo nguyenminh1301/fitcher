@@ -13,9 +13,16 @@ dependencies = [
     "numpy==2.5.4",
     "onnxruntime==1.31.1",
     "opentelemetry-sdk==1.45.1",
+    # Company documents (app/onboarding): read-only parsers; uploads are multipart forms.
+    "openpyxl==3.1.5",
     "pydantic==2.14.1",
     "pyjwt[crypto]==2.15.1",
+    "pypdf==6.21.1",
+    "python-docx==1.2.0",
+    "python-multipart==0.0.32",
     "pyyaml==6.0.3",
+    # Reviewed pack YAML is rewritten keeping comments, anchors and order.
+    "ruamel.yaml==0.19.1",
     "sqlglot==30.23.0",
     "tokenizers==0.23.3",
     # zoneinfo reads IANA zones from this package on Windows, which has no system zone database.

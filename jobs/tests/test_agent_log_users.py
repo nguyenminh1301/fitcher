@@ -153,3 +153,19 @@ def test_the_models_page_user_cannot_read_run_logs_or_marts():
     client.query("SELECT count() FROM agent_logs.eval_reports")
     assert_denied(client, "SELECT count() FROM agent_logs.runs")
     assert_denied(client, "SELECT count() FROM agent_logs.admin_actions")
+
+
+def test_the_pack_review_user_writes_only_the_document_registry_and_reads_marts():
+    assert grants("pack_review.xml", "pack_review") == [
+        "GRANT SELECT, INSERT ON data_meta.documents", "GRANT SELECT ON marts.*",
+    ]
+    root = ElementTree.parse(USERS_DIR / "pack_review.xml").getroot()
+    assert root.find("users/pack_review/password").get("from_env") == "CLICKHOUSE_PACK_REVIEW_PASSWORD"
+
+
+@live
+def test_the_pack_review_user_cannot_read_logs_or_raw_data():
+    client = connect("pack_review", "CLICKHOUSE_PACK_REVIEW_PASSWORD")
+    client.query("SELECT count() FROM data_meta.documents")
+    assert_denied(client, "SELECT count() FROM agent_logs.runs")
+    assert_denied(client, "SELECT count() FROM data_meta.model_tiers")
