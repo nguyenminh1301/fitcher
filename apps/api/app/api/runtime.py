@@ -18,10 +18,13 @@ from app.auth.jwt import JwksCache, TokenSettings, TokenVerifier
 from app.config import load_settings
 from app.conversation.store import ConversationStore, conversations_client
 from app.llm.client import LLMError
+from app.llm.embeddings import LiteLLMEmbeddings
 from app.llm.model_store import CatalogClient, ClickHouseModelStore, model_tiers_client
-from app.llm.tiers import TierMap, TierStoreError
+from app.llm.tiers import EMBED_TIER, TierMap, TierStoreError
+from app.onboarding.documents import ClickHouseDocumentRegistry, DocumentService, pack_review_client
 from app.packs.compiler import CompileError, CompiledPack, load_compiled
 from app.screening.screen import Screener
+from app.search.client import QdrantSearch
 
 
 logger = logging.getLogger(__name__)
@@ -131,6 +134,27 @@ def get_conversation_store() -> ConversationStore:
         return ConversationStore(conversations_client())
     except RuntimeError as error:
         raise unavailable(str(error)) from None
+
+
+@cache
+def get_document_service() -> DocumentService:
+    """The active pack's documents; chunks are screened and embedded like a compile does."""
+    settings = load_settings()
+    compiled = get_compiled()
+    try:
+        registry = ClickHouseDocumentRegistry(pack_review_client())
+        embeddings = LiteLLMEmbeddings(
+            settings.litellm_base_url, settings.litellm_master_key, settings.embedding_dimensions,
+            alias=settings.model_tiers[EMBED_TIER],
+        )
+    except Exception as error:  # noqa: BLE001 - a missing password or gateway key, or ClickHouse unreachable
+        raise unavailable(f"the document store is unavailable: {error}") from None
+    return DocumentService(
+        pack=compiled.pack.name, pack_roles=[role.id for role in compiled.pack.policies.roles], registry=registry,
+        search=QdrantSearch(settings.qdrant_url), embeddings=embeddings, screener=get_screener(),
+        store_dir=Path(settings.documents_dir), compiled_dir=Path(settings.compiled_pack_dir),
+        max_bytes=settings.document_max_bytes,
+    )
 
 
 @cache

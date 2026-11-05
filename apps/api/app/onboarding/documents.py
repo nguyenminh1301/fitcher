@@ -16,20 +16,23 @@ never drops or restores a document. The api runs one worker; a lock in the
 service serializes its changes.
 """
 
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from datetime import UTC, datetime, timedelta
 import hashlib
+import os
 from pathlib import Path
 import threading
 from typing import Literal, Protocol
 import uuid
 
+import clickhouse_connect
 from pydantic import BaseModel, ConfigDict
 
 from app.llm.embeddings import EmbeddingClient
+from app.observability.tracing import trusted_pack_calls
 from app.onboarding.chunker import DEFAULT_MAX_CHARS, Chunk, chunk_sections
 from app.onboarding.docs_parser import DocumentRejected, detect_media_type, parse_document
-from app.packs.search_indices import alias_name, points
+from app.packs.search_indices import alias_name, physical_name, points
 from app.search.client import document_filter
 
 KB_DOCS = "kb_docs"
@@ -135,6 +138,18 @@ class ClickHouseDocumentRegistry:
     def write(self, record: DocumentRecord) -> None:
         row = record.model_dump()
         self._client.insert(TABLE, [[row[column] for column in COLUMNS]], column_names=list(COLUMNS))
+
+
+def pack_review_client(env: Mapping[str, str] | None = None):
+    """A ClickHouse client as ``pack_review``, the only api user that writes the document registry."""
+    env = os.environ if env is None else env
+    password = env.get("CLICKHOUSE_PACK_REVIEW_PASSWORD", "")
+    if not password:
+        raise RuntimeError("CLICKHOUSE_PACK_REVIEW_PASSWORD must be set")
+    return clickhouse_connect.get_client(
+        host=env.get("CLICKHOUSE_HOST", "clickhouse"), port=int(env.get("CLICKHOUSE_HTTP_PORT", "8123")),
+        username="pack_review", password=password,
+    )
 
 
 def _aware(row: dict) -> dict:
@@ -282,9 +297,21 @@ class DocumentService:
             self.registry.write(record.model_copy(update={"blocked_chunks": blocked}))
             raise DocumentRejected("every chunk was blocked by input screening")
         documents = chunk_payloads(record, kept)
-        vectors = self.embeddings.embed([document["embedding_text"] for document in documents])
+        # The chunks were screened above, so the gateway takes them as checked content (DECISIONS §9).
+        with trusted_pack_calls():
+            vectors = self.embeddings.embed([document["embedding_text"] for document in documents])
+        self._ensure_alias()
         self.search.upsert(self.alias, points(self.alias, documents, vectors))
         return self._save(record, status="indexed", chunk_count=len(kept), blocked_chunks=blocked)
+
+    def _ensure_alias(self) -> None:
+        """Give a pack that was never compiled a ``kb_docs`` generation 0; its first compile replaces it."""
+        if self.alias in self.search.alias_targets():
+            return
+        name = physical_name(self.pack, KB_DOCS, 0)
+        if name not in self.search.list_collections():
+            self.search.create_collection(name, self.embeddings.dimensions)
+        self.search.update_aliases([{"create_alias": {"collection_name": name, "alias_name": self.alias}}])
 
     def _discard(self, record: DocumentRecord) -> None:
         try:

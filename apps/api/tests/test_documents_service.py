@@ -184,3 +184,17 @@ def test_chunks_reads_one_document_or_all(service):
     service.upload("notes.txt", b"Other document.", ["analyst"], "u-1")
     assert {chunk["document_id"] for chunk in service.chunks(first.id)} == {first.id}
     assert len(service.chunks()) == 4
+
+
+def test_a_pack_never_compiled_gets_a_kb_docs_alias_on_its_first_upload(tmp_path):
+    search = FakeSearch()
+    service = DocumentService(
+        pack="fresh", pack_roles=ROLES, registry=InMemoryDocumentRegistry(), search=search,
+        embeddings=FakeEmbeddings(), screener=WordScreener(), store_dir=tmp_path / "documents",
+        compiled_dir=tmp_path / "compiled", max_bytes=10_000, clock=lambda: NOW,
+    )
+    record = service.upload("notes.txt", b"First document.", ["analyst"], "u-1")
+    # Generation 0 sorts before every compiled generation, so the first compile replaces it.
+    assert search.aliases == {"fresh_kb_docs": "fresh_kb_docs_v0"}
+    assert search.collections["fresh_kb_docs_v0"] == 4
+    assert [point["payload"]["document_id"] for point in search.points["fresh_kb_docs_v0"]] == [record.id]
