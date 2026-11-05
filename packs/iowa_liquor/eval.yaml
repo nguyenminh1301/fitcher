@@ -1,0 +1,821 @@
+# Hand-written eval set of the iowa_liquor pack (Phase 11): every DECISIONS §12 category, over 2025.
+reference_date: "2026-01-15"
+cases:
+  - id: "top_categories_q2_vs_q1"
+    question: "Top 5 liquor categories by sales dollars in Q2 2025 compared with Q1 2025"
+    language: "en"
+    category: "two_period_compare"
+    role: "analyst"
+    expected:
+      intent: "data_query"
+      outcome: "answer"
+      metrics: ["total_sales_dollars"]
+      periods:
+        - label: "Q1 2025"
+          start: "2025-01-01"
+          end: "2025-04-01"
+        - label: "Q2 2025"
+          start: "2025-04-01"
+          end: "2025-07-01"
+      dataset: "liquor_sales"
+      top_n: 5
+      rank_by: "total_sales_dollars"
+      columns: ["category_name"]
+    expected_sql: |-
+      SELECT category_name,
+          sumIf(sale_dollars, sale_date >= toDate('2025-04-01') AND sale_date < toDate('2025-07-01')) AS sales_q2,
+          sumIf(sale_dollars, sale_date >= toDate('2025-01-01') AND sale_date < toDate('2025-04-01')) AS sales_q1
+      FROM marts.liquor_sales
+      WHERE sale_date >= toDate('2025-01-01') AND sale_date < toDate('2025-07-01')
+      GROUP BY category_name
+      ORDER BY sales_q2 DESC
+      LIMIT 5
+    status: "approved"
+    evidence:
+      - kind: "manual"
+        ref: "packs/iowa_liquor/README.md"
+    confidence: 1.0
+
+  - id: "bottles_h1_vs_h2"
+    question: "Bottles sold in the first half of 2025 compared with the second half of 2025"
+    language: "en"
+    category: "two_period_compare"
+    role: "analyst"
+    expected:
+      intent: "data_query"
+      outcome: "answer"
+      metrics: ["total_bottles_sold"]
+      periods:
+        - label: "H1 2025"
+          start: "2025-01-01"
+          end: "2025-07-01"
+        - label: "H2 2025"
+          start: "2025-07-01"
+          end: "2026-01-01"
+      dataset: "liquor_sales"
+    expected_sql: |-
+      SELECT sumIf(bottles_sold, sale_date >= toDate('2025-01-01') AND sale_date < toDate('2025-07-01')) AS bottles_h1,
+          sumIf(bottles_sold, sale_date >= toDate('2025-07-01') AND sale_date < toDate('2026-01-01')) AS bottles_h2
+      FROM marts.liquor_sales
+      WHERE sale_date >= toDate('2025-01-01') AND sale_date < toDate('2026-01-01')
+    status: "approved"
+    evidence:
+      - kind: "manual"
+        ref: "packs/iowa_liquor/README.md"
+    confidence: 1.0
+
+  - id: "sales_november_vs_december"
+    question: "So sánh doanh thu tháng 11 và tháng 12 năm 2025"
+    language: "vi"
+    category: "two_period_compare"
+    role: "analyst"
+    expected:
+      intent: "data_query"
+      outcome: "answer"
+      metrics: ["total_sales_dollars"]
+      periods:
+        - label: "11/2025"
+          start: "2025-11-01"
+          end: "2025-12-01"
+        - label: "12/2025"
+          start: "2025-12-01"
+          end: "2026-01-01"
+      dataset: "liquor_sales"
+    expected_sql: |-
+      SELECT sumIf(sale_dollars, sale_date >= toDate('2025-11-01') AND sale_date < toDate('2025-12-01')) AS sales_november,
+          sumIf(sale_dollars, sale_date >= toDate('2025-12-01') AND sale_date < toDate('2026-01-01')) AS sales_december
+      FROM marts.liquor_sales
+      WHERE sale_date >= toDate('2025-11-01') AND sale_date < toDate('2026-01-01')
+    status: "approved"
+    evidence:
+      - kind: "manual"
+        ref: "packs/iowa_liquor/README.md"
+    confidence: 1.0
+
+  - id: "polk_sales_q3_vs_q4"
+    question: "Polk County sales dollars in Q3 2025 compared with Q4 2025"
+    language: "en"
+    category: "two_period_compare"
+    role: "analyst"
+    expected:
+      intent: "data_query"
+      outcome: "answer"
+      metrics: ["total_sales_dollars"]
+      periods:
+        - label: "Q3 2025"
+          start: "2025-07-01"
+          end: "2025-10-01"
+        - label: "Q4 2025"
+          start: "2025-10-01"
+          end: "2026-01-01"
+      dataset: "liquor_sales"
+      columns: ["county_name"]
+    expected_sql: |-
+      SELECT sumIf(sale_dollars, sale_date >= toDate('2025-07-01') AND sale_date < toDate('2025-10-01')) AS sales_q3,
+          sumIf(sale_dollars, sale_date >= toDate('2025-10-01') AND sale_date < toDate('2026-01-01')) AS sales_q4
+      FROM marts.liquor_sales
+      WHERE county_name = 'POLK' AND sale_date >= toDate('2025-07-01') AND sale_date < toDate('2026-01-01')
+    status: "approved"
+    evidence:
+      - kind: "manual"
+        ref: "packs/iowa_liquor/README.md"
+    confidence: 1.0
+
+  - id: "top_vendors_by_sales_2025"
+    question: "Top 10 vendors by sales dollars in 2025"
+    language: "en"
+    category: "top_n"
+    role: "analyst"
+    expected:
+      intent: "data_query"
+      outcome: "answer"
+      metrics: ["total_sales_dollars"]
+      periods:
+        - label: "2025"
+          start: "2025-01-01"
+          end: "2026-01-01"
+      dataset: "liquor_sales"
+      top_n: 10
+      rank_by: "total_sales_dollars"
+      columns: ["vendor_name"]
+    expected_sql: |-
+      SELECT vendor_name, sum(sale_dollars) AS total_sales_dollars
+      FROM marts.liquor_sales
+      WHERE sale_date >= toDate('2025-01-01') AND sale_date < toDate('2026-01-01')
+      GROUP BY vendor_name
+      ORDER BY total_sales_dollars DESC
+      LIMIT 10
+    status: "approved"
+    evidence:
+      - kind: "manual"
+        ref: "packs/iowa_liquor/README.md"
+    confidence: 1.0
+
+  - id: "top_counties_by_bottles_2025"
+    question: "Top 5 counties by bottles sold in 2025"
+    language: "en"
+    category: "top_n"
+    role: "analyst"
+    expected:
+      intent: "data_query"
+      outcome: "answer"
+      metrics: ["total_bottles_sold"]
+      periods:
+        - label: "2025"
+          start: "2025-01-01"
+          end: "2026-01-01"
+      dataset: "liquor_sales"
+      top_n: 5
+      rank_by: "total_bottles_sold"
+      columns: ["county_name"]
+    expected_sql: |-
+      SELECT county_name, sum(bottles_sold) AS total_bottles_sold
+      FROM marts.liquor_sales
+      WHERE sale_date >= toDate('2025-01-01') AND sale_date < toDate('2026-01-01')
+      GROUP BY county_name
+      ORDER BY total_bottles_sold DESC
+      LIMIT 5
+    status: "approved"
+    evidence:
+      - kind: "manual"
+        ref: "packs/iowa_liquor/README.md"
+    confidence: 1.0
+
+  - id: "top_stores_by_sales_2025"
+    question: "Top 10 cửa hàng có doanh thu cao nhất năm 2025"
+    language: "vi"
+    category: "top_n"
+    role: "analyst"
+    expected:
+      intent: "data_query"
+      outcome: "answer"
+      metrics: ["total_sales_dollars"]
+      periods:
+        - label: "2025"
+          start: "2025-01-01"
+          end: "2026-01-01"
+      dataset: "liquor_sales"
+      top_n: 10
+      rank_by: "total_sales_dollars"
+      columns: ["store_name"]
+    expected_sql: |-
+      SELECT store_name, sum(sale_dollars) AS total_sales_dollars
+      FROM marts.liquor_sales
+      WHERE sale_date >= toDate('2025-01-01') AND sale_date < toDate('2026-01-01')
+      GROUP BY store_name
+      ORDER BY total_sales_dollars DESC
+      LIMIT 10
+    status: "approved"
+    evidence:
+      - kind: "manual"
+        ref: "packs/iowa_liquor/README.md"
+    confidence: 1.0
+
+  - id: "top_items_by_liters_2025"
+    question: "Top 5 items by liters sold in 2025"
+    language: "en"
+    category: "top_n"
+    role: "analyst"
+    expected:
+      intent: "data_query"
+      outcome: "answer"
+      metrics: ["total_liters_sold"]
+      periods:
+        - label: "2025"
+          start: "2025-01-01"
+          end: "2026-01-01"
+      dataset: "liquor_sales"
+      top_n: 5
+      rank_by: "total_liters_sold"
+      columns: ["item_description"]
+    expected_sql: |-
+      SELECT item_description, sum(liters_sold) AS total_liters_sold
+      FROM marts.liquor_sales
+      WHERE sale_date >= toDate('2025-01-01') AND sale_date < toDate('2026-01-01')
+      GROUP BY item_description
+      ORDER BY total_liters_sold DESC
+      LIMIT 5
+    status: "approved"
+    evidence:
+      - kind: "manual"
+        ref: "packs/iowa_liquor/README.md"
+    confidence: 1.0
+
+  - id: "top_cities_by_margin_2025"
+    question: "Which 3 cities had the highest state margin in 2025?"
+    language: "en"
+    category: "top_n"
+    role: "analyst"
+    expected:
+      intent: "data_query"
+      outcome: "answer"
+      metrics: ["total_state_margin"]
+      periods:
+        - label: "2025"
+          start: "2025-01-01"
+          end: "2026-01-01"
+      dataset: "liquor_sales"
+      top_n: 3
+      rank_by: "total_state_margin"
+      columns: ["store_city"]
+    expected_sql: |-
+      SELECT store_city, sum(state_margin) AS total_state_margin
+      FROM marts.liquor_sales
+      WHERE sale_date >= toDate('2025-01-01') AND sale_date < toDate('2026-01-01')
+      GROUP BY store_city
+      ORDER BY total_state_margin DESC
+      LIMIT 3
+    status: "approved"
+    evidence:
+      - kind: "manual"
+        ref: "packs/iowa_liquor/README.md"
+    confidence: 1.0
+
+  - id: "vodka_bottles_2025"
+    question: "How many bottles of vodka were sold in 2025?"
+    language: "en"
+    category: "string_filter"
+    role: "analyst"
+    expected:
+      intent: "data_query"
+      outcome: "answer"
+      metrics: ["total_bottles_sold"]
+      periods:
+        - label: "2025"
+          start: "2025-01-01"
+          end: "2026-01-01"
+      dataset: "liquor_sales"
+      columns: ["category_name"]
+    expected_sql: |-
+      SELECT sum(bottles_sold) AS total_bottles_sold
+      FROM marts.liquor_sales
+      WHERE category_name IN ('AMERICAN VODKAS', 'IMPORTED VODKAS', 'AMERICAN FLAVORED VODKA', 'IMPORTED FLAVORED VODKA')
+        AND sale_date >= toDate('2025-01-01') AND sale_date < toDate('2026-01-01')
+    status: "approved"
+    evidence:
+      - kind: "manual"
+        ref: "packs/iowa_liquor/README.md"
+    confidence: 1.0
+
+  - id: "linn_county_sales_2025"
+    question: "Sales dollars in Linn County in 2025"
+    language: "en"
+    category: "string_filter"
+    role: "analyst"
+    expected:
+      intent: "data_query"
+      outcome: "answer"
+      metrics: ["total_sales_dollars"]
+      periods:
+        - label: "2025"
+          start: "2025-01-01"
+          end: "2026-01-01"
+      dataset: "liquor_sales"
+      columns: ["county_name"]
+    expected_sql: |-
+      SELECT sum(sale_dollars) AS total_sales_dollars
+      FROM marts.liquor_sales
+      WHERE county_name = 'LINN'
+        AND sale_date >= toDate('2025-01-01') AND sale_date < toDate('2026-01-01')
+    status: "approved"
+    evidence:
+      - kind: "manual"
+        ref: "packs/iowa_liquor/README.md"
+    confidence: 1.0
+
+  - id: "diageo_sales_2025"
+    question: "Doanh thu của nhà cung cấp DIAGEO AMERICAS năm 2025"
+    language: "vi"
+    category: "string_filter"
+    role: "analyst"
+    expected:
+      intent: "data_query"
+      outcome: "answer"
+      metrics: ["total_sales_dollars"]
+      periods:
+        - label: "2025"
+          start: "2025-01-01"
+          end: "2026-01-01"
+      dataset: "liquor_sales"
+      columns: ["vendor_name"]
+    expected_sql: |-
+      SELECT sum(sale_dollars) AS total_sales_dollars
+      FROM marts.liquor_sales
+      WHERE vendor_name = 'DIAGEO AMERICAS'
+        AND sale_date >= toDate('2025-01-01') AND sale_date < toDate('2026-01-01')
+    status: "approved"
+    evidence:
+      - kind: "manual"
+        ref: "packs/iowa_liquor/README.md"
+    confidence: 1.0
+
+  - id: "agave_tequila_liters_des_moines_2025"
+    question: "How many liters of 100% agave tequila were sold in Des Moines in 2025?"
+    language: "en"
+    category: "string_filter"
+    role: "analyst"
+    expected:
+      intent: "data_query"
+      outcome: "answer"
+      metrics: ["total_liters_sold"]
+      periods:
+        - label: "2025"
+          start: "2025-01-01"
+          end: "2026-01-01"
+      dataset: "liquor_sales"
+      columns: ["category_name", "store_city"]
+    expected_sql: |-
+      SELECT sum(liters_sold) AS total_liters_sold
+      FROM marts.liquor_sales
+      WHERE category_name = '100% AGAVE TEQUILA'
+        AND store_city = 'DES MOINES'
+        AND sale_date >= toDate('2025-01-01') AND sale_date < toDate('2026-01-01')
+    status: "approved"
+    evidence:
+      - kind: "manual"
+        ref: "packs/iowa_liquor/README.md"
+    confidence: 1.0
+
+  - id: "titos_sales_2025"
+    question: "Sales dollars of Titos Handmade Vodka in 2025"
+    language: "en"
+    category: "string_filter"
+    role: "analyst"
+    expected:
+      intent: "data_query"
+      outcome: "answer"
+      metrics: ["total_sales_dollars"]
+      periods:
+        - label: "2025"
+          start: "2025-01-01"
+          end: "2026-01-01"
+      dataset: "liquor_sales"
+      columns: ["item_description"]
+    expected_sql: |-
+      SELECT sum(sale_dollars) AS total_sales_dollars
+      FROM marts.liquor_sales
+      WHERE item_description = 'TITOS HANDMADE VODKA'
+        AND sale_date >= toDate('2025-01-01') AND sale_date < toDate('2026-01-01')
+    status: "approved"
+    evidence:
+      - kind: "manual"
+        ref: "packs/iowa_liquor/README.md"
+    confidence: 1.0
+
+  - id: "monthly_sales_2025"
+    question: "Monthly sales dollars in 2025"
+    language: "en"
+    category: "monthly_trend"
+    role: "analyst"
+    expected:
+      intent: "data_query"
+      outcome: "answer"
+      metrics: ["total_sales_dollars"]
+      periods:
+        - label: "2025"
+          start: "2025-01-01"
+          end: "2026-01-01"
+      dataset: "liquor_sales"
+    expected_sql: |-
+      SELECT toStartOfMonth(sale_date) AS month, sum(sale_dollars) AS total_sales_dollars
+      FROM marts.liquor_sales
+      WHERE sale_date >= toDate('2025-01-01') AND sale_date < toDate('2026-01-01')
+      GROUP BY month
+      ORDER BY month
+    status: "approved"
+    evidence:
+      - kind: "manual"
+        ref: "packs/iowa_liquor/README.md"
+    confidence: 1.0
+
+  - id: "monthly_bottles_2025"
+    question: "Số chai bán ra theo tháng năm 2025"
+    language: "vi"
+    category: "monthly_trend"
+    role: "analyst"
+    expected:
+      intent: "data_query"
+      outcome: "answer"
+      metrics: ["total_bottles_sold"]
+      periods:
+        - label: "2025"
+          start: "2025-01-01"
+          end: "2026-01-01"
+      dataset: "liquor_sales"
+    expected_sql: |-
+      SELECT toStartOfMonth(sale_date) AS month, sum(bottles_sold) AS total_bottles_sold
+      FROM marts.liquor_sales
+      WHERE sale_date >= toDate('2025-01-01') AND sale_date < toDate('2026-01-01')
+      GROUP BY month
+      ORDER BY month
+    status: "approved"
+    evidence:
+      - kind: "manual"
+        ref: "packs/iowa_liquor/README.md"
+    confidence: 1.0
+
+  - id: "monthly_margin_rate_2025"
+    question: "Monthly state margin rate in 2025"
+    language: "en"
+    category: "monthly_trend"
+    role: "analyst"
+    expected:
+      intent: "data_query"
+      outcome: "answer"
+      metrics: ["average_state_margin_rate"]
+      periods:
+        - label: "2025"
+          start: "2025-01-01"
+          end: "2026-01-01"
+      dataset: "liquor_sales"
+    expected_sql: |-
+      SELECT toStartOfMonth(sale_date) AS month,
+          sum(state_margin) / nullIf(sum(sale_dollars), 0) AS average_state_margin_rate
+      FROM marts.liquor_sales
+      WHERE sale_date >= toDate('2025-01-01') AND sale_date < toDate('2026-01-01')
+      GROUP BY month
+      ORDER BY month
+    status: "approved"
+    evidence:
+      - kind: "manual"
+        ref: "packs/iowa_liquor/README.md"
+    confidence: 1.0
+
+  - id: "monthly_bourbon_sales_2025"
+    question: "Monthly bourbon sales dollars in 2025"
+    language: "en"
+    category: "monthly_trend"
+    role: "analyst"
+    expected:
+      intent: "data_query"
+      outcome: "answer"
+      metrics: ["total_sales_dollars"]
+      periods:
+        - label: "2025"
+          start: "2025-01-01"
+          end: "2026-01-01"
+      dataset: "liquor_sales"
+      columns: ["category_name"]
+    expected_sql: |-
+      SELECT toStartOfMonth(sale_date) AS month, sum(sale_dollars) AS total_sales_dollars
+      FROM marts.liquor_sales
+      WHERE category_name IN ('STRAIGHT BOURBON WHISKIES', 'SINGLE BARREL BOURBON WHISKIES', 'BOTTLED IN BOND BOURBON')
+        AND sale_date >= toDate('2025-01-01') AND sale_date < toDate('2026-01-01')
+      GROUP BY month
+      ORDER BY month
+    status: "approved"
+    evidence:
+      - kind: "manual"
+        ref: "packs/iowa_liquor/README.md"
+    confidence: 1.0
+
+  - id: "best_store_without_measure"
+    question: "Cửa hàng nào tốt nhất năm 2025?"
+    language: "vi"
+    category: "ambiguous"
+    role: "analyst"
+    expected:
+      intent: "data_query"
+      outcome: "clarify"
+      periods:
+        - label: "2025"
+          start: "2025-01-01"
+          end: "2026-01-01"
+    status: "approved"
+    evidence:
+      - kind: "manual"
+        ref: "packs/iowa_liquor/README.md"
+    confidence: 1.0
+
+  - id: "vendor_performance_last_quarter"
+    question: "How did the vendors perform last quarter?"
+    language: "en"
+    category: "ambiguous"
+    role: "analyst"
+    expected:
+      intent: "data_query"
+      outcome: "clarify"
+      periods:
+        - label: "Q4 2025"
+          start: "2025-10-01"
+          end: "2026-01-01"
+    status: "approved"
+    evidence:
+      - kind: "manual"
+        ref: "packs/iowa_liquor/README.md"
+    confidence: 1.0
+
+  - id: "average_without_measure"
+    question: "What was the average in 2025?"
+    language: "en"
+    category: "ambiguous"
+    role: "analyst"
+    expected:
+      intent: "data_query"
+      outcome: "clarify"
+      periods:
+        - label: "2025"
+          start: "2025-01-01"
+          end: "2026-01-01"
+    status: "approved"
+    evidence:
+      - kind: "manual"
+        ref: "packs/iowa_liquor/README.md"
+    confidence: 1.0
+
+  - id: "vendor_partner_asks_for_margin"
+    question: "What was the state margin in 2025?"
+    language: "en"
+    category: "unauthorized"
+    role: "vendor_partner"
+    expected:
+      intent: "data_query"
+      outcome: "deny"
+      metrics: ["total_state_margin"]
+      dataset: "liquor_sales"
+    status: "approved"
+    evidence:
+      - kind: "manual"
+        ref: "packs/iowa_liquor/README.md"
+    confidence: 1.0
+
+  - id: "vendor_partner_asks_for_bottle_cost"
+    question: "Giá vốn mỗi chai của bang năm 2025 là bao nhiêu?"
+    language: "vi"
+    category: "unauthorized"
+    role: "vendor_partner"
+    expected:
+      intent: "data_query"
+      outcome: "deny"
+      dataset: "liquor_sales"
+      columns: ["state_bottle_cost"]
+    status: "approved"
+    evidence:
+      - kind: "manual"
+        ref: "packs/iowa_liquor/README.md"
+    confidence: 1.0
+
+  - id: "vendor_partner_asks_for_margin_rate"
+    question: "Average state margin rate by category in 2025"
+    language: "en"
+    category: "unauthorized"
+    role: "vendor_partner"
+    expected:
+      intent: "data_query"
+      outcome: "deny"
+      metrics: ["average_state_margin_rate"]
+      dataset: "liquor_sales"
+    status: "approved"
+    evidence:
+      - kind: "manual"
+        ref: "packs/iowa_liquor/README.md"
+    confidence: 1.0
+
+  - id: "weather_question"
+    question: "What's the weather in Des Moines today?"
+    language: "en"
+    category: "out_of_scope"
+    role: "analyst"
+    expected:
+      intent: "out_of_scope"
+      outcome: "answer"
+    status: "approved"
+    evidence:
+      - kind: "manual"
+        ref: "packs/iowa_liquor/README.md"
+    confidence: 1.0
+
+  - id: "poem_request"
+    question: "Viết cho tôi một bài thơ về rượu whisky"
+    language: "vi"
+    category: "out_of_scope"
+    role: "analyst"
+    expected:
+      intent: "out_of_scope"
+      outcome: "answer"
+    status: "approved"
+    evidence:
+      - kind: "manual"
+        ref: "packs/iowa_liquor/README.md"
+    confidence: 1.0
+
+  - id: "top_vendors_by_bottles_follow_up"
+    previous_question: "Top 10 vendors by sales dollars in 2025"
+    question: "What about by bottles sold?"
+    language: "en"
+    category: "follow_up"
+    role: "analyst"
+    expected:
+      intent: "data_query"
+      outcome: "answer"
+      metrics: ["total_bottles_sold"]
+      periods:
+        - label: "2025"
+          start: "2025-01-01"
+          end: "2026-01-01"
+      dataset: "liquor_sales"
+      top_n: 10
+      rank_by: "total_bottles_sold"
+      columns: ["vendor_name"]
+    expected_sql: |-
+      SELECT vendor_name, sum(bottles_sold) AS total_bottles_sold
+      FROM marts.liquor_sales
+      WHERE sale_date >= toDate('2025-01-01') AND sale_date < toDate('2026-01-01')
+      GROUP BY vendor_name
+      ORDER BY total_bottles_sold DESC
+      LIMIT 10
+    status: "approved"
+    evidence:
+      - kind: "manual"
+        ref: "packs/iowa_liquor/README.md"
+    confidence: 1.0
+
+  - id: "monthly_sales_polk_follow_up"
+    previous_question: "Monthly sales dollars in 2025"
+    question: "Only for Polk County"
+    language: "en"
+    category: "follow_up"
+    role: "analyst"
+    expected:
+      intent: "data_query"
+      outcome: "answer"
+      metrics: ["total_sales_dollars"]
+      periods:
+        - label: "2025"
+          start: "2025-01-01"
+          end: "2026-01-01"
+      dataset: "liquor_sales"
+      columns: ["county_name"]
+    expected_sql: |-
+      SELECT toStartOfMonth(sale_date) AS month, sum(sale_dollars) AS total_sales_dollars
+      FROM marts.liquor_sales
+      WHERE county_name = 'POLK'
+        AND sale_date >= toDate('2025-01-01') AND sale_date < toDate('2026-01-01')
+      GROUP BY month
+      ORDER BY month
+    status: "approved"
+    evidence:
+      - kind: "manual"
+        ref: "packs/iowa_liquor/README.md"
+    confidence: 1.0
+
+  - id: "top_counties_q4_follow_up"
+    previous_question: "Top 5 counties by sales dollars in 2025"
+    question: "Còn quý 4 năm 2025 thì sao?"
+    language: "vi"
+    category: "follow_up"
+    role: "analyst"
+    expected:
+      intent: "data_query"
+      outcome: "answer"
+      metrics: ["total_sales_dollars"]
+      periods:
+        - label: "Q4 2025"
+          start: "2025-10-01"
+          end: "2026-01-01"
+      dataset: "liquor_sales"
+      top_n: 5
+      rank_by: "total_sales_dollars"
+      columns: ["county_name"]
+    expected_sql: |-
+      SELECT county_name, sum(sale_dollars) AS total_sales_dollars
+      FROM marts.liquor_sales
+      WHERE sale_date >= toDate('2025-10-01') AND sale_date < toDate('2026-01-01')
+      GROUP BY county_name
+      ORDER BY total_sales_dollars DESC
+      LIMIT 5
+    status: "approved"
+    evidence:
+      - kind: "manual"
+        ref: "packs/iowa_liquor/README.md"
+    confidence: 1.0
+
+  - id: "monthly_sales_as_bars"
+    previous_question: "Monthly sales dollars in 2025"
+    question: "Show it as a bar chart"
+    language: "en"
+    category: "chart_edit"
+    role: "analyst"
+    expected:
+      intent: "chart_edit"
+      outcome: "answer"
+    status: "approved"
+    evidence:
+      - kind: "manual"
+        ref: "packs/iowa_liquor/README.md"
+    confidence: 1.0
+
+  - id: "top_counties_as_pie"
+    previous_question: "Top 5 counties by bottles sold in 2025"
+    question: "Vẽ thành biểu đồ tròn"
+    language: "vi"
+    category: "chart_edit"
+    role: "analyst"
+    expected:
+      intent: "chart_edit"
+      outcome: "answer"
+    status: "approved"
+    evidence:
+      - kind: "manual"
+        ref: "packs/iowa_liquor/README.md"
+    confidence: 1.0
+
+  - id: "state_margin_meaning"
+    question: "What does state margin mean?"
+    language: "en"
+    category: "definition"
+    role: "analyst"
+    expected:
+      intent: "metadata_qa"
+      outcome: "answer"
+    expected_sources: ["glossary_terms:state_margin", "metrics:total_state_margin"]
+    status: "approved"
+    evidence:
+      - kind: "manual"
+        ref: "packs/iowa_liquor/README.md"
+    confidence: 1.0
+
+  - id: "sales_dollars_meaning_vi"
+    question: "Doanh thu bán hàng là gì?"
+    language: "vi"
+    category: "definition"
+    role: "analyst"
+    expected:
+      intent: "metadata_qa"
+      outcome: "answer"
+    expected_sources: ["glossary_terms:sales_dollars", "metrics:total_sales_dollars"]
+    status: "approved"
+    evidence:
+      - kind: "manual"
+        ref: "packs/iowa_liquor/README.md"
+    confidence: 1.0
+
+  - id: "margin_rate_definition"
+    question: "How is the average state margin rate calculated?"
+    language: "en"
+    category: "definition"
+    role: "analyst"
+    expected:
+      intent: "metadata_qa"
+      outcome: "answer"
+    expected_sources: ["metrics:average_state_margin_rate"]
+    status: "approved"
+    evidence:
+      - kind: "manual"
+        ref: "packs/iowa_liquor/README.md"
+    confidence: 1.0
+
+  - id: "bourbon_meaning"
+    question: "What counts as bourbon in this data?"
+    language: "en"
+    category: "definition"
+    role: "analyst"
+    expected:
+      intent: "metadata_qa"
+      outcome: "answer"
+    expected_sources: ["glossary_terms:bourbon"]
+    status: "approved"
+    evidence:
+      - kind: "manual"
+        ref: "packs/iowa_liquor/README.md"
+    confidence: 1.0

@@ -1,0 +1,47 @@
+{
+  "pack": {
+    "name": "iowa_liquor",
+    "display_name": "Iowa liquor wholesale"
+  },
+  "pack_roles": [
+    "analyst",
+    "polk_county_manager",
+    "vendor_partner"
+  ],
+  "identities": [
+    {
+      "user_id": "lab.analyst",
+      "display_name": "Lab Analyst",
+      "roles": [
+        "analyst"
+      ]
+    },
+    {
+      "user_id": "lab.reviewer",
+      "display_name": "Lab Reviewer",
+      "roles": [
+        "pack_reviewer",
+        "analyst"
+      ]
+    },
+    {
+      "user_id": "lab.admin",
+      "display_name": "Lab Admin",
+      "roles": [
+        "admin",
+        "analyst"
+      ]
+    }
+  ],
+  "conversations": [],
+  "datasets": [],
+  "review_items": [],
+  "documents": [],
+  "feedback": [],
+  "eval_reports": [],
+  "runs": [],
+  "traces": {},
+  "audit": [],
+  "costs": [],
+  "users": []
+}

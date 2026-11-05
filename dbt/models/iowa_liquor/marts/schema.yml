@@ -12,5 +12,19 @@ models:
       - {name: invoice_id, data_tests: [not_null]}
       - {name: sale_date, data_tests: [not_null]}
       - {name: store_number, data_tests: [not_null]}
-      - {name: sale_dollars, data_tests: [not_null]}
+      - {name: store_name}
+      - {name: store_city}
+      - {name: store_zip_code}
+      - {name: county_name}
+      - {name: category_name}
+      - {name: vendor_name}
+      - {name: item_number}
+      - {name: item_description}
+      - {name: bottles_per_case}
+      - {name: bottle_volume_ml}
+      - {name: state_bottle_cost}
+      - {name: state_bottle_retail}
       - {name: bottles_sold, data_tests: [not_null]}
+      - {name: sale_dollars, data_tests: [not_null]}
+      - {name: liters_sold}
+      - {name: state_margin}
