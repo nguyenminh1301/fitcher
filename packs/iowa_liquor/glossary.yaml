@@ -5,6 +5,7 @@ terms:
     definition: The dollar amount recorded for liquor sales on a transaction line. People use this term to mean revenue from sales in the liquor sales data.
     aliases:
       vi:
+        - doanh thu
         - doanh thu bán hàng
         - giá trị bán hàng
         - tiền bán hàng
@@ -15,9 +16,6 @@ terms:
     targets:
       - kind: metric
         metric: total_sales_dollars
-      - kind: column
-        dataset: liquor_sales
-        column: sale_dollars
     evidence:
       - kind: profile
         ref: liquor_sales.sale_dollars
@@ -38,9 +36,6 @@ terms:
     targets:
       - kind: metric
         metric: total_bottles_sold
-      - kind: column
-        dataset: liquor_sales
-        column: bottles_sold
     evidence:
       - kind: profile
         ref: liquor_sales.bottles_sold
@@ -61,9 +56,6 @@ terms:
     targets:
       - kind: metric
         metric: total_liters_sold
-      - kind: column
-        dataset: liquor_sales
-        column: liters_sold
     evidence:
       - kind: profile
         ref: liquor_sales.liters_sold
@@ -84,9 +76,6 @@ terms:
     targets:
       - kind: metric
         metric: total_state_margin
-      - kind: column
-        dataset: liquor_sales
-        column: state_margin
     evidence:
       - kind: profile
         ref: liquor_sales.state_margin
@@ -128,11 +117,6 @@ terms:
         - retailer
         - location
     targets:
-      - kind: metric
-        metric: distinct_stores_selling
-      - kind: column
-        dataset: liquor_sales
-        column: store_number
       - kind: column
         dataset: liquor_sales
         column: store_name
@@ -156,11 +140,6 @@ terms:
         - product
         - sku
     targets:
-      - kind: metric
-        metric: distinct_items_sold
-      - kind: column
-        dataset: liquor_sales
-        column: item_number
       - kind: column
         dataset: liquor_sales
         column: item_description
@@ -374,3 +353,80 @@ terms:
       - kind: profile
         ref: liquor_sales.category_name
     status: approved
+  - id: vendor
+    term: Vendor
+    definition: The supplier whose product the state sold; each line names one vendor.
+    aliases:
+      vi:
+        - nhà cung cấp
+        - nhà phân phối
+      en:
+        - vendor
+        - vendors
+        - supplier
+        - suppliers
+    targets:
+      - kind: column
+        dataset: liquor_sales
+        column: vendor_name
+    status: approved
+    evidence: &id001
+      - kind: manual
+        ref: review of the drafted pack (docs/eval/iowa_liquor-report.md)
+    confidence: 1.0
+  - id: category
+    term: Category
+    definition: The liquor category of the item sold, such as American vodkas or straight bourbon whiskies.
+    aliases:
+      vi:
+        - nhóm hàng
+        - loại rượu
+        - danh mục
+      en:
+        - category
+        - categories
+        - liquor category
+    targets:
+      - kind: column
+        dataset: liquor_sales
+        column: category_name
+    status: approved
+    evidence: *id001
+    confidence: 1.0
+  - id: city
+    term: City
+    definition: The city of the store that bought the liquor.
+    aliases:
+      vi:
+        - thành phố
+      en:
+        - city
+        - cities
+        - town
+    targets:
+      - kind: column
+        dataset: liquor_sales
+        column: store_city
+    status: approved
+    evidence: *id001
+    confidence: 1.0
+  - id: state_bottle_cost
+    term: State bottle cost
+    definition: What the state paid for one bottle of the item; vendor partners may not see it.
+    aliases:
+      vi:
+        - giá vốn
+        - giá vốn mỗi chai
+      en:
+        - bottle cost
+        - state cost
+        - cost per bottle
+    targets:
+      - kind: column
+        dataset: liquor_sales
+        column: state_bottle_cost
+    status: approved
+    evidence:
+      - kind: manual
+        ref: review of the drafted pack (docs/eval/iowa_liquor-report.md)
+    confidence: 1.0
