@@ -4,6 +4,7 @@
 
 ### Added
 
+- Connect Iowa Liquor Sales through a source manifest only: `jobs/sources/iowa_liquor.yaml` (`kind: postgres`, copy mode) feeds dbt models tagged `iowa_liquor`, whose staging types the text export and whose `liquor_sales` mart holds one row per invoice line with the store, county, item, category, vendor, state cost and retail, bottles, dollars, liters and the state's margin.
 - Serve a second industry's data from the fixture PostgreSQL: `infra/sources/iowa_liquor/fetch.py` downloads Iowa Liquor Sales 2025 (Iowa Data Hub dataset 1262, CC BY 4.0, 2 490 620 invoice lines) into the Git-ignored `data/`, checks its header and prints its row count and SHA-256, `seed.sh` loads it into database `iowa_liquor` with a read-only role, and ClickHouse reaches it through the new `iowa_liquor` named collection; DECISIONS §4 records the choice.
 - Document onboarding a company: the README, `jobs/README.md` and `packs/README.md` describe `jobs.profile`, `jobs.ingest_docs`, `jobs.draft_pack`, the Review, Documents and Datasets sections and how reviewed YAML is committed through a pull request.
 - Add `packs/ecommerce_twin_regen`, the hand-written pack with its 36 dataset, column, metric and glossary descriptions drafted from the mart profile and reviewed in the console; it scores the same 39/45 execution match as the hand-written pack case for case, recorded in `docs/eval/ecommerce_twin_regen-report.md`.

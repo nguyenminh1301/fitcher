@@ -30,6 +30,14 @@ models:
       marts:
         +schema: marts
         +materialized: table
+    iowa_liquor:
+      +tags: ["iowa_liquor"]
+      staging:
+        +schema: raw
+        +materialized: view
+      marts:
+        +schema: marts
+        +materialized: "{{ 'view' if var('source_mode', 'copy') == 'live' else 'table' }}"
     fixture_widgets:
       +tags: ["fixture_widgets"]
       staging:

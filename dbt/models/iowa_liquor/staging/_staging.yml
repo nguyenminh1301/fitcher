@@ -1,0 +1,10 @@
+version: 2
+
+# Staging over the iowa_liquor source copied by jobs.refresh_data. The source
+# holds every column as text; this model types them.
+models:
+  - name: stg_iowa_liquor__sales
+    columns:
+      - {name: invoice_id, data_tests: [not_null]}
+      - {name: sale_date, data_tests: [not_null]}
+      - {name: sale_dollars, data_tests: [not_null]}

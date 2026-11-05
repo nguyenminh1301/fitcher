@@ -1,0 +1,16 @@
+version: 2
+
+# The mart of the iowa_liquor pack (packs/iowa_liquor): Iowa Liquor Sales 2025.
+models:
+  - name: liquor_sales
+    description: >-
+      One row per invoice line of a Class E liquor licensee's purchase from the
+      State of Iowa in 2025: the store, its city and county, the item with its
+      category and vendor, the state's bottle cost and retail price, bottles,
+      dollars and liters sold, and the state's margin on the line.
+    columns:
+      - {name: invoice_id, data_tests: [not_null]}
+      - {name: sale_date, data_tests: [not_null]}
+      - {name: store_number, data_tests: [not_null]}
+      - {name: sale_dollars, data_tests: [not_null]}
+      - {name: bottles_sold, data_tests: [not_null]}
