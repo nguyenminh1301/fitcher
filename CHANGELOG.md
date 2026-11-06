@@ -4,6 +4,7 @@
 
 ### Added
 
+- Prepare the admin and feedback console: `agent_logs.example_proposals` gains the redacted QuerySpec, error, feedback note and confidence of a proposal (existing volumes through `jobs.apply_log_schema`), the trace reader may read input screening, conversations and messages for the `admin` paths, and the review reader may read the runs, node events and SQL a proposal is built from.
 - Document onboarding a company: the README, `jobs/README.md` and `packs/README.md` describe `jobs.profile`, `jobs.ingest_docs`, `jobs.draft_pack`, the Review, Documents and Datasets sections and how reviewed YAML is committed through a pull request.
 - Add `packs/ecommerce_twin_regen`, the hand-written pack with its 36 dataset, column, metric and glossary descriptions drafted from the mart profile and reviewed in the console; it scores the same 39/45 execution match as the hand-written pack case for case, recorded in `docs/eval/ecommerce_twin_regen-report.md`.
 - Onboard a pack before its first compile: `/me`, `/pack`, Review and Documents read the active pack's name, display name and roles from `compiled.json` and, while the pack was never compiled, from its `business_profile.yaml` and `policies.yaml`, so a reviewer can sign in and approve drafts that the compiler would still refuse; questions and `/datasets` keep needing the compiled pack.

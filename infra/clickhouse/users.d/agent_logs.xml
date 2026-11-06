@@ -8,11 +8,13 @@
 
         agent_logs_writer        api log writer, LiteLLM callback and eval
                                  reports; insert only, no reads.
-        agent_logs_trace_reader  trace queries: run, node, LLM, SQL, audit
-                                 and eval tables, the trace_query_log view
+        agent_logs_trace_reader  admin paths: run, node, LLM, SQL, audit,
+                                 eval, input-screening, conversation and
+                                 message tables, the trace_query_log view
                                  and the system.query_log it reads.
         agent_logs_review_reader pack_reviewer and admin paths: proposed
-                                 examples, feedback and chat messages.
+                                 examples, feedback, chat messages and the
+                                 runs, node events and SQL a proposal reads.
 
         The agent's per-role users, which compile_pack creates, get no access here.
     -->
@@ -61,6 +63,9 @@
                 <query>GRANT SELECT ON agent_logs.audit</query>
                 <query>GRANT SELECT ON agent_logs.eval_reports</query>
                 <query>GRANT SELECT ON agent_logs.trace_query_log</query>
+                <query>GRANT SELECT ON agent_logs.input_screening</query>
+                <query>GRANT SELECT ON agent_logs.conversations</query>
+                <query>GRANT SELECT ON agent_logs.chat_messages</query>
                 <query>GRANT SELECT ON system.query_log</query>
             </grants>
         </agent_logs_trace_reader>
@@ -76,6 +81,9 @@
                 <query>GRANT SELECT ON agent_logs.example_proposals</query>
                 <query>GRANT SELECT ON agent_logs.feedback</query>
                 <query>GRANT SELECT ON agent_logs.chat_messages</query>
+                <query>GRANT SELECT ON agent_logs.runs</query>
+                <query>GRANT SELECT ON agent_logs.events</query>
+                <query>GRANT SELECT ON agent_logs.sql_runs</query>
             </grants>
         </agent_logs_review_reader>
     </users>

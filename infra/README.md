@@ -46,8 +46,8 @@ Six configuration users reach it and the registries in `data_meta`, each with it
 | User | Password | Access |
 | --- | --- | --- |
 | `agent_logs_writer` | `CLICKHOUSE_LOGS_WRITER_PASSWORD` | `INSERT` on `agent_logs`; no reads |
-| `agent_logs_trace_reader` | `CLICKHOUSE_TRACE_READER_PASSWORD` | `SELECT` on `runs`, `events`, `llm_calls`, `sql_runs`, `audit`, `eval_reports` and `system.query_log` |
-| `agent_logs_review_reader` | `CLICKHOUSE_REVIEW_READER_PASSWORD` | `SELECT` on `example_proposals`, `feedback` and `chat_messages` for the `pack_reviewer` and `admin` paths |
+| `agent_logs_trace_reader` | `CLICKHOUSE_TRACE_READER_PASSWORD` | `SELECT` on `runs`, `events`, `llm_calls`, `sql_runs`, `audit`, `eval_reports`, `input_screening`, `conversations`, `chat_messages` and `system.query_log` for the `admin` paths |
+| `agent_logs_review_reader` | `CLICKHOUSE_REVIEW_READER_PASSWORD` | `SELECT` on `example_proposals`, `feedback`, `chat_messages`, `runs`, `events` and `sql_runs` for the `pack_reviewer` paths and the proposals built from runs |
 | `agent_conversations` | `CLICKHOUSE_CONVERSATIONS_PASSWORD` | `SELECT` and `INSERT` on `chat_messages`, `conversations` and `conversation_groups`; the api's conversation store, which filters every query by the requesting user |
 | `model_tiers_admin` | `CLICKHOUSE_MODEL_TIERS_PASSWORD` | `SELECT` and `INSERT` on `data_meta.model_tiers`, `SELECT` on `eval_reports` and `INSERT` on `admin_actions`; the api's tier lookup and Models page |
 | `pack_review` | `CLICKHOUSE_PACK_REVIEW_PASSWORD` | `SELECT` and `INSERT` on the document registry `data_meta.documents` and `SELECT` on `marts`; the api's Documents and Review paths, whose test-runs send `readonly=2` and the `QUERY_MAX_*` limits |

@@ -12,8 +12,11 @@ import xml.etree.ElementTree as ElementTree
 import pytest
 
 USERS_DIR = Path(__file__).resolve().parents[2] / "infra" / "clickhouse" / "users.d"
-TRACE_TABLES = ["runs", "events", "llm_calls", "sql_runs", "audit", "eval_reports", "trace_query_log"]
-REVIEW_TABLES = ["example_proposals", "feedback", "chat_messages"]
+TRACE_TABLES = [
+    "runs", "events", "llm_calls", "sql_runs", "audit", "eval_reports", "trace_query_log",
+    "input_screening", "conversations", "chat_messages",
+]
+REVIEW_TABLES = ["example_proposals", "feedback", "chat_messages", "runs", "events", "sql_runs"]
 
 
 def grants(file_name: str, user: str) -> list[str]:
