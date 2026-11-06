@@ -45,8 +45,8 @@ const CONSOLE: Partial<ConsoleFile> = {
     },
   ],
   runs: [
-    { trace_id: "t1", ts: "2026-11-02T08:15:00Z", user_id: "ana", role: "analyst", question: "Totals by month", status: "succeeded", latency_ms: 6420, cost_usd: 0.0042 },
-    { trace_id: "t2", ts: "2026-11-02T09:15:00Z", user_id: "bo", role: "viewer", question: "Refunds in 2025", status: "denied", latency_ms: 900, cost_usd: 0.0004 },
+    { trace_id: "t1", ts: "2026-11-02T08:15:00Z", user_id: "ana", role: "analyst", question: "Totals by month", intent: "data_query", status: "succeeded", latency_ms: 6420, cost_usd: 0.0042 },
+    { trace_id: "t2", ts: "2026-11-02T09:15:00Z", user_id: "bo", role: "viewer", question: "Refunds in 2025", intent: "data_query", status: "denied", latency_ms: 900, cost_usd: 0.0004 },
   ],
   traces: {
     t1: [
@@ -60,8 +60,8 @@ const CONSOLE: Partial<ConsoleFile> = {
     { ts: "2026-11-02T09:15:01Z", trace_id: "t2", user_id: "bo", role: "viewer", decision: "DENY", dataset: "table_two", blocked_tables: ["table_two"], reason: "not granted" },
   ],
   costs: [
-    { day: "2026-11-01", alias: "fast", model: "model-small", calls: 10, cost_usd: 0.25 },
-    { day: "2026-11-02", alias: "sql-gen", model: "model-large", calls: 4, cost_usd: 1.5 },
+    { day: "2026-11-01", alias: "fast", model: "model-small", tier: "fast", provider: "openai", calls: 10, cost_usd: 0.25 },
+    { day: "2026-11-02", alias: "sql-gen", model: "model-large", tier: "sql-gen", provider: "openai", calls: 4, cost_usd: 1.5 },
   ],
   users: [
     { id: "adm", username: "adm", display_name: "Ada Admin", roles: ["admin", "analyst"], enabled: true },

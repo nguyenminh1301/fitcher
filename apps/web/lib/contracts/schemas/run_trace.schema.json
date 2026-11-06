@@ -1,0 +1,163 @@
+{
+  "$defs": {
+    "RunRow": {
+      "additionalProperties": false,
+      "properties": {
+        "trace_id": {
+          "title": "Trace Id",
+          "type": "string"
+        },
+        "ts": {
+          "format": "date-time",
+          "title": "Ts",
+          "type": "string"
+        },
+        "user_id": {
+          "title": "User Id",
+          "type": "string"
+        },
+        "role": {
+          "title": "Role",
+          "type": "string"
+        },
+        "question": {
+          "title": "Question",
+          "type": "string"
+        },
+        "intent": {
+          "title": "Intent",
+          "type": "string"
+        },
+        "status": {
+          "title": "Status",
+          "type": "string"
+        },
+        "latency_ms": {
+          "title": "Latency Ms",
+          "type": "integer"
+        },
+        "cost_usd": {
+          "title": "Cost Usd",
+          "type": "number"
+        },
+        "error": {
+          "default": "",
+          "title": "Error",
+          "type": "string"
+        }
+      },
+      "required": [
+        "trace_id",
+        "ts",
+        "user_id",
+        "role",
+        "question",
+        "intent",
+        "status",
+        "latency_ms",
+        "cost_usd"
+      ],
+      "title": "RunRow",
+      "type": "object"
+    },
+    "TraceItem": {
+      "additionalProperties": false,
+      "description": "One step of a run, in time order: a graph node, an LLM call, a SQL attempt or an access decision.",
+      "properties": {
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "node",
+            "llm",
+            "sql",
+            "access"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "ok",
+            "err",
+            "deny"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "ms": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Ms"
+        },
+        "meta": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Meta",
+          "type": "array"
+        },
+        "sql": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Sql"
+        },
+        "error": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Error"
+        }
+      },
+      "required": [
+        "name",
+        "kind",
+        "status"
+      ],
+      "title": "TraceItem",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "run": {
+      "$ref": "#/$defs/RunRow"
+    },
+    "items": {
+      "items": {
+        "$ref": "#/$defs/TraceItem"
+      },
+      "title": "Items",
+      "type": "array"
+    }
+  },
+  "required": [
+    "run",
+    "items"
+  ],
+  "title": "RunTrace",
+  "type": "object"
+}

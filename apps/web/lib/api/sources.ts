@@ -19,12 +19,12 @@ export const sources: Sources = {
   datasets: "http",
   review: "http",
   documents: "http",
-  feedbackReview: "mock",
-  evaluation: "mock",
-  runs: "mock",
-  audit: "mock",
-  costs: "mock",
-  users: "mock",
+  feedbackReview: "http",
+  evaluation: "http",
+  runs: "http",
+  audit: "http",
+  costs: "http",
+  users: "http",
   models: "http",
 };
 

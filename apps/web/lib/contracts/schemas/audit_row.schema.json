@@ -1,0 +1,57 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "ts": {
+      "format": "date-time",
+      "title": "Ts",
+      "type": "string"
+    },
+    "trace_id": {
+      "title": "Trace Id",
+      "type": "string"
+    },
+    "user_id": {
+      "title": "User Id",
+      "type": "string"
+    },
+    "role": {
+      "title": "Role",
+      "type": "string"
+    },
+    "decision": {
+      "enum": [
+        "ALLOW",
+        "DENY"
+      ],
+      "title": "Decision",
+      "type": "string"
+    },
+    "dataset": {
+      "title": "Dataset",
+      "type": "string"
+    },
+    "blocked_tables": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Blocked Tables",
+      "type": "array"
+    },
+    "reason": {
+      "title": "Reason",
+      "type": "string"
+    }
+  },
+  "required": [
+    "ts",
+    "trace_id",
+    "user_id",
+    "role",
+    "decision",
+    "dataset",
+    "blocked_tables",
+    "reason"
+  ],
+  "title": "AuditRow",
+  "type": "object"
+}

@@ -12,7 +12,7 @@ import { ListPage, RecordTable } from "@/components/console/ListPage";
 import { Button, Chip, Segmented, Tabs, TextField } from "@/components/ui/controls";
 import { StatusPill, WarningBanner } from "@/components/ui/feedback";
 import { Dialog } from "@/components/ui/overlay";
-import type { UserRow } from "@/lib/api/provisional";
+import type { UserRow } from "@/lib/contracts";
 import { useChat } from "@/lib/chat/ChatContext";
 import { allowedSections } from "@/lib/console/sections";
 import { useLoad } from "@/lib/console/useLoad";
