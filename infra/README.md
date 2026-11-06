@@ -15,6 +15,7 @@ See [DECISIONS §3](../docs/DECISIONS.md#3-docker-compose) and the [Phase 0 plan
 | `clickhouse/initdb/001-databases.sql` | Creates `raw`, `marts` and `data_meta` |
 | `clickhouse/initdb/010-agent-logs.sql` | Creates the `agent_logs` database and its run log tables |
 | `clickhouse/initdb/020-model-tiers.sql` | Creates `data_meta.model_tiers`, the model tier mapping of the Models page |
+| `litellm/Dockerfile` | The pinned upstream LiteLLM image with patched bundled packages the upstream still ships at a vulnerable version (see SECURITY.md) |
 | `litellm/config.yaml` | Gateway settings shared by every model: callbacks, guardrail and master key |
 | `litellm/catalog/*.yaml` | One file per provider (OpenAI, Anthropic, Gemini, Ollama) with its aliases, named `<provider>-<size>`, and the variables it needs |
 | `litellm/build_config.py` | Container entrypoint: adds each catalog file whose variables are set to the settings and starts the proxy |
