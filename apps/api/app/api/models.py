@@ -19,7 +19,7 @@ from typing import Annotated, Protocol
 
 from fastapi import APIRouter, Depends, HTTPException, status
 
-from app.api.auth import current_principal
+from app.api.console import require_admin
 from app.api.runtime import get_catalog, get_compiled, get_model_store, get_tier_map, unavailable
 from app.auth.jwt import Principal
 from app.contracts.model_tiers import AliasOption, ModelTier, ModelTierChange, ModelTiers
@@ -32,7 +32,6 @@ from app.packs.compiler import CompiledPack
 logger = logging.getLogger(__name__)
 router = APIRouter()
 ACTION = "model_tier"
-ADMIN_ROLE = "admin"
 _CHANGES = threading.Lock()
 
 
@@ -48,12 +47,6 @@ class ModelStore(Protocol):
 
 class Catalog(Protocol):
     def aliases(self) -> list[str]: ...
-
-
-def require_admin(principal: Annotated[Principal, Depends(current_principal)]) -> Principal:
-    if ADMIN_ROLE not in principal.roles:
-        raise HTTPException(status.HTTP_403_FORBIDDEN, detail="the Models page needs the admin role")
-    return principal
 
 
 def _chat_aliases(catalog: Catalog) -> tuple[list[str], str | None]:

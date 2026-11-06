@@ -28,6 +28,7 @@ from app.llm.embeddings import LiteLLMEmbeddings
 from app.llm.model_store import CatalogClient, ClickHouseModelStore, model_tiers_client
 from app.llm.tiers import EMBED_TIER, TierMap, TierStoreError
 from app.onboarding.documents import ClickHouseDocumentRegistry, DocumentService, pack_review_client
+from app.admin.logs import AdminLogs, trace_reader_client
 from app.onboarding.drafter import Drafter
 from app.onboarding.review import ReviewService
 from app.packs.compiler import CompileError, CompiledPack, load_compiled
@@ -245,6 +246,15 @@ def get_review_service() -> ReviewService:
         pack=pack_identity(get_compiled_or_none()).name, pack_dir=get_pack_dir(), registry=get_document_service().registry,
         warehouse=get_review_warehouse(), limits=QueryLimits.from_env(), compiled_dir=Path(settings.compiled_pack_dir),
     )
+
+
+@cache
+def get_admin_logs() -> AdminLogs:
+    """The run logs of the active pack, read as ``agent_logs_trace_reader``."""
+    try:
+        return AdminLogs.from_client(trace_reader_client(), pack_identity(get_compiled_or_none()).name)
+    except Exception as error:  # noqa: BLE001 - a missing password or ClickHouse unreachable
+        raise unavailable(f"the run logs are unavailable: {error}") from None
 
 
 @cache

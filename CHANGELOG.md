@@ -4,6 +4,7 @@
 
 ### Added
 
+- Read the run logs from the api for an `admin`: `GET /admin/runs` (by user, status and date, 50 per page, with each run's role and estimated cost), `GET /admin/runs/{trace_id}` (graph nodes, LLM calls, SQL attempts and access decisions in time order), `GET /admin/audit`, `GET /admin/screening`, `GET /admin/costs` (by day, alias, model, tier and provider) and `GET /admin/conversations[/{id}]`, which include conversations their owner deleted; every read runs as the read-only trace reader.
 - Prepare the admin and feedback console: `agent_logs.example_proposals` gains the redacted QuerySpec, error, feedback note and confidence of a proposal (existing volumes through `jobs.apply_log_schema`), the trace reader may read input screening, conversations and messages for the `admin` paths, and the review reader may read the runs, node events and SQL a proposal is built from.
 - Document onboarding a company: the README, `jobs/README.md` and `packs/README.md` describe `jobs.profile`, `jobs.ingest_docs`, `jobs.draft_pack`, the Review, Documents and Datasets sections and how reviewed YAML is committed through a pull request.
 - Add `packs/ecommerce_twin_regen`, the hand-written pack with its 36 dataset, column, metric and glossary descriptions drafted from the mart profile and reviewed in the console; it scores the same 39/45 execution match as the hand-written pack case for case, recorded in `docs/eval/ecommerce_twin_regen-report.md`.
