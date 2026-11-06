@@ -29,6 +29,7 @@ from app.llm.model_store import CatalogClient, ClickHouseModelStore, model_tiers
 from app.llm.tiers import EMBED_TIER, TierMap, TierStoreError
 from app.onboarding.documents import ClickHouseDocumentRegistry, DocumentService, pack_review_client
 from app.admin.logs import AdminLogs, trace_reader_client
+from app.auth.keycloak_admin import KeycloakAdmin, KeycloakAdminError
 from app.eval.console import EvalReports, EvalRuns
 from app.feedback.store import ClickHouseProposalStore, review_reader_client
 from app.observability.log_writer import writer_client
@@ -288,6 +289,19 @@ def get_eval_reports() -> EvalReports:
         raise unavailable(f"the eval reports are unavailable: {error}") from None
     return EvalReports(lambda sql, parameters: client.query(sql, parameters=parameters).result_rows,
                        pack_identity(get_compiled_or_none()).name)
+
+
+@cache
+def get_keycloak_admin() -> KeycloakAdmin:
+    try:
+        return KeycloakAdmin.from_env()
+    except KeycloakAdminError as error:
+        raise unavailable(str(error)) from None
+
+
+def get_admin_action_log() -> ClickHouseModelStore:
+    """``agent_logs.admin_actions``, written by the same user as the Models page's changes."""
+    return get_model_store()
 
 
 @cache

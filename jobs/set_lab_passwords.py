@@ -25,7 +25,8 @@ TIMEOUT_SECONDS = 30
 
 def lab_usernames() -> list[str]:
     realm = json.loads(REALM_FILE.read_text(encoding="utf-8"))
-    return [user["username"] for user in realm.get("users", [])]
+    # A client's service account signs in with its client secret, never a password.
+    return [user["username"] for user in realm.get("users", []) if "serviceAccountClientId" not in user]
 
 
 def realm_name() -> str:
