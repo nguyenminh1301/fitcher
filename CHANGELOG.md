@@ -184,6 +184,7 @@
 
 ### Fixed
 
+- Let the api's shared ClickHouse clients (conversations, model tiers, document registry, log readers and writer) run concurrent queries: they no longer open a server session, which made ClickHouse refuse the chat page's parallel conversation and group requests with a 503.
 - Refuse an Iowa Liquor Sales export whose later CSV part has other columns or another column order, instead of appending its rows under the first part's header.
 - Keep the api healthy while the screening classifier loads: the api builds the screener in the background at startup and `/health` only reads its state, instead of loading the model inside the 2-second health probe, which kept the container unhealthy once the real model was present.
 - Draw a streamed answer as the chart its `chart_spec` names instead of the table: the chat kept the chart type it had before the spec arrived, so every live answer opened as a table until the reader switched it.

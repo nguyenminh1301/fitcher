@@ -72,6 +72,8 @@ def writer_client(env: Mapping[str, str] | None = None):
         username=env.get("CLICKHOUSE_LOGS_WRITER_USER", DEFAULT_WRITER_USER),
         password=password,
         database=LOGS_DATABASE,
+        # Shared across concurrent requests: a session would serialize them and refuse overlaps.
+        autogenerate_session_id=False,
     )
 
 
