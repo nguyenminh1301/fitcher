@@ -1,0 +1,432 @@
+terms:
+  - id: sales_dollars
+    confidence: 0.96
+    term: Sales dollars
+    definition: The dollar amount recorded for liquor sales on a transaction line. People use this term to mean revenue from sales in the liquor sales data.
+    aliases:
+      vi:
+        - doanh thu
+        - doanh thu bán hàng
+        - giá trị bán hàng
+        - tiền bán hàng
+      en:
+        - sales dollars
+        - sales amount
+        - sales revenue
+    targets:
+      - kind: metric
+        metric: total_sales_dollars
+    evidence:
+      - kind: profile
+        ref: liquor_sales.sale_dollars
+    status: approved
+  - id: bottles_sold
+    confidence: 0.97
+    term: Bottles sold
+    definition: The number of bottles sold on a transaction line. This term is used when asking about unit volume in bottles.
+    aliases:
+      vi:
+        - số chai bán ra
+        - chai đã bán
+        - sản lượng chai
+      en:
+        - bottles sold
+        - units sold in bottles
+        - bottle sales
+    targets:
+      - kind: metric
+        metric: total_bottles_sold
+    evidence:
+      - kind: profile
+        ref: liquor_sales.bottles_sold
+    status: approved
+  - id: liters_sold
+    confidence: 0.97
+    term: Liters sold
+    definition: The volume of liquor sold measured in liters on a transaction line. People use this term when asking about sales volume by liquid quantity.
+    aliases:
+      vi:
+        - số lít bán ra
+        - lượng lít bán
+        - sản lượng theo lít
+      en:
+        - liters sold
+        - volume sold in liters
+        - liter sales
+    targets:
+      - kind: metric
+        metric: total_liters_sold
+    evidence:
+      - kind: profile
+        ref: liquor_sales.liters_sold
+    status: approved
+  - id: state_margin
+    confidence: 0.94
+    term: State margin
+    definition: The margin amount attributed to the state for a sales line. This term is used for questions about state earnings or margin from liquor sales.
+    aliases:
+      vi:
+        - biên lợi nhuận của bang
+        - lợi nhuận bang
+        - margin của bang
+      en:
+        - state margin
+        - state earnings
+        - state gross margin
+    targets:
+      - kind: metric
+        metric: total_state_margin
+    evidence:
+      - kind: profile
+        ref: liquor_sales.state_margin
+    status: approved
+  - id: invoice
+    confidence: 0.92
+    term: Invoice
+    definition: A sales invoice or transaction identifier in the liquor sales data. People use this term when referring to receipts, bills, or distinct transactions.
+    aliases:
+      vi:
+        - hóa đơn
+        - mã hóa đơn
+        - giao dịch
+      en:
+        - invoice
+        - invoice id
+        - transaction
+    targets:
+      - kind: metric
+        metric: distinct_invoices
+      - kind: column
+        dataset: liquor_sales
+        column: invoice_id
+    evidence:
+      - kind: profile
+        ref: liquor_sales.invoice_id
+    status: approved
+  - id: store
+    confidence: 0.93
+    term: Store
+    definition: A retail location that sells liquor in the dataset. People use this term to refer to the selling outlet by store number or store name.
+    aliases:
+      vi:
+        - cửa hàng
+        - điểm bán
+        - shop
+      en:
+        - store
+        - retailer
+        - location
+    targets:
+      - kind: column
+        dataset: liquor_sales
+        column: store_name
+    evidence:
+      - kind: profile
+        ref: liquor_sales.store_number
+      - kind: profile
+        ref: liquor_sales.store_name
+    status: approved
+  - id: item
+    confidence: 0.93
+    term: Item
+    definition: A liquor product sold in the dataset, identified by item number and description. People use this term when asking about SKUs, products, or merchandise sold.
+    aliases:
+      vi:
+        - mặt hàng
+        - sản phẩm
+        - mã hàng
+      en:
+        - item
+        - product
+        - sku
+    targets:
+      - kind: column
+        dataset: liquor_sales
+        column: item_description
+    evidence:
+      - kind: profile
+        ref: liquor_sales.item_number
+      - kind: profile
+        ref: liquor_sales.item_description
+    status: approved
+  - id: sale_date
+    confidence: 0.98
+    term: Sale date
+    definition: The calendar date when the liquor sale was recorded. This term is used for filtering or grouping sales by day or time period.
+    aliases:
+      vi:
+        - ngày bán
+        - ngày giao dịch
+        - ngày bán hàng
+      en:
+        - sale date
+        - transaction date
+        - sales date
+    targets:
+      - kind: column
+        dataset: liquor_sales
+        column: sale_date
+    evidence:
+      - kind: profile
+        ref: liquor_sales.sale_date
+    status: approved
+  - id: county
+    confidence: 0.96
+    term: County
+    definition: The county associated with the liquor sale or store location. People use this term for geographic analysis below the state level.
+    aliases:
+      vi:
+        - quận hạt
+        - hạt
+        - khu vực hạt
+      en:
+        - county
+        - county name
+        - county area
+    targets:
+      - kind: column
+        dataset: liquor_sales
+        column: county_name
+    evidence:
+      - kind: profile
+        ref: liquor_sales.county_name
+    status: approved
+  - id: vodka
+    confidence: 0.88
+    term: Vodka
+    definition: Liquor products categorized as vodka in the sales data. People use this term to refer to vodka categories including standard, imported, or flavored vodka.
+    aliases:
+      vi:
+        - vodka
+        - rượu vodka
+      en:
+        - vodka
+        - vodka products
+    targets:
+      - kind: value
+        dataset: liquor_sales
+        column: category_name
+        value: AMERICAN VODKAS
+      - kind: value
+        dataset: liquor_sales
+        column: category_name
+        value: IMPORTED VODKAS
+      - kind: value
+        dataset: liquor_sales
+        column: category_name
+        value: AMERICAN FLAVORED VODKA
+      - kind: value
+        dataset: liquor_sales
+        column: category_name
+        value: IMPORTED FLAVORED VODKA
+    evidence:
+      - kind: profile
+        ref: liquor_sales.category_name
+    status: approved
+  - id: canadian_whisky
+    confidence: 0.95
+    term: Canadian whisky
+    definition: Liquor products classified in the Canadian whisky category. People use this term for sales related to Canadian whisky products.
+    aliases:
+      vi:
+        - whisky canada
+        - rượu whisky canada
+      en:
+        - Canadian whisky
+        - Canadian whiskey
+        - Canadian whiskies
+    targets:
+      - kind: value
+        dataset: liquor_sales
+        column: category_name
+        value: CANADIAN WHISKIES
+    evidence:
+      - kind: profile
+        ref: liquor_sales.category_name
+    status: approved
+  - id: bourbon
+    confidence: 0.94
+    term: Bourbon
+    definition: Liquor products classified as straight bourbon whisky in the sales data. People use this term when asking about bourbon sales.
+    aliases:
+      vi:
+        - bourbon
+        - rượu bourbon
+      en:
+        - bourbon
+        - straight bourbon
+        - bourbon whiskey
+    targets:
+      - kind: value
+        dataset: liquor_sales
+        column: category_name
+        value: STRAIGHT BOURBON WHISKIES
+      - kind: value
+        dataset: liquor_sales
+        column: category_name
+        value: SINGLE BARREL BOURBON WHISKIES
+      - kind: value
+        dataset: liquor_sales
+        column: category_name
+        value: BOTTLED IN BOND BOURBON
+    evidence:
+      - kind: profile
+        ref: liquor_sales.category_name
+    status: approved
+  - id: tequila
+    confidence: 0.9
+    term: Tequila
+    definition: Liquor products categorized as tequila in the sales data. People use this term to refer to tequila categories such as agave tequila or mixto tequila.
+    aliases:
+      vi:
+        - tequila
+        - rượu tequila
+      en:
+        - tequila
+        - tequila products
+    targets:
+      - kind: value
+        dataset: liquor_sales
+        column: category_name
+        value: 100% AGAVE TEQUILA
+      - kind: value
+        dataset: liquor_sales
+        column: category_name
+        value: MIXTO TEQUILA
+    evidence:
+      - kind: profile
+        ref: liquor_sales.category_name
+    status: approved
+  - id: rum
+    confidence: 0.9
+    term: Rum
+    definition: Liquor products categorized as rum in the sales data. People use this term to refer to rum categories such as spiced rum, flavored rum, or white rum.
+    aliases:
+      vi:
+        - rum
+        - rượu rum
+      en:
+        - rum
+        - rum products
+    targets:
+      - kind: value
+        dataset: liquor_sales
+        column: category_name
+        value: SPICED RUM
+      - kind: value
+        dataset: liquor_sales
+        column: category_name
+        value: FLAVORED RUM
+      - kind: value
+        dataset: liquor_sales
+        column: category_name
+        value: WHITE RUM
+      - kind: value
+        dataset: liquor_sales
+        column: category_name
+        value: AGED DARK RUM
+      - kind: value
+        dataset: liquor_sales
+        column: category_name
+        value: GOLD RUM
+    evidence:
+      - kind: profile
+        ref: liquor_sales.category_name
+    status: approved
+  - id: whiskey_liqueur
+    confidence: 0.95
+    term: Whiskey liqueur
+    definition: Liquor products classified in the whiskey liqueur category. People use this term for whiskey-based liqueur sales.
+    aliases:
+      vi:
+        - liqueur whisky
+        - rượu mùi whisky
+      en:
+        - whiskey liqueur
+        - whisky liqueur
+    targets:
+      - kind: value
+        dataset: liquor_sales
+        column: category_name
+        value: WHISKEY LIQUEUR
+    evidence:
+      - kind: profile
+        ref: liquor_sales.category_name
+    status: approved
+  - id: vendor
+    term: Vendor
+    definition: The supplier whose product the state sold; each line names one vendor.
+    aliases:
+      vi:
+        - nhà cung cấp
+        - nhà phân phối
+      en:
+        - vendor
+        - vendors
+        - supplier
+        - suppliers
+    targets:
+      - kind: column
+        dataset: liquor_sales
+        column: vendor_name
+    status: approved
+    evidence: &id001
+      - kind: manual
+        ref: review of the drafted pack (docs/eval/iowa_liquor-report.md)
+    confidence: 1.0
+  - id: category
+    term: Category
+    definition: The liquor category of the item sold, such as American vodkas or straight bourbon whiskies.
+    aliases:
+      vi:
+        - nhóm hàng
+        - loại rượu
+        - danh mục
+      en:
+        - category
+        - categories
+        - liquor category
+    targets:
+      - kind: column
+        dataset: liquor_sales
+        column: category_name
+    status: approved
+    evidence: *id001
+    confidence: 1.0
+  - id: city
+    term: City
+    definition: The city of the store that bought the liquor.
+    aliases:
+      vi:
+        - thành phố
+      en:
+        - city
+        - cities
+        - town
+    targets:
+      - kind: column
+        dataset: liquor_sales
+        column: store_city
+    status: approved
+    evidence: *id001
+    confidence: 1.0
+  - id: state_bottle_cost
+    term: State bottle cost
+    definition: What the state paid for one bottle of the item; vendor partners may not see it.
+    aliases:
+      vi:
+        - giá vốn
+        - giá vốn mỗi chai
+      en:
+        - bottle cost
+        - state cost
+        - cost per bottle
+    targets:
+      - kind: column
+        dataset: liquor_sales
+        column: state_bottle_cost
+    status: approved
+    evidence:
+      - kind: manual
+        ref: review of the drafted pack (docs/eval/iowa_liquor-report.md)
+    confidence: 1.0

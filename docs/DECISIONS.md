@@ -91,7 +91,10 @@ Jobs share the `api` image and run manually or from CI; an admin can also start 
   - `sales_lines` = order_items JOIN orders JOIN products JOIN customers, one row per line item
   - `returns_fact`
   - `sessions_daily`
-- **Second dataset** (to prove industry neutrality): Iowa Liquor Sales (real data, one wide table) or `SDataPro/maycee-retail-dataset`.
+- **Second dataset** (to prove industry neutrality): Iowa Liquor Sales 2025, chosen over `SDataPro/maycee-retail-dataset` because it is real data from a clearly different industry (state-regulated spirits wholesale) under a clear licence.
+  - Iowa Data Hub dataset 1262: every Class E liquor licensee purchase in Iowa from 2025-01-01 to 2025-12-31, one wide table of invoice lines (store, county, category, vendor, item, bottle size, state cost and retail, bottles, dollars, volume)
+  - License CC BY 4.0, published by the Iowa Department of Revenue, Alcohol Operations Bureau; the download stays in the Git-ignored `data/` directory
+  - Served from the fixture PostgreSQL (`infra/sources/iowa_liquor`) and copied into ClickHouse through its source manifest like a company's own database; pack `iowa_liquor`
 
 Principle: the agent queries only **marts** (2-5 wide tables, few joins), never `raw`.
 

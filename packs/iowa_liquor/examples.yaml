@@ -1,0 +1,126 @@
+examples:
+  - id: monthly_sales_trend
+    confidence: 0.95
+    question: What were total liquor sales dollars by month in 2025?
+    language: en
+    sql: SELECT toStartOfMonth(sale_date) AS month, sum(sale_dollars) AS total_sales_dollars FROM marts.liquor_sales GROUP BY month ORDER BY month
+    datasets:
+      - liquor_sales
+    metrics:
+      - total_sales_dollars
+    evidence:
+      - kind: profile
+        ref: liquor_sales.sale_date
+      - kind: profile
+        ref: liquor_sales.sale_dollars
+    status: approved
+  - id: top_categories_by_sales
+    confidence: 0.94
+    question: Which liquor categories had the highest total sales dollars?
+    language: en
+    sql: SELECT category_name, sum(sale_dollars) AS total_sales_dollars FROM marts.liquor_sales GROUP BY category_name ORDER BY total_sales_dollars DESC LIMIT 10
+    datasets:
+      - liquor_sales
+    metrics:
+      - total_sales_dollars
+    evidence:
+      - kind: profile
+        ref: liquor_sales.category_name
+      - kind: profile
+        ref: liquor_sales.sale_dollars
+    status: approved
+  - id: county_sales_summary
+    confidence: 0.92
+    question: How much did each county sell, and how many distinct invoices did each county have?
+    language: en
+    sql: SELECT county_name, sum(sale_dollars) AS total_sales_dollars, uniqExact(invoice_id) AS distinct_invoices FROM marts.liquor_sales GROUP BY county_name ORDER BY total_sales_dollars DESC
+    datasets:
+      - liquor_sales
+    metrics:
+      - total_sales_dollars
+      - distinct_invoices
+    evidence:
+      - kind: profile
+        ref: liquor_sales.county_name
+      - kind: profile
+        ref: liquor_sales.sale_dollars
+      - kind: profile
+        ref: liquor_sales.invoice_id
+    status: approved
+  - id: top_stores_by_bottles_sold
+    confidence: 0.93
+    question: Which stores sold the most bottles?
+    language: en
+    sql: SELECT store_name, sum(bottles_sold) AS total_bottles_sold FROM marts.liquor_sales GROUP BY store_name ORDER BY total_bottles_sold DESC LIMIT 10
+    datasets:
+      - liquor_sales
+    metrics:
+      - total_bottles_sold
+    evidence:
+      - kind: profile
+        ref: liquor_sales.store_name
+      - kind: profile
+        ref: liquor_sales.bottles_sold
+    status: approved
+  - id: vendors_by_liters_sold
+    confidence: 0.9
+    question: Which vendors sold the most liters overall?
+    language: en
+    sql: SELECT vendor_name, sum(liters_sold) AS total_liters_sold FROM marts.liquor_sales GROUP BY vendor_name ORDER BY total_liters_sold DESC LIMIT 10
+    datasets:
+      - liquor_sales
+    metrics:
+      - total_liters_sold
+    evidence:
+      - kind: profile
+        ref: liquor_sales.vendor_name
+      - kind: profile
+        ref: liquor_sales.liters_sold
+    status: approved
+  - id: category_margin_rate
+    confidence: 0.89
+    question: Which categories have the highest average state margin rate?
+    language: en
+    sql: SELECT category_name, sum(state_margin) / nullIf(sum(sale_dollars), 0) AS average_state_margin_rate FROM marts.liquor_sales GROUP BY category_name ORDER BY average_state_margin_rate DESC LIMIT 10
+    datasets:
+      - liquor_sales
+    metrics:
+      - average_state_margin_rate
+    evidence:
+      - kind: profile
+        ref: liquor_sales.category_name
+      - kind: profile
+        ref: liquor_sales.state_margin
+      - kind: profile
+        ref: liquor_sales.sale_dollars
+    status: approved
+  - id: city_store_coverage
+    confidence: 0.88
+    question: How many distinct stores sold liquor in each city?
+    language: en
+    sql: SELECT store_city, uniqExact(store_number) AS distinct_stores_selling FROM marts.liquor_sales GROUP BY store_city ORDER BY distinct_stores_selling DESC
+    datasets:
+      - liquor_sales
+    metrics:
+      - distinct_stores_selling
+    evidence:
+      - kind: profile
+        ref: liquor_sales.store_city
+      - kind: profile
+        ref: liquor_sales.store_number
+    status: approved
+  - id: items_by_category
+    confidence: 0.87
+    question: How many distinct items were sold in each liquor category?
+    language: en
+    sql: SELECT category_name, uniqExact(item_number) AS distinct_items_sold FROM marts.liquor_sales GROUP BY category_name ORDER BY distinct_items_sold DESC
+    datasets:
+      - liquor_sales
+    metrics:
+      - distinct_items_sold
+    evidence:
+      - kind: profile
+        ref: liquor_sales.category_name
+      - kind: profile
+        ref: liquor_sales.item_number
+    status: approved

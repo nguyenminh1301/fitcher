@@ -1,0 +1,11 @@
+# Iowa Liquor Sales 2025 (DECISIONS §4), served by the PostgreSQL fixture of the
+# `sources` profile as a company's own database would be (infra/sources/iowa_liquor).
+# Its read-only credentials are the IOWA_LIQUOR_POSTGRES_* variables, read by the
+# iowa_liquor named collection in infra/clickhouse/config.d/sources.xml.
+name: iowa_liquor
+kind: postgres
+mode: copy
+connection_env: IOWA_LIQUOR_POSTGRES
+dbt_tag: iowa_liquor
+tables:
+  - {name: sales, expected_rows: 2490620}
