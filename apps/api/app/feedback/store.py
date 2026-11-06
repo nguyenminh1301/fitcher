@@ -8,12 +8,13 @@ last ``sql_runs`` attempt and its rating and note from the latest feedback.
 
 from collections.abc import Mapping
 from dataclasses import asdict
-from datetime import datetime
+from datetime import UTC, datetime
 import json
 import os
 
 import clickhouse_connect
 
+from app.contracts.admin_feedback import FeedbackRow
 from app.feedback.proposals import Proposal, RunFacts, normalize
 
 TABLE = "agent_logs.example_proposals"
@@ -74,6 +75,45 @@ class ClickHouseProposalStore:
         rows = self._reader.query(f"SELECT question FROM {TABLE} WHERE pack = {{pack:String}}",
                                   parameters={"pack": pack}).result_rows
         return {normalize(question) for (question,) in rows}
+
+    def proposals(self, pack: str, open_only: bool = True) -> list[Proposal]:
+        """The latest version of each proposal of the pack; with ``open_only`` only those still to review."""
+        # The whole latest row as one tuple, so no aggregate refers to an alias of another.
+        sql = (f"SELECT argMax(tuple({', '.join(COLUMNS)}), ts) AS latest FROM {TABLE} "
+               "WHERE pack = {pack:String} GROUP BY proposal_id ORDER BY max(ts) DESC")
+        found = []
+        for (latest,) in self._reader.query(sql, parameters={"pack": pack}).result_rows:
+            row = dict(zip(COLUMNS, latest, strict=True))
+            row["ts"] = row["ts"] if row["ts"].tzinfo else row["ts"].replace(tzinfo=UTC)
+            found.append(Proposal(**row))
+        return [p for p in found if p.status == "proposed"] if open_only else found
+
+    def feedback(self, pack: str, rating: str | None, start: datetime | None, end: datetime | None) -> list[FeedbackRow]:
+        """Likes and dislikes of the pack's answers, newest first, with the run's status and any proposal."""
+        where, parameters = ["r.pack = {pack:String}"], {"pack": pack}
+        if rating:
+            where.append("f.rating = {rating:String}")
+            parameters["rating"] = rating
+        if start:
+            where.append("f.ts >= {start:DateTime64(3)}")
+            parameters["start"] = start
+        if end:
+            where.append("f.ts < {end:DateTime64(3)}")
+            parameters["end"] = end
+        sql = (
+            "SELECT f.trace_id, f.ts, f.user_id, f.rating, r.question, f.note, r.status, p.status "
+            "FROM agent_logs.feedback AS f "
+            "INNER JOIN (SELECT * FROM agent_logs.runs FINAL) AS r ON r.trace_id = f.trace_id "
+            f"LEFT JOIN (SELECT trace_id, argMax(status, ts) AS status FROM {TABLE} GROUP BY trace_id) AS p "
+            "ON p.trace_id = f.trace_id "
+            f"WHERE {' AND '.join(where)} ORDER BY f.ts DESC LIMIT 500"
+        )
+        return [
+            FeedbackRow(trace_id=trace_id, ts=ts, user_id=user_id, rating=rating_value, question=question,
+                        note=note or None, run_status=run_status, proposal=proposal or None)
+            for trace_id, ts, user_id, rating_value, question, note, run_status, proposal
+            in self._reader.query(sql, parameters=parameters).result_rows
+        ]
 
     def save(self, proposal: Proposal) -> None:
         row = asdict(proposal)
