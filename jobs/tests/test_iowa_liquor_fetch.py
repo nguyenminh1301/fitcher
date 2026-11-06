@@ -47,3 +47,13 @@ def test_an_archive_without_csv_is_refused(tmp_path):
         out.writestr("readme.txt", "nothing")
     with pytest.raises(fetch.FetchError, match="no CSV"):
         fetch.extract_csv(archive, tmp_path / "sales.csv")
+
+
+def test_a_later_part_with_another_header_is_refused(tmp_path):
+    archive = tmp_path / "export.zip"
+    with zipfile.ZipFile(archive, "w") as out:
+        out.writestr("rows_part_0001.csv", f"{HEADER}\n{ROW}\n")
+        swapped = ",".join([fetch.COLUMNS[1], fetch.COLUMNS[0], *fetch.COLUMNS[2:]])
+        out.writestr("rows_part_0002.csv", f"{swapped}\n{ROW}\n")
+    with pytest.raises(fetch.FetchError, match="rows_part_0002.csv"):
+        fetch.extract_csv(archive, tmp_path / "sales.csv")

@@ -54,6 +54,11 @@ def extract_csv(archive: Path, target: Path) -> None:
             for number, name in enumerate(parts):
                 with bundle.open(name) as part:
                     header = part.readline()
+                    # Every part must carry the same columns in the same order, or its rows would shift.
+                    try:
+                        check_header(next(csv.reader([header.decode("utf-8-sig")])))
+                    except FetchError as error:
+                        raise FetchError(f"{name}: {error}") from None
                     if number == 0:
                         out.write(header)
                     shutil.copyfileobj(part, out, CHUNK)
