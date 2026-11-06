@@ -29,6 +29,7 @@ from app.llm.model_store import CatalogClient, ClickHouseModelStore, model_tiers
 from app.llm.tiers import EMBED_TIER, TierMap, TierStoreError
 from app.onboarding.documents import ClickHouseDocumentRegistry, DocumentService, pack_review_client
 from app.admin.logs import AdminLogs, trace_reader_client
+from app.eval.console import EvalReports, EvalRuns
 from app.feedback.store import ClickHouseProposalStore, review_reader_client
 from app.observability.log_writer import writer_client
 from app.onboarding.drafter import Drafter
@@ -265,6 +266,28 @@ def _optional_proposal_store() -> ClickHouseProposalStore | None:
         return get_proposal_store()
     except HTTPException:
         return None
+
+
+def _run_eval(pack: str) -> int:
+    """One run of the pack's eval set with jobs.eval itself, which stores its report in agent_logs."""
+    from jobs import eval as eval_job  # noqa: PLC0415 - the api image ships jobs/; imported only when a run starts
+
+    return eval_job.main(["--pack", pack, "--packs-dir", load_settings().packs_dir], runners_factory=eval_job.role_runners)
+
+
+@cache
+def get_eval_runs() -> EvalRuns:
+    return EvalRuns(_run_eval)
+
+
+@cache
+def get_eval_reports() -> EvalReports:
+    try:
+        client = trace_reader_client()
+    except Exception as error:  # noqa: BLE001 - a missing password or ClickHouse unreachable
+        raise unavailable(f"the eval reports are unavailable: {error}") from None
+    return EvalReports(lambda sql, parameters: client.query(sql, parameters=parameters).result_rows,
+                       pack_identity(get_compiled_or_none()).name)
 
 
 @cache
