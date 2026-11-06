@@ -4,6 +4,10 @@
 
 ### Added
 
+- Record the second industry's eval in `docs/eval/iowa_liquor-report.md`: the `iowa_liquor` pack reaches 83% execution match (29/35) with no change to `apps/api` or `apps/web`, and its glossary now gives each term one meaning and covers vendor, category, city and the state's bottle cost after a first eval showed "vendors" was ambiguous.
+- Add the `iowa_liquor` pack, onboarded only through the Phase 10 pipeline: its dataset, 13 metrics, 15 glossary terms and 8 examples were drafted from the mart profile and approved in the console after the reviewer corrected three ratio metrics, one example and the categories behind three terms; its policies (`analyst`, `polk_county_manager`, `vendor_partner`), business profile, 35-case eval set covering every question category and sample data are hand-written.
+- Connect Iowa Liquor Sales through a source manifest only: `jobs/sources/iowa_liquor.yaml` (`kind: postgres`, copy mode) feeds dbt models tagged `iowa_liquor`, whose staging types the text export and whose `liquor_sales` mart holds one row per invoice line with the store, county, item, category, vendor, state cost and retail, bottles, dollars, liters and the state's margin.
+- Serve a second industry's data from the fixture PostgreSQL: `infra/sources/iowa_liquor/fetch.py` downloads Iowa Liquor Sales 2025 (Iowa Data Hub dataset 1262, CC BY 4.0, 2 490 620 invoice lines) into the Git-ignored `data/`, checks its header and prints its row count and SHA-256, `seed.sh` loads it into database `iowa_liquor` with a read-only role, and ClickHouse reaches it through the new `iowa_liquor` named collection; DECISIONS §4 records the choice.
 - Document onboarding a company: the README, `jobs/README.md` and `packs/README.md` describe `jobs.profile`, `jobs.ingest_docs`, `jobs.draft_pack`, the Review, Documents and Datasets sections and how reviewed YAML is committed through a pull request.
 - Add `packs/ecommerce_twin_regen`, the hand-written pack with its 36 dataset, column, metric and glossary descriptions drafted from the mart profile and reviewed in the console; it scores the same 39/45 execution match as the hand-written pack case for case, recorded in `docs/eval/ecommerce_twin_regen-report.md`.
 - Onboard a pack before its first compile: `/me`, `/pack`, Review and Documents read the active pack's name, display name and roles from `compiled.json` and, while the pack was never compiled, from its `business_profile.yaml` and `policies.yaml`, so a reviewer can sign in and approve drafts that the compiler would still refuse; questions and `/datasets` keep needing the compiled pack.
@@ -173,6 +177,7 @@
 
 ### Fixed
 
+- Refuse an Iowa Liquor Sales export whose later CSV part has other columns or another column order, instead of appending its rows under the first part's header.
 - Keep the api healthy while the screening classifier loads: the api builds the screener in the background at startup and `/health` only reads its state, instead of loading the model inside the 2-second health probe, which kept the container unhealthy once the real model was present.
 - Draw a streamed answer as the chart its `chart_spec` names instead of the table: the chat kept the chart type it had before the spec arrived, so every live answer opened as a table until the reader switched it.
 - Keep the web chat working now that `/ask` accepts only conversation ids the api created: the web server's `/api/ask` passes the api's `X-Conversation-Id` header through, and the browser's chat sends no conversation id with a chat's first question and the api's id with its follow-ups, so they read the earlier turns, until the conversation endpoints replace the browser's sample conversations.

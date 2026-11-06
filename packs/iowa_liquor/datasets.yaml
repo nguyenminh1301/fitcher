@@ -1,0 +1,107 @@
+datasets:
+  - id: liquor_sales
+    confidence: 0.96
+    description: Line-level liquor sales transactions with store, product category, item, vendor, packaging, and sales amount details for each sold item entry.
+    grain: One row represents one liquor sales line item on an invoice for a specific product sold by a store on a sale date.
+    time_column: sale_date
+    columns:
+      - name: invoice_id
+        type: string
+        role: dimension
+        description: Identifier for the sales invoice that groups one or more sold line items.
+      - name: sale_date
+        type: date
+        role: time
+        description: Date the liquor sale transaction was recorded.
+      - name: store_number
+        type: string
+        role: dimension
+        description: Identifier for the retail store that made the sale.
+      - name: store_name
+        type: string
+        role: dimension
+        description: Name of the retail store that made the sale.
+        indexable: true
+      - name: store_city
+        type: string
+        role: dimension
+        description: City where the retail store is located.
+        indexable: true
+      - name: store_zip_code
+        type: string
+        role: dimension
+        description: ZIP code of the retail store location.
+      - name: county_name
+        type: string
+        role: dimension
+        description: County associated with the retail store location.
+        indexable: true
+      - name: category_name
+        type: string
+        role: dimension
+        description: Liquor product category for the item sold.
+        indexable: true
+      - name: vendor_name
+        type: string
+        role: dimension
+        description: Vendor or supplier name associated with the sold item.
+        indexable: true
+      - name: item_number
+        type: string
+        role: dimension
+        description: Identifier for the liquor item sold.
+      - name: item_description
+        type: string
+        role: dimension
+        description: Descriptive name of the liquor item sold.
+        indexable: true
+      - name: bottles_per_case
+        type: number
+        role: dimension
+        description: Standard number of bottles contained in a case for the item.
+      - name: bottle_volume_ml
+        type: number
+        role: dimension
+        description: Volume of a single bottle sold, measured in milliliters.
+      - name: state_bottle_cost
+        type: number
+        role: measure
+        description: State cost amount per bottle for the item sold.
+      - name: state_bottle_retail
+        type: number
+        role: measure
+        description: State retail price per bottle for the item sold.
+      - name: bottles_sold
+        type: number
+        role: measure
+        description: Number of bottles sold on the transaction line.
+      - name: sale_dollars
+        type: number
+        role: measure
+        description: Total sales dollar amount for the transaction line.
+      - name: liters_sold
+        type: number
+        role: measure
+        description: Total liquid volume sold on the transaction line, measured in liters.
+      - name: state_margin
+        type: number
+        role: measure
+        description: Margin amount retained by the state for the transaction line.
+    allowed_roles:
+      - analyst
+      - polk_county_manager
+      - vendor_partner
+    evidence:
+      - kind: profile
+        ref: liquor_sales
+      - kind: profile
+        ref: liquor_sales.sale_date
+      - kind: profile
+        ref: liquor_sales.invoice_id
+      - kind: profile
+        ref: liquor_sales.store_number
+      - kind: profile
+        ref: liquor_sales.category_name
+      - kind: profile
+        ref: liquor_sales.item_number
+    status: approved

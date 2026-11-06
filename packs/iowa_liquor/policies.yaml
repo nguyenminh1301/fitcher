@@ -1,0 +1,29 @@
+# Access rules written by the company, not drafted: who may read which columns and rows.
+roles:
+  - id: analyst
+    description: Reads every column of every liquor sales line.
+    datasets:
+      - dataset: liquor_sales
+        columns: [invoice_id, sale_date, store_number, store_name, store_city, store_zip_code, county_name, category_name, vendor_name, item_number, item_description, bottles_per_case, bottle_volume_ml, state_bottle_cost, state_bottle_retail, bottles_sold, sale_dollars, liters_sold, state_margin]
+    status: approved
+    evidence: &policy [{kind: manual, ref: packs/iowa_liquor/README.md}]
+    confidence: 1.0
+
+  - id: polk_county_manager
+    description: Manages the stores of Polk County; reads every column of their lines only.
+    datasets:
+      - dataset: liquor_sales
+        columns: [invoice_id, sale_date, store_number, store_name, store_city, store_zip_code, county_name, category_name, vendor_name, item_number, item_description, bottles_per_case, bottle_volume_ml, state_bottle_cost, state_bottle_retail, bottles_sold, sale_dollars, liters_sold, state_margin]
+        row_filter: county_name = 'POLK'
+    status: approved
+    evidence: *policy
+    confidence: 1.0
+
+  - id: vendor_partner
+    description: A supplier's account team; reads sales by store, item and vendor but never the state's cost or margin.
+    datasets:
+      - dataset: liquor_sales
+        columns: [invoice_id, sale_date, store_number, store_name, store_city, store_zip_code, county_name, category_name, vendor_name, item_number, item_description, bottles_per_case, bottle_volume_ml, state_bottle_retail, bottles_sold, sale_dollars, liters_sold]
+    status: approved
+    evidence: *policy
+    confidence: 1.0
