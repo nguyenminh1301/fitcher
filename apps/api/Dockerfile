@@ -32,9 +32,13 @@ COPY apps/api/tests/screening ./tests/screening
 COPY infra/clickhouse/initdb ./infra/clickhouse/initdb
 # jobs.set_lab_passwords reads the lab users of the realm Keycloak imports.
 COPY infra/keycloak/realm-finch.json ./infra/keycloak/realm-finch.json
-# Compiled packs live in a named volume mounted here; Docker copies this
-# directory's owner into a new volume, so the app user can write to it.
-RUN useradd --create-home --uid 10001 app     && mkdir -p /app/build/packs /app/build/guard_model /app/build/documents     && chown app /app/build/packs /app/build/documents
+# Compiled packs, the guard model and documents live in named volumes mounted
+# here; Docker copies each directory's owner into a new volume, so the app user
+# (UID 10001, as in the guard-model image) owns the volume whichever service
+# creates it first.
+RUN useradd --create-home --uid 10001 app \
+    && mkdir -p /app/build/packs /app/build/guard_model /app/build/documents \
+    && chown app /app/build/packs /app/build/guard_model /app/build/documents
 USER app
 
 EXPOSE 8000

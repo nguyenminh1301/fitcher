@@ -184,6 +184,8 @@
 
 ### Fixed
 
+- Start `mysql-fixture` on a fresh volume: the mysql entrypoint sources its init script, whose `set -eu` leaked into the entrypoint and stopped it at the unset `MYSQL_ONETIME_PASSWORD`, so the script now runs its body in a subshell.
+- Give a new `guard-models` volume to the app user whichever service creates it: the api image created `/app/build/guard_model` as root, so a volume first mounted by `api` or `jobs` was root-owned, and the guard-model job (UID 10001) could fail to write `.model.onnx.new` into it; the api image now chowns the directory to UID 10001 like the `packs` and `documents` directories.
 - Let a reviewer edit a proposed example's question and SQL on the Review page: the page offered only the masked-value fields, and its test-run ran the stored SQL instead of the edited one; a test-run now saves the edits first, and any later edit asks for a new test-run before approval.
 - Open the Users page for an admin without the `pack_reviewer` role, which failed because the page also read the Datasets section, and offer only the pack's roles there, the only roles the api changes, instead of `admin` and `pack_reviewer` chips the api refused.
 - Let the api's shared ClickHouse clients (conversations, model tiers, document registry, log readers and writer) run concurrent queries: they no longer open a server session, which made ClickHouse refuse the chat page's parallel conversation and group requests with a 503.
