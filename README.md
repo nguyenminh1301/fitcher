@@ -1,10 +1,11 @@
-# fitcher
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/brand/banner/fitcher-banner-dark.png">
+  <img alt="Fitcher: ask your data in plain language, get SQL, tables and charts back" src="docs/brand/banner/fitcher-banner-light.png" width="100%">
+</picture>
 
-fitcher answers questions about a company's data. You ask in English or Vietnamese, for example "Top 10 best-selling products in Q1 2024 compared with Q1 2025", and it replies with the SQL it ran, a table, a chart and a short summary.
+Fitcher answers questions about a company's data. You ask in English or Vietnamese, for example "Top 10 best-selling products in Q1 2024 compared with Q1 2025", and it replies with the SQL it ran, a table, a chart and a short summary.
 
-The engine knows nothing about any one industry. What it needs to know about a company lives in a Domain Pack: reviewed files that describe the company's tables, business terms, metrics and who may see what. The company's data is loaded into ClickHouse or read from its own databases through ClickHouse.
-
-fitcher is a lab. It runs on one machine with Docker Compose and has no high availability, caching or multi-tenancy. The architecture it follows is recorded in [DECISIONS.md](docs/DECISIONS.md).
+Everything fitcher knows about a company comes from its Domain Pack: a set of reviewed files describing the company's tables, business terms, metrics and who may see what. Swap the pack and the same app answers questions for a different business.
 
 ## What you can do with it
 
@@ -14,7 +15,7 @@ fitcher is a lab. It runs on one machine with Docker Compose and has no high ava
 | Hold a conversation | Ask a follow-up and it reuses the previous query. Ask to see the answer as a line chart and it redraws without querying again. Ask what a term means and it answers from the glossary and company documents. |
 | Get asked back | When a question is unclear, fitcher asks which meaning you intended and offers the options. |
 | See only your data | Each user works under a role. A question about data the role may not read is refused before any SQL is written, and the database enforces the same rules. |
-| Stay safe | Every question is screened for prompt injection before it reaches an AI model. |
+| Stay safe | Every question is screened for prompt injection before it reaches an AI model. For now the screener records its verdict and lets the question through; blocking is switched on once it is accurate enough in both languages. |
 | Check the work | Each answer shows the SQL it ran and the steps it took, and admins can open the full trace of any run. |
 | Add a new company | fitcher profiles the company's tables, reads its documents and drafts a pack. A reviewer approves each item before it goes live. |
 | Measure quality | Each pack has a set of test questions with known answers. A pack goes live only when at least 80% of them return the right result. |
@@ -46,8 +47,6 @@ Each company's access rules live in one policy file. Publishing the pack turns i
 | Data modelling | dbt |
 | Domain Packs | YAML checked against JSON Schema |
 
-The editable diagram is [docs/finch-architecture.excalidraw](docs/finch-architecture.excalidraw). After changing the layout in [scripts/build_architecture_diagram.py](scripts/build_architecture_diagram.py), run `python scripts/build_architecture_diagram.py` to rebuild it and the images above.
-
 ## Quick start
 
 You need Docker with Compose v2 and about 8 GB of memory for Docker. Run the commands from the repository root, in Bash or PowerShell.
@@ -78,7 +77,7 @@ You need Docker with Compose v2 and about 8 GB of memory for Docker. Run the com
    docker compose run --rm guard-model
    ```
 
-6. Give the lab users the password set as `KEYCLOAK_LAB_USER_PASSWORD` in `.env`.
+6. Give the demo users the password set as `KEYCLOAK_LAB_USER_PASSWORD` in `.env`.
 
    ```bash
    docker compose run --rm jobs python -m jobs.set_lab_passwords
@@ -94,7 +93,7 @@ docker compose run --rm api python -m jobs.ask "Top 10 best-selling products in 
 
 `make up`, `make ps`, `make logs`, `make smoke` and `make down` are shortcuts for the Compose commands. Stopping the services keeps the data.
 
-### Lab users
+### Demo users
 
 | User | What they can see |
 | --- | --- |
@@ -120,7 +119,7 @@ All ports listen on the local machine only.
 
 ## Using the API
 
-The API streams each answer as server-sent events and needs a Keycloak access token. In the lab, the `finch-cli` client issues one for a lab user:
+The API streams each answer as server-sent events and needs a Keycloak access token. On a local setup, the `finch-cli` client issues one for a demo user:
 
 ```bash
 TOKEN=$(curl -s -d grant_type=password -d client_id=finch-cli -d username=lab.analyst --data-urlencode "password=$KEYCLOAK_LAB_USER_PASSWORD" http://127.0.0.1:8080/realms/finch/protocol/openid-connect/token | python -c "import sys, json; print(json.load(sys.stdin)['access_token'])")
@@ -129,13 +128,13 @@ curl -N -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" -d
 
 The stream reports each step as it starts and finishes, then sends the SQL, the result, the chart and the summary. A question that cannot be answered ends with a clarifying question, a refusal, a blocked notice or an error instead. The response names the conversation it started; send that id with the next question to ask a follow-up. Closing the connection stops the run and its database query.
 
-Each user may ask 10 questions a minute by default. The same API manages conversations (list, search, rename, pin, group and delete), records likes and dislikes, and serves the console's admin pages. [DECISIONS §6](docs/DECISIONS.md#6-runtime-flow-langgraph) describes every event and the [API docs](http://localhost:8000/docs) of a running stack list every endpoint.
+Each user may ask 10 questions a minute by default. The same API manages conversations (list, search, rename, pin, group and delete), records likes and dislikes, and serves the console's admin pages. The [API docs](http://localhost:8000/docs) of a running stack list every endpoint.
 
 ## Bringing in a new company
 
 ![Bringing in a new company](docs/architecture/onboarding.svg)
 
-A company needs a Domain Pack and no changes to the engine. The Iowa Liquor Sales pack was built this way from a PostgreSQL database.
+A new company needs its own Domain Pack and nothing else. The Iowa Liquor Sales pack was built this way from a PostgreSQL database.
 
 1. Connect the company's PostgreSQL, MySQL, MongoDB or file sources. ClickHouse either copies the data on a schedule or reads it live, and only ClickHouse holds the read-only credentials.
 2. Profile the tables to find their columns, date ranges and common values.
@@ -163,23 +162,6 @@ docker compose run --rm -v ./build/eval:/app/build/eval api python -m jobs.eval 
 
 Every run is logged in ClickHouse for 90 days: each step, SQL attempt, model call with its estimated cost, and access decision. [docs/tracing.md](docs/tracing.md) shows how to read one trace.
 
-## Project status
-
-The work follows the [master plan](docs/MASTER_PLAN.md), with one [plan per phase](docs/plans/README.md).
-
-| Phase | Scope | Status |
-| --- | --- | --- |
-| 0 to 2 | Services, sample data, Domain Pack and compiler | Done |
-| 3 to 5 | Agent on the command line, evaluation, logging and tracing | Done |
-| 6 and 6B | Roles and sign-in, web app | Done |
-| 7 and 8 | Streaming API, conversations | Done |
-| 9 | Charts and feedback in the chat | In progress |
-| 9B | Input screening | Done, recording verdicts without blocking yet |
-| 9C to 9E | Search on Qdrant, model routing, data sources | Done |
-| 10 to 12 | Automated onboarding, a second industry, admin console and feedback loop | Done |
-
-Input screening blocks questions once the screening test shows no false alarm and catches at least 90% of attacks in both English and Vietnamese ([plan](docs/plans/phase-09b-input-screening.md)).
-
 ## Development
 
 Use Python 3.13 with uv 0.13.6 and Node 24.21.0 with npm 11. Stop the Compose `api` and `web` services before running them on your machine, because they use the same ports.
@@ -199,13 +181,6 @@ npm --prefix apps/web run dev
 
 Unit tests replace every AI model and search call with a fake, so they need no key. Set `ACTIVE_PACK` before starting the web app; in development, `/dev/components` shows the design system. Commit dependency changes together with `apps/api/uv.lock` or `apps/web/package-lock.json`.
 
-The repository checks need only Python 3.11 or newer:
-
-```bash
-python scripts/check_repository.py
-python scripts/check_git.py --range origin/develop..HEAD
-```
-
 | Folder | Contents |
 | --- | --- |
 | [apps/api](apps/api) | API, agent and its prompts |
@@ -214,23 +189,12 @@ python scripts/check_git.py --range origin/develop..HEAD
 | [dbt/](dbt/README.md) | Models that turn raw tables into the tables the agent reads |
 | [jobs/](jobs/README.md) | Commands for loading data, publishing packs, onboarding and evaluation |
 | [infra/](infra/README.md) | Service configuration |
-| [docs/](docs) | Decisions, plans, design and evaluation reports |
+| [docs/](docs) | Design notes and evaluation reports |
 
 ### Contributing
 
-Branch from `develop`, name the branch `<type>/<scope>/<description>` and open a pull request back to `develop`. Commit messages and pull request titles are one line in the form `type(scope): subject`, at most 80 characters, with the types and scopes listed in [.github/git-policy.json](.github/git-policy.json). A pull request is merged once every CI and Security check on its latest commit passes. Read [CONTRIBUTING.md](CONTRIBUTING.md) and the [Git rules](.agents/rules/git_workflow.md) first; automated agents start from [AGENTS.md](AGENTS.md) or [CLAUDE.md](CLAUDE.md).
-
-CI checks the repository structure, commit messages, workflows, the API tests and the web build. A weekly Security workflow audits dependencies, scans the history for secrets and scans every image; [SECURITY.md](SECURITY.md) explains how findings are handled and how to report a vulnerability.
-
-To pick up base image and OS security updates, rebuild and restart:
-
-```bash
-docker compose build --pull --no-cache
-docker compose up -d --wait
-```
-
-Third-party images are pinned to exact tags in `compose.yaml`. A checkout that still runs the old PostgreSQL `db` service needs one start with `--remove-orphans`; its `fitcher_pgdata` volume is left for its owner to delete.
+Branch from `develop` and open a pull request back to it. [CONTRIBUTING.md](CONTRIBUTING.md) describes the branch and commit message format, and [SECURITY.md](SECURITY.md) explains how to report a vulnerability.
 
 ## Data and licences
 
-Datasets are never committed; downloads stay in the Git-ignored `data/` folder. FreeEcommerceTwin14M is licensed CC BY-NC 4.0 for non-commercial use. Iowa Liquor Sales 2025 is published by the Iowa Department of Revenue under CC BY 4.0. Repository changes are listed in [CHANGELOG.md](CHANGELOG.md).
+Datasets are never committed; downloads stay in the Git-ignored `data/` folder. FreeEcommerceTwin14M is licensed CC BY-NC 4.0 for non-commercial use. Iowa Liquor Sales 2025 is published by the Iowa Department of Revenue under CC BY 4.0.
