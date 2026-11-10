@@ -1,4 +1,120 @@
 {
+  "$defs": {
+    "ReviewedSpec": {
+      "additionalProperties": false,
+      "description": "The QuerySpec a proposal's example settles for its question, without periods (DECISIONS §6 step 7).",
+      "properties": {
+        "metric_ids": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Metric Ids",
+          "type": "array"
+        },
+        "dataset": {
+          "minLength": 1,
+          "title": "Dataset",
+          "type": "string"
+        },
+        "dimensions": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Dimensions",
+          "type": "array"
+        },
+        "filters": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/SpecFilter"
+          },
+          "title": "Filters",
+          "type": "array"
+        },
+        "top_n": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Top N"
+        },
+        "rank_by": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Rank By"
+        }
+      },
+      "required": [
+        "metric_ids",
+        "dataset"
+      ],
+      "title": "ReviewedSpec",
+      "type": "object"
+    },
+    "SpecFilter": {
+      "additionalProperties": false,
+      "properties": {
+        "column": {
+          "minLength": 1,
+          "title": "Column",
+          "type": "string"
+        },
+        "op": {
+          "enum": [
+            "=",
+            "!=",
+            "in",
+            "not in"
+          ],
+          "title": "Op",
+          "type": "string"
+        },
+        "values": {
+          "items": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "boolean"
+              }
+            ]
+          },
+          "minItems": 1,
+          "title": "Values",
+          "type": "array"
+        }
+      },
+      "required": [
+        "column",
+        "op",
+        "values"
+      ],
+      "title": "SpecFilter",
+      "type": "object"
+    }
+  },
   "additionalProperties": false,
   "properties": {
     "body": {
@@ -24,6 +140,29 @@
       ],
       "default": null,
       "title": "Formula"
+    },
+    "spec": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ReviewedSpec"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "spec_reviewed": {
+      "anyOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Spec Reviewed"
     }
   },
   "title": "ReviewItemPatch",

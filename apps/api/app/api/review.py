@@ -52,7 +52,7 @@ def list_items(
 @router.patch("/{item_id}")
 def edit_item(item_id: str, body: ReviewItemPatch, _: Reviewer, service: Service) -> ReviewItem:
     try:
-        return service.update(item_id, body=body.body, formula=body.formula)
+        return service.update(item_id, body=body.body, formula=body.formula, spec=body.spec, spec_reviewed=body.spec_reviewed)
     except REFUSED as error:
         raise _refusal(error) from None
 

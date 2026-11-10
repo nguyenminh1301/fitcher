@@ -2,7 +2,9 @@
 
 from typing import Literal
 
-from app.contracts.query_spec import ContractModel
+from pydantic import Field
+
+from app.contracts.query_spec import ContractModel, Scalar
 from app.contracts.result import Result
 
 
@@ -18,6 +20,23 @@ class ReviewEvidence(ContractModel):
 class EvidenceRef(ContractModel):
     kind: Literal["manual", "profile", "doc", "error", "trace"]
     ref: str
+
+
+class SpecFilter(ContractModel):
+    column: str = Field(min_length=1)
+    op: Literal["=", "!=", "in", "not in"]
+    values: list[Scalar] = Field(min_length=1)
+
+
+class ReviewedSpec(ContractModel):
+    """The QuerySpec a proposal's example settles for its question, without periods (DECISIONS §6 step 7)."""
+
+    metric_ids: list[str] = Field(min_length=1)
+    dataset: str = Field(min_length=1)
+    dimensions: list[str] = []
+    filters: list[SpecFilter] = []
+    top_n: int | None = Field(default=None, ge=1)
+    rank_by: str | None = None
 
 
 class ReviewItem(ContractModel):
@@ -36,11 +55,17 @@ class ReviewItem(ContractModel):
     evidence: ReviewEvidence | None = None
     evidence_refs: list[EvidenceRef] = []
     test_result: Result | None = None
+    # A proposal's spec: the run's, until the reviewer edits it; only a reviewed spec is approved into the example.
+    spec: ReviewedSpec | None = None
+    spec_reviewed: bool = False
 
 
 class ReviewItemPatch(ContractModel):
     body: str | None = None
     formula: str | None = None
+    # Proposals only: a spec marks it reviewed; spec_reviewed false leaves it out of the approved example.
+    spec: ReviewedSpec | None = None
+    spec_reviewed: bool | None = None
 
 
 class DatasetColumnView(ContractModel):
