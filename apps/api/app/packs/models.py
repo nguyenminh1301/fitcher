@@ -123,6 +123,21 @@ class RelationshipsFile(PackModel):
     relationships: list[Relationship]
 
 
+class ExampleFilter(PackModel):
+    column: str
+    op: Literal["=", "!=", "in", "not in"]
+    values: list[str | float]
+
+
+class ExampleSpec(PackModel):
+    """A reviewed QuerySpec for the example's own question, without periods; metrics and dataset come from the example."""
+
+    dimensions: list[str] = []
+    filters: list[ExampleFilter] = []
+    top_n: int | None = None
+    rank_by: str | None = None
+
+
 class Example(Draftable):
     id: str
     question: str
@@ -130,6 +145,7 @@ class Example(Draftable):
     sql: str
     datasets: list[str]
     metrics: list[str]
+    spec: ExampleSpec | None = None
 
 
 class ExamplesFile(PackModel):
