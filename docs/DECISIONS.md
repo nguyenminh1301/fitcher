@@ -3,7 +3,7 @@
 This document is the source of truth for implementation.
 Every decision here is binding; to change one, edit this file first.
 
-The v3 architecture diagram is pending. An earlier v2 diagram (ScyllaDB logs, Plotly, Uber/HR marts) is superseded by this document and is not authoritative.
+The v3 architecture diagram is [finch-architecture.excalidraw](finch-architecture.excalidraw), with one SVG per section in [architecture/](architecture/); `scripts/build_architecture_diagram.py` rebuilds both. Where the diagram and this document disagree, this document wins.
 
 The repository and package names remain `fitcher`; Finch-Lab names the architecture.
 

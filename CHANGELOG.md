@@ -4,6 +4,7 @@
 
 ### Added
 
+- Draw the architecture in `docs/finch-architecture.excalidraw` with five sections (how the services fit together, how a question is answered, who can see what, onboarding a company and run tracing), each also exported as an SVG under `docs/architecture/`; `scripts/build_architecture_diagram.py` rebuilds both from one layout.
 - Record the evals after the spec-building fixes in `docs/eval/spec-building-fixes-report.md`: `iowa_liquor` reaches 30/35 execution match (was 29/35) and `ecommerce_twin` 42/45 (was 39/45) with no regression against its baseline, and the cases still failing are listed with their cause.
 - Edit a proposal's spec on the Review page: a reviewer ticks "Use this spec when the same question is asked", fills the metrics, dataset, dimensions, filters (one per line), top N and ranking, replaces masked filter values with the same fields as the SQL, and sees the api's reason when approval refuses the spec.
 - Let a reviewer confirm a proposed example's spec through the Review api: a proposal now shows the run's spec without the time column, a patch with `spec` marks it reviewed (or `spec_reviewed: false` leaves it out), and approval writes a reviewed spec into the example only after checking its metrics, dataset, columns, operators, ranking and that every filter value exists in the data and is not masked.

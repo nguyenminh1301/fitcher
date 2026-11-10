@@ -1,0 +1,76 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1340" height="691" viewBox="-30 -30 1340 691" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif">
+<title>1. How the pieces fit together</title>
+<rect x="-30" y="-30" width="1340" height="691" fill="#ffffff"/>
+<defs>
+<marker id="head0" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#1e1e1e"/></marker>
+</defs>
+<text x="0" y="28" font-size="26" font-weight="700" fill="#1e1e1e">1. How the pieces fit together</text>
+<polyline points="200,310 270,310" fill="none" stroke="#1e1e1e" stroke-width="2" marker-end="url(#head0)"/>
+<polyline points="470,310 540,310" fill="none" stroke="#1e1e1e" stroke-width="2" marker-end="url(#head0)"/>
+<polyline points="740,310 810,310" fill="none" stroke="#1e1e1e" stroke-width="2" marker-end="url(#head0)"/>
+<polyline points="1010,310 1080,310" fill="none" stroke="#1e1e1e" stroke-width="2" marker-end="url(#head0)"/>
+<polyline points="370,370 370,440" fill="none" stroke="#1e1e1e" stroke-width="2" marker-end="url(#head0)"/>
+<polyline points="640,250 640,180" fill="none" stroke="#1e1e1e" stroke-width="2" marker-end="url(#head0)"/>
+<polyline points="640,370 640,440" fill="none" stroke="#1e1e1e" stroke-width="2" marker-end="url(#head0)"/>
+<polyline points="810,500 740,500" fill="none" stroke="#1e1e1e" stroke-width="2" marker-end="url(#head0)"/>
+<polyline points="810,120 740,120" fill="none" stroke="#1e1e1e" stroke-width="2" marker-end="url(#head0)"/>
+<rect x="540" y="60" width="200" height="120" rx="14" fill="#fff0f6" stroke="#c2255c" stroke-width="2"/>
+<svg x="624.0" y="74" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#c2255c" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-5-5"/></svg>
+<text x="640.0" y="128" font-size="17" font-weight="700" fill="#1e1e1e" text-anchor="middle">Search index</text>
+<text x="640.0" y="150" font-size="13.5" fill="#5c636a" text-anchor="middle">Finds terms, metrics</text>
+<text x="640.0" y="168" font-size="13.5" fill="#5c636a" text-anchor="middle">and examples (Qdrant)</text>
+<rect x="810" y="60" width="200" height="120" rx="14" fill="#fff9db" stroke="#e67700" stroke-width="2"/>
+<svg x="894.0" y="74" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#e67700" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6M8 13h8M8 17h6"/></svg>
+<text x="910.0" y="128" font-size="17" font-weight="700" fill="#1e1e1e" text-anchor="middle">Domain Pack</text>
+<text x="910.0" y="150" font-size="13.5" fill="#5c636a" text-anchor="middle">A company&#x27;s terms,</text>
+<text x="910.0" y="168" font-size="13.5" fill="#5c636a" text-anchor="middle">metrics and access rules</text>
+<rect x="0" y="250" width="200" height="120" rx="14" fill="#fff9db" stroke="#e67700" stroke-width="2"/>
+<svg x="84.0" y="264" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#e67700" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+<text x="100.0" y="318" font-size="17" font-weight="700" fill="#1e1e1e" text-anchor="middle">User</text>
+<text x="100.0" y="340" font-size="13.5" fill="#5c636a" text-anchor="middle">Asks in English</text>
+<text x="100.0" y="358" font-size="13.5" fill="#5c636a" text-anchor="middle">or Vietnamese</text>
+<rect x="270" y="250" width="200" height="120" rx="14" fill="#e7f5ff" stroke="#1c7ed6" stroke-width="2"/>
+<svg x="354.0" y="264" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#1c7ed6" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg>
+<text x="370.0" y="318" font-size="17" font-weight="700" fill="#1e1e1e" text-anchor="middle">Web app</text>
+<text x="370.0" y="340" font-size="13.5" fill="#5c636a" text-anchor="middle">Chat and</text>
+<text x="370.0" y="358" font-size="13.5" fill="#5c636a" text-anchor="middle">workspace console</text>
+<rect x="540" y="250" width="200" height="120" rx="14" fill="#ebfbee" stroke="#2f9e44" stroke-width="2"/>
+<svg x="624.0" y="264" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#2f9e44" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="7" rx="2"/><rect x="3" y="14" width="18" height="7" rx="2"/><path d="M7 6.5h.01M7 17.5h.01"/></svg>
+<text x="640.0" y="318" font-size="17" font-weight="700" fill="#1e1e1e" text-anchor="middle">API and agent</text>
+<text x="640.0" y="340" font-size="13.5" fill="#5c636a" text-anchor="middle">Understands the question</text>
+<text x="640.0" y="358" font-size="13.5" fill="#5c636a" text-anchor="middle">and writes the SQL</text>
+<rect x="810" y="250" width="200" height="120" rx="14" fill="#fff4e6" stroke="#e8590c" stroke-width="2"/>
+<svg x="894.0" y="264" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#e8590c" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="12" r="2.5"/><circle cx="19" cy="5" r="2.5"/><circle cx="19" cy="19" r="2.5"/><path d="M7.5 12h4l5-6M11.5 12l5 6"/></svg>
+<text x="910.0" y="318" font-size="17" font-weight="700" fill="#1e1e1e" text-anchor="middle">LLM gateway</text>
+<text x="910.0" y="340" font-size="13.5" fill="#5c636a" text-anchor="middle">Sends each task to</text>
+<text x="910.0" y="358" font-size="13.5" fill="#5c636a" text-anchor="middle">the right model (LiteLLM)</text>
+<rect x="1080" y="250" width="200" height="120" rx="14" fill="#f8f9fa" stroke="#495057" stroke-width="2"/>
+<svg x="1164.0" y="264" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#495057" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M11 3l1.8 5.2L18 10l-5.2 1.8L11 17l-1.8-5.2L4 10l5.2-1.8z"/><path d="M19 14l.8 2.2L22 17l-2.2.8L19 20l-.8-2.2L16 17l2.2-.8z"/></svg>
+<text x="1180.0" y="318" font-size="17" font-weight="700" fill="#1e1e1e" text-anchor="middle">AI models</text>
+<text x="1180.0" y="340" font-size="13.5" fill="#5c636a" text-anchor="middle">OpenAI, Anthropic,</text>
+<text x="1180.0" y="358" font-size="13.5" fill="#5c636a" text-anchor="middle">Gemini or a local model</text>
+<rect x="270" y="440" width="200" height="120" rx="14" fill="#f3f0ff" stroke="#7048e8" stroke-width="2"/>
+<svg x="354.0" y="454" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#7048e8" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
+<text x="370.0" y="508" font-size="17" font-weight="700" fill="#1e1e1e" text-anchor="middle">Sign-in</text>
+<text x="370.0" y="530" font-size="13.5" fill="#5c636a" text-anchor="middle">Accounts and roles</text>
+<text x="370.0" y="548" font-size="13.5" fill="#5c636a" text-anchor="middle">(Keycloak)</text>
+<rect x="540" y="440" width="200" height="120" rx="14" fill="#e6fcf5" stroke="#0c8599" stroke-width="2"/>
+<svg x="624.0" y="454" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#0c8599" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5"/><path d="M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"/></svg>
+<text x="640.0" y="508" font-size="17" font-weight="700" fill="#1e1e1e" text-anchor="middle">Data warehouse</text>
+<text x="640.0" y="530" font-size="13.5" fill="#5c636a" text-anchor="middle">Company data and</text>
+<text x="640.0" y="548" font-size="13.5" fill="#5c636a" text-anchor="middle">run logs (ClickHouse)</text>
+<rect x="810" y="440" width="200" height="120" rx="14" fill="#f8f9fa" stroke="#495057" stroke-width="2"/>
+<svg x="894.0" y="454" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#495057" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 2v6M15 2v6"/><path d="M6 8h12v3a6 6 0 0 1-12 0z"/><path d="M12 17v5"/></svg>
+<text x="910.0" y="508" font-size="17" font-weight="700" fill="#1e1e1e" text-anchor="middle">Company sources</text>
+<text x="910.0" y="530" font-size="13.5" fill="#5c636a" text-anchor="middle">Databases and files,</text>
+<text x="910.0" y="548" font-size="13.5" fill="#5c636a" text-anchor="middle">copied or read live</text>
+<text x="235" y="298" font-size="13" fill="#5c636a" text-anchor="middle">asks</text>
+<text x="505" y="298" font-size="13" fill="#5c636a" text-anchor="middle">streams</text>
+<text x="775" y="298" font-size="13" fill="#5c636a" text-anchor="middle">AI tasks</text>
+<text x="380" y="405" font-size="13" fill="#5c636a" text-anchor="start">signs in</text>
+<text x="650" y="215" font-size="13" fill="#5c636a" text-anchor="start">looks up</text>
+<text x="650" y="405" font-size="13" fill="#5c636a" text-anchor="start">runs SQL</text>
+<text x="775" y="488" font-size="13" fill="#5c636a" text-anchor="middle">loads</text>
+<text x="775" y="108" font-size="13" fill="#5c636a" text-anchor="middle">indexed</text>
+<text x="0" y="605" font-size="15" fill="#5c636a">Everything runs in Docker Compose on one machine. Publishing a Domain Pack also writes the database permissions for each role.</text>
+</svg>
