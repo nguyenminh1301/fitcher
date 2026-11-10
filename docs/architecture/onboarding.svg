@@ -1,0 +1,67 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1340" height="490" viewBox="-30 -30 1340 490" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif">
+<title>4. Bringing in a new company</title>
+<rect x="-30" y="-30" width="1340" height="490" fill="#ffffff"/>
+<defs>
+<marker id="head0" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#1e1e1e"/></marker>
+</defs>
+<text x="0" y="28" font-size="26" font-weight="700" fill="#1e1e1e">4. Bringing in a new company</text>
+<polyline points="160,130 187,130" fill="none" stroke="#1e1e1e" stroke-width="2" marker-end="url(#head0)"/>
+<polyline points="347,130 374,130" fill="none" stroke="#1e1e1e" stroke-width="2" marker-end="url(#head0)"/>
+<polyline points="534,130 561,130" fill="none" stroke="#1e1e1e" stroke-width="2" marker-end="url(#head0)"/>
+<polyline points="721,130 748,130" fill="none" stroke="#1e1e1e" stroke-width="2" marker-end="url(#head0)"/>
+<polyline points="908,130 935,130" fill="none" stroke="#1e1e1e" stroke-width="2" marker-end="url(#head0)"/>
+<polyline points="1095,130 1122,130" fill="none" stroke="#1e1e1e" stroke-width="2" marker-end="url(#head0)"/>
+<polyline points="1202,200 1202,270" fill="none" stroke="#1e1e1e" stroke-width="2" marker-end="url(#head0)"/>
+<polyline points="1122,340 908,340" fill="none" stroke="#1e1e1e" stroke-width="2" marker-end="url(#head0)"/>
+<polyline points="828,270 828,200" fill="none" stroke="#1e1e1e" stroke-width="2" marker-end="url(#head0)"/>
+<rect x="0" y="60" width="160" height="140" rx="14" fill="#e6fcf5" stroke="#0c8599" stroke-width="2"/>
+<svg x="64.0" y="74" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#0c8599" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 2v6M15 2v6"/><path d="M6 8h12v3a6 6 0 0 1-12 0z"/><path d="M12 17v5"/></svg>
+<text x="80.0" y="128" font-size="17" font-weight="700" fill="#1e1e1e" text-anchor="middle">Connect data</text>
+<text x="80.0" y="150" font-size="13.5" fill="#5c636a" text-anchor="middle">Copy it in</text>
+<text x="80.0" y="168" font-size="13.5" fill="#5c636a" text-anchor="middle">or read it live</text>
+<rect x="187" y="60" width="160" height="140" rx="14" fill="#f8f9fa" stroke="#495057" stroke-width="2"/>
+<svg x="251.0" y="74" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#495057" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg>
+<text x="267.0" y="128" font-size="17" font-weight="700" fill="#1e1e1e" text-anchor="middle">Profile</text>
+<text x="267.0" y="150" font-size="13.5" fill="#5c636a" text-anchor="middle">Measure tables,</text>
+<text x="267.0" y="168" font-size="13.5" fill="#5c636a" text-anchor="middle">dates and values</text>
+<rect x="374" y="60" width="160" height="140" rx="14" fill="#fff0f6" stroke="#c2255c" stroke-width="2"/>
+<svg x="438.0" y="74" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#c2255c" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6M8 13h8M8 17h6"/></svg>
+<text x="454.0" y="128" font-size="17" font-weight="700" fill="#1e1e1e" text-anchor="middle">Add documents</text>
+<text x="454.0" y="150" font-size="13.5" fill="#5c636a" text-anchor="middle">Manuals, policies,</text>
+<text x="454.0" y="168" font-size="13.5" fill="#5c636a" text-anchor="middle">glossaries</text>
+<rect x="561" y="60" width="160" height="140" rx="14" fill="#fff4e6" stroke="#e8590c" stroke-width="2"/>
+<svg x="625.0" y="74" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#e8590c" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13 7l4 4"/></svg>
+<text x="641.0" y="128" font-size="17" font-weight="700" fill="#1e1e1e" text-anchor="middle">Draft the pack</text>
+<text x="641.0" y="150" font-size="13.5" fill="#5c636a" text-anchor="middle">AI proposes terms</text>
+<text x="641.0" y="168" font-size="13.5" fill="#5c636a" text-anchor="middle">and metrics</text>
+<rect x="748" y="60" width="160" height="140" rx="14" fill="#f3f0ff" stroke="#7048e8" stroke-width="2"/>
+<svg x="812.0" y="74" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#7048e8" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c0-3.5 2.9-6 6.5-6s6.5 2.5 6.5 6"/><path d="M16 4.5a3.5 3.5 0 0 1 0 7M18 14c2.2.6 3.5 2.6 3.5 6"/></svg>
+<text x="828.0" y="128" font-size="17" font-weight="700" fill="#1e1e1e" text-anchor="middle">Review</text>
+<text x="828.0" y="150" font-size="13.5" fill="#5c636a" text-anchor="middle">A person approves</text>
+<text x="828.0" y="168" font-size="13.5" fill="#5c636a" text-anchor="middle">each item</text>
+<rect x="935" y="60" width="160" height="140" rx="14" fill="#e7f5ff" stroke="#1c7ed6" stroke-width="2"/>
+<svg x="999.0" y="74" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#1c7ed6" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l9 5v10l-9 5-9-5V7z"/><path d="M3 7l9 5 9-5M12 12v10"/></svg>
+<text x="1015.0" y="128" font-size="17" font-weight="700" fill="#1e1e1e" text-anchor="middle">Publish</text>
+<text x="1015.0" y="150" font-size="13.5" fill="#5c636a" text-anchor="middle">Search index and</text>
+<text x="1015.0" y="168" font-size="13.5" fill="#5c636a" text-anchor="middle">permissions</text>
+<rect x="1122" y="60" width="160" height="140" rx="14" fill="#ebfbee" stroke="#2f9e44" stroke-width="2"/>
+<svg x="1186.0" y="74" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#2f9e44" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3h6M10 3v6L4.5 19a1.5 1.5 0 0 0 1.3 2h12.4a1.5 1.5 0 0 0 1.3-2L14 9V3"/><path d="M7 15h10"/></svg>
+<text x="1202.0" y="128" font-size="17" font-weight="700" fill="#1e1e1e" text-anchor="middle">Test</text>
+<text x="1202.0" y="150" font-size="13.5" fill="#5c636a" text-anchor="middle">Must answer 80%</text>
+<text x="1202.0" y="168" font-size="13.5" fill="#5c636a" text-anchor="middle">of eval questions</text>
+<rect x="1122" y="270" width="160" height="140" rx="14" fill="#ebfbee" stroke="#2f9e44" stroke-width="2"/>
+<svg x="1186.0" y="284" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#2f9e44" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="2"/><path d="M7.8 7.8a6 6 0 0 0 0 8.4M16.2 7.8a6 6 0 0 1 0 8.4M5 5a10 10 0 0 0 0 14M19 5a10 10 0 0 1 0 14"/></svg>
+<text x="1202.0" y="338" font-size="17" font-weight="700" fill="#1e1e1e" text-anchor="middle">Live</text>
+<text x="1202.0" y="360" font-size="13.5" fill="#5c636a" text-anchor="middle">Answers the</text>
+<text x="1202.0" y="378" font-size="13.5" fill="#5c636a" text-anchor="middle">company&#x27;s questions</text>
+<rect x="748" y="270" width="160" height="140" rx="14" fill="#fff9db" stroke="#e67700" stroke-width="2"/>
+<svg x="812.0" y="284" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#e67700" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11a8 8 0 0 0-14.5-4.5L4 8"/><path d="M4 3v5h5"/><path d="M4 13a8 8 0 0 0 14.5 4.5L20 16"/><path d="M20 21v-5h-5"/></svg>
+<text x="828.0" y="338" font-size="17" font-weight="700" fill="#1e1e1e" text-anchor="middle">Learn</text>
+<text x="828.0" y="360" font-size="13.5" fill="#5c636a" text-anchor="middle">Disliked answers</text>
+<text x="828.0" y="378" font-size="13.5" fill="#5c636a" text-anchor="middle">become new examples</text>
+<text x="1212" y="235" font-size="13" fill="#5c636a" text-anchor="start">passes</text>
+<text x="1015" y="328" font-size="13" fill="#5c636a" text-anchor="middle">feedback</text>
+<text x="0" y="305" font-size="15" fill="#5c636a">No engine code changes per company.</text>
+<text x="0" y="326" font-size="15" fill="#5c636a">The Iowa Liquor Sales pack went through</text>
+<text x="0" y="347" font-size="15" fill="#5c636a">these steps from a PostgreSQL database.</text>
+</svg>
