@@ -125,7 +125,7 @@ Path: `packs/<company>/`. Git is the source of truth. Packs live in Git and are 
 | `glossary.yaml` | terms with **Vietnamese + English** aliases, pointing to metrics/columns/values |
 | `metrics.yaml` | id, sql_expr, dataset, grain, unit, owner |
 | `relationships.yaml` | allowed join paths (if any); the LLM may not invent joins |
-| `examples.yaml` | question -> canonical SQL (used as few-shot) |
+| `examples.yaml` | question -> canonical SQL (used as few-shot), optionally with a reviewed spec (§6 step 7) |
 | `policies.yaml` | role -> dataset/columns, row filters, aggregate-only (granted through views) |
 | `eval.yaml` | question -> correct result (or correct SQL), labelled per layer |
 
@@ -180,6 +180,7 @@ Nodes in order:
    The browser sends its IANA time zone with every request; clients without one (CLI, eval) pass it explicitly, otherwise UTC is used.
 6. **retrieve**: Qdrant hybrid search over the 6 collections. Candidates for the question's own terms (metrics, dimensions, filter values) are searched across all of the pack's roles, so a term resolves to what it means and the gate can deny it rather than replace it with the nearest item the role may read; the context given to SQL generation (examples, dataset hits) is filtered by the asking role.
 7. **build_spec** -> `QuerySpec`, with a coverage check (dataset min/max dates versus the requested periods).
+   When an approved example readable by the asking role asks the same question (compared case-, diacritic- and punctuation-insensitively) and carries a reviewed spec, that spec's metrics, dataset, dimensions, filters, top N and ranking replace the term resolution; periods and time grain still come from the question, and the gate checks the result as usual. A reviewed spec names only pack items and pack values, never a value taken from a user's run.
 8. **gate**:
    - ambiguous -> **clarify** (ask the user with options, or apply the pack's default convention if one exists)
    - no permission or no dataset -> **deny** + audit record
