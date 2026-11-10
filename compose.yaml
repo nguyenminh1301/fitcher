@@ -77,7 +77,9 @@ services:
 
   # Search collections of every pack: dense and BM25 sparse vectors fused with RRF (DECISIONS §5).
   qdrant:
-    image: qdrant/qdrant:v1.20.0
+    # qdrant/qdrant:v1.20.0 with patched Debian packages (infra/qdrant/Dockerfile).
+    build:
+      context: ./infra/qdrant
     environment:
       QDRANT__TELEMETRY_DISABLED: "true"
     ports:
