@@ -187,6 +187,7 @@
 
 ### Fixed
 
+- Answer "Monthly state margin rate in 2025" in the iowa pack with a reviewed example whose spec has no dimension, so the extractor's stray "state" no longer groups by the `state_margin` column.
 - Keep a value named inside a metric term as a filter: when the extractor reads "bourbon sales dollars" as one measure, `build_spec` resolved the measure and silently dropped "bourbon"; a glossary term that names only values is now split off a metric term that matches no metric, the remaining words name the metric and the values become a filter, and a value of another dataset is refused instead of dropped.
 - Map "customer"/"khách hàng" to `customer_id` in the ecommerce pack, so "top 10 customers" groups by customer instead of the nearest column `customer_segment`, and "margin rate"/"state margin rate" to `average_state_margin_rate` in the iowa pack, which tied with `total_state_margin` and was clarified.
 - Start `mysql-fixture` on a fresh volume: the mysql entrypoint sources its init script, whose `set -eu` leaked into the entrypoint and stopped it at the unset `MYSQL_ONETIME_PASSWORD`, so the script now runs its body in a subshell.
