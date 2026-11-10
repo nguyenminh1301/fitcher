@@ -26,15 +26,15 @@ The web app has a chat for everyone and a workspace console for reviewers and ad
 
 ![How the pieces fit together](docs/architecture/system.svg)
 
-The user talks to the web app, which signs them in through Keycloak and streams answers from the API. The API runs the agent: it looks up the company's terms in the search index, sends language tasks to AI models through the LiteLLM gateway, and runs SQL in ClickHouse as the user's role. Models are called by task (fast replies, simple SQL, harder SQL, embeddings), and an admin can switch a task to another model once that model passes the pack's test questions.
+The user talks to the web app, which signs them in through Keycloak and streams answers from the API. The API runs the agent: it looks up the company's terms in the search index, sends language tasks to AI models through the LiteLLM gateway, and runs SQL in ClickHouse as the user's role. Models are called by task (fast replies, simple SQL, harder SQL, embeddings), and an admin can switch a task to another model once that model passes the pack's test questions. All of these services run together with Docker Compose on one machine.
 
 ![How a question is answered](docs/architecture/question-flow.svg)
 
-A question goes through a safety check first. The agent then works out what is being asked, matches the words to the company's metrics, checks that the question is clear and permitted, writes one read-only query, validates and runs it, and picks a chart. If the query fails, the agent fixes it and tries again up to three times; if it still fails, you see the last SQL and the error. The summary only describes the rows the database returned.
+A question goes through a safety check first. The agent then works out what is being asked, matches the words to the company's metrics, checks that the question is clear and permitted, writes one read-only query, validates and runs it, and picks a chart. If the query fails, the agent fixes it and tries again up to three times; if it still fails, you see the last SQL and the error. Each step shows on screen as it happens, and the numbers in the answer always come from the database, never from the AI model.
 
 ![Who can see what](docs/architecture/access-control.svg)
 
-Each company's access rules live in one policy file. Publishing the pack turns it into database roles, column grants, row filters and aggregate-only views, so the database itself stops a role from reading what it should not. Every allow and deny decision goes to the audit log.
+Each company's access rules live in one policy file. Publishing the pack turns it into database roles, column grants, row filters and aggregate-only views, so the database itself stops a role from reading what it should not. Every allow and deny decision goes to the audit log. The role-aware search only keeps the AI's context small and relevant; the database's own grants and row filters are what enforce access.
 
 | Component | Technology |
 | --- | --- |
