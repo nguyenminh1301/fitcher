@@ -2,7 +2,8 @@
 
 // Review (DECISIONS §11, §15): pack items drafted from documents and data profiles, grouped by file,
 // and examples proposed from feedback. A metric is test-run before approval; a proposal is approved
-// only after its masked values are replaced and its SQL has been test-run.
+// only after its masked values are replaced and its SQL has been test-run. A reviewer may also confirm the
+// proposal's spec, which then answers the same question without resolving its terms again.
 
 import { useCallback, useState } from "react";
 
@@ -13,10 +14,11 @@ import { ConfidenceMeter } from "@/components/console/ConfidenceMeter";
 import { useConsole } from "@/components/console/ConsoleLayout";
 import { DetailPage } from "@/components/console/DetailPage";
 import { ListPage, ListRow } from "@/components/console/ListPage";
-import { Button, Segmented, Tabs, TextField } from "@/components/ui/controls";
+import { Button, Checkbox, Segmented, Tabs, TextField } from "@/components/ui/controls";
 import { EmptyState, Skeleton, StatusPill, WarningBanner } from "@/components/ui/feedback";
 import type { ReviewItem } from "@/lib/contracts";
 import { useChat } from "@/lib/chat/ChatContext";
+import { parseSpec, specFields, type SpecFields } from "@/lib/console/reviewedSpec";
 import { useLoad } from "@/lib/console/useLoad";
 import type { Result } from "@/lib/contracts";
 import { cx } from "@/lib/cx";
@@ -219,8 +221,11 @@ function ProposalDetail({ item, reload }: { item: ReviewItem; reload: () => Prom
   const [question, setQuestion] = useState(item.body);
   const [formula, setFormula] = useState(item.formula ?? "");
   const [values, setValues] = useState<Record<string, string>>({});
+  const [useSpec, setUseSpec] = useState(item.spec_reviewed ?? false);
+  const [fields, setFields] = useState<SpecFields>(specFields(item.spec));
   const [run, setRun] = useState<Run>({ state: "idle" });
-  const tokens = [...new Set([...question.matchAll(MASK), ...formula.matchAll(MASK)].map((match) => match[0]))];
+  const masked = (text: string) => [...text.matchAll(MASK)].map((match) => match[0]);
+  const tokens = [...new Set([...masked(question), ...masked(formula), ...(useSpec ? masked(fields.filters) : [])])];
   const filled = tokens.every((token) => values[token]?.trim());
   const fill = (text: string, quote: boolean) => tokens.reduce((out, token) => {
     const value = values[token]?.trim();
@@ -228,6 +233,10 @@ function ProposalDetail({ item, reload }: { item: ReviewItem; reload: () => Prom
   }, text);
   const body = fill(question, false);
   const sql = fill(formula, true);
+  const parsed = parseSpec({ ...fields, filters: fill(fields.filters, false) });
+  const specError = useSpec && "error" in parsed ? parsed.error : null;
+  const specPatch = useSpec && "spec" in parsed ? { spec: parsed.spec } : item.spec_reviewed ? { spec_reviewed: false } : {};
+  const setField = (name: keyof SpecFields) => (event: { target: { value: string } }) => edit(() => setFields({ ...fields, [name]: event.target.value }));
   // Any edit invalidates the last test-run: approval needs a test-run of the text that will be saved.
   const edit = (apply: () => void) => { apply(); setRun({ state: "idle" }); };
   const back = () => navigate("/console/review");
@@ -241,15 +250,21 @@ function ProposalDetail({ item, reload }: { item: ReviewItem; reload: () => Prom
       meta={<span className="fc-help">{!filled ? t("ui.replaceFirst") : run.state !== "done" ? t("ui.testFirst") : ""}</span>}
       actions={
         <>
-          <Button icon={run.state === "running" ? "loader" : "play"} disabled={!filled || !body.trim() || !sql.trim() || run.state === "running"} onClick={async () => {
+          <Button icon={run.state === "running" ? "loader" : "play"} disabled={!filled || !body.trim() || !sql.trim() || specError !== null || run.state === "running"} onClick={async () => {
             setRun({ state: "running" });
             // The api test-runs the stored SQL, so the reviewer's edits are saved first.
-            await api.review.update(item.id, { body, formula: sql });
+            await api.review.update(item.id, { body, formula: sql, ...specPatch });
             const tested = await api.review.testRun(item.id);
             setRun({ state: "done", result: tested.test_result ?? undefined });
           }}>{t("ui.testRun")}</Button>
           <Button variant="primary" icon="check" disabled={run.state !== "done"} onClick={async () => {
-            await api.review.approve(item.id);
+            try {
+              await api.review.approve(item.id);
+            } catch (refused) {
+              // The api checks the spec's pack items and filter values on approval.
+              toast(refused instanceof Error ? refused.message : String(refused));
+              return;
+            }
             toast(t("ui.approvedName", { name: body }));
             await reload();
             back();
@@ -274,6 +289,24 @@ function ProposalDetail({ item, reload }: { item: ReviewItem; reload: () => Prom
             <dd className="fc-kv-ctl">
               <TextField multiline aria-label={t("ui.sql")} spellCheck={false} value={formula}
                 onChange={(event) => edit(() => setFormula(event.target.value))} />
+            </dd>
+            <dt>{t("ui.spec")}</dt>
+            <dd className="fc-kv-ctl">
+              <div className="fc-stack" style={{ gap: "var(--base-size-12)" }}>
+                <Checkbox label={t("ui.useSpec")} checked={useSpec} onChange={(checked) => edit(() => setUseSpec(checked))} />
+                {useSpec ? (
+                  <>
+                    <span className="fc-help">{t("ui.specHelp")}</span>
+                    <TextField label={t("ui.specMetrics")} spellCheck={false} value={fields.metrics} onChange={setField("metrics")} />
+                    <TextField label={t("ui.specDataset")} spellCheck={false} value={fields.dataset} onChange={setField("dataset")} />
+                    <TextField label={t("ui.specDimensions")} spellCheck={false} value={fields.dimensions} onChange={setField("dimensions")} />
+                    <TextField multiline label={t("ui.specFilters")} spellCheck={false} value={fields.filters} onChange={setField("filters")} />
+                    <TextField label={t("ui.specTopN")} inputMode="numeric" value={fields.topN} onChange={setField("topN")} />
+                    <TextField label={t("ui.specRankBy")} spellCheck={false} value={fields.rankBy} onChange={setField("rankBy")} />
+                    {specError !== null ? <span className="fc-help" role="alert">{t("ui.specInvalid", { text: specError || "—" })}</span> : null}
+                  </>
+                ) : null}
+              </div>
             </dd>
             <dt>{t("ui.origin")}</dt>
             <dd>{item.evidence?.source ?? "—"}{item.evidence?.quote ? <>{" "}<q lang={langOf(item.evidence.quote)}>{item.evidence.quote}</q></> : null}</dd>

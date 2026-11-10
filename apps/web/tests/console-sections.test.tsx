@@ -167,6 +167,35 @@ describe("review", () => {
     fireEvent.change(screen.getByRole("textbox", { name: "SQL" }), { target: { value: "SELECT 1" } });
     expect(approve.hasAttribute("disabled")).toBe(true);
   });
+
+  it("saves a confirmed spec with its masked filter value replaced", async () => {
+    const update = vi.spyOn(api.review, "update");
+    show("review", <ReviewDetail id="p1" />);
+    const approve = await screen.findByRole("button", { name: "Approve" });
+
+    fireEvent.click(screen.getByRole("checkbox", { name: "Use this spec when the same question is asked" }));
+    fireEvent.change(screen.getByRole("textbox", { name: "Metrics" }), { target: { value: "total" } });
+    fireEvent.change(screen.getByRole("textbox", { name: "Dataset" }), { target: { value: "t" } });
+    fireEvent.change(screen.getByRole("textbox", { name: "Filters" }), { target: { value: "name = [MASKED_NAME]" } });
+    fireEvent.change(screen.getByRole("textbox", { name: "Replace [MASKED_NAME]" }), { target: { value: "North" } });
+    fireEvent.click(screen.getByRole("button", { name: "Test run" }));
+
+    await waitFor(() => expect(approve.hasAttribute("disabled")).toBe(false));
+    expect(update).toHaveBeenCalledWith("p1", expect.objectContaining({ spec: {
+      metric_ids: ["total"], dataset: "t", dimensions: [], filters: [{ column: "name", op: "=", values: ["North"] }], top_n: null, rank_by: null,
+    } }));
+  });
+
+  it("does not test-run a spec that does not parse", async () => {
+    show("review", <ReviewDetail id="p1" />);
+    await screen.findByRole("button", { name: "Approve" });
+    fireEvent.change(screen.getByRole("textbox", { name: "Replace [MASKED_NAME]" }), { target: { value: "North" } });
+
+    fireEvent.click(screen.getByRole("checkbox", { name: "Use this spec when the same question is asked" }));
+
+    expect(screen.getByRole("alert").textContent).toContain("Check this part of the spec");
+    expect(screen.getByRole("button", { name: "Test run" }).hasAttribute("disabled")).toBe(true);
+  });
 });
 
 describe("documents", () => {
