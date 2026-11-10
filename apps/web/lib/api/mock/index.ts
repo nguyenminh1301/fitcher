@@ -5,9 +5,9 @@
 import { readStored, writeStored } from "@/lib/storage";
 
 import type { FitcherApi } from "../client";
-import type { DocumentView, ReviewItem } from "@/lib/contracts";
+import type { DocumentView, EvalRunStarted, ReviewItem } from "@/lib/contracts";
 
-import type { EvalReport, Identity, SampleDocument } from "../provisional";
+import type { Identity, SampleDocument } from "../provisional";
 import { createMockChat } from "./chat";
 import { createMockConversations } from "./conversations";
 import { sampleLoader, type SampleStatus } from "./load";
@@ -108,17 +108,19 @@ export function createMockApi(options: { latencyMs?: number; identity?: () => Pr
       propose: async (traceId) => {
         const row = (await load()).console.feedback.find((item) => item.trace_id === traceId);
         if (row) row.proposal = "proposed";
+        return { proposed: !!row, proposal_id: row ? `p-${traceId}` : null, question: row?.question ?? null,
+          reason: row ? null : "run not found" };
       },
     },
     evaluation: {
       reports: async () => wait((await load()).console.eval_reports),
       report: async (id) => wait((await load()).console.eval_reports.find((report) => report.id === id) ?? null),
-      start: async (): Promise<EvalReport> => {
+      start: async (): Promise<EvalRunStarted> => {
         const state = (await load()).console;
         const latest = state.eval_reports[0];
         const report = { ...latest, id: `eval-${Date.now()}`, ts: new Date().toISOString() };
         state.eval_reports = [report, ...state.eval_reports];
-        return delay(report, 2500);
+        return delay({ pack: state.pack.name, running: true }, 2500);
       },
     },
     runs: {

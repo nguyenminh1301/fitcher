@@ -13,17 +13,21 @@ import sys
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "apps" / "api"))
 
-from app.contracts.chart_spec import ChartSpec  # noqa: E402 - needs apps/api on the path
+from app.contracts.admin import AuditRow, CostRow, RunRow, RunTrace  # noqa: E402 - needs apps/api on the path
+from app.contracts.admin_feedback import FeedbackRow, ProposalResult  # noqa: E402
+from app.contracts.chart_spec import ChartSpec  # noqa: E402
 from app.contracts.conversations import (  # noqa: E402
     Conversation, ConversationGroup, ConversationPatch, ConversationThread, GroupInput,
 )
 from app.contracts.documents import DocumentList, DocumentRolesChange, DocumentView, DraftResult  # noqa: E402
+from app.contracts.evaluation import EvalReportView, EvalRunStarted  # noqa: E402
 from app.contracts.events import AskEvent, AskRequest  # noqa: E402
 from app.contracts.feedback import FeedbackInput  # noqa: E402
 from app.contracts.model_tiers import ModelTierChange, ModelTiers  # noqa: E402
 from app.contracts.query_spec import QuerySpec  # noqa: E402
 from app.contracts.result import Result  # noqa: E402
 from app.contracts.review import DatasetView, ReviewItem, ReviewItemPatch  # noqa: E402
+from app.contracts.users import UserRoles, UserView  # noqa: E402
 
 # Each contract with the JSON Schema mode of its direction: what the api accepts ("validation") or
 # what it sends ("serialization", where every field is present).
@@ -48,6 +52,16 @@ CONTRACTS = {
     "document_list": (DocumentList, "serialization"),
     "document_roles_change": (DocumentRolesChange, "validation"),
     "draft_result": (DraftResult, "serialization"),
+    "run_row": (RunRow, "serialization"),
+    "run_trace": (RunTrace, "serialization"),
+    "audit_row": (AuditRow, "serialization"),
+    "cost_row": (CostRow, "serialization"),
+    "feedback_row": (FeedbackRow, "serialization"),
+    "proposal_result": (ProposalResult, "serialization"),
+    "eval_report_view": (EvalReportView, "serialization"),
+    "eval_run_started": (EvalRunStarted, "serialization"),
+    "user_view": (UserView, "serialization"),
+    "user_roles": (UserRoles, "validation"),
 }
 SCHEMAS = ROOT / "apps" / "web" / "lib" / "contracts" / "schemas"
 

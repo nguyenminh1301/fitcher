@@ -9,7 +9,7 @@ import { useConsole } from "@/components/console/ConsoleLayout";
 import { ListPage, RecordTable } from "@/components/console/ListPage";
 import { Button, Segmented } from "@/components/ui/controls";
 import { StatusPill } from "@/components/ui/feedback";
-import type { FeedbackRow } from "@/lib/api/provisional";
+import type { FeedbackRow } from "@/lib/contracts";
 import { useChat } from "@/lib/chat/ChatContext";
 import { useLoad } from "@/lib/console/useLoad";
 import { useI18n } from "@/lib/i18n/react";

@@ -12,7 +12,8 @@ automatically.
 """
 
 from collections.abc import Callable, Sequence
-from datetime import UTC, date, datetime
+from dataclasses import replace
+from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 import json
 from pathlib import Path
@@ -25,6 +26,7 @@ from app.onboarding.documents import DocumentRegistry, is_compiling
 from app.onboarding.pack_yaml import ITEM_LISTS, ItemNotFound, PackFiles
 from app.onboarding.profiler import base_type
 from app.packs.compiler import check_metric_expression, table_ref
+from app.feedback.proposals import Proposal
 
 # (name field, body field, formula field) of each file's items.
 FIELDS: dict[str, tuple[str, str, str | None]] = {
@@ -38,6 +40,9 @@ FIELDS: dict[str, tuple[str, str, str | None]] = {
     "eval.yaml": ("id", "question", "expected_sql"),
 }
 TEST_ROWS = 100
+PROPOSALS = "proposals"
+MASK = "[MASKED_"
+_VIETNAMESE = set("ăâđêôơưàáảãạằắẳẵặầấẩẫậèéẻẽẹềếểễệìíỉĩịòóỏõọồốổỗộờớởỡợùúủũụừứửữựỳýỷỹỵ")
 ERROR_LIMIT = 500
 
 
@@ -85,7 +90,10 @@ class ReviewService:
         limits: QueryLimits,
         compiled_dir: Path,
         clock: Callable[[], datetime] = lambda: datetime.now(UTC),
+        proposals=None,
     ):
+        """``proposals`` is the example proposal store; without it the Review page lists pack items only."""
+        self.proposals = proposals
         self.pack = pack
         self.pack_dir = pack_dir
         self.registry = registry
@@ -145,9 +153,60 @@ class ReviewService:
             if name not in ITEM_LISTS:
                 raise ItemNotFound(f"{name} is not a pack file")
             views.extend(self._view(name, _plain(item)) for item in files.items(name))
+        if self.proposals is not None and file in (None, "examples.yaml"):
+            views.extend(self._proposal_view(proposal) for proposal in self.proposals.proposals(self.pack))
         return [view for view in views if status is None or view.status == status]
 
+    # proposals
+
+    @staticmethod
+    def _proposal_view(proposal: Proposal, test_result: Result | None = None) -> ReviewItem:
+        return ReviewItem(
+            id=f"{PROPOSALS}.{proposal.proposal_id}", file="examples.yaml", name=proposal.question[:80],
+            kind="proposal", status="draft", confidence=proposal.confidence, body=proposal.question,
+            formula=proposal.sql,
+            evidence=ReviewEvidence(source=f"Trace {proposal.trace_id}", quote=proposal.note or proposal.error or None),
+            evidence_refs=[EvidenceRef(kind="trace", ref=proposal.trace_id)], test_result=test_result,
+        )
+
+    def _proposal(self, proposal_id: str) -> Proposal:
+        if self.proposals is None:
+            raise ItemNotFound(f"no review item proposals.{proposal_id}")
+        for proposal in self.proposals.proposals(self.pack):
+            if proposal.proposal_id == proposal_id:
+                return proposal
+        raise ItemNotFound(f"no open proposal {proposal_id}")
+
+    def _save_proposal(self, proposal: Proposal, **changes) -> Proposal:
+        updated = replace(proposal, ts=max(self.clock(), proposal.ts + timedelta(milliseconds=1)), **changes)
+        self.proposals.save(updated)
+        return updated
+
+    def _approve_proposal(self, proposal: Proposal) -> ReviewItem:
+        if MASK in proposal.question or MASK in proposal.sql:
+            raise ReviewRefused("replace every masked value with a valid non-personal value before approving")
+        try:
+            self._run("examples.yaml", {"id": proposal.proposal_id, "sql": proposal.sql})
+        except ReviewRefused as error:
+            raise ReviewRefused(f"approve after a clean test-run; the test-run failed: {error}") from None
+        spec = json.loads(proposal.spec or "{}")
+        language = "vi" if set(proposal.question.lower()) & _VIETNAMESE else "en"
+        example = {
+            "id": f"proposal_{proposal.proposal_id[:12]}", "question": proposal.question, "language": language,
+            "sql": proposal.sql, "datasets": [spec["dataset"]] if spec.get("dataset") else [],
+            "metrics": list(spec.get("metric_ids") or []), "status": "approved",
+            "evidence": [{"kind": "trace", "ref": proposal.trace_id}], "confidence": proposal.confidence,
+        }
+        files = PackFiles(self.pack_dir)
+        files.items("examples.yaml").append(example)
+        files._changed.add("examples.yaml")  # noqa: SLF001 - an approved example is appended as reviewed
+        files.save("examples.yaml")
+        self._save_proposal(proposal, status="approved")
+        return self._view("examples.yaml", example)
+
     def items_by_id(self, review_id: str) -> ReviewItem:
+        if review_id.startswith(f"{PROPOSALS}."):
+            return self._proposal_view(self._proposal(review_id.split(".", 1)[1]))
         file, item_id = self._split(review_id)
         return self._view(file, _plain(PackFiles(self.pack_dir).find(file, item_id)))
 
@@ -159,6 +218,10 @@ class ReviewService:
 
     def update(self, review_id: str, body: str | None = None, formula: str | None = None) -> ReviewItem:
         self._guard()
+        if review_id.startswith(f"{PROPOSALS}."):
+            proposal = self._proposal(review_id.split(".", 1)[1])
+            changes = {key: value for key, value in (("question", body), ("sql", formula)) if value is not None}
+            return self._proposal_view(self._save_proposal(proposal, **changes))
         file, item_id = self._split(review_id)
         _, body_field, formula_field = FIELDS[file]
         fields: dict = {}
@@ -175,6 +238,8 @@ class ReviewService:
 
     def approve(self, review_id: str) -> ReviewItem:
         self._guard()
+        if review_id.startswith(f"{PROPOSALS}."):
+            return self._approve_proposal(self._proposal(review_id.split(".", 1)[1]))
         file, item_id = self._split(review_id)
         files = PackFiles(self.pack_dir)
         item = _plain(files.find(file, item_id))
@@ -189,6 +254,9 @@ class ReviewService:
 
     def delete(self, review_id: str) -> None:
         self._guard()
+        if review_id.startswith(f"{PROPOSALS}."):
+            self._save_proposal(self._proposal(review_id.split(".", 1)[1]), status="dismissed")
+            return
         file, item_id = self._split(review_id)
         files = PackFiles(self.pack_dir)
         files.delete(file, item_id)
@@ -229,6 +297,10 @@ class ReviewService:
         return Result(columns=columns, rows=cells, row_count=len(cells))
 
     def test_run(self, review_id: str) -> ReviewItem:
+        if review_id.startswith(f"{PROPOSALS}."):
+            proposal = self._proposal(review_id.split(".", 1)[1])
+            result = self._run("examples.yaml", {"id": proposal.proposal_id, "sql": proposal.sql})
+            return self._proposal_view(proposal, test_result=result)
         file, item_id = self._split(review_id)
         item = _plain(PackFiles(self.pack_dir).find(file, item_id))
         return self._view(file, item, test_result=self._run(file, item))

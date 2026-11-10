@@ -19,6 +19,16 @@ export type { DocumentView } from "./document_view";
 export type { DocumentList } from "./document_list";
 export type { DocumentRolesChange } from "./document_roles_change";
 export type { DraftResult } from "./draft_result";
+export type { RunRow } from "./run_row";
+export type { RunTrace, TraceItem } from "./run_trace";
+export type { AuditRow } from "./audit_row";
+export type { CostRow } from "./cost_row";
+export type { FeedbackRow } from "./feedback_row";
+export type { ProposalResult } from "./proposal_result";
+export type { EvalLayer, EvalReportView as EvalReport, FailedCase } from "./eval_report_view";
+export type { EvalRunStarted } from "./eval_run_started";
+export type { UserView as UserRow } from "./user_view";
+export type { UserRoles } from "./user_roles";
 export type {
   AskEvent as StreamEvent,
   ChartSpecEvent,

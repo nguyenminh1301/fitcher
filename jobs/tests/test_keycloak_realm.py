@@ -6,6 +6,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 REALM = json.loads((ROOT / "infra" / "keycloak" / "realm-finch.json").read_text(encoding="utf-8"))
 CONSOLE_ROLES = {"pack_reviewer", "admin"}
+# People who sign in; a client's service account is not one of them.
+LAB_USERS = [user for user in REALM["users"] if "serviceAccountClientId" not in user]
 
 
 def _active_pack_roles() -> set[str]:
@@ -30,7 +32,7 @@ def test_realm_roles_are_the_active_packs_policy_roles_and_the_console_roles():
 
 def test_every_lab_user_has_known_roles_and_no_credentials():
     realm_roles = {role["name"] for role in REALM["roles"]["realm"]}
-    users = REALM["users"]
+    users = LAB_USERS
 
     assert users
     for user in users:
@@ -40,7 +42,7 @@ def test_every_lab_user_has_known_roles_and_no_credentials():
 
 
 def test_every_role_has_a_lab_user():
-    granted = {role for user in REALM["users"] for role in user["realmRoles"]}
+    granted = {role for user in LAB_USERS for role in user["realmRoles"]}
 
     assert granted == {role["name"] for role in REALM["roles"]["realm"]}
 
@@ -54,7 +56,7 @@ def test_web_client_access_tokens_carry_the_realm_roles():
 
 def test_lab_users_can_sign_in_without_completing_a_profile():
     # Keycloak's user profile asks for a verified email before the first sign-in otherwise.
-    for user in REALM["users"]:
+    for user in LAB_USERS:
         assert user["email"].endswith(".test") and user["emailVerified"] is True, user["username"]
         assert user["firstName"] and user["lastName"], user["username"]
         assert not user.get("requiredActions"), user["username"]
@@ -83,3 +85,13 @@ def test_the_cli_client_only_grants_tokens_for_a_username_and_password():
 
 def test_the_web_client_redirects_only_to_its_sign_in_callback():
     assert _client("finch-web")["redirectUris"] == ["http://localhost:3000/auth/callback"]
+
+
+def test_the_admin_api_client_is_a_confidential_service_account_with_user_rights_only():
+    client = next(client for client in REALM["clients"] if client["clientId"] == "fitcher-admin-api")
+    assert client["publicClient"] is False and client["serviceAccountsEnabled"] is True
+    assert not client["standardFlowEnabled"] and not client["directAccessGrantsEnabled"]
+    assert client["secret"] == "${KEYCLOAK_ADMIN_API_SECRET}"
+    account = next(user for user in REALM["users"] if user.get("serviceAccountClientId") == "fitcher-admin-api")
+    assert account["clientRoles"] == {"realm-management": ["view-users", "manage-users"]}
+    assert not account.get("realmRoles")

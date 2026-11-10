@@ -71,3 +71,8 @@ def test_admin_credentials_are_required(monkeypatch, missing):
     monkeypatch.setattr(job, "call", FakeKeycloak({}))
 
     assert job.main({**ENV, missing: ""}) == 1
+
+
+def test_a_clients_service_account_never_gets_a_password():
+    assert "service-account-fitcher-admin-api" not in job.lab_usernames()
+    assert "lab.admin" in job.lab_usernames()

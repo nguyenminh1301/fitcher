@@ -46,6 +46,8 @@ def model_tiers_client(env: Mapping[str, str] | None = None):
         password=password,
         connect_timeout=TIMEOUT_SECONDS,
         send_receive_timeout=TIMEOUT_SECONDS,
+        # Shared across concurrent requests: a session would serialize them and refuse overlaps.
+        autogenerate_session_id=False,
     )
 
 

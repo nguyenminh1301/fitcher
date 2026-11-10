@@ -30,7 +30,7 @@ const CONSOLE: Partial<ConsoleFile> = {
   conversations: [],
   review_items: [{ id: "i1", file: "glossary.yaml", name: "term_one", kind: "item", status: "draft", confidence: 0.9, body: "A definition." }],
   eval_reports: [{ id: "e1", ts: "2026-11-02T13:40:00Z", passed: true, threshold: 0.8, layers: {}, categories: {}, failed_cases: [] }],
-  runs: [{ trace_id: "t1", ts: "2026-11-02T08:15:00Z", user_id: "ana", role: "analyst", question: "Totals", status: "succeeded", latency_ms: 10, cost_usd: 0 }],
+  runs: [{ trace_id: "t1", ts: "2026-11-02T08:15:00Z", user_id: "ana", role: "analyst", question: "Totals", intent: "data_query", status: "succeeded", latency_ms: 10, cost_usd: 0 }],
   traces: { t1: [] },
 };
 
