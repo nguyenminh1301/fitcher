@@ -178,3 +178,9 @@ def test_document_registry_is_applied_to_existing_volumes():
     ):
         assert f"    {column}" in statement, column
     assert "ENGINE = ReplacingMergeTree(updated_at)\nORDER BY (pack, id)" in statement
+
+
+@pytest.mark.parametrize("column", ["spec String", "error String", "note String", "confidence Float64"])
+def test_proposal_columns_reach_existing_volumes(column):
+    assert f"    {column}" in table_statement("example_proposals")
+    assert f"ALTER TABLE agent_logs.example_proposals ADD COLUMN IF NOT EXISTS {column}" in schema_statements()

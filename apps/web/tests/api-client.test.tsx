@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { createApi } from "@/lib/api";
 import { createMockApi } from "@/lib/api/mock";
-import { NotWiredError, httpApi } from "@/lib/api/http";
+import { httpApi } from "@/lib/api/http";
 import { FEATURES, type Sources } from "@/lib/api/sources";
 import { SampleDataBadge } from "@/components/ui/SampleDataBadge";
 import { I18nProvider } from "@/lib/i18n/react";
@@ -48,11 +48,6 @@ describe("api client", () => {
 
     expect(api.chat).toBe(httpApi.chat);
     expect(api.datasets).toBe(mock.datasets);
-  });
-
-  it("an http feature that is not wired yet says which one", async () => {
-    await expect(httpApi.runs.list()).rejects.toBeInstanceOf(NotWiredError);
-    await expect(httpApi.runs.list()).rejects.toThrow("runs");
   });
 
   it("missing sample data yields empty lists, not an exception", async () => {

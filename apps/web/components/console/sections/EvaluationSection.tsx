@@ -12,7 +12,7 @@ import { ListPage, RecordTable } from "@/components/console/ListPage";
 import { PaidAiConfirm } from "@/components/console/PaidAiConfirm";
 import { Button } from "@/components/ui/controls";
 import { StatusPill, WarningBanner } from "@/components/ui/feedback";
-import type { EvalReport } from "@/lib/api/provisional";
+import type { EvalReport } from "@/lib/contracts";
 import { useChat } from "@/lib/chat/ChatContext";
 import { useLoad } from "@/lib/console/useLoad";
 import { cx } from "@/lib/cx";

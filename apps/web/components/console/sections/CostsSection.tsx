@@ -8,7 +8,7 @@ import { useCallback } from "react";
 import { ChartView } from "@/components/chat/ChartView";
 import { ListPage } from "@/components/console/ListPage";
 import { StatusPill, WarningBanner } from "@/components/ui/feedback";
-import type { CostRow } from "@/lib/api/provisional";
+import type { CostRow } from "@/lib/contracts";
 import type { ChartSpec, ChartType } from "@/lib/contracts";
 import { useChat } from "@/lib/chat/ChatContext";
 import { useLoad } from "@/lib/console/useLoad";

@@ -1,7 +1,20 @@
 // Contracts the backend has no Pydantic model for yet (DECISIONS §7 and §15): the sample-data mode uses
 // them until the phase named on each type adds its model and generated type, then deletes it here.
 
-import type { ChartSpec, DatasetView, DocumentView, Result, ReviewItem } from "@/lib/contracts";
+import type {
+  AuditRow,
+  ChartSpec,
+  CostRow,
+  DatasetView,
+  DocumentView,
+  EvalReport,
+  FeedbackRow,
+  Result,
+  ReviewItem,
+  RunRow,
+  TraceItem,
+  UserRow,
+} from "@/lib/contracts";
 
 import type { ConversationThread } from "./conversations";
 import type { AskEvent } from "./events";
@@ -17,70 +30,6 @@ export interface Identity {
 export type SampleDocument = Pick<DocumentView, "id" | "name" | "size" | "status" | "roles" | "uploaded_at"> & {
   error?: string;
 };
-/** Console rows the backend serves in Phase 12. */
-export interface FeedbackRow {
-  trace_id: string;
-  ts: string;
-  user_id: string;
-  rating: "like" | "dislike";
-  question: string;
-  note?: string;
-  run_status: string;
-  proposal?: "proposed" | "dismissed";
-}
-export interface EvalReport {
-  id: string;
-  ts: string;
-  passed: boolean;
-  threshold: number;
-  layers: Record<string, { passed: number; failed: number; not_scored: number }>;
-  categories: Record<string, string>;
-  failed_cases: { case_id: string; category: string; reason: string }[];
-}
-export interface RunRow {
-  trace_id: string;
-  ts: string;
-  user_id: string;
-  role: string;
-  question: string;
-  status: string;
-  latency_ms: number;
-  cost_usd: number;
-}
-export interface TraceItem {
-  name: string;
-  kind?: "llm" | "sql" | "access" | "search";
-  status?: "ok" | "err" | "deny";
-  ms?: number;
-  meta?: string[];
-  sql?: string;
-  error?: string;
-}
-export interface AuditRow {
-  ts: string;
-  trace_id: string;
-  user_id: string;
-  role: string;
-  decision: "ALLOW" | "DENY";
-  dataset: string;
-  blocked_tables: string[];
-  reason: string;
-}
-export interface CostRow {
-  day: string;
-  alias: string;
-  model: string;
-  calls: number;
-  cost_usd: number;
-}
-export interface UserRow {
-  id: string;
-  username: string;
-  display_name: string;
-  roles: string[];
-  enabled: boolean;
-}
-
 /** A sample answer the mock chat streams (packs/<pack>/sample_data/scenarios.json). */
 export interface Scenario {
   id: string;

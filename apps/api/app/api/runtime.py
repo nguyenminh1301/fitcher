@@ -28,6 +28,11 @@ from app.llm.embeddings import LiteLLMEmbeddings
 from app.llm.model_store import CatalogClient, ClickHouseModelStore, model_tiers_client
 from app.llm.tiers import EMBED_TIER, TierMap, TierStoreError
 from app.onboarding.documents import ClickHouseDocumentRegistry, DocumentService, pack_review_client
+from app.admin.logs import AdminLogs, trace_reader_client
+from app.auth.keycloak_admin import KeycloakAdmin, KeycloakAdminError
+from app.eval.console import EvalReports, EvalRuns
+from app.feedback.store import ClickHouseProposalStore, review_reader_client
+from app.observability.log_writer import writer_client
 from app.onboarding.drafter import Drafter
 from app.onboarding.review import ReviewService
 from app.packs.compiler import CompileError, CompiledPack, load_compiled
@@ -244,7 +249,68 @@ def get_review_service() -> ReviewService:
     return ReviewService(
         pack=pack_identity(get_compiled_or_none()).name, pack_dir=get_pack_dir(), registry=get_document_service().registry,
         warehouse=get_review_warehouse(), limits=QueryLimits.from_env(), compiled_dir=Path(settings.compiled_pack_dir),
+        proposals=_optional_proposal_store(),
     )
+
+
+@cache
+def get_proposal_store() -> ClickHouseProposalStore:
+    """Example proposals: read as the review reader, written as the insert-only log writer."""
+    try:
+        return ClickHouseProposalStore(review_reader_client(), writer_client())
+    except Exception as error:  # noqa: BLE001 - a missing password or ClickHouse unreachable
+        raise unavailable(f"the feedback store is unavailable: {error}") from None
+
+
+def _optional_proposal_store() -> ClickHouseProposalStore | None:
+    try:
+        return get_proposal_store()
+    except HTTPException:
+        return None
+
+
+def _run_eval(pack: str) -> int:
+    """One run of the pack's eval set with jobs.eval itself, which stores its report in agent_logs."""
+    from jobs import eval as eval_job  # noqa: PLC0415 - the api image ships jobs/; imported only when a run starts
+
+    return eval_job.main(["--pack", pack, "--packs-dir", load_settings().packs_dir], runners_factory=eval_job.role_runners)
+
+
+@cache
+def get_eval_runs() -> EvalRuns:
+    return EvalRuns(_run_eval)
+
+
+@cache
+def get_eval_reports() -> EvalReports:
+    try:
+        client = trace_reader_client()
+    except Exception as error:  # noqa: BLE001 - a missing password or ClickHouse unreachable
+        raise unavailable(f"the eval reports are unavailable: {error}") from None
+    return EvalReports(lambda sql, parameters: client.query(sql, parameters=parameters).result_rows,
+                       pack_identity(get_compiled_or_none()).name)
+
+
+@cache
+def get_keycloak_admin() -> KeycloakAdmin:
+    try:
+        return KeycloakAdmin.from_env()
+    except KeycloakAdminError as error:
+        raise unavailable(str(error)) from None
+
+
+def get_admin_action_log() -> ClickHouseModelStore:
+    """``agent_logs.admin_actions``, written by the same user as the Models page's changes."""
+    return get_model_store()
+
+
+@cache
+def get_admin_logs() -> AdminLogs:
+    """The run logs of the active pack, read as ``agent_logs_trace_reader``."""
+    try:
+        return AdminLogs.from_client(trace_reader_client(), pack_identity(get_compiled_or_none()).name)
+    except Exception as error:  # noqa: BLE001 - a missing password or ClickHouse unreachable
+        raise unavailable(f"the run logs are unavailable: {error}") from None
 
 
 @cache

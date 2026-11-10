@@ -1,0 +1,73 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "trace_id": {
+      "title": "Trace Id",
+      "type": "string"
+    },
+    "ts": {
+      "format": "date-time",
+      "title": "Ts",
+      "type": "string"
+    },
+    "user_id": {
+      "title": "User Id",
+      "type": "string"
+    },
+    "rating": {
+      "enum": [
+        "like",
+        "dislike"
+      ],
+      "title": "Rating",
+      "type": "string"
+    },
+    "question": {
+      "title": "Question",
+      "type": "string"
+    },
+    "note": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Note"
+    },
+    "run_status": {
+      "title": "Run Status",
+      "type": "string"
+    },
+    "proposal": {
+      "anyOf": [
+        {
+          "enum": [
+            "proposed",
+            "approved",
+            "dismissed"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Proposal"
+    }
+  },
+  "required": [
+    "trace_id",
+    "ts",
+    "user_id",
+    "rating",
+    "question",
+    "run_status"
+  ],
+  "title": "FeedbackRow",
+  "type": "object"
+}

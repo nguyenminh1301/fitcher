@@ -149,6 +149,24 @@ describe("review", () => {
 
     await waitFor(() => expect(approve.hasAttribute("disabled")).toBe(false));
   });
+
+  it("saves the reviewer's question and SQL before test-running them, and asks for a new test-run after an edit", async () => {
+    const update = vi.spyOn(api.review, "update");
+    const testRun = vi.spyOn(api.review, "testRun");
+    show("review", <ReviewDetail id="p1" />);
+    const approve = await screen.findByRole("button", { name: "Approve" });
+
+    fireEvent.change(screen.getByRole("textbox", { name: "Question" }), { target: { value: "Total for North in 2025?" } });
+    fireEvent.change(screen.getByRole("textbox", { name: "SQL" }), { target: { value: "SELECT sum(x) AS total FROM marts.t WHERE name = 'North'" } });
+    fireEvent.click(screen.getByRole("button", { name: "Test run" }));
+
+    await waitFor(() => expect(approve.hasAttribute("disabled")).toBe(false));
+    expect(update).toHaveBeenCalledWith("p1", { body: "Total for North in 2025?", formula: "SELECT sum(x) AS total FROM marts.t WHERE name = 'North'" });
+    expect(update.mock.invocationCallOrder[0]).toBeLessThan(testRun.mock.invocationCallOrder[0]);
+
+    fireEvent.change(screen.getByRole("textbox", { name: "SQL" }), { target: { value: "SELECT 1" } });
+    expect(approve.hasAttribute("disabled")).toBe(true);
+  });
 });
 
 describe("documents", () => {

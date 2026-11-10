@@ -7,7 +7,7 @@
 import { Icon } from "@/components/brand/Icon";
 import { SqlView } from "@/components/chat/SqlView";
 import { StatusPill } from "@/components/ui/feedback";
-import type { TraceItem } from "@/lib/api/provisional";
+import type { TraceItem } from "@/lib/contracts";
 import { cx } from "@/lib/cx";
 import { useI18n } from "@/lib/i18n/react";
 
@@ -37,7 +37,7 @@ export function TraceTimeline({ items }: { items: TraceItem[] }) {
             <div className="fc-trace-top">
               <span className="fc-trace-name fc-mono">{item.name}</span>
               {item.status === "err" ? <StatusPill status="failed" /> : item.status === "deny" ? <StatusPill status="deny" /> : null}
-              <span className="fc-trace-dur">{item.ms !== undefined ? duration(item.ms) : ""}</span>
+              <span className="fc-trace-dur">{item.ms != null ? duration(item.ms) : ""}</span>
             </div>
             {item.ms ? <div className="fc-trace-bar" aria-hidden><span style={{ width: `${Math.max(2, (item.ms / longest) * 100)}%` }} /></div> : null}
             {item.meta?.length ? <div className="fc-trace-meta">{item.meta.map((entry, position) => <span key={position}>{entry}</span>)}</div> : null}

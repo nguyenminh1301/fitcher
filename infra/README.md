@@ -47,8 +47,8 @@ Six configuration users reach it and the registries in `data_meta`, each with it
 | User | Password | Access |
 | --- | --- | --- |
 | `agent_logs_writer` | `CLICKHOUSE_LOGS_WRITER_PASSWORD` | `INSERT` on `agent_logs`; no reads |
-| `agent_logs_trace_reader` | `CLICKHOUSE_TRACE_READER_PASSWORD` | `SELECT` on `runs`, `events`, `llm_calls`, `sql_runs`, `audit`, `eval_reports` and `system.query_log` |
-| `agent_logs_review_reader` | `CLICKHOUSE_REVIEW_READER_PASSWORD` | `SELECT` on `example_proposals`, `feedback` and `chat_messages` for the `pack_reviewer` and `admin` paths |
+| `agent_logs_trace_reader` | `CLICKHOUSE_TRACE_READER_PASSWORD` | `SELECT` on `runs`, `events`, `llm_calls`, `sql_runs`, `audit`, `eval_reports`, `input_screening`, `conversations`, `chat_messages` and `system.query_log` for the `admin` paths |
+| `agent_logs_review_reader` | `CLICKHOUSE_REVIEW_READER_PASSWORD` | `SELECT` on `example_proposals`, `feedback`, `chat_messages`, `runs`, `events` and `sql_runs` for the `pack_reviewer` paths and the proposals built from runs |
 | `agent_conversations` | `CLICKHOUSE_CONVERSATIONS_PASSWORD` | `SELECT` and `INSERT` on `chat_messages`, `conversations` and `conversation_groups`; the api's conversation store, which filters every query by the requesting user |
 | `model_tiers_admin` | `CLICKHOUSE_MODEL_TIERS_PASSWORD` | `SELECT` and `INSERT` on `data_meta.model_tiers`, `SELECT` on `eval_reports` and `INSERT` on `admin_actions`; the api's tier lookup and Models page |
 | `pack_review` | `CLICKHOUSE_PACK_REVIEW_PASSWORD` | `SELECT` and `INSERT` on the document registry `data_meta.documents` and `SELECT` on `marts`; the api's Documents and Review paths, whose test-runs send `readonly=2` and the `QUERY_MAX_*` limits |
@@ -91,5 +91,7 @@ docker compose run --rm jobs python -m jobs.set_lab_passwords
 Each user has a verified `@fitcher.test` email, so the first sign-in asks for no profile update.
 `finch-web` access tokens carry the user's roles under `realm_access.roles`.
 Access tokens of `finch-web` and of the lab-only `finch-cli` client name `finch-api` as audience, which the api requires (`KEYCLOAK_AUDIENCE`).
+The confidential `fitcher-admin-api` client has no browser flow; its service account holds only the `realm-management` roles `view-users` and `manage-users`, which the api uses for the console's Users section, and its secret is `KEYCLOAK_ADMIN_API_SECRET` in `.env`.
+A role change made there applies when the user's access token is next issued: at the next sign-in or token refresh, within the realm's access token lifespan.
 `finch-web` redirects only to the web app's `/auth/callback`; `finch-cli` has no browser flow and grants tokens for a lab user's username and password, for curl against the api.
 `KC_HOSTNAME` fixes the issuer to `http://localhost:8080/realms/finch` (`KEYCLOAK_ISSUER`) whichever address requested a token, while containers keep reaching Keycloak at `keycloak:8080`; the api reads the signing keys from `KEYCLOAK_JWKS_URL`.

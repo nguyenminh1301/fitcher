@@ -8,6 +8,15 @@ import type {
   DocumentList,
   DocumentView,
   DraftResult,
+  AuditRow,
+  CostRow,
+  EvalReport,
+  EvalRunStarted,
+  FeedbackRow,
+  ProposalResult,
+  RunRow,
+  TraceItem,
+  UserRow,
   FeedbackInput,
   ModelTier,
   ModelTiers,
@@ -17,16 +26,7 @@ import type {
 
 import type { Conversation, ConversationGroup, ConversationThread } from "./conversations";
 import type { AskEvent } from "./events";
-import type {
-  AuditRow,
-  CostRow,
-  EvalReport,
-  FeedbackRow,
-  Identity,
-  RunRow,
-  TraceItem,
-  UserRow,
-} from "./provisional";
+import type { Identity } from "./provisional";
 
 export type { ConversationPatch } from "@/lib/contracts";
 
@@ -78,12 +78,14 @@ export interface FitcherApi {
   };
   feedbackReview: {
     list(): Promise<FeedbackRow[]>;
-    propose(traceId: string): Promise<void>;
+    /** Propose an example from one run; the answer says why when the run is not eligible. */
+    propose(traceId: string): Promise<ProposalResult>;
   };
   evaluation: {
     reports(): Promise<EvalReport[]>;
     report(id: string): Promise<EvalReport | null>;
-    start(): Promise<EvalReport>;
+    /** Start a run of the active pack's eval set in the background; it uses paid AI. */
+    start(): Promise<EvalRunStarted>;
   };
   runs: {
     list(): Promise<RunRow[]>;

@@ -149,6 +149,8 @@ def pack_review_client(env: Mapping[str, str] | None = None):
     return clickhouse_connect.get_client(
         host=env.get("CLICKHOUSE_HOST", "clickhouse"), port=int(env.get("CLICKHOUSE_HTTP_PORT", "8123")),
         username="pack_review", password=password,
+        # Shared across concurrent requests: a session would serialize them and refuse overlaps.
+        autogenerate_session_id=False,
     )
 
 

@@ -395,4 +395,6 @@ def conversations_client(env: Mapping[str, str] | None = None):
         username=USER,
         password=password,
         database=DATABASE,
+        # Shared across concurrent requests: a session would serialize them and refuse overlaps.
+        autogenerate_session_id=False,
     )

@@ -259,12 +259,22 @@ CREATE TABLE IF NOT EXISTS agent_logs.example_proposals
     question String,
     sql String,
     source LowCardinality(String),
-    status LowCardinality(String)
+    status LowCardinality(String),
+    -- The run's final QuerySpec (JSON), its error, the feedback note and the proposal's confidence,
+    -- all redacted before storage (Phase 12); never written to Git.
+    spec String,
+    error String,
+    note String,
+    confidence Float64
 )
 ENGINE = MergeTree
 ORDER BY (pack, ts)
 TTL toDateTime(ts) + INTERVAL 90 DAY
 SETTINGS non_replicated_deduplication_window = 10000;
+ALTER TABLE agent_logs.example_proposals ADD COLUMN IF NOT EXISTS spec String;
+ALTER TABLE agent_logs.example_proposals ADD COLUMN IF NOT EXISTS error String;
+ALTER TABLE agent_logs.example_proposals ADD COLUMN IF NOT EXISTS note String;
+ALTER TABLE agent_logs.example_proposals ADD COLUMN IF NOT EXISTS confidence Float64;
 
 -- ClickHouse's own record of every agent query, keyed by the trace id the api
 -- sets as log_comment. No copy is kept: the view reads system.query_log, which

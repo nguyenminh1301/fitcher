@@ -1,0 +1,19 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "pack": {
+      "title": "Pack",
+      "type": "string"
+    },
+    "running": {
+      "title": "Running",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "pack",
+    "running"
+  ],
+  "title": "EvalRunStarted",
+  "type": "object"
+}

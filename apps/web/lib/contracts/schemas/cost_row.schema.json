@@ -1,0 +1,45 @@
+{
+  "additionalProperties": false,
+  "description": "Estimated LLM cost of one day, alias and model, from LiteLLM's cost table.",
+  "properties": {
+    "day": {
+      "title": "Day",
+      "type": "string"
+    },
+    "alias": {
+      "title": "Alias",
+      "type": "string"
+    },
+    "model": {
+      "title": "Model",
+      "type": "string"
+    },
+    "tier": {
+      "title": "Tier",
+      "type": "string"
+    },
+    "provider": {
+      "title": "Provider",
+      "type": "string"
+    },
+    "calls": {
+      "title": "Calls",
+      "type": "integer"
+    },
+    "cost_usd": {
+      "title": "Cost Usd",
+      "type": "number"
+    }
+  },
+  "required": [
+    "day",
+    "alias",
+    "model",
+    "tier",
+    "provider",
+    "calls",
+    "cost_usd"
+  ],
+  "title": "CostRow",
+  "type": "object"
+}
