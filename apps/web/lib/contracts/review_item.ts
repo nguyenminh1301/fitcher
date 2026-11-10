@@ -28,6 +28,22 @@ export type Format = ("currency" | "count" | "ratio" | "percent" | "days" | "num
 export type Rows = (string | number | boolean | null)[][];
 export type RowCount = number;
 export type Truncated = boolean;
+/**
+ * @minItems 1
+ */
+export type MetricIds = [string, ...string[]];
+export type Dataset = string;
+export type Dimensions = string[];
+export type Column = string;
+export type Op = "=" | "!=" | "in" | "not in";
+/**
+ * @minItems 1
+ */
+export type Values = [string | number | number | boolean, ...(string | number | number | boolean)[]];
+export type Filters = SpecFilter[];
+export type TopN = number | null;
+export type RankBy = string | null;
+export type SpecReviewed = boolean;
 
 export interface ReviewItem {
   id: Id;
@@ -41,6 +57,8 @@ export interface ReviewItem {
   evidence?: ReviewEvidence | null;
   evidence_refs?: EvidenceRefs;
   test_result?: Result | null;
+  spec?: ReviewedSpec | null;
+  spec_reviewed?: SpecReviewed;
 }
 /**
  * The evidence shown first: a cited document, else the first entry.
@@ -65,4 +83,20 @@ export interface ColumnInfo {
   type: Type;
   role: Role;
   format?: Format;
+}
+/**
+ * The QuerySpec a proposal's example settles for its question, without periods (DECISIONS §6 step 7).
+ */
+export interface ReviewedSpec {
+  metric_ids: MetricIds;
+  dataset: Dataset;
+  dimensions?: Dimensions;
+  filters?: Filters;
+  top_n?: TopN;
+  rank_by?: RankBy;
+}
+export interface SpecFilter {
+  column: Column;
+  op: Op;
+  values: Values;
 }
