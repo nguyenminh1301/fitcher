@@ -80,6 +80,26 @@ terms:
       - kind: profile
         ref: liquor_sales.state_margin
     status: approved
+  - id: state_margin_rate
+    confidence: 1.0
+    term: State margin rate
+    definition: State margin as a share of sales dollars. People use this term when asking about the state's margin percentage rather than the margin amount.
+    aliases:
+      vi:
+        - tỷ lệ biên lợi nhuận của bang
+        - tỷ lệ lợi nhuận bang
+        - tỷ suất lợi nhuận bang
+      en:
+        - state margin rate
+        - margin rate
+        - state margin percentage
+    targets:
+      - kind: metric
+        metric: average_state_margin_rate
+    evidence:
+      - kind: manual
+        ref: packs/iowa_liquor/README.md
+    status: approved
   - id: invoice
     confidence: 0.92
     term: Invoice
