@@ -187,6 +187,19 @@ terms:
     evidence: *owner
     confidence: 1.0
 
+  - id: customer
+    term: customer
+    definition: A single customer, identified by the customer id on order and return lines.
+    aliases:
+      vi: [khách hàng, người mua]
+      en: [customer, customers, buyer, buyers]
+    targets:
+      - {kind: column, dataset: sales_lines, column: customer_id}
+      - {kind: column, dataset: returns_fact, column: customer_id}
+    status: approved
+    evidence: *owner
+    confidence: 1.0
+
   - id: customer_segment
     term: customer segment
     definition: "Customer segment: new, casual, loyal or vip."
