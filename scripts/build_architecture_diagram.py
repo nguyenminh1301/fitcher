@@ -16,20 +16,27 @@ ROOT = Path(__file__).resolve().parent.parent
 EXCALIDRAW = ROOT / "docs" / "finch-architecture.excalidraw"
 SVG_DIR = ROOT / "docs" / "architecture"
 
-INK = "#1e1e1e"
-MUTED = "#5c636a"
+# Brand colours from docs/brand/README.md.
+INK = "#111111"
+PAPER = "#FFFFFF"
+MIST = "#E8E8EA"
+GRAPHITE = "#6B6B70"
+CANVAS = "#F6F6F7"
+MUTED = GRAPHITE
 FONT = "Inter, 'Segoe UI', Helvetica, Arial, sans-serif"
-PALETTE = {  # name: (fill, stroke)
-    "blue": ("#e7f5ff", "#1c7ed6"),
-    "green": ("#ebfbee", "#2f9e44"),
-    "orange": ("#fff4e6", "#e8590c"),
-    "violet": ("#f3f0ff", "#7048e8"),
-    "teal": ("#e6fcf5", "#0c8599"),
-    "pink": ("#fff0f6", "#c2255c"),
-    "gray": ("#f8f9fa", "#495057"),
-    "yellow": ("#fff9db", "#e67700"),
-    "red": ("#fff5f5", "#e03131"),
+# Box kinds: a step of the product (white card, ink icon cell), an outcome that
+# leaves the main path (ghost card, mist icon cell) and the answer (ink card,
+# like the round dot of the logo).
+KINDS = {
+    "step": dict(fill=PAPER, stroke=MIST, cell=INK, glyph=PAPER, title=INK, sub=GRAPHITE, dashed=False),
+    "ghost": dict(fill=CANVAS, stroke="#C9C9CE", cell=MIST, glyph=INK, title=INK, sub=GRAPHITE, dashed=True),
+    "answer": dict(fill=INK, stroke=INK, cell=PAPER, glyph=INK, title=PAPER, sub="#C9C9CE", dashed=False),
 }
+SYMBOL = ('<rect x="28" y="28" width="56" height="56" rx="14"/><rect x="100" y="28" width="56" height="56" rx="14"/>'
+          '<rect x="172" y="28" width="56" height="56" rx="14"/><rect x="28" y="100" width="56" height="56" rx="14"/>'
+          '<rect x="100" y="100" width="56" height="56" rx="14"/><rect x="28" y="172" width="56" height="56" rx="14"/>'
+          '<circle cx="200" cy="200" r="24"/>')
+LOGO = ROOT / "docs" / "brand" / "svg" / "fitcher-horizontal.svg"
 
 # 24x24 line icons, drawn for this diagram.
 ICONS = {
@@ -88,9 +95,9 @@ class Section:
         self.boxes, self.arrows, self.notes = {}, [], []
 
     def box(self, id_, x, y, w, h, icon, title, sub, color):
-        self.boxes[id_] = dict(x=x, y=y, w=w, h=h, icon=icon, title=title, sub=sub, color=color)
+        self.boxes[id_] = dict(x=x, y=y, w=w, h=h, icon=icon, title=title, sub=sub, kind=color)
 
-    def arrow(self, a, b, label=None, via=None, start=None, end=None, color=INK, dashed=False, label_at=None):
+    def arrow(self, a, b, label=None, via=None, start=None, end=None, color=GRAPHITE, dashed=False, label_at=None):
         A, B = self.boxes[a], self.boxes[b]
         if start is None or end is None:
             ax, ay = A["x"] + A["w"] / 2, A["y"] + A["h"] / 2
@@ -133,16 +140,16 @@ def system():
     W, H = 200, 120
     c = grid(5, W, 70)
     r = [60, 250, 440]
-    s.box("search", c[2], r[0], W, H, "search", "Search index", "Finds terms, metrics\nand examples (Qdrant)", "pink")
-    s.box("pack", c[3], r[0], W, H, "file", "Domain Pack", "A company's terms,\nmetrics and access rules", "yellow")
-    s.box("user", c[0], r[1], W, H, "user", "User", "Asks in English\nor Vietnamese", "yellow")
-    s.box("web", c[1], r[1], W, H, "monitor", "Web app", "Chat and\nworkspace console", "blue")
-    s.box("api", c[2], r[1], W, H, "server", "API and agent", "Understands the question\nand writes the SQL", "green")
-    s.box("gateway", c[3], r[1], W, H, "route", "LLM gateway", "Sends each task to\nthe right model (LiteLLM)", "orange")
-    s.box("models", c[4], r[1], W, H, "sparkles", "AI models", "OpenAI, Anthropic,\nGemini or a local model", "gray")
-    s.box("signin", c[1], r[2], W, H, "lock", "Sign-in", "Accounts and roles\n(Keycloak)", "violet")
-    s.box("dw", c[2], r[2], W, H, "database", "Data warehouse", "Company data and\nrun logs (ClickHouse)", "teal")
-    s.box("sources", c[3], r[2], W, H, "plug", "Company sources", "Databases and files,\ncopied or read live", "gray")
+    s.box("search", c[2], r[0], W, H, "search", "Search index", "Finds terms, metrics\nand examples (Qdrant)", "step")
+    s.box("pack", c[3], r[0], W, H, "file", "Domain Pack", "A company's terms,\nmetrics and access rules", "step")
+    s.box("user", c[0], r[1], W, H, "user", "User", "Asks in English\nor Vietnamese", "step")
+    s.box("web", c[1], r[1], W, H, "monitor", "Web app", "Chat and\nworkspace console", "step")
+    s.box("api", c[2], r[1], W, H, "server", "API and agent", "Understands the question\nand writes the SQL", "step")
+    s.box("gateway", c[3], r[1], W, H, "route", "LLM gateway", "Sends each task to\nthe right model (LiteLLM)", "step")
+    s.box("models", c[4], r[1], W, H, "sparkles", "AI models", "OpenAI, Anthropic,\nGemini or a local model", "step")
+    s.box("signin", c[1], r[2], W, H, "lock", "Sign-in", "Accounts and roles\n(Keycloak)", "step")
+    s.box("dw", c[2], r[2], W, H, "database", "Data warehouse", "Company data and\nrun logs (ClickHouse)", "step")
+    s.box("sources", c[3], r[2], W, H, "plug", "Company sources", "Databases and files,\ncopied or read live", "step")
     s.arrow("user", "web", "asks")
     s.arrow("web", "api", "streams")
     s.arrow("api", "gateway", "AI tasks")
@@ -162,19 +169,19 @@ def flow():
     W, H = 200, 120
     c = grid(5, W, 70)
     r = [60, 250, 470]
-    s.box("blocked", c[1], r[0], W, H, "stop", "Blocked", "Unsafe input\nstops here", "red")
-    s.box("quick", c[2], r[0], W, H, "message", "Quick reply", "Definitions, chart changes\nor off-topic questions", "gray")
-    s.box("clarify", c[4], r[0], W, H, "help", "Clarify or deny", "Ask which one was meant,\nor refuse politely", "red")
-    s.box("q", c[0], r[1], W, H, "message", "Question", "Typed in the chat\nor on the command line", "yellow")
-    s.box("safety", c[1], r[1], W, H, "shield", "Safety check", "Screens for prompt\ninjection first", "green")
-    s.box("understand", c[2], r[1], W, H, "bulb", "Understand", "What is measured,\nfor which period", "orange")
-    s.box("terms", c[3], r[1], W, H, "book", "Match terms", "Maps words to the\ncompany's metrics", "pink")
-    s.box("perm", c[4], r[1], W, H, "shieldcheck", "Permission check", "Is the question clear,\nand may this role see it?", "green")
-    s.box("sql", c[4], r[2], W, H, "code", "Write SQL", "One read-only query", "orange")
-    s.box("run", c[3], r[2], W, H, "play", "Check and run", "Validated, then run\nas the user's role", "teal")
-    s.box("chart", c[2], r[2], W, H, "chart", "Pick a chart", "Chosen by rules\nfrom the result shape", "blue")
-    s.box("summary", c[1], r[2], W, H, "lines", "Summarize", "Explains the rows in\nthe question's language", "orange")
-    s.box("answer", c[0], r[2], W, H, "check", "Answer", "SQL, table, chart\nand summary", "green")
+    s.box("blocked", c[1], r[0], W, H, "stop", "Blocked", "Unsafe input\nstops here", "ghost")
+    s.box("quick", c[2], r[0], W, H, "message", "Quick reply", "Definitions, chart changes\nor off-topic questions", "ghost")
+    s.box("clarify", c[4], r[0], W, H, "help", "Clarify or deny", "Ask which one was meant,\nor refuse politely", "ghost")
+    s.box("q", c[0], r[1], W, H, "message", "Question", "Typed in the chat\nor on the command line", "step")
+    s.box("safety", c[1], r[1], W, H, "shield", "Safety check", "Screens for prompt\ninjection first", "step")
+    s.box("understand", c[2], r[1], W, H, "bulb", "Understand", "What is measured,\nfor which period", "step")
+    s.box("terms", c[3], r[1], W, H, "book", "Match terms", "Maps words to the\ncompany's metrics", "step")
+    s.box("perm", c[4], r[1], W, H, "shieldcheck", "Permission check", "Is the question clear,\nand may this role see it?", "step")
+    s.box("sql", c[4], r[2], W, H, "code", "Write SQL", "One read-only query", "step")
+    s.box("run", c[3], r[2], W, H, "play", "Check and run", "Validated, then run\nas the user's role", "step")
+    s.box("chart", c[2], r[2], W, H, "chart", "Pick a chart", "Chosen by rules\nfrom the result shape", "step")
+    s.box("summary", c[1], r[2], W, H, "lines", "Summarize", "Explains the rows in\nthe question's language", "step")
+    s.box("answer", c[0], r[2], W, H, "check", "Answer", "SQL, table, chart\nand summary", "answer")
     for a, b in [("q", "safety"), ("safety", "understand"), ("understand", "terms"), ("terms", "perm"),
                  ("perm", "sql"), ("sql", "run"), ("run", "chart"), ("chart", "summary"), ("summary", "answer")]:
         s.arrow(a, b)
@@ -183,7 +190,7 @@ def flow():
     s.arrow("perm", "clarify")
     run, sql = s.boxes["run"], s.boxes["sql"]
     yb = r[2] + H
-    s.arrow("run", "sql", "on an error: fix and retry, up to 3 times", color=PALETTE["red"][1],
+    s.arrow("run", "sql", "on an error: fix and retry, up to 3 times", dashed=True,
             start=(run["x"] + W / 2 + 40, yb), end=(sql["x"] + W / 2, yb),
             via=[(run["x"] + W / 2 + 40, yb + 40), (sql["x"] + W / 2, yb + 40)],
             label_at=(run["x"] + W / 2 + 175, yb + 62))
@@ -198,15 +205,15 @@ def access():
     c = grid(6, W, 35)
     r = [60, 260, 460]
     s.box("rules", c[3], r[0], c[4] + W - c[3], 125, "file", "Access rules", "One policy file per company sets each role's\n"
-                                                                   "tables, columns and rows", "yellow")
-    s.box("user", c[0], r[1], W, H, "user", "Signed-in user", "Asks with one\nof their roles", "yellow")
-    s.box("l0", c[1], r[1], W, H, "shield", "Safety screen", "Layer 0: before\nany AI model call", "green")
-    s.box("l1", c[2], r[1], W, H, "search", "Role-aware search", "Layer 1: context\nlimited to the role", "pink")
-    s.box("l2", c[3], r[1], W, H, "shieldcheck", "Permission check", "Layer 2: refuses\nbefore any SQL", "green")
-    s.box("l3", c[4], r[1], W, H, "lock", "Database rules", "Layer 3: the real\nsecurity boundary", "teal")
-    s.box("data", c[5], r[1], W, H, "database", "Data", "Only what the\nrole may read", "teal")
+                                                                   "tables, columns and rows", "step")
+    s.box("user", c[0], r[1], W, H, "user", "Signed-in user", "Asks with one\nof their roles", "step")
+    s.box("l0", c[1], r[1], W, H, "shield", "Safety screen", "Layer 0: before\nany AI model call", "step")
+    s.box("l1", c[2], r[1], W, H, "search", "Role-aware search", "Layer 1: context\nlimited to the role", "step")
+    s.box("l2", c[3], r[1], W, H, "shieldcheck", "Permission check", "Layer 2: refuses\nbefore any SQL", "step")
+    s.box("l3", c[4], r[1], W, H, "lock", "Database rules", "Layer 3: the real\nsecurity boundary", "step")
+    s.box("data", c[5], r[1], W, H, "database", "Data", "Only what the\nrole may read", "step")
     s.box("audit", c[3], r[2], c[4] + W - c[3], 125, "eye", "Audit log", "Every allow and deny is recorded\n"
-                                                                "and shown to admins", "violet")
+                                                                "and shown to admins", "step")
     for a, b in [("user", "l0"), ("l0", "l1"), ("l1", "l2"), ("l2", "l3"), ("l3", "data")]:
         s.arrow(a, b)
     rules, audit = s.boxes["rules"], s.boxes["audit"]
@@ -225,20 +232,20 @@ def onboarding():
     c = grid(7, W, 27)
     r = [60, 270]
     steps = [
-        ("connect", "plug", "Connect data", "Copy it in\nor read it live", "teal"),
-        ("profile", "pulse", "Profile", "Measure tables,\ndates and values", "gray"),
-        ("docs", "file", "Add documents", "Manuals, policies,\nglossaries", "pink"),
-        ("draft", "pen", "Draft the pack", "AI proposes terms\nand metrics", "orange"),
-        ("review", "users", "Review", "A person approves\neach item", "violet"),
-        ("publish", "package", "Publish", "Search index and\npermissions", "blue"),
-        ("test", "flask", "Test", "Must answer 80%\nof eval questions", "green"),
+        ("connect", "plug", "Connect data", "Copy it in\nor read it live", "step"),
+        ("profile", "pulse", "Profile", "Measure tables,\ndates and values", "step"),
+        ("docs", "file", "Add documents", "Manuals, policies,\nglossaries", "step"),
+        ("draft", "pen", "Draft the pack", "AI proposes terms\nand metrics", "step"),
+        ("review", "users", "Review", "A person approves\neach item", "step"),
+        ("publish", "package", "Publish", "Search index and\npermissions", "step"),
+        ("test", "flask", "Test", "Must answer 80%\nof eval questions", "step"),
     ]
     for i, (id_, icon, title, sub, color) in enumerate(steps):
         s.box(id_, c[i], r[0], W, H, icon, title, sub, color)
     for (a, *_), (b, *_) in zip(steps, steps[1:]):
         s.arrow(a, b)
-    s.box("live", c[6], r[1], W, H, "live", "Live", "Answers the\ncompany's questions", "green")
-    s.box("feedback", c[4], r[1], W, H, "refresh", "Learn", "Disliked answers\nbecome new examples", "yellow")
+    s.box("live", c[6], r[1], W, H, "live", "Live", "Answers the\ncompany's questions", "answer")
+    s.box("feedback", c[4], r[1], W, H, "refresh", "Learn", "Disliked answers\nbecome new examples", "step")
     s.arrow("test", "live", "passes")
     s.arrow("live", "feedback", "feedback")
     s.arrow("feedback", "review")
@@ -251,9 +258,9 @@ def tracing():
     s = Section("tracing", "5. Every run is traced", 1280)
     W, H = 300, 130
     c = [0, 490, 980]
-    s.box("run", c[0], 60, W, H, "message", "Each question", "Gets one trace id that\nfollows it through every step", "yellow")
-    s.box("store", c[1], 60, W, H, "database", "Run log", "Steps, SQL, AI calls, cost\nand access decisions", "teal")
-    s.box("console", c[2], 60, W, H, "layout", "Workspace console", "Runs, Audit, Costs,\nFeedback and Evaluation", "blue")
+    s.box("run", c[0], 60, W, H, "message", "Each question", "Gets one trace id that\nfollows it through every step", "step")
+    s.box("store", c[1], 60, W, H, "database", "Run log", "Steps, SQL, AI calls, cost\nand access decisions", "step")
+    s.box("console", c[2], 60, W, H, "layout", "Workspace console", "Runs, Audit, Costs,\nFeedback and Evaluation", "step")
     s.arrow("run", "store", "written as it runs")
     s.arrow("store", "console", "read by admins and reviewers")
     s.note(0, 215, "Run logs and conversations are kept for 90 days.")
@@ -270,48 +277,51 @@ def text_width(s, size):
 
 
 def svg_section(sec):
-    pad = 30
+    pad = 36
     W, H = sec.width + 2 * pad, sec.height + 2 * pad
-    out = [f'<svg xmlns="http://www.w3.org/2000/svg" width="{W:.0f}" height="{H:.0f}" viewBox="{-pad} {-pad} {W:.0f} {H:.0f}" '
-           f'font-family="{FONT}">',
+    out = [f'<svg xmlns="http://www.w3.org/2000/svg" width="{W:.0f}" height="{H:.0f}" '
+           f'viewBox="{-pad} {-pad} {W:.0f} {H:.0f}" font-family="{FONT}">',
            f'<title>{escape(sec.title)}</title>',
-           f'<rect x="{-pad}" y="{-pad}" width="{W:.0f}" height="{H:.0f}" fill="#ffffff"/>',
+           f'<rect x="{-pad}" y="{-pad}" width="{W:.0f}" height="{H:.0f}" rx="18" fill="{CANVAS}"/>',
            '<defs>']
-    colors = {a["color"] for a in sec.arrows}
-    for i, col in enumerate(sorted(colors)):
-        out.append(f'<marker id="head{i}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" '
+    colors = sorted({a["color"] for a in sec.arrows})
+    for i, col in enumerate(colors):
+        out.append(f'<marker id="head{i}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" '
                    f'orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="{col}"/></marker>')
     out.append('</defs>')
-    heads = {col: f"head{i}" for i, col in enumerate(sorted(colors))}
-    out.append(f'<text x="0" y="28" font-size="26" font-weight="700" fill="{INK}">{escape(sec.title)}</text>')
+    heads = {col: f"head{i}" for i, col in enumerate(colors)}
+    # brand symbol next to the section title
+    out.append(f'<g transform="translate(0,2) scale(0.125)" fill="{INK}">{SYMBOL}</g>')
+    out.append(f'<text x="44" y="26" font-size="24" font-weight="600" fill="{INK}">{escape(sec.title)}</text>')
     for a in sec.arrows:
         pts = " ".join(f"{x:.0f},{y:.0f}" for x, y in a["pts"])
-        dash = ' stroke-dasharray="7 5"' if a["dashed"] else ""
-        out.append(f'<polyline points="{pts}" fill="none" stroke="{a["color"]}" stroke-width="2"{dash} '
-                   f'marker-end="url(#{heads[a["color"]]})"/>')
+        dash = ' stroke-dasharray="6 5"' if a["dashed"] else ""
+        out.append(f'<polyline points="{pts}" fill="none" stroke="{a["color"]}" stroke-width="1.8"{dash} '
+                   f'stroke-linejoin="round" marker-end="url(#{heads[a["color"]]})"/>')
     for b in sec.boxes.values():
-        fill, stroke = PALETTE[b["color"]]
+        k = KINDS[b["kind"]]
         cx = b["x"] + b["w"] / 2
-        out.append(f'<rect x="{b["x"]}" y="{b["y"]}" width="{b["w"]}" height="{b["h"]}" rx="14" fill="{fill}" '
-                   f'stroke="{stroke}" stroke-width="2"/>')
-        out.append(f'<svg x="{cx - 16}" y="{b["y"] + 14}" width="32" height="32" viewBox="0 0 24 24" fill="none" '
-                   f'stroke="{stroke}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">'
+        dash = ' stroke-dasharray="6 5"' if k["dashed"] else ""
+        out.append(f'<rect x="{b["x"]}" y="{b["y"]}" width="{b["w"]}" height="{b["h"]}" rx="14" fill="{k["fill"]}" '
+                   f'stroke="{k["stroke"]}" stroke-width="1.5"{dash}/>')
+        out.append(f'<rect x="{cx - 19}" y="{b["y"] + 12}" width="38" height="38" rx="10" fill="{k["cell"]}"/>')
+        out.append(f'<svg x="{cx - 12}" y="{b["y"] + 19}" width="24" height="24" viewBox="0 0 24 24" fill="none" '
+                   f'stroke="{k["glyph"]}" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">'
                    f'{ICONS[b["icon"]]}</svg>')
-        out.append(f'<text x="{cx}" y="{b["y"] + 68}" font-size="17" font-weight="700" fill="{INK}" '
+        out.append(f'<text x="{cx}" y="{b["y"] + 72}" font-size="16.5" font-weight="600" fill="{k["title"]}" '
                    f'text-anchor="middle">{escape(b["title"])}</text>')
         for i, line in enumerate(b["sub"].split("\n")):
-            out.append(f'<text x="{cx}" y="{b["y"] + 90 + i * 18}" font-size="13.5" fill="{MUTED}" '
+            out.append(f'<text x="{cx}" y="{b["y"] + 93 + i * 18}" font-size="13.5" fill="{k["sub"]}" '
                        f'text-anchor="middle">{escape(line)}</text>')
     for a in sec.arrows:
         if a["label"]:
             x, y = a["label_at"]
-            anchor = "middle" if a["anchor"] == "middle" else "start"
-            out.append(f'<text x="{x:.0f}" y="{y:.0f}" font-size="13" fill="{a["color"] if a["color"] != INK else MUTED}" '
-                       f'text-anchor="{anchor}">{escape(a["label"])}</text>')
+            out.append(f'<text x="{x:.0f}" y="{y:.0f}" font-size="13" fill="{GRAPHITE}" '
+                       f'text-anchor="{a["anchor"]}">{escape(a["label"])}</text>')
     for n in sec.notes:
         for i, line in enumerate(n["text"].split("\n")):
-            out.append(f'<text x="{n["x"]}" y="{n["y"] + n["size"] + i * n["size"] * 1.4:.0f}" font-size="{n["size"]}" '
-                       f'fill="{n["color"]}">{escape(line)}</text>')
+            out.append(f'<text x="{n["x"]}" y="{n["y"] + n["size"] + i * n["size"] * 1.4:.0f}" '
+                       f'font-size="{n["size"]}" fill="{n["color"]}">{escape(line)}</text>')
     out.append("</svg>")
     return "\n".join(out) + "\n"
 
@@ -347,27 +357,35 @@ class Excalidraw:
                           verticalAlign="top", baseline=int(size * 0.9), containerId=None, autoResize=True,
                           lineHeight=1.25, groupIds=group or [])
 
-    def icon(self, name, color, x, y, size, group):
-        svg = icon_svg(name, color)
+    def image(self, svg, x, y, w, h, group=None):
         file_id = hashlib.sha1(svg.encode()).hexdigest()
         self.files[file_id] = {"mimeType": "image/svg+xml", "id": file_id, "created": 1, "lastRetrieved": 1,
                                "dataURL": "data:image/svg+xml;base64," + base64.b64encode(svg.encode()).decode()}
-        self._base("image", x, y, size, size, strokeColor="transparent", fileId=file_id, status="saved",
-                   scale=[1, 1], crop=None, groupIds=group)
+        self._base("image", x, y, w, h, strokeColor="transparent", fileId=file_id, status="saved",
+                   scale=[1, 1], crop=None, groupIds=group or [])
+
+    def symbol(self, x, y, size):
+        svg = f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256"><g fill="{INK}">{SYMBOL}</g></svg>'
+        self.image(svg, x, y, size, size)
 
     def add(self, sec, oy):
-        self.text(0, oy, sec.title, 32)
+        self.symbol(0, oy, 34)
+        self.text(46, oy, sec.title, 28)
         ids = {}
         for key, b in sec.boxes.items():
-            fill, stroke = PALETTE[b["color"]]
+            k = KINDS[b["kind"]]
             group = [f"{sec.key}-{key}"]
             rect = self._base("rectangle", b["x"], oy + b["y"], b["w"], b["h"], id=f"{sec.key}-{key}",
-                              backgroundColor=fill, strokeColor=stroke, roundness={"type": 3}, groupIds=group)
+                              backgroundColor=k["fill"], strokeColor=k["stroke"], strokeWidth=1,
+                              strokeStyle="dashed" if k["dashed"] else "solid", roundness={"type": 3},
+                              groupIds=group)
             ids[key] = rect
             cx = b["x"] + b["w"] / 2
-            self.icon(b["icon"], stroke, cx - 16, oy + b["y"] + 12, 32, group)
-            self.text(cx, oy + b["y"] + 50, b["title"], 18, INK, center=True, group=group)
-            self.text(cx, oy + b["y"] + 76, b["sub"], 14, MUTED, center=True, group=group)
+            self._base("rectangle", cx - 19, oy + b["y"] + 10, 38, 38, backgroundColor=k["cell"],
+                       strokeColor=k["cell"], strokeWidth=1, roundness={"type": 3}, groupIds=group)
+            self.image(icon_svg(b["icon"], k["glyph"]), cx - 12, oy + b["y"] + 17, 24, 24, group)
+            self.text(cx, oy + b["y"] + 56, b["title"], 18, k["title"], center=True, group=group)
+            self.text(cx, oy + b["y"] + 80, b["sub"], 14, k["sub"], center=True, group=group)
         for a in sec.arrows:
             pts = [(x, y + oy) for x, y in a["pts"]]
             x0, y0 = pts[0]
@@ -382,11 +400,7 @@ class Excalidraw:
             ids[a["b"]]["boundElements"].append({"type": "arrow", "id": e["id"]})
             if a["label"]:
                 lx, ly = a["label_at"]
-                color = a["color"] if a["color"] != INK else MUTED
-                if a["anchor"] == "middle":
-                    self.text(lx, oy + ly - 12, a["label"], 13, color, center=True)
-                else:
-                    self.text(lx, oy + ly - 12, a["label"], 13, color)
+                self.text(lx, oy + ly - 12, a["label"], 13, GRAPHITE, center=a["anchor"] == "middle")
         for n in sec.notes:
             self.text(n["x"], oy + n["y"], n["text"], n["size"], n["color"])
 
@@ -394,16 +408,16 @@ class Excalidraw:
 def main():
     SVG_DIR.mkdir(exist_ok=True)
     doc = Excalidraw()
-    doc.text(0, -110, "fitcher architecture", 40)
-    doc.text(0, -55, "Ask a company's data a question in plain language and get back SQL, a table, a chart and a summary.",
-             18, MUTED)
+    logo = LOGO.read_text(encoding="utf-8")
+    doc.image(logo, 0, -150, 268, 60)  # horizontal lockup, 893.6 x 200
+    doc.text(0, -70, "Ask your data in plain language. Get SQL, tables and charts back.", 20, GRAPHITE)
     oy = 0
     for sec in SECTIONS:
         (SVG_DIR / f"{sec.key}.svg").write_text(svg_section(sec), encoding="utf-8")
         doc.add(sec, oy)
         oy += sec.height + 120
     data = {"type": "excalidraw", "version": 2, "source": "https://excalidraw.com", "elements": doc.elements,
-            "appState": {"viewBackgroundColor": "#ffffff", "gridSize": None}, "files": doc.files}
+            "appState": {"viewBackgroundColor": CANVAS, "gridSize": None}, "files": doc.files}
     EXCALIDRAW.write_text(json.dumps(data, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
     print(f"{len(doc.elements)} elements, {len(SECTIONS)} SVG sections")
 
