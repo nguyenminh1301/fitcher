@@ -4,6 +4,7 @@
 
 ### Added
 
+- Record the evals after the spec-building fixes in `docs/eval/spec-building-fixes-report.md`: `iowa_liquor` reaches 30/35 execution match (was 29/35) and `ecommerce_twin` 42/45 (was 39/45) with no regression against its baseline, and the cases still failing are listed with their cause.
 - Edit a proposal's spec on the Review page: a reviewer ticks "Use this spec when the same question is asked", fills the metrics, dataset, dimensions, filters (one per line), top N and ranking, replaces masked filter values with the same fields as the SQL, and sees the api's reason when approval refuses the spec.
 - Let a reviewer confirm a proposed example's spec through the Review api: a proposal now shows the run's spec without the time column, a patch with `spec` marks it reviewed (or `spec_reviewed: false` leaves it out), and approval writes a reviewed spec into the example only after checking its metrics, dataset, columns, operators, ranking and that every filter value exists in the data and is not masked.
 - Let an approved example in `examples.yaml` carry a reviewed `spec` (dimensions, filters, top N, ranking; metrics and dataset from the example): when the same question is asked, compared without case, diacritics or punctuation, `build_spec` uses it instead of resolving the extracted terms, the periods and time grain still come from the question and the gate checks it as usual, so a reviewer can fix a question that went wrong before SQL generation; the pack loader checks the spec's columns, operators and ranking, and the examples index carries it.
