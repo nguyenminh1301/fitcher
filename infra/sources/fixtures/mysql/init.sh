@@ -3,6 +3,10 @@
 # copied into the server's secure_file_priv directory, and a user that can only
 # read them.
 # The lab passwords are placed in SQL string literals, so they must not contain quotes.
+# The mysql entrypoint sources a script that is not executable, so the body runs
+# in a subshell: its shell options must not leak into the entrypoint, which reads
+# unset variables such as MYSQL_ONETIME_PASSWORD after the init scripts.
+(
 set -eu
 
 cp /fixtures/*.csv /var/lib/mysql-files/
@@ -35,3 +39,4 @@ LOAD DATA INFILE '/var/lib/mysql-files/refunds.csv' INTO TABLE refunds FIELDS TE
 CREATE USER '$FIXTURE_MYSQL_USER'@'%' IDENTIFIED BY '$FIXTURE_MYSQL_PASSWORD';
 GRANT SELECT ON \`$MYSQL_DATABASE\`.* TO '$FIXTURE_MYSQL_USER'@'%';
 SQL
+)

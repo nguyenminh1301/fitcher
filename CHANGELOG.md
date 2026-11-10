@@ -177,6 +177,7 @@
 
 ### Fixed
 
+- Start `mysql-fixture` on a fresh volume: the mysql entrypoint sources its init script, whose `set -eu` leaked into the entrypoint and stopped it at the unset `MYSQL_ONETIME_PASSWORD`, so the script now runs its body in a subshell.
 - Refuse an Iowa Liquor Sales export whose later CSV part has other columns or another column order, instead of appending its rows under the first part's header.
 - Keep the api healthy while the screening classifier loads: the api builds the screener in the background at startup and `/health` only reads its state, instead of loading the model inside the 2-second health probe, which kept the container unhealthy once the real model was present.
 - Draw a streamed answer as the chart its `chart_spec` names instead of the table: the chat kept the chart type it had before the spec arrived, so every live answer opened as a table until the reader switched it.
