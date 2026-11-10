@@ -1,185 +1,193 @@
 # fitcher
 
-fitcher is a domain-neutral natural-language data analysis lab.
-The planned application answers questions such as "Top 10 best-selling products in Q1 2024 compared with Q1 2025" with validated SQL, tables, charts and summaries over company data loaded into ClickHouse and described by a Domain Pack.
+fitcher answers questions about a company's data. You ask in English or Vietnamese, for example "Top 10 best-selling products in Q1 2024 compared with Q1 2025", and it replies with the SQL it ran, a table, a chart and a short summary.
 
-## Current status
+The engine knows nothing about any one industry. What it needs to know about a company lives in a Domain Pack: reviewed files that describe the company's tables, business terms, metrics and who may see what. The company's data is loaded into ClickHouse or read from its own databases through ClickHouse.
 
-The repository runs the six lab services and answers `data_query` questions from the command line.
-Docker Compose starts ClickHouse, Qdrant, LiteLLM, Keycloak, the FastAPI skeleton in `apps/api` (`GET /health`) and the Next.js web app in `apps/web`; their configuration lives in [infra/](infra/README.md).
-`jobs/` loads the e-commerce lab dataset into ClickHouse `raw` and refreshes it, and [dbt/](dbt/README.md) builds the `sales_lines`, `returns_fact` and `sessions_daily` marts; [packs/](packs/README.md) holds the Domain Pack schemas and the hand-written `ecommerce_twin` pack, which `jobs/compile_pack.py` validates, test-runs and indexes into Qdrant; `jobs/ask.py` runs the LangGraph agent in `apps/api/app/agent` over the compiled pack, with its prompts in `apps/api/prompts/`.
+fitcher is a lab. It runs on one machine with Docker Compose and has no high availability, caching or multi-tenancy. The architecture it follows is recorded in [DECISIONS.md](docs/DECISIONS.md).
 
-The architecture is settled in [DECISIONS.md](docs/DECISIONS.md) and delivered in the order of the [master plan](docs/MASTER_PLAN.md), with one [detailed plan per phase](docs/plans/README.md).
-Phases 1 (lab dataset and dbt marts), 2 (hand-written Domain Pack and compiler), 3 (core agent on the CLI) and 4 (eval harness) are complete: `jobs/eval.py` scores a pack's eval set per layer, and the `ecommerce_twin` eval set has a recorded [baseline](docs/eval/ecommerce_twin-baseline.md). Phase 5 (logging and tracing) is complete as well: every `jobs.ask` and `jobs.eval` run writes its run row, node events, SQL attempts and LiteLLM calls to ClickHouse `agent_logs`, and [docs/tracing.md](docs/tracing.md) shows how to read one trace. Phase 6 (RBAC and auth) is complete: `compile_pack` turns `policies.yaml` into per-role ClickHouse roles, column grants, row policies, aggregate-only views and users; every question runs as one pack role (`--role`), a question the role may not read is denied before any SQL and every access decision is written to `agent_logs.audit`; the Keycloak realm carries the pack roles and lab users. Phase 6B (the web app on sample data) is complete: every screen of the [web app design](docs/design/web-app.md) works on the active pack's sample data in English and Vietnamese, light and dark themes, at desktop and phone widths. That covers the chat app with streamed answers, charts, tables and SQL, and the workspace console with each role's sections. Each feature shows a Sample data badge until its backend phase wires it to the api. Phase 7 (API and streaming) is complete: the api verifies Keycloak access tokens and streams answers from `POST /ask`, and the web app signs users in through Keycloak and streams its chat answers from the api; the other web features keep their Sample data badge until their phase. Phase 8 (conversation) is complete: a router sends each question to the data, definition, chart-edit or out-of-scope branch, follow-ups reuse the previous query, ambiguous questions get a clarifying question with options, every turn is stored per user so the chat sidebar lists, searches, renames, pins, groups and deletes conversations from the api, and an earlier question can be edited or retried. Phase 9 (charts) is in progress: the api chooses each answer's chart by the DECISIONS §8 rules, and likes and dislikes in the chat are stored per answer through `POST /feedback`. Phase 9B (input screening) screens every question with EN/VI rules and a local prompt-injection classifier before any LLM call, in `SCREEN_MODE=log` until the measurement shows the enforcement gate holds; the LiteLLM gateway rejects requests the api did not screen. Phase 9E (data sources) connects PostgreSQL, MySQL/MariaDB, MongoDB and S3 files through ClickHouse: a source manifest copies each source into `raw` or reads it live through a database or table engine, ClickHouse alone holds the read-only credentials, and lab fixtures of every kind build the same marts in both modes. Phase 10 (automated onboarding) drafts a pack for a new company: `jobs.profile` profiles its marts, company documents are uploaded on the console's Documents page or with `jobs.ingest_docs` and indexed into `kb_docs` after screening, `jobs.draft_pack` drafts items with evidence and confidence, and a `pack_reviewer` edits, test-runs and approves them in the Review section before `compile_pack`; see [packs/](packs/README.md#onboarding-a-company). Phase 11 (industry neutrality) onboarded Iowa Liquor Sales 2025 from a PostgreSQL source as the `iowa_liquor` pack with the same pipeline and no change to `apps/`; it reaches 83% execution match ([report](docs/eval/iowa_liquor-report.md)). Phase 12 (admin, audit and feedback loop) gives the console's Runs, Audit, Costs, Feedback, Evaluation and Users sections their api: an `admin` reads every run's trace, access decisions, screening verdicts, estimated cost and any user's conversations, starts an eval run and changes users' pack roles through Keycloak; `jobs.propose_examples` turns disliked or failed questions into redacted example proposals that a `pack_reviewer` corrects, test-runs and approves into `examples.yaml` in the Review section, so the next compile and eval use them.
+## What you can do with it
 
-## Architecture
-
-| Component | Technology | Responsibility |
-| --- | --- | --- |
-| Web | Next.js, ECharts, TanStack Table | Chat, tables, charts, SQL view, Review and Admin UIs |
-| Auth | Keycloak (OIDC) | Users and roles carried in JWTs |
-| API | FastAPI, SSE | Authenticated requests and streamed results |
-| Agent | LangGraph, sqlglot | Extract, retrieve, generate, guard, execute and summarize |
-| LLM gateway | LiteLLM Proxy (OpenAI, Anthropic, Gemini, Ollama) | Model tiers `fast`, `sql-small`, `sql-gen`, `sql-gen-hard`, `embed` mapped to catalog aliases |
-| Data and logs | ClickHouse | `raw`, `marts` and `agent_logs` databases, role-based access |
-| Retrieval | Qdrant | Dense vectors of the `embed` tier and BM25 sparse vectors per point, fused with RRF on the server |
-| Transform | dbt-clickhouse | Raw tables to wide marts |
-| Packs | YAML + JSON Schema | Per-company profile, datasets, glossary, metrics, policies and eval |
-| Deployment | Docker Compose | Six long-running services plus jobs |
-
-
-## Run locally
-
-Install Docker with Compose v2 (`--wait` support) and give Docker about 8 GB of free memory.
-Host Node/Python are optional when using Docker. Run these commands from the repository root.
-
-Copy [.env.example](.env.example) to `.env` and replace every `change-me` value. Never commit `.env`.
-A provider's catalog aliases load only when its key is set (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GEMINI_API_KEY`, or `OLLAMA_URL` with the `local-models` profile); every service reports healthy without any key.
-
-| Make target | Plain command (PowerShell and Bash) |
+| Feature | What it means for a user |
 | --- | --- |
-| `make up` | `docker compose up --build --wait` |
-| `make ps` | `docker compose ps` |
-| `make logs` | `docker compose logs --follow --tail=200` |
-| `make smoke` | `docker compose exec -T api python -m jobs.smoke_llm` |
-| `make down` | `docker compose down` |
+| Ask about data | Ask for rankings, trends, comparisons between periods and filtered totals. Relative periods such as "last quarter" use the company's fiscal calendar and your time zone. |
+| Hold a conversation | Ask a follow-up and it reuses the previous query. Ask to see the answer as a line chart and it redraws without querying again. Ask what a term means and it answers from the glossary and company documents. |
+| Get asked back | When a question is unclear, fitcher asks which meaning you intended and offers the options. |
+| See only your data | Each user works under a role. A question about data the role may not read is refused before any SQL is written, and the database enforces the same rules. |
+| Stay safe | Every question is screened for prompt injection before it reaches an AI model. |
+| Check the work | Each answer shows the SQL it ran and the steps it took, and admins can open the full trace of any run. |
+| Add a new company | fitcher profiles the company's tables, reads its documents and drafts a pack. A reviewer approves each item before it goes live. |
+| Measure quality | Each pack has a set of test questions with known answers. A pack goes live only when at least 80% of them return the right result. |
 
-`make` is optional; the Makefile only wraps these commands. `make down` never removes volumes, so ClickHouse and Qdrant data survive restarts.
-`make smoke` sends one tiny billable request to every alias LiteLLM loaded, checking structured output for chat aliases and one vector for `-embed` aliases, and prints only whether each passed; `--alias <name>` limits it.
+The web app has a chat for everyone and a workspace console for reviewers and admins, in English and Vietnamese, light and dark themes, on desktop and phone.
 
-### Load the lab dataset and build the marts
+## How it works
 
-```bash
-docker compose run --rm jobs python -m jobs.refresh_data --source ecommerce_twin
-```
+![How the pieces fit together](docs/architecture/system.svg)
 
-The refresh loads the raw tables, runs `dbt build` for the source's staging views, marts and tests, and records the outcome in `data_meta.refresh_log`; see [jobs/](jobs/README.md) for the refresh state and stale-lock recovery.
-`python -m jobs.load_data --source ecommerce_twin` loads the raw tables alone.
-Jobs run in the `jobs` Compose service (profile `jobs`), which uses the `api` image, mounts `./data` and is the only service holding the ClickHouse admin credentials.
-The loader downloads the seven Parquet files of [`ziadatalabs/FreeEcommerceTwin14M`](https://huggingface.co/datasets/ziadatalabs/FreeEcommerceTwin14M) at the revision pinned in `jobs/sources/ecommerce_twin.yaml` into `data/hf/`, reuses complete downloads on later runs, and publishes the `raw` tables only after every row count matches the manifest.
-The dataset is licensed CC BY-NC 4.0 for non-commercial use only; downloads and derived data stay in the Git-ignored `data/` directory and are never committed.
-On Linux hosts, `./data` must be writable by UID 10001, the non-root user of the `api` image.
+The user talks to the web app, which signs them in through Keycloak and streams answers from the API. The API runs the agent: it looks up the company's terms in the search index, sends language tasks to AI models through the LiteLLM gateway, and runs SQL in ClickHouse as the user's role. Models are called by task (fast replies, simple SQL, harder SQL, embeddings), and an admin can switch a task to another model once that model passes the pack's test questions.
 
-### Connect a company's data sources
+![How a question is answered](docs/architecture/question-flow.svg)
 
-```bash
-docker compose --profile sources up -d --wait
-docker compose run --rm jobs python -m jobs.refresh_data --source fixture_postgres
-```
+A question goes through a safety check first. The agent then works out what is being asked, matches the words to the company's metrics, checks that the question is clear and permitted, writes one read-only query, validates and runs it, and picks a chart. If the query fails, the agent fixes it and tries again up to three times; if it still fails, you see the last SQL and the error. The summary only describes the rows the database returned.
 
-A source manifest under `jobs/sources/` declares a PostgreSQL, MySQL/MariaDB, MongoDB or S3 file source and whether ClickHouse copies it into `raw` (the default) or reads it live; `jobs.sync_sources` runs the copy or defines the live database alone.
-The `sources` profile starts lab fixtures of each kind with a synthetic widget dataset; see [jobs/](jobs/README.md#data-sources) for adding a source and choosing a mode.
+![Who can see what](docs/architecture/access-control.svg)
 
-### Compile the Domain Pack
+Each company's access rules live in one policy file. Publishing the pack turns it into database roles, column grants, row filters and aggregate-only views, so the database itself stops a role from reading what it should not. Every allow and deny decision goes to the audit log.
 
-```bash
-docker compose run --rm jobs python -m jobs.compile_pack --pack ecommerce_twin
-```
+| Component | Technology |
+| --- | --- |
+| Web app | Next.js, ECharts, TanStack Table |
+| Sign-in | Keycloak (OpenID Connect) |
+| API and agent | FastAPI with streamed responses, LangGraph, sqlglot |
+| AI model gateway | LiteLLM, with OpenAI, Anthropic, Gemini or a local Ollama model |
+| Data and run logs | ClickHouse |
+| Search index | Qdrant, combining meaning-based and keyword search |
+| Data modelling | dbt |
+| Domain Packs | YAML checked against JSON Schema |
 
-The compile validates the pack against the marts, test-runs every metric, embeds pack items through the `embed` tier's alias (billable, needs `OPENAI_API_KEY`) and publishes the pack's Qdrant collections and `compiled.json`; see [packs/](packs/README.md#compiling-a-pack).
-`ACTIVE_PACK` in `.env` names the pack the API serves.
+The editable diagram is [docs/finch-architecture.excalidraw](docs/finch-architecture.excalidraw). After changing the layout in [scripts/build_architecture_diagram.py](scripts/build_architecture_diagram.py), run `python scripts/build_architecture_diagram.py` to rebuild it and the images above.
 
-### Screen questions
+## Quick start
 
-Every question is screened before any LLM call (DECISIONS §9): EN/VI rules and the local classifier `meta-llama/Llama-Prompt-Guard-2-86M`, which is gated and never stored in Git.
-Accept its licence on Hugging Face, put an access token in `.env` as `HF_TOKEN`, then fetch and export it once into the `guard-models` volume:
+You need Docker with Compose v2 and about 8 GB of memory for Docker. Run the commands from the repository root, in Bash or PowerShell.
 
-```bash
-docker compose run --rm guard-model
-```
+1. Copy [.env.example](.env.example) to `.env`, replace every `change-me` value and add a key for at least one model provider (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GEMINI_API_KEY`, or `OLLAMA_URL` with the `local-models` profile). Never commit `.env`.
 
-Without the classifier every question gets the blocked notice that screening is unavailable, in both modes; `/health` stays healthy and reports `screening: unavailable`.
-`SCREEN_MODE=log` (default) records each question's verdict in `agent_logs.input_screening` and lets it continue; `enforce` also stops a blocked one with the `blocked` reply.
-Measure the false-positive rate and recall per language before switching to `enforce`:
+2. Start the services. They all report healthy even before a model key is set.
 
-```bash
-docker compose run --rm api python -m jobs.screen_eval --pack ecommerce_twin
-```
+   ```bash
+   docker compose up --build --wait
+   ```
 
-### Ask a question
+3. Load the sample e-commerce data and build the tables the agent reads. This downloads [FreeEcommerceTwin14M](https://huggingface.co/datasets/ziadatalabs/FreeEcommerceTwin14M), 14.3 million rows licensed for non-commercial use only. On Linux, `./data` must be writable by user ID 10001.
+
+   ```bash
+   docker compose run --rm jobs python -m jobs.refresh_data --source ecommerce_twin
+   ```
+
+4. Publish the e-commerce Domain Pack. This checks it, test-runs its metrics, writes the database permissions and builds the search index, which costs a little in embedding calls.
+
+   ```bash
+   docker compose run --rm jobs python -m jobs.compile_pack --pack ecommerce_twin
+   ```
+
+5. Install the prompt-injection classifier. Accept the licence of `meta-llama/Llama-Prompt-Guard-2-86M` on Hugging Face and put your token in `.env` as `HF_TOKEN`. Until the classifier is installed, every question is blocked.
+
+   ```bash
+   docker compose run --rm guard-model
+   ```
+
+6. Give the lab users the password set as `KEYCLOAK_LAB_USER_PASSWORD` in `.env`.
+
+   ```bash
+   docker compose run --rm jobs python -m jobs.set_lab_passwords
+   ```
+
+7. Open [localhost:3000](http://localhost:3000), choose Continue with company account, sign in as `lab.analyst` and pick one of the suggested questions. Every question is billed by your model provider.
+
+You can also ask from the command line:
 
 ```bash
 docker compose run --rm api python -m jobs.ask "Top 10 best-selling products in Q1 2024 compared with Q1 2025"
 ```
 
-The agent extracts the question, resolves its periods, retrieves pack context, builds a QuerySpec, generates SQL through `sql-small` for a simple spec (one metric, at most one dimension, one period, no comparison or top N) and `sql-gen` otherwise, guards it, runs `EXPLAIN` and the query as the asking role's read-only ClickHouse user (`--role`, the pack's first role by default), repairs failing SQL up to three times (a retry after `sql-small` moves to `sql-gen`, the third through `sql-gen-hard`) and summarizes the rows in the question's language.
-Each run sends billable requests to the LiteLLM aliases. Pass `--timezone <IANA name>` for relative periods (UTC by default) and `--inject-sql-fault` to watch a broken first query being repaired.
-A question that names no measure or period, ranks by a word no convention defines, or uses a term that fits several metrics or columns prints a clarifying question with its options and exits with code 2, as does a question with a term or value that matches nothing; a question the role may not read exits with code 3 and the denial, before any SQL is generated, and is written to `agent_logs.audit`; a query that cannot be repaired exits with code 1 after printing the last SQL and error.
+`make up`, `make ps`, `make logs`, `make smoke` and `make down` are shortcuts for the Compose commands. Stopping the services keeps the data.
 
-### Ask through the api
+### Lab users
 
-`POST /ask` answers one question as server-sent events, authenticated with a Keycloak access token.
-For curl, the lab-only `finch-cli` client grants a token for a lab user whose password `jobs.set_lab_passwords` set (`KEYCLOAK_LAB_USER_PASSWORD` in `.env`):
+| User | What they can see |
+| --- | --- |
+| `lab.analyst` | All sales, returns and site traffic |
+| `lab.marketing` | Site traffic only, so a sales question is refused |
+| `lab.northwest` | Sales and returns of the Northwest region only |
+| `lab.partner` | Daily sales and units by product category, never single orders |
+| `lab.reviewer` | What the analyst sees, plus the console's Review, Documents, Datasets, Feedback and Evaluation pages |
+| `lab.admin` | What the analyst sees, plus Runs and trace, Audit, Costs, Models and Users |
+
+### Services
+
+| Service | Address |
+| --- | --- |
+| Web app | [localhost:3000](http://localhost:3000) |
+| API | [localhost:8000](http://localhost:8000/health), with interactive [API docs](http://localhost:8000/docs) |
+| Keycloak | [localhost:8080](http://localhost:8080), realm `finch` |
+| LiteLLM | localhost:4000 |
+| Qdrant | localhost:6333 |
+| ClickHouse | localhost:8123 (HTTP) and localhost:9000 (native) |
+
+All ports listen on the local machine only.
+
+## Using the API
+
+The API streams each answer as server-sent events and needs a Keycloak access token. In the lab, the `finch-cli` client issues one for a lab user:
 
 ```bash
-TOKEN=$(curl -s -d grant_type=password -d client_id=finch-cli -d username=lab.analyst   --data-urlencode "password=$KEYCLOAK_LAB_USER_PASSWORD"   http://127.0.0.1:8080/realms/finch/protocol/openid-connect/token | python -c "import sys, json; print(json.load(sys.stdin)['access_token'])")
-curl -N -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json"   -d '{"question":"Top 10 best-selling products in Q1 2024 compared with Q1 2025","timezone":"Asia/Ho_Chi_Minh"}'   http://127.0.0.1:8000/ask
+TOKEN=$(curl -s -d grant_type=password -d client_id=finch-cli -d username=lab.analyst --data-urlencode "password=$KEYCLOAK_LAB_USER_PASSWORD" http://127.0.0.1:8080/realms/finch/protocol/openid-connect/token | python -c "import sys, json; print(json.load(sys.stdin)['access_token'])")
+curl -N -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" -d '{"question":"Top 10 best-selling products in Q1 2024 compared with Q1 2025","timezone":"Asia/Ho_Chi_Minh"}' http://127.0.0.1:8000/ask
 ```
 
-The body is `{"question": ..., "conversation_id": null, "timezone": null}`, with the asker's IANA time zone (UTC when null).
-A question without `conversation_id` starts a conversation; the response's `X-Conversation-Id` header names it, and passing that id with the next question makes it a follow-up that reads the previous turns. An id that is not one of the user's own conversations gets 404 before any work starts. Every question and answer is stored in `agent_logs.chat_messages`.
-Each frame is `event: <name>` with JSON `data` carrying the run's `trace_id`, in the DECISIONS §6 order: `status` at the start and end of every graph node, then `sql` (the checked query, repeated for each repair), `result`, `chart_spec`, `summary` and `done` for an answer; `summary` and `done` alone for an out-of-scope or definition question; `result`, `chart_spec` and `done` without SQL when the question redraws the previous answer; `clarify` (a question with options whose labels can be sent as the next question) or `deny` and `done` when the question cannot be queried; `blocked` and `done` when screening stops the question, which is then not stored as a turn; `error` last when no SQL attempt produced a result.
-A comment line keeps the connection open every 15 seconds. Disconnecting stops the run at its next node, stops its running ClickHouse query and logs the run as `cancelled`.
+The stream reports each step as it starts and finishes, then sends the SQL, the result, the chart and the summary. A question that cannot be answered ends with a clarifying question, a refusal, a blocked notice or an error instead. The response names the conversation it started; send that id with the next question to ask a follow-up. Closing the connection stops the run and its database query.
 
-A missing, expired or otherwise invalid token gets 401. The request runs as one pack role: the one named by an `X-Active-Role` header, which the token must hold, or else the token's first role in `policies.yaml` order; a token without a pack role gets 403, and a role that may not read what the question needs gets a `deny` event (try `lab.marketing`).
-Each user may ask `RATE_LIMIT_PER_MINUTE` questions per minute (10 by default); beyond it `/ask` answers 429 with `Retry-After` before any work starts.
-With `conversation_id`, `edit_of_turn: k` asks the question in place of turn k and `retry_of_turn: k` asks turn k's question again, each under a new revision; the turns after k leave the conversation and its context.
-`GET /conversations` (newest activity first, `limit` and `offset`), `GET /conversations/search?q=` (titles and the user's own questions, ignoring case and diacritics), `GET`/`PATCH`/`DELETE /conversations/{id}` (the current thread with each answer's events; title, pinned, group) and `GET`/`POST`/`PATCH`/`DELETE /conversation-groups` manage the signed-in user's conversations; another user's conversation or group, or a deleted one, is 404, and deleting only hides it from its owner.
-`GET /me` returns the signed-in user, their pack and console roles and the active role; `GET /pack` names the active pack and its roles without a token.
-Every run sends billable requests to the LiteLLM aliases, like `jobs.ask`.
+Each user may ask 10 questions a minute by default. The same API manages conversations (list, search, rename, pin, group and delete), records likes and dislikes, and serves the console's admin pages. [DECISIONS §6](docs/DECISIONS.md#6-runtime-flow-langgraph) describes every event and the [API docs](http://localhost:8000/docs) of a running stack list every endpoint.
 
-### Score a pack's eval set
+## Bringing in a new company
+
+![Bringing in a new company](docs/architecture/onboarding.svg)
+
+A company needs a Domain Pack and no changes to the engine. The Iowa Liquor Sales pack was built this way from a PostgreSQL database.
+
+1. Connect the company's PostgreSQL, MySQL, MongoDB or file sources. ClickHouse either copies the data on a schedule or reads it live, and only ClickHouse holds the read-only credentials.
+2. Profile the tables to find their columns, date ranges and common values.
+3. Upload manuals, policies and glossaries on the console's Documents page.
+4. Let the AI draft the pack's terms, metrics and example questions, each with the evidence it used.
+5. Review every draft in the console: edit it, test-run it and approve it.
+6. Publish the pack and run its test questions.
+
+Later, disliked or failed answers become example proposals. A reviewer corrects and approves them, and the next publish uses them. [packs/](packs/README.md#onboarding-a-company) covers the pack files and each step, and [jobs/](jobs/README.md) lists the commands.
+
+## Quality
+
+Each pack carries test questions with known answers: comparisons between two periods, top N rankings, filters, monthly trends, and questions that should be clarified, refused or declined as off-topic. The evaluation scores each step separately (the type of question, what was extracted, what was found in the search index and whether the result matches) and compares result sets rather than SQL text.
+
+| Pack | Industry | Correct results | Report |
+| --- | --- | --- | --- |
+| `ecommerce_twin` | E-commerce | 42 of 45 (93%) | [report](docs/eval/spec-building-fixes-report.md) |
+| `iowa_liquor` | Spirits wholesale | 30 of 35 (86%) | [report](docs/eval/spec-building-fixes-report.md) |
 
 ```bash
 docker compose run --rm -v ./build/eval:/app/build/eval api python -m jobs.eval --pack ecommerce_twin --output-dir build/eval
 ```
 
-Each active case in `packs/<pack>/eval.yaml` runs through the agent at temperature 0 with the eval set's `reference_date` as today, and is scored on the router's intent, extraction, retrieval and execution against its reference result; a case that expects a denial, a clarifying question or an out-of-scope reply scores that decision as its execution, and a `follow_up` or `chart_edit` case asks its `previous_question` first in the same conversation. Cases for branches of later phases are reported as not yet scored.
-The run prints a Markdown report and, with `--output-dir`, also writes `<pack>-eval.md` and `<pack>-eval.json`; `--baseline <json>` compares the run with an earlier one, `--only <ids>` runs selected cases.
-It exits with code 0 when the execution match rate reaches the pack threshold (80% by default) and no layer regressed, 1 otherwise, and 2 when the run cannot start or a reference query fails. Each run sends billable requests to the LiteLLM aliases.
-The report shows the share of SQL first generated by `sql-small` and how often it escalated. `--tier <tier>=<alias>` runs a chat tier on another catalog alias, for example `--tier sql-small=anthropic-small`; the mapping of the tiers the run called and whether it regressed against `--baseline` are stored with the report in `agent_logs.eval_reports`. A run with `--only`, a `--threshold` below 80% or a reference error is stored without tier evidence.
+![Every run is traced](docs/architecture/tracing.svg)
 
-### Map model tiers to aliases
+Every run is logged in ClickHouse for 90 days: each step, SQL attempt, model call with its estimated cost, and access decision. [docs/tracing.md](docs/tracing.md) shows how to read one trace.
 
-Each tier calls its `MODEL_TIER_<TIER>` default from `.env`. An `admin` changes a chat tier on the console's Models page, backed by `GET /admin/models` and `PUT /admin/models/{tier}`: an alias is offered only when LiteLLM loaded it and is eligible when the latest eval report of the active pack that called the tier with it met the threshold and did not regress against its baseline; a tier no eval case reached, such as `sql-gen-hard` when nothing escalated, gets no evidence from that run. The mapping is stored in `data_meta.model_tiers`, read by the api at most 30 seconds later without a LiteLLM restart, and each change is recorded in `agent_logs.admin_actions`. `embed` changes only in `.env`, followed by a full reindex.
+## Project status
 
-| Service | Host address | Health check |
+The work follows the [master plan](docs/MASTER_PLAN.md), with one [plan per phase](docs/plans/README.md).
+
+| Phase | Scope | Status |
 | --- | --- | --- |
-| web | [localhost:3000](http://localhost:3000) | page responds |
-| api | [localhost:8000](http://localhost:8000/health) | `GET /health` |
-| keycloak | [localhost:8080](http://localhost:8080) (realm `finch`) | management `/health/ready` |
-| litellm | localhost:4000 | `/health/liveliness`, no OpenAI call |
-| qdrant | localhost:6333 | `/readyz` |
-| clickhouse | localhost:8123 (HTTP), localhost:9000 (native) | `GET /ping` |
+| 0 to 2 | Services, sample data, Domain Pack and compiler | Done |
+| 3 to 5 | Agent on the command line, evaluation, logging and tracing | Done |
+| 6 and 6B | Roles and sign-in, web app | Done |
+| 7 and 8 | Streaming API, conversations | Done |
+| 9 | Charts and feedback in the chat | In progress |
+| 9B | Input screening | Done, recording verdicts without blocking yet |
+| 9C to 9E | Search on Qdrant, model routing, data sources | Done |
+| 10 to 12 | Automated onboarding, a second industry, admin console and feedback loop | Done |
 
-`GET /health` returns `200` and `{"status":"ok"}` as a liveness probe; it calls no other service.
-All ports bind to loopback. Open [API docs](http://localhost:8000/docs) for the API skeleton.
-An earlier foundation ran a PostgreSQL `db` service with the `fitcher_pgdata` named volume. When upgrading a checkout that still has that container, start once with `docker compose up --build --wait --remove-orphans` so the old container stops and frees port 5432; this removes the container, not the volume. The volume is left untouched, and removing it with `docker volume rm fitcher_pgdata` is an explicit choice for its owner.
+Input screening blocks questions once the screening test shows no false alarm and catches at least 90% of attacks in both English and Vietnamese ([plan](docs/plans/phase-09b-input-screening.md)).
 
-The `api` and `web` images apply available OS security updates during their builds and omit language package managers.
-Refresh base images and OS security packages periodically, then recreate the services:
+## Development
 
-```bash
-docker compose build --pull --no-cache
-docker compose up -d --wait
-```
-
-`--no-cache` ensures the OS update layer is rerun. Dependency versions still come from the committed lockfiles; changes to base image tags and language runtimes need their own compatibility review.
-ClickHouse, Qdrant, LiteLLM and Keycloak run upstream images pinned to exact tags in `compose.yaml`; `docker compose pull` changes nothing until a tag is updated deliberately.
-
-## Host development and checks
-
-Use Python 3.13, uv 0.13.6, Node 24.21.0 and npm 11.x. Docker pins its own runtimes; host setup does not require changing global versions.
-Install [uv](https://docs.astral.sh/uv/getting-started/installation/) if not already available.
-From the root, these commands work in PowerShell and Bash:
+Use Python 3.13 with uv 0.13.6 and Node 24.21.0 with npm 11. Stop the Compose `api` and `web` services before running them on your machine, because they use the same ports.
 
 ```bash
 uv sync --project apps/api --frozen
 uv run --project apps/api pytest -c apps/api/pyproject.toml
-uv run --project apps/api uvicorn app.main:app --app-dir apps/api --host 127.0.0.1 --port 8000
 ```
-
-In another terminal:
 
 ```bash
 npm --prefix apps/web ci
@@ -189,71 +197,40 @@ npm --prefix apps/web run build
 npm --prefix apps/web run dev
 ```
 
-Host and Docker services use the same ports; stop the Compose services before starting host servers.
-`npm --prefix apps/web run test` runs the web unit tests (Vitest). Until each feature is wired to the api, the web app shows the active pack's sample data ([packs/](packs/README.md#sample-data-for-the-web-app)); set `ACTIVE_PACK` in the shell before `npm --prefix apps/web run dev` (Compose sets it for the `web` service). Open `http://localhost:3000` and sign in with a lab user through Keycloak (Continue with company account; the password is `KEYCLOAK_LAB_USER_PASSWORD` from `.env`), then ask one of the suggested questions: the answer streams from the api's `/ask` through the web server's `/api/ask` route, Stop ends the run on the api, and `lab.reviewer` and `lab.admin` also open the workspace console at `/console`. The web server runs the OIDC authorization code flow with PKCE against the `finch-web` client and keeps the tokens in a server-side session behind an httpOnly cookie, so a restart of the web server signs everyone out; sign-in needs Keycloak and the api running (`KEYCLOAK_ISSUER`, `KEYCLOAK_BACKCHANNEL_URL`, `APP_URL` and `API_URL` default to the host addresses, and Compose sets the container ones). In development, `/dev/components` shows the shared components of the design system in both languages and themes. After replacing `apps/web/app/styles/tokens.json` with a new export of the design tokens, run `npm --prefix apps/web run tokens` to regenerate `tokens.css`.
-Commit dependency changes with the corresponding `apps/api/uv.lock` or `apps/web/package-lock.json`.
+Unit tests replace every AI model and search call with a fake, so they need no key. Set `ACTIVE_PACK` before starting the web app; in development, `/dev/components` shows the design system. Commit dependency changes together with `apps/api/uv.lock` or `apps/web/package-lock.json`.
 
-## Repository workflow
-
-`develop` is the default integration branch; `main` is the production branch.
-Start a focused branch from updated `develop`, then open a PR back to `develop`.
-The repository owner may deliberately push directly to `main`; this exception does not permit direct implementation commits to `develop`.
-The owner exception does not authorize automatic integration or synchronizing implementation changes into both long-lived branches.
-
-```bash
-git switch develop
-git pull --ff-only
-git switch -c chore/common/update-project-setup
-```
-
-Read [CONTRIBUTING.md](CONTRIBUTING.md), [Git rules](.agents/rules/git_workflow.md) and [AGENTS.md](AGENTS.md) before making changes.
-Commit messages and PR titles use `type(scope): subject`, in English, on one line with no body or trailers, at most 80 characters (target 72).
-Types and project-specific scopes live in [.github/git-policy.json](.github/git-policy.json).
-The initial README commit predates this policy; do not rewrite published history just to rename it.
-
-## Checks
-
-Python 3.11 or newer is sufficient for the local repository checks; they use the standard library.
+The repository checks need only Python 3.11 or newer:
 
 ```bash
 python scripts/check_repository.py
 python scripts/check_git.py --range origin/develop..HEAD
-python scripts/check_git.py --title "chore(common): update project setup"
 ```
 
-CI validates repository text/structure, commit messages, PR titles, source branches and GitHub workflows.
-PR size labels are advisory: XS up to 100 changed lines, S up to 400, M up to 1000, L up to 2000 and XL above 2000.
-Keep PRs at most 1000 changed lines where practical and below 100 changed files for review.
-CI also runs the API suite on Linux and the web frozen install, typecheck and production build. Run the same commands locally for application changes.
+| Folder | Contents |
+| --- | --- |
+| [apps/api](apps/api) | API, agent and its prompts |
+| [apps/web](apps/web) | Chat app and workspace console |
+| [packs/](packs/README.md) | Domain Packs and their schemas |
+| [dbt/](dbt/README.md) | Models that turn raw tables into the tables the agent reads |
+| [jobs/](jobs/README.md) | Commands for loading data, publishing packs, onboarding and evaluation |
+| [infra/](infra/README.md) | Service configuration |
+| [docs/](docs) | Decisions, plans, design and evaluation reports |
 
-The Security workflow runs on PRs, integration/production pushes, manual dispatch and a weekly schedule. It audits locked npm/Python dependencies, scans Git history for secrets, rebuilds and scans the `api` and `web` images, and scans the four third-party service images by their pinned tags. Image jobs retain complete JSON reports and fail for High/Critical findings with a published fix; unfixed advisories remain visible for review. See [security policy](SECURITY.md) for triage and scanner limits. These jobs do not configure required status checks or branch protection automatically.
+### Contributing
 
-CodeRabbit is configured for `develop` and `main`, skips drafts, and reviews incremental updates without pausing after a fixed number of commits.
-The CodeRabbit GitHub App must have access to this repository and a plan that supports the requested reviews.
-Configuration alone does not install or authorize the App.
-CodeRabbit reviews code only: agent instructions (`AGENTS.md`, `CLAUDE.md`, `.agents/`, `.claude/`) and documentation (`docs/`, Markdown files, PR and issue templates) are excluded from review.
-PRs into `develop` are merged once every CI and Security check on the latest commit passes; the CodeRabbit review is not awaited, and each finding it has posted is verified, then fixed or answered with a reason.
-CODEOWNERS and written rules do not themselves enforce branch protection; no branch protection is installed by this bootstrap.
+Branch from `develop`, name the branch `<type>/<scope>/<description>` and open a pull request back to `develop`. Commit messages and pull request titles are one line in the form `type(scope): subject`, at most 80 characters, with the types and scopes listed in [.github/git-policy.json](.github/git-policy.json). A pull request is merged once every CI and Security check on its latest commit passes. Read [CONTRIBUTING.md](CONTRIBUTING.md) and the [Git rules](.agents/rules/git_workflow.md) first; automated agents start from [AGENTS.md](AGENTS.md) or [CLAUDE.md](CLAUDE.md).
 
-Dependabot configuration is prepared for weekly GitHub Actions updates into `develop`.
-Automatic version-update PRs are paused (`open-pull-requests-limit: 0`) because generated commit bodies conflict with the one-line commit policy.
-Apply dependency changes on a normal work branch with compliant commits until an explicit bot policy is chosen.
-The PR size labeler runs for branches within this repository; fork PRs do not receive a write token.
+CI checks the repository structure, commit messages, workflows, the API tests and the web build. A weekly Security workflow audits dependencies, scans the history for secrets and scans every image; [SECURITY.md](SECURITY.md) explains how findings are handled and how to report a vulnerability.
 
-## Next steps
+To pick up base image and OS security updates, rebuild and restart:
 
-- Switch input screening to `SCREEN_MODE=enforce` once `jobs.screen_eval` shows no false positive and at least 90% recall in English and Vietnamese ([plan](docs/plans/phase-09b-input-screening.md)).
-- Later phases follow the [master plan](docs/MASTER_PLAN.md); each starts from its [phase plan](docs/plans/README.md).
+```bash
+docker compose build --pull --no-cache
+docker compose up -d --wait
+```
 
-See [CHANGELOG.md](CHANGELOG.md) for repository changes and [SECURITY.md](SECURITY.md) for vulnerability reporting.
+Third-party images are pinned to exact tags in `compose.yaml`. A checkout that still runs the old PostgreSQL `db` service needs one start with `--remove-orphans`; its `fitcher_pgdata` volume is left for its owner to delete.
 
-## Agent workspace
+## Data and licences
 
-Start with [AGENTS.md](AGENTS.md) or [CLAUDE.md](CLAUDE.md), then read the corresponding `workspace.md` and `base.md` rules.
-Rules and workspace guidance are mirrored in `.agents/` and `.claude/`; keep both copies identical.
-The [.workspace guide](.workspace/README.md) explains the tracked baseline directories and ignored per-developer working content.
-Plans, progress, reports, one-off scripts and scratch files stay there; reusable tools stay in tracked root `scripts/`.
-
-The rule wording and presentation follow the [backend workspace rule](https://github.com/luvax-social/backend/blob/develop/.agents/rules/workspace.md), [backend Git rule](https://github.com/luvax-social/backend/blob/develop/.agents/rules/git_workflow.md) and their shared [working-directory](https://github.com/luvax-social/social-media-platforms/blob/main/.agents/rules/WORKING_DIRECTORY.md) and [Git workflow](https://github.com/luvax-social/social-media-platforms/blob/main/.agents/rules/GIT_WORKFLOW.md) rules.
-This repository consolidates the applicable shared rules locally and substitutes its actual stack, scopes and checks; it does not depend on a sibling checkout.
-Reference repositories provide rule structure and writing style; project-specific commands, component boundaries and database procedures must match the current manifests and source.
+Datasets are never committed; downloads stay in the Git-ignored `data/` folder. FreeEcommerceTwin14M is licensed CC BY-NC 4.0 for non-commercial use. Iowa Liquor Sales 2025 is published by the Iowa Department of Revenue under CC BY 4.0. Repository changes are listed in [CHANGELOG.md](CHANGELOG.md).
