@@ -66,7 +66,11 @@ export function toEChartsOption(spec: ChartSpec, result: Result, palette: string
       legend: { bottom: 0 },
       series: [{
         type: "pie",
-        radius: ["50%", "75%"],
+        // The ring is drawn in the area above the legend, small enough that the outside labels of the
+        // top and bottom slices stay inside that area instead of running into the legend.
+        top: 8,
+        bottom: 36,
+        radius: ["48%", "70%"],
         data: rows.map((row, index) => ({ name: String(row[spec.x]), value: row[spec.y[0]], itemStyle: seriesStyle(index, palette) })),
         label: { formatter: (item: { name: string; value: number }) => `${item.name}: ${formatCell(item.value, measure, locale)}` },
       }],
