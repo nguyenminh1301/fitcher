@@ -1,4 +1,4 @@
-# Fixable High/Critical advisories in qdrant/qdrant:v1.20.0 that only an upstream release can fix.
+# Fixable High/Critical advisories in qdrant/qdrant:v1.20.0 (built by infra/qdrant/Dockerfile) that only an upstream release can fix.
 # The tag was the newest stable release when scanned on 2026-11-04; see SECURITY.md, Image exceptions.
 # Each entry expires; after that date the finding blocks the image audit again.
 vulnerabilities:
