@@ -3,14 +3,14 @@ import { describe, expect, it } from "vitest";
 import { parseSpec, specFields } from "@/lib/console/reviewedSpec";
 import type { ReviewedSpec } from "@/lib/contracts";
 
-const FIELDS = { metrics: "net_sales", dataset: "sales_lines", dimensions: "customer_id, region", filters: "", topN: "10", rankBy: "net_sales" };
+const FIELDS = { metrics: "total", dataset: "lines", dimensions: "buyer, region", filters: "", topN: "10", rankBy: "total" };
 
 describe("reviewed spec fields", () => {
   it("parses lists, filter lines and the top N", () => {
     const parsed = parseSpec({ ...FIELDS, filters: "region = West\ncategory in A, B C\nstatus not in cancelled" });
 
     expect(parsed).toEqual({ spec: {
-      metric_ids: ["net_sales"], dataset: "sales_lines", dimensions: ["customer_id", "region"], top_n: 10, rank_by: "net_sales",
+      metric_ids: ["total"], dataset: "lines", dimensions: ["buyer", "region"], top_n: 10, rank_by: "total",
       filters: [
         { column: "region", op: "=", values: ["West"] },
         { column: "category", op: "in", values: ["A", "B C"] },
