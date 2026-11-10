@@ -208,11 +208,27 @@ describe("users", () => {
     expect((await api.users.list()).find((user) => user.id === "ana")).toMatchObject({ roles: ["analyst", "viewer"], enabled: false });
   });
 
+  it("lists users for an admin who may not read the Datasets section", async () => {
+    vi.spyOn(api.datasets, "list").mockRejectedValue(new Error("this console section needs the pack_reviewer role"));
+    show("users", <UsersSection />);
+
+    expect(await screen.findByText("Ana Analyst")).toBeTruthy();
+  });
+
   it("does not let the signed-in admin change their own roles or disable themselves", async () => {
     show("users", <UsersSection />);
     const row = (await screen.findByText("Ada Admin", { selector: "b" })).closest("tr") as HTMLElement;
 
-    expect(within(row).getByRole("button", { name: "admin" }).hasAttribute("disabled")).toBe(true);
+    expect(within(row).getByRole("button", { name: "analyst" }).hasAttribute("disabled")).toBe(true);
     expect(within(row).queryByRole("button", { name: "Disable" })).toBeNull();
+  });
+
+  it("offers only the pack's roles, which are the only roles the api changes", async () => {
+    show("users", <UsersSection />);
+    const row = (await screen.findByText("Ana Analyst")).closest("tr") as HTMLElement;
+
+    expect(within(row).getAllByRole("button").map((button) => button.textContent)).toEqual(expect.arrayContaining(["analyst", "viewer"]));
+    expect(within(row).queryByRole("button", { name: "admin" })).toBeNull();
+    expect(within(row).queryByRole("button", { name: "pack_reviewer" })).toBeNull();
   });
 });

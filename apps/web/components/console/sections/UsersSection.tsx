@@ -1,8 +1,8 @@
 "use client";
 
-// Users (DECISIONS §9, §15): the realm's users with their pack and console roles and status. An admin
-// changes roles and disables or enables users, never their own account; a second tab shows what each
-// role can open and read.
+// Users (DECISIONS §9, §15): the realm's users with their pack roles and status. An admin changes a
+// user's pack roles (the only roles the api reads or changes) and disables or enables users, never their
+// own account; a second tab shows what each pack and console role can open and read.
 
 import { useCallback, useState } from "react";
 
@@ -24,12 +24,18 @@ export function UsersSection() {
   const { t } = useI18n();
   const { api, identity, pack } = useChat();
   const { toast } = useConsole();
-  const { data, failed, reload } = useLoad(useCallback(async () => ({ users: await api.users.list(), datasets: await api.datasets.list() }), [api]));
+  // The datasets a role reads are a hint on the Roles tab; Datasets is a pack_reviewer section, so an admin
+  // without that role is refused and the page shows the users without the hint.
+  const { data, failed, reload } = useLoad(useCallback(async () => {
+    const [users, datasets] = await Promise.all([api.users.list(), api.datasets.list().catch(() => [])]);
+    return { users, datasets };
+  }, [api]));
   const [tab, setTab] = useState("users");
   const [query, setQuery] = useState("");
   const [role, setRole] = useState("all");
   const [disabling, setDisabling] = useState<UserRow | null>(null);
-  const roles = [...(pack?.roles ?? []), ...CONSOLE_ROLES];
+  const packRoles = pack?.roles ?? [];
+  const roles = [...packRoles, ...CONSOLE_ROLES];
   const users = data?.users ?? [];
   const needle = query.trim().toLowerCase();
   const rows = users.filter((user) => (role === "all" || user.roles.includes(role))
@@ -59,7 +65,7 @@ export function UsersSection() {
             <TextField icon="search" type="search" aria-label={t("ui.searchUsers")} placeholder={t("ui.searchUsers")} value={query}
               onChange={(event) => setQuery(event.target.value)} className="fc-tool-field fc-tool-wide" />
             <div className="fc-scroll-x">
-              <Segmented label={t("ui.role")} value={role} onChange={setRole} options={[["all", t("ui.allRoles")], ...roles.map((item): [string, string] => [item, item])]} />
+              <Segmented label={t("ui.role")} value={role} onChange={setRole} options={[["all", t("ui.allRoles")], ...packRoles.map((item): [string, string] => [item, item])]} />
             </div>
           </div>
           <RecordTable
@@ -76,7 +82,7 @@ export function UsersSection() {
               ) },
               { key: "roles", label: t("ui.roles"), render: (user) => (
                 <span className="fc-row" role="group" aria-label={t("ui.rolesOf", { name: user.display_name })} style={{ gap: "var(--base-size-4)" }}>
-                  {roles.map((item) => {
+                  {packRoles.map((item) => {
                     const on = user.roles.includes(item);
                     return (
                       <Chip key={item} size="sm" selected={on} disabled={isSelf(user)}
@@ -106,7 +112,7 @@ export function UsersSection() {
               <section key={item} className="fc-card">
                 <div className="fc-card-head">
                   <h2 className="fc-card-title fc-mono">{item}</h2>
-                  <span className="fc-counter" style={{ marginRight: "var(--base-size-8)" }}>{t("ui.members", { n: users.filter((user) => user.roles.includes(item)).length })}</span>
+                  {packRoles.includes(item) ? <span className="fc-counter" style={{ marginRight: "var(--base-size-8)" }}>{t("ui.members", { n: users.filter((user) => user.roles.includes(item)).length })}</span> : null}
                 </div>
                 <div className="fc-card-body fc-stack" style={{ gap: "var(--base-size-12)" }}>
                   <p style={{ margin: 0 }}>{t(`ui.roleDesc_${CONSOLE_ROLES.includes(item) ? item : "analyst"}`)}</p>
