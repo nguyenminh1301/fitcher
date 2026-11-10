@@ -10,6 +10,10 @@ open becomes a ``Need`` that the gate asks about: no measure, a ranking word
 alone, a term whose best candidates score almost alike, or no period. Metrics
 from different datasets and terms or values that match nothing are refused.
 
+A metric term that matches no metric but contains a glossary term naming only
+values ("bourbon sales dollars") is split: the rest of the words name the
+metric and the values become a filter, so the values are never silently lost.
+
 The coverage check compares each period with the dataset's compiled date
 range and adds warnings; it never blocks the question.
 """
@@ -24,7 +28,7 @@ from app.agent.nodes.retrieve import Hit, Retrieval
 from app.agent.state import AgentDeps, AgentState
 from app.contracts.query_spec import Filter, Period, QuerySpec
 from app.packs.compiler import CompiledPack, DateCoverage
-from app.packs.models import Dataset
+from app.packs.models import Dataset, GlossaryTerm
 from app.text import fold
 
 # A runner-up scoring at least this share of the best candidate makes a term ambiguous.
@@ -73,6 +77,27 @@ class _Catalog:
             for name in [term.term, term.id, *term.aliases.vi, *term.aliases.en]:
                 self.terms.setdefault(fold(name), []).append(term)
         self.conventions = {fold(convention.id): convention.metric for convention in pack.business_profile.conventions}
+        # Glossary terms that name only values, longest name first, so "straight bourbon" wins over "bourbon".
+        named = {
+            (tuple(fold(name).split()), term.id): term for term in pack.glossary.terms
+            if term.targets and all(target.kind == "value" for target in term.targets)
+            for name in [term.term, *term.aliases.vi, *term.aliases.en] if fold(name)
+        }
+        self.value_terms = sorted(((words, term) for (words, _), term in named.items()), key=lambda item: -len(item[0]))
+
+    def split_values(self, term: str) -> tuple[str, list[GlossaryTerm]]:
+        """The words left after removing value-naming glossary terms, and those terms; ``(term, [])`` if none or nothing is left."""
+        words = fold(term).split()
+        found: dict[str, GlossaryTerm] = {}
+        for name, entry in self.value_terms:
+            for start in range(len(words) - len(name) + 1):
+                if tuple(words[start:start + len(name)]) == name:
+                    words = words[:start] + words[start + len(name):]
+                    found.setdefault(entry.id, entry)
+                    break
+        if not found or not words:
+            return term, []
+        return " ".join(words), list(found.values())
 
     def glossary(self, term: str):
         return [entry for form in _forms(term) for entry in self.terms.get(form, [])]
@@ -129,8 +154,9 @@ def _metric_from_hits(hits: Iterable[Hit]) -> dict[str, float]:
     return scores
 
 
-def _resolve_metric(term: str, catalog: _Catalog, retrieval: Retrieval) -> str:
-    exact = catalog.exact_metrics(term)
+def _resolve_metric(term: str, catalog: _Catalog, retrieval: Retrieval, words: str | None = None) -> str:
+    """Resolve ``term``; ``words`` replaces it for exact matching when value terms were split off it."""
+    exact = catalog.exact_metrics(words or term)
     if len(exact) == 1:
         return exact[0]
     if len(exact) > 1:
@@ -210,6 +236,23 @@ def _resolve_value(value: object, column: str | None, dataset: Dataset, catalog:
     raise SpecRejected(f"no value of {dataset.id} matches '{value}'")
 
 
+def _value_term_filters(terms: list[GlossaryTerm], dataset: Dataset, filtered: set[str]) -> list[Filter]:
+    """Filters for value terms split off metric terms; a column the question already filters is left as asked."""
+    by_column: dict[str, list[str]] = {}
+    for term in terms:
+        targets = [t for t in term.targets if t.dataset == dataset.id and t.column and t.value is not None]
+        if not targets:
+            raise SpecRejected(f"'{term.term}' names no value of {dataset.id}")
+        for target in targets:
+            by_column.setdefault(target.column, [])
+            if target.value not in by_column[target.column]:
+                by_column[target.column].append(target.value)
+    return [
+        Filter(column=column, op="=", value=values[0]) if len(values) == 1 else Filter(column=column, op="in", value=values)
+        for column, values in by_column.items() if column not in filtered
+    ]
+
+
 def coverage_warnings(periods: list[Period], dataset: str, coverage: DateCoverage | None) -> list[str]:
     if coverage is None or coverage.rows == 0 or coverage.min_date is None or coverage.max_date is None:
         return [f"{dataset} has no data"]
@@ -232,7 +275,12 @@ def make_spec(state: AgentState, compiled: CompiledPack) -> QuerySpec:
 
     if not extraction.metric_terms and not extraction.rank_term:
         raise NeedsChoice(Need(kind="metric", candidates=_ranked(_metric_from_hits(retrieval.question_metrics))))
-    metric_ids = [_resolve_metric(term, catalog, retrieval) for term in extraction.metric_terms]
+    metric_ids = []
+    value_terms: list[GlossaryTerm] = []
+    for term in extraction.metric_terms:
+        words, named = (term, []) if catalog.exact_metrics(term) else catalog.split_values(term)
+        metric_ids.append(_resolve_metric(term, catalog, retrieval, words if named else None))
+        value_terms += named
     rank_by = None
     if extraction.rank_term:
         try:
@@ -265,6 +313,7 @@ def make_spec(state: AgentState, compiled: CompiledPack) -> QuerySpec:
             raise SpecRejected(f"the values {extracted.values} belong to different columns")
         values = [value for _, value in resolved]
         filters.append(Filter(column=columns.pop(), op=extracted.op, value=values if extracted.op in ("in", "not in") else values[0]))
+    filters += _value_term_filters(value_terms, dataset, {f.column for f in filters})
 
     if rank_by is None and extraction.top_n is not None:
         rank_by = metric_ids[0]

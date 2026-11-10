@@ -13,7 +13,7 @@ from app.agent.nodes.extract import Extraction, extract
 from app.agent.nodes.generate_sql import build_prompt, clean_sql, generate_sql, tier_for
 from app.agent.nodes.resolve_time import resolve_periods
 from app.agent.nodes.retrieve import Hit, Retrieval, retrieve
-from app.packs.models import AggregateOnly
+from app.packs.models import AggregateOnly, Aliases, GlossaryTarget
 from app.agent.nodes.shape_result import to_result
 from app.agent.errors import AgentError
 from app.agent.state import Attempt
@@ -205,6 +205,69 @@ def test_time_grain_groups_by_the_time_column():
     spec = make_spec(state_for(extraction), compiled_fixture())
 
     assert spec.dimensions == ["sold_on"]
+
+
+def _with_value_term(aliases: list[str], values: list[str], dataset: str = "widget_sales"):
+    """The fixture pack with a glossary term that names widget values, like "bourbon" names categories."""
+    compiled = compiled_fixture()
+    pack = compiled.pack
+    term = pack.glossary.terms[0].model_copy(update={
+        "id": "blue_range", "term": aliases[0], "aliases": Aliases(vi=[], en=aliases),
+        "targets": [GlossaryTarget(kind="value", dataset=dataset, column="widget_name", value=value) for value in values],
+    })
+    glossary = pack.glossary.model_copy(update={"terms": [*pack.glossary.terms, term]})
+    return compiled.model_copy(update={"pack": pack.model_copy(update={"glossary": glossary})})
+
+
+def test_value_term_inside_a_metric_term_becomes_a_filter():
+    compiled = _with_value_term(["blue", "blue range"], ["Blue Widget", "Navy Widget"])
+    extraction = extraction_reply(metric_terms=["blue range revenue"], rank_term=None, dimension_terms=[], top_n=None)
+
+    spec = make_spec(state_for(extraction), compiled)
+
+    assert spec.metric_ids == ["widget_revenue"]
+    assert [(f.column, f.op, f.value) for f in spec.filters] == [("widget_name", "in", ["Blue Widget", "Navy Widget"])]
+
+
+def test_value_term_with_one_value_filters_by_equality_in_vietnamese():
+    compiled = _with_value_term(["xanh"], ["Blue Widget"])
+    extraction = extraction_reply(metric_terms=["Doanh thu xanh"], rank_term=None, dimension_terms=[], top_n=None)
+
+    spec = make_spec(state_for(extraction), compiled)
+
+    assert spec.metric_ids == ["widget_revenue"]
+    assert [(f.column, f.op, f.value) for f in spec.filters] == [("widget_name", "=", "Blue Widget")]
+
+
+def test_value_term_does_not_repeat_a_filter_the_question_already_has():
+    compiled = _with_value_term(["blue"], ["Blue Widget"])
+    retrieval = Retrieval(values={"Blue Widget": [hit(
+        "column_values", "v1", 1.0, dataset="widget_sales", column="widget_name", payload={"value": "Blue Widget"},
+    )]})
+    extraction = extraction_reply(metric_terms=["blue revenue"], rank_term=None, dimension_terms=[], top_n=None,
+                                  filters=[{"column_term": None, "op": "=", "values": ["Blue Widget"]}])
+
+    spec = make_spec(state_for(extraction, retrieval), compiled)
+
+    assert [(f.column, f.op, f.value) for f in spec.filters] == [("widget_name", "=", "Blue Widget")]
+
+
+def test_value_term_of_another_dataset_is_refused_rather_than_dropped():
+    compiled = _with_value_term(["blue"], ["Blue Widget"], dataset="widget_refunds")
+    extraction = extraction_reply(metric_terms=["blue revenue"], rank_term=None, dimension_terms=[], top_n=None)
+
+    with pytest.raises(Exception, match="'blue' names no value of widget_sales"):
+        make_spec(state_for(extraction), compiled)
+
+
+def test_metric_term_that_is_only_a_value_term_is_not_split():
+    compiled = _with_value_term(["blue"], ["Blue Widget"])
+    retrieval = Retrieval(metric_terms={"blue": [hit("metrics", "widget_revenue", 0.9)]})
+    extraction = extraction_reply(metric_terms=["blue"], rank_term=None, dimension_terms=[], top_n=None)
+
+    spec = make_spec(state_for(extraction, retrieval), compiled)
+
+    assert spec.metric_ids == ["widget_revenue"] and spec.filters == []
 
 
 def test_fold_ignores_case_diacritics_and_punctuation():
