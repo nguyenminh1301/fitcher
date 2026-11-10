@@ -216,15 +216,20 @@ function ProposalDetail({ item, reload }: { item: ReviewItem; reload: () => Prom
   const { t } = useI18n();
   const { api } = useChat();
   const { navigate, toast } = useConsole();
+  const [question, setQuestion] = useState(item.body);
+  const [formula, setFormula] = useState(item.formula ?? "");
   const [values, setValues] = useState<Record<string, string>>({});
   const [run, setRun] = useState<Run>({ state: "idle" });
-  const tokens = [...new Set([...item.body.matchAll(MASK), ...(item.formula ?? "").matchAll(MASK)].map((match) => match[0]))];
+  const tokens = [...new Set([...question.matchAll(MASK), ...formula.matchAll(MASK)].map((match) => match[0]))];
   const filled = tokens.every((token) => values[token]?.trim());
   const fill = (text: string, quote: boolean) => tokens.reduce((out, token) => {
     const value = values[token]?.trim();
     return value ? out.split(token).join(quote ? value.replace(/'/g, "''") : value) : out;
   }, text);
-  const sql = fill(item.formula ?? "", true);
+  const body = fill(question, false);
+  const sql = fill(formula, true);
+  // Any edit invalidates the last test-run: approval needs a test-run of the text that will be saved.
+  const edit = (apply: () => void) => { apply(); setRun({ state: "idle" }); };
   const back = () => navigate("/console/review");
 
   return (
@@ -236,15 +241,16 @@ function ProposalDetail({ item, reload }: { item: ReviewItem; reload: () => Prom
       meta={<span className="fc-help">{!filled ? t("ui.replaceFirst") : run.state !== "done" ? t("ui.testFirst") : ""}</span>}
       actions={
         <>
-          <Button icon={run.state === "running" ? "loader" : "play"} disabled={!filled || run.state === "running"} onClick={async () => {
+          <Button icon={run.state === "running" ? "loader" : "play"} disabled={!filled || !body.trim() || !sql.trim() || run.state === "running"} onClick={async () => {
             setRun({ state: "running" });
+            // The api test-runs the stored SQL, so the reviewer's edits are saved first.
+            await api.review.update(item.id, { body, formula: sql });
             const tested = await api.review.testRun(item.id);
             setRun({ state: "done", result: tested.test_result ?? undefined });
           }}>{t("ui.testRun")}</Button>
           <Button variant="primary" icon="check" disabled={run.state !== "done"} onClick={async () => {
-            await api.review.update(item.id, { body: fill(item.body, false), formula: sql });
             await api.review.approve(item.id);
-            toast(t("ui.approvedName", { name: fill(item.body, false) }));
+            toast(t("ui.approvedName", { name: body }));
             await reload();
             back();
           }}>{t("ui.approve")}</Button>
@@ -260,7 +266,15 @@ function ProposalDetail({ item, reload }: { item: ReviewItem; reload: () => Prom
         <div>
           <dl className="fc-kv">
             <dt>{t("ui.question")}</dt>
-            <dd lang={langOf(item.body)}>{item.body}</dd>
+            <dd className="fc-kv-ctl">
+              <TextField multiline aria-label={t("ui.question")} lang={langOf(question)} value={question}
+                onChange={(event) => edit(() => setQuestion(event.target.value))} />
+            </dd>
+            <dt>{t("ui.sql")}</dt>
+            <dd className="fc-kv-ctl">
+              <TextField multiline aria-label={t("ui.sql")} spellCheck={false} value={formula}
+                onChange={(event) => edit(() => setFormula(event.target.value))} />
+            </dd>
             <dt>{t("ui.origin")}</dt>
             <dd>{item.evidence?.source ?? "—"}{item.evidence?.quote ? <>{" "}<q lang={langOf(item.evidence.quote)}>{item.evidence.quote}</q></> : null}</dd>
             <dt>{t("ui.variables")}</dt>
@@ -268,7 +282,7 @@ function ProposalDetail({ item, reload }: { item: ReviewItem; reload: () => Prom
               <div className="fc-stack" style={{ gap: "var(--base-size-12)" }}>
                 {tokens.map((token) => (
                   <TextField key={token} label={t("ui.maskedValue", { token })} value={values[token] ?? ""}
-                    onChange={(event) => { setValues({ ...values, [token]: event.target.value }); setRun({ state: "idle" }); }} />
+                    onChange={(event) => edit(() => setValues({ ...values, [token]: event.target.value }))} />
                 ))}
               </div>
             </dd>
