@@ -184,6 +184,7 @@
 
 ### Fixed
 
+- Map "customer"/"khách hàng" to `customer_id` in the ecommerce pack, so "top 10 customers" groups by customer instead of the nearest column `customer_segment`, and "margin rate"/"state margin rate" to `average_state_margin_rate` in the iowa pack, which tied with `total_state_margin` and was clarified.
 - Start `mysql-fixture` on a fresh volume: the mysql entrypoint sources its init script, whose `set -eu` leaked into the entrypoint and stopped it at the unset `MYSQL_ONETIME_PASSWORD`, so the script now runs its body in a subshell.
 - Give a new `guard-models` volume to the app user whichever service creates it: the api image created `/app/build/guard_model` as root, so a volume first mounted by `api` or `jobs` was root-owned, and the guard-model job (UID 10001) could fail to write `.model.onnx.new` into it; the api image now chowns the directory to UID 10001 like the `packs` and `documents` directories.
 - Let a reviewer edit a proposed example's question and SQL on the Review page: the page offered only the masked-value fields, and its test-run ran the stored SQL instead of the edited one; a test-run now saves the edits first, and any later edit asks for a new test-run before approval.
