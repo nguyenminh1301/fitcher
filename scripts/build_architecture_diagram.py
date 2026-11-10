@@ -1,4 +1,4 @@
-"""Build the Finch-Lab architecture diagram from one layout.
+"""Build the fitcher architecture diagram from one layout.
 
 Writes docs/finch-architecture.excalidraw (all sections, editable in Excalidraw)
 and one SVG per section under docs/architecture/ for the README.
@@ -394,8 +394,8 @@ class Excalidraw:
 def main():
     SVG_DIR.mkdir(exist_ok=True)
     doc = Excalidraw()
-    doc.text(0, -110, "Finch-Lab architecture", 40)
-    doc.text(0, -55, "Ask a company's data a question in plain language. The binding decisions are in docs/DECISIONS.md.",
+    doc.text(0, -110, "fitcher architecture", 40)
+    doc.text(0, -55, "Ask a company's data a question in plain language and get back SQL, a table, a chart and a summary.",
              18, MUTED)
     oy = 0
     for sec in SECTIONS:
