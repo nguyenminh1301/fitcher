@@ -91,5 +91,7 @@ docker compose run --rm jobs python -m jobs.set_lab_passwords
 Each user has a verified `@fitcher.test` email, so the first sign-in asks for no profile update.
 `finch-web` access tokens carry the user's roles under `realm_access.roles`.
 Access tokens of `finch-web` and of the lab-only `finch-cli` client name `finch-api` as audience, which the api requires (`KEYCLOAK_AUDIENCE`).
+The confidential `fitcher-admin-api` client has no browser flow; its service account holds only the `realm-management` roles `view-users` and `manage-users`, which the api uses for the console's Users section, and its secret is `KEYCLOAK_ADMIN_API_SECRET` in `.env`.
+A role change made there applies when the user's access token is next issued: at the next sign-in or token refresh, within the realm's access token lifespan.
 `finch-web` redirects only to the web app's `/auth/callback`; `finch-cli` has no browser flow and grants tokens for a lab user's username and password, for curl against the api.
 `KC_HOSTNAME` fixes the issuer to `http://localhost:8080/realms/finch` (`KEYCLOAK_ISSUER`) whichever address requested a token, while containers keep reaching Keycloak at `keycloak:8080`; the api reads the signing keys from `KEYCLOAK_JWKS_URL`.
