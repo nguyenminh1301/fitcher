@@ -124,3 +124,18 @@ examples:
       - kind: profile
         ref: liquor_sales.item_number
     status: approved
+  - id: monthly_state_margin_rate
+    confidence: 0.5
+    question: Monthly state margin rate in 2025
+    language: en
+    sql: SELECT toStartOfMonth(sale_date) AS month, sum(state_margin) / nullIf(sum(sale_dollars), 0) AS average_state_margin_rate FROM marts.liquor_sales WHERE sale_date >= toDate('2025-01-01') AND sale_date < toDate('2026-01-01') GROUP BY month ORDER BY month
+    datasets:
+      - liquor_sales
+    metrics:
+      - average_state_margin_rate
+    spec:
+      dimensions: []
+    evidence:
+      - kind: trace
+        ref: f6a9742de57202789af5c0061de79398
+    status: approved
