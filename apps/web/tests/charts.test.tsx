@@ -72,8 +72,11 @@ describe("chart adapter", () => {
     expect(line.series[0].symbol).not.toBe(line.series[1].symbol);
   });
 
-  it("draws pie as a donut", () => {
-    expect(option(spec({ type: "pie" })).series[0]).toMatchObject({ type: "pie", radius: ["50%", "75%"] });
+  it("draws pie as a donut in the area above its legend", () => {
+    const donut = toEChartsOption(spec({ type: "pie" }), BRANDS, PALETTE, "en") as unknown as { legend: { bottom: number }; series: { type: string; radius: string[]; bottom: number }[] };
+    expect(donut.series[0]).toMatchObject({ type: "pie", radius: ["48%", "70%"] });
+    expect(donut.legend.bottom).toBe(0);
+    expect(donut.series[0].bottom).toBeGreaterThanOrEqual(32);
   });
 
   it("draws scatter from two numeric columns", () => {
