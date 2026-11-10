@@ -6,6 +6,7 @@ import { useRef } from "react";
 import { Icon } from "@/components/brand/Icon";
 import { Button } from "@/components/ui/controls";
 import type { ChartSpec, ChartType } from "@/lib/contracts";
+import { chartPng } from "@/lib/chart/chartPng";
 import { download, toCsv } from "@/lib/chart/toEChartsOption";
 import type { Result } from "@/lib/contracts";
 import { useI18n } from "@/lib/i18n/react";
@@ -26,8 +27,7 @@ export function ChartCard({ spec, result, type, onType, orientation, onOrientati
     const instance = chart.current;
     if (!instance) return;
     const background = getComputedStyle(document.documentElement).getPropertyValue("--bgColor-default").trim() || "#ffffff";
-    fetch(instance.getDataURL({ type: "png", pixelRatio: 2, backgroundColor: background }))
-      .then((response) => response.blob())
+    chartPng(instance, background)
       .then((blob) => download(blob, "fitcher-chart.png"))
       .catch(() => undefined);
   }

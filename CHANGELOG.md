@@ -190,6 +190,7 @@
 
 ### Fixed
 
+- Export a chart as a real PNG: charts are drawn as SVG, so Export PNG used to save an SVG document named `fitcher-chart.png` that image viewers could not open; the chart is now drawn once more on an off-screen canvas at twice its size in the page's font and saved as PNG.
 - Keep a donut chart's labels off its legend: the ring is drawn in the area above the legend and slightly smaller, so the outside label of a slice at the bottom no longer overlaps the legend entries.
 - Answer "Monthly state margin rate in 2025" in the iowa pack with a reviewed example whose spec has no dimension, so the extractor's stray "state" no longer groups by the `state_margin` column.
 - Keep a value named inside a metric term as a filter: when the extractor reads "bourbon sales dollars" as one measure, `build_spec` resolved the measure and silently dropped "bourbon"; a glossary term that names only values is now split off a metric term that matches no metric, the remaining words name the metric and the values become a filter, and a value of another dataset is refused instead of dropped.
