@@ -125,6 +125,8 @@ class AgentState(TypedDict, total=False):
     periods: list[Period]
     retrieval: BaseModel | None
     spec: QuerySpec | None
+    # The approved example whose reviewed spec build_spec used instead of resolving the terms.
+    spec_example: str | None
     time_grain: TimeGrain | None
     # The SQL complexity rule's score of ``spec``: simple or standard.
     complexity: str | None

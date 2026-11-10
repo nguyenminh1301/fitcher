@@ -19,6 +19,29 @@
           "sql": {"$ref": "common.schema.json#/$defs/text"},
           "datasets": {"type": "array", "minItems": 1, "items": {"$ref": "common.schema.json#/$defs/id"}},
           "metrics": {"type": "array", "items": {"$ref": "common.schema.json#/$defs/id"}},
+          "spec": {
+            "description": "A reviewed QuerySpec for this question without periods; build_spec uses it when the same question is asked. Metrics and dataset come from the example.",
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "dimensions": {"type": "array", "items": {"$ref": "common.schema.json#/$defs/name"}},
+              "filters": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["column", "op", "values"],
+                  "properties": {
+                    "column": {"$ref": "common.schema.json#/$defs/name"},
+                    "op": {"type": "string", "enum": ["=", "!=", "in", "not in"]},
+                    "values": {"type": "array", "minItems": 1, "items": {"anyOf": [{"type": "string"}, {"type": "number"}]}}
+                  }
+                }
+              },
+              "top_n": {"type": "integer", "minimum": 1},
+              "rank_by": {"$ref": "common.schema.json#/$defs/id"}
+            }
+          },
           "status": {"$ref": "common.schema.json#/$defs/status"},
           "evidence": {"$ref": "common.schema.json#/$defs/evidence"},
           "confidence": {"$ref": "common.schema.json#/$defs/confidence"}

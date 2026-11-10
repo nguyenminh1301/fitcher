@@ -170,7 +170,7 @@ def build_documents(pack: Pack, column_values: Sequence[ColumnValue]) -> dict[st
         documents["examples"].append(_document(
             pack, "example", example.id, roles.every(example.datasets), example.question, example.question,
             payload={"sql": example.sql, "language": example.language, "datasets": example.datasets,
-                     "metrics": example.metrics},
+                     "metrics": example.metrics, "spec": example.spec.model_dump(mode="json") if example.spec else None},
             embedding_text=example.question,
         ))
     return documents

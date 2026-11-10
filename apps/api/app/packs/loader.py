@@ -19,7 +19,7 @@ from referencing import Registry, Resource
 import yaml
 from yaml.constructor import ConstructorError
 
-from app.packs.models import PACK_FILES, Pack
+from app.packs.models import PACK_FILES, Example, Pack
 from app.packs.policy_compiler import ROW_COUNT_COLUMN, adds_up, check_row_filter
 
 
@@ -186,6 +186,29 @@ class _References:
         if repeated := sorted({name for name in names if names.count(name) > 1}):
             self.add("policies.yaml", path, f"the view would have more than one column named {', '.join(repeated)}")
 
+    def example_spec(self, path: list[str | int], example: Example) -> None:
+        """Check a reviewed spec: one dataset, its columns, single-value operators and a ranking by one of its metrics."""
+        spec, path = example.spec, [*path, "spec"]
+        if len(example.datasets) != 1:
+            self.add("examples.yaml", path, "an example with a spec names exactly one dataset")
+            return
+        dataset_id = example.datasets[0]
+        if dataset_id not in self.datasets:
+            return
+        defined = {metric.id: metric.dataset for metric in self.pack.metrics.metrics}
+        for position, metric_id in enumerate(example.metrics):
+            if defined.get(metric_id, dataset_id) != dataset_id:
+                self.add("examples.yaml", [*path[:-1], "metrics", position],
+                         f"metric '{metric_id}' is computed from dataset '{defined[metric_id]}', not '{dataset_id}'")
+        for position, column in enumerate(spec.dimensions):
+            self.column("examples.yaml", [*path, "dimensions", position], dataset_id, column)
+        for position, item in enumerate(spec.filters):
+            self.column("examples.yaml", [*path, "filters", position, "column"], dataset_id, item.column)
+            if item.op in ("=", "!=") and len(item.values) != 1:
+                self.add("examples.yaml", [*path, "filters", position, "values"], f"operator '{item.op}' takes exactly one value")
+        if spec.rank_by is not None and spec.rank_by not in example.metrics:
+            self.add("examples.yaml", [*path, "rank_by"], "must be one of the example's metrics")
+
     def unique_ids(self, file: str, key: str, items: Iterable[object]) -> None:
         seen: set[str] = set()
         for index, item in enumerate(items):
@@ -253,6 +276,8 @@ def check_references(pack: Pack, catalog: Catalog | None = None) -> list[PackIss
             refs.dataset("examples.yaml", ["examples", index, "datasets", position], dataset_id)
         for position, metric_id in enumerate(example.metrics):
             refs.metric("examples.yaml", ["examples", index, "metrics", position], metric_id)
+        if example.spec is not None:
+            refs.example_spec(["examples", index], example)
 
     refs.unique_ids("policies.yaml", "roles", pack.policies.roles)
     for index, role in enumerate(pack.policies.roles):

@@ -14,6 +14,11 @@ A metric term that matches no metric but contains a glossary term naming only
 values ("bourbon sales dollars") is split: the rest of the words name the
 metric and the values become a filter, so the values are never silently lost.
 
+An approved example that asks the same question (compared after folding) and
+carries a reviewed spec settles the metrics, dataset, dimensions, filters, top
+N and ranking instead (DECISIONS §6 step 7); the periods and time grain still
+come from the question. The examples were retrieved for the asking role.
+
 The coverage check compares each period with the dataset's compiled date
 range and adds warnings; it never blocks the question.
 """
@@ -267,7 +272,62 @@ def coverage_warnings(periods: list[Period], dataset: str, coverage: DateCoverag
     return warnings
 
 
-def make_spec(state: AgentState, compiled: CompiledPack) -> QuerySpec:
+def reviewed_example(state: AgentState, compiled: CompiledPack) -> Hit | None:
+    """The first retrieved example asking the question itself with a reviewed spec over known metrics."""
+    question = fold(state.get("question", ""))
+    metrics = {metric.id for metric in compiled.pack.metrics.metrics}
+    for hit in state["retrieval"].examples:
+        payload = hit.source.get("payload", {})
+        if (
+            payload.get("spec") is not None and fold(hit.source.get("title", "")) == question
+            and payload.get("metrics") and set(payload["metrics"]) <= metrics and len(payload.get("datasets", [])) == 1
+        ):
+            return hit
+    return None
+
+
+def _reviewed_spec(state: AgentState, compiled: CompiledPack, example: Hit) -> QuerySpec:
+    payload = example.source["payload"]
+    reviewed = payload["spec"]
+    dataset = {item.id: item for item in compiled.pack.datasets.datasets}[payload["datasets"][0]]
+    periods = state["periods"]
+    if not periods:
+        raise NeedsChoice(Need(kind="period"))
+    dimensions = list(reviewed.get("dimensions", []))
+    if state.get("time_grain") and dataset.time_column not in dimensions:
+        dimensions.append(dataset.time_column)
+    filters = [
+        Filter(column=item["column"], op=item["op"], value=item["values"] if item["op"] in ("in", "not in") else item["values"][0])
+        for item in reviewed.get("filters", [])
+    ]
+    metric_ids = list(payload["metrics"])
+    top_n = reviewed.get("top_n")
+    rank_by = reviewed.get("rank_by") or (metric_ids[0] if top_n is not None else None)
+    return _finish(state, compiled, metric_ids, dataset, dimensions, filters, top_n, rank_by)
+
+
+def _finish(state: AgentState, compiled: CompiledPack, metric_ids: list[str], dataset: Dataset, dimensions: list[str],
+            filters: list[Filter], top_n: int | None, rank_by: str | None) -> QuerySpec:
+    extraction, periods = state["extraction"], state["periods"]
+    warnings = []
+    compare = extraction.compare and len(periods) > 1
+    if extraction.compare and not compare:
+        warnings.append("only one period was named, so nothing is compared")
+    rank_period = max(periods, key=lambda period: period.start).label if rank_by and len(periods) > 1 else None
+    warnings += coverage_warnings(periods, dataset.id, compiled.coverage.get(dataset.id))
+    return QuerySpec(
+        metric_ids=metric_ids, dimensions=list(dict.fromkeys(dimensions)), periods=periods, filters=filters,
+        top_n=top_n, rank_by=rank_by, rank_period=rank_period, compare=compare, dataset=dataset.id,
+        warnings=warnings,
+    )
+
+
+def make_spec(state: AgentState, compiled: CompiledPack, example: Hit | None = None) -> QuerySpec:
+    """Build the QuerySpec; ``example`` is the approved example whose reviewed spec settles the question."""
+    if example is None and state.get("retrieval") is not None:
+        example = reviewed_example(state, compiled)
+    if example is not None:
+        return _reviewed_spec(state, compiled, example)
     extraction = state["extraction"]
     retrieval = state["retrieval"]
     periods = state["periods"]
@@ -317,26 +377,20 @@ def make_spec(state: AgentState, compiled: CompiledPack) -> QuerySpec:
 
     if rank_by is None and extraction.top_n is not None:
         rank_by = metric_ids[0]
-    warnings = []
-    compare = extraction.compare and len(periods) > 1
-    if extraction.compare and not compare:
-        warnings.append("only one period was named, so nothing is compared")
-    rank_period = max(periods, key=lambda period: period.start).label if rank_by and len(periods) > 1 else None
-    warnings += coverage_warnings(periods, dataset.id, compiled.coverage.get(dataset.id))
-    return QuerySpec(
-        metric_ids=metric_ids, dimensions=list(dict.fromkeys(dimensions)), periods=periods, filters=filters,
-        top_n=extraction.top_n, rank_by=rank_by, rank_period=rank_period, compare=compare, dataset=dataset.id,
-        warnings=warnings,
-    )
+    return _finish(state, compiled, metric_ids, dataset, dimensions, filters, extraction.top_n, rank_by)
 
 
 def build_spec(state: AgentState, deps: AgentDeps) -> dict:
+    example = reviewed_example(state, deps.compiled)
     try:
-        spec = make_spec(state, deps.compiled)
+        spec = make_spec(state, deps.compiled, example)
     except NeedsChoice as choice:
         return {"need": choice.need}
     except SpecRejected as rejection:
         return {"rejection": str(rejection)}
     except ValidationError as error:
         return {"rejection": f"the question does not form a valid query: {error.errors()[0]['msg']}"}
-    return {"spec": spec, "warnings": [*state.get("warnings", []), *spec.warnings]}
+    update = {"spec": spec, "warnings": [*state.get("warnings", []), *spec.warnings]}
+    if example is not None:
+        update["spec_example"] = example.id
+    return update

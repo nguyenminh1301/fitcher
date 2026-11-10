@@ -28,6 +28,11 @@ def _copy_first(key):
     return change
 
 
+def _example_with_spec_on_two_datasets(data):
+    data["examples"][0]["datasets"] = ["widget_sales", "widget_refunds"]
+    data["examples"][0]["spec"] = {}
+
+
 # (file, change, file named in the message, item path, expected message text)
 BROKEN_REFERENCES = [
     ("business_profile.yaml", _set(("name",), "other"), "business_profile.yaml", "name", "must equal the pack directory name 'minimal'"),
@@ -47,6 +52,11 @@ BROKEN_REFERENCES = [
     ("relationships.yaml", _set(("relationships", 0, "on", 0, "to_column"), "refund_total"), "relationships.yaml", "relationships[0].on[0].to_column", "unknown column 'refund_total' in dataset 'widget_sales'"),
     ("examples.yaml", _set(("examples", 0, "metrics"), ["nope"]), "examples.yaml", "examples[0].metrics[0]", "unknown metric 'nope'"),
     ("examples.yaml", _set(("examples", 0, "datasets"), ["nope"]), "examples.yaml", "examples[0].datasets[0]", "unknown dataset 'nope'"),
+    ("examples.yaml", _set(("examples", 0, "spec"), {"dimensions": ["nope"]}), "examples.yaml", "examples[0].spec.dimensions[0]", "unknown column 'nope' in dataset 'widget_sales'"),
+    ("examples.yaml", _set(("examples", 0, "spec"), {"filters": [{"column": "nope", "op": "=", "values": ["A"]}]}), "examples.yaml", "examples[0].spec.filters[0].column", "unknown column 'nope' in dataset 'widget_sales'"),
+    ("examples.yaml", _set(("examples", 0, "spec"), {"filters": [{"column": "widget_name", "op": "=", "values": ["A", "B"]}]}), "examples.yaml", "examples[0].spec.filters[0].values", "operator '=' takes exactly one value"),
+    ("examples.yaml", _set(("examples", 0, "spec"), {"rank_by": "refunded_value"}), "examples.yaml", "examples[0].spec.rank_by", "must be one of the example's metrics"),
+    ("examples.yaml", _example_with_spec_on_two_datasets, "examples.yaml", "examples[0].spec", "an example with a spec names exactly one dataset"),
     ("policies.yaml", _set(("roles", 0, "datasets", 0, "columns", 1), "nope"), "policies.yaml", "roles[0].datasets[0].columns[1]", "unknown column 'nope' in dataset 'widget_sales'"),
     ("policies.yaml", _set(("roles", 0, "datasets", 1, "dataset"), "nope"), "policies.yaml", "roles[0].datasets[1].dataset", "unknown dataset 'nope'"),
     ("policies.yaml", _set(("roles", 0, "datasets", 1, "dataset"), "widget_sales"), "policies.yaml", "roles[0].datasets[1].dataset", "dataset 'widget_sales' is granted to this role more than once"),

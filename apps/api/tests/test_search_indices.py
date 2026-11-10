@@ -133,3 +133,18 @@ def test_search_pack_reads_every_alias_with_one_embedding():
     assert embeddings.calls == [["revenue"]]
     assert [request.alias for request in search.queries] == [f"shop_{index}" for index in INDEX_NAMES]
 
+
+
+def test_example_document_carries_its_reviewed_spec(pack_dir, edit_pack):
+    spec = {"dimensions": ["widget_name"], "filters": [{"column": "widget_name", "op": "in", "values": ["Blue Widget"]}], "top_n": 10}
+    edit_pack("examples.yaml", lambda data: data["examples"][0].update(spec=spec))
+
+    documents = build_documents(load_pack(pack_dir, schema_dir=SCHEMA_DIR), [])
+
+    assert documents["examples"][0]["payload"]["spec"] == {**spec, "rank_by": None}
+
+
+def test_example_document_without_a_spec_carries_none(pack_dir):
+    documents = build_documents(load_pack(pack_dir, schema_dir=SCHEMA_DIR), [])
+
+    assert documents["examples"][0]["payload"]["spec"] is None

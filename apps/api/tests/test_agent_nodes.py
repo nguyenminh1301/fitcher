@@ -8,7 +8,7 @@ from agent_fixtures import compiled_fixture, deps, extraction_reply
 from fakes import FakeEmbeddings
 import pytest
 
-from app.agent.nodes.build_spec import fold, make_spec
+from app.agent.nodes.build_spec import build_spec, fold, make_spec
 from app.agent.nodes.extract import Extraction, extract
 from app.agent.nodes.generate_sql import build_prompt, clean_sql, generate_sql, tier_for
 from app.agent.nodes.resolve_time import resolve_periods
@@ -268,6 +268,65 @@ def test_metric_term_that_is_only_a_value_term_is_not_split():
     spec = make_spec(state_for(extraction, retrieval), compiled)
 
     assert spec.metric_ids == ["widget_revenue"] and spec.filters == []
+
+
+def _example(question: str, spec: dict | None, metrics=("widget_revenue",), datasets=("widget_sales",)) -> Hit:
+    return hit("examples", "reviewed", 1.0, title=question, type="example", payload={
+        "sql": "SELECT 1", "datasets": list(datasets), "metrics": list(metrics), "spec": spec,
+    })
+
+
+REVIEWED = {"dimensions": ["widget_name"], "filters": [{"column": "widget_name", "op": "in", "values": ["Blue Widget", "Navy Widget"]}],
+            "top_n": 3, "rank_by": "widget_revenue"}
+# Terms the extractor got wrong: a refunds measure and no dimension.
+MISREAD = extraction_reply(metric_terms=["money back"], rank_term=None, dimension_terms=[], top_n=None, compare=False,
+                           periods=[{"kind": "year", "year": 2024}])
+
+
+def test_reviewed_example_spec_replaces_the_terms_for_the_same_question():
+    retrieval = Retrieval(examples=[_example("Top 3 blue widgets by revenue in 2024", REVIEWED)])
+    state = state_for(MISREAD, retrieval, question="top 3 Blue widgets, by revenue in 2024!")
+
+    update = build_spec(state, deps([]))
+
+    spec = update["spec"]
+    assert update["spec_example"] == "reviewed"
+    assert (spec.metric_ids, spec.dataset, spec.dimensions, spec.top_n, spec.rank_by) == (
+        ["widget_revenue"], "widget_sales", ["widget_name"], 3, "widget_revenue")
+    assert [(f.column, f.op, f.value) for f in spec.filters] == [("widget_name", "in", ["Blue Widget", "Navy Widget"])]
+    assert [p.label for p in spec.periods] == ["2024"]
+
+
+def test_reviewed_spec_keeps_the_questions_time_grain_and_one_value_filters_by_equality():
+    reviewed = {"dimensions": [], "filters": [{"column": "widget_name", "op": "=", "values": ["Blue Widget"]}]}
+    retrieval = Retrieval(examples=[_example("Monthly blue revenue in 2024", reviewed)])
+    extraction = {**MISREAD, "time_grain": "month"}
+
+    spec = make_spec(state_for(extraction, retrieval, question="Monthly blue revenue in 2024"), compiled_fixture())
+
+    assert spec.dimensions == ["sold_on"]
+    assert [(f.column, f.op, f.value) for f in spec.filters] == [("widget_name", "=", "Blue Widget")]
+
+
+@pytest.mark.parametrize(("question", "spec"), [
+    ("Top 3 blue widgets by revenue in 2025", REVIEWED),
+    ("Top 3 blue widgets by revenue in 2024", None),
+])
+def test_example_is_not_used_for_another_question_or_without_a_reviewed_spec(question, spec):
+    retrieval = Retrieval(examples=[_example(question, spec)], metric_terms={"money back": [hit("metrics", "refunded_value", 0.9)]})
+    state = state_for(MISREAD, retrieval, question="Top 3 blue widgets by revenue in 2024")
+
+    update = build_spec(state, deps([]))
+
+    assert update["spec"].metric_ids == ["refunded_value"] and "spec_example" not in update
+
+
+def test_reviewed_spec_still_asks_for_a_missing_period():
+    retrieval = Retrieval(examples=[_example("Blue revenue", REVIEWED)])
+
+    update = build_spec(state_for(MISREAD, retrieval, question="Blue revenue", periods=[]), deps([]))
+
+    assert update["need"].kind == "period"
 
 
 def test_fold_ignores_case_diacritics_and_punctuation():
