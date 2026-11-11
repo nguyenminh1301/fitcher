@@ -9,6 +9,8 @@ Everything fitcher knows about a company comes from its Domain Pack: a set of re
 
 ## What you can do with it
 
+![Asking a question in plain language, reading the answer and chart, changing the chart, and exporting the chart as PNG and the data as CSV](docs/media/fitcher-demo.gif)
+
 | Feature | What it means for a user |
 | --- | --- |
 | Ask about data | Ask for rankings, trends, comparisons between periods and filtered totals. Relative periods such as "last quarter" use the company's fiscal calendar and your time zone. |
@@ -31,6 +33,10 @@ The user talks to the web app, which signs them in through Keycloak and streams 
 ![How a question is answered](docs/architecture/question-flow.svg)
 
 A question goes through a safety check first. The agent then works out what is being asked, matches the words to the company's metrics, checks that the question is clear and permitted, writes one read-only query, validates and runs it, and picks a chart. If the query fails, the agent fixes it and tries again up to three times; if it still fails, you see the last SQL and the error. Each step shows on screen as it happens, and the numbers in the answer always come from the database, never from the AI model.
+
+The recording below shows one question in the app going through these steps, each lit on the diagram as it runs, with the graph nodes it passed. It then opens the SQL the answer ran, and a follow-up chart change takes the quick-reply path without querying again.
+
+![A question in the app going through the steps of the diagram, then its SQL and a chart change](docs/media/fitcher-question-flow.gif)
 
 ![Who can see what](docs/architecture/access-control.svg)
 

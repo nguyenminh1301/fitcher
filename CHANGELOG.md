@@ -4,6 +4,7 @@
 
 ### Added
 
+- Show the product in the README with two recordings of the running app: `docs/media/fitcher-demo.gif` under "What you can do with it" (asking a question, the answer and chart, changing the chart and exporting PNG and CSV) and `docs/media/fitcher-question-flow.gif` under the question-flow diagram (each agent step lit on the diagram as the app shows it, the SQL the answer ran, and a chart change through the quick-reply path).
 - Draw the architecture in `docs/finch-architecture.excalidraw` with five sections (how the services fit together, how a question is answered, who can see what, onboarding a company and run tracing), each also exported as an SVG under `docs/architecture/`; the diagrams hold only boxes and arrows, their explanations live in the README, and `scripts/build_architecture_diagram.py` rebuilds both from one layout. The README opens with the brand banner, dark or light to match the reader's theme.
 - Record the evals after the spec-building fixes in `docs/eval/spec-building-fixes-report.md`: `iowa_liquor` reaches 30/35 execution match (was 29/35) and `ecommerce_twin` 42/45 (was 39/45) with no regression against its baseline, and the cases still failing are listed with their cause.
 - Edit a proposal's spec on the Review page: a reviewer ticks "Use this spec when the same question is asked", fills the metrics, dataset, dimensions, filters (one per line), top N and ranking, replaces masked filter values with the same fields as the SQL, and sees the api's reason when approval refuses the spec.
