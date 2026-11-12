@@ -12,9 +12,10 @@ See [DECISIONS §3](../docs/DECISIONS.md#3-docker-compose) and the [Phase 0 plan
 | `clickhouse/users.d/agent_query_stopper.xml` | `agent_query_stopper`, which may only list and stop running queries; the api stops the query of an answer whose client disconnected |
 | `clickhouse/users.d/model_tiers.xml` | `model_tiers_admin`, which reads and writes the model tier mapping, reads eval reports and records admin actions for the Models page |
 | `clickhouse/users.d/sources.xml` | `source_loader`, the only user that may use the source named collections; copies sources into `raw` and defines the live `src_<source>` databases |
-| `clickhouse/initdb/001-databases.sql` | Creates `raw`, `marts` and `data_meta` |
-| `clickhouse/initdb/010-agent-logs.sql` | Creates the `agent_logs` database and its run log tables |
-| `clickhouse/initdb/020-model-tiers.sql` | Creates `data_meta.model_tiers`, the model tier mapping of the Models page |
+| `clickhouse/changes/0001_databases.sql` | Creates `raw`, `marts` and `data_meta` |
+| `clickhouse/changes/0002_agent_logs.sql` | Creates the `agent_logs` database and its run log tables |
+| `clickhouse/changes/0003_model_tiers.sql` | Creates `data_meta.model_tiers`, the model tier mapping of the Models page |
+| `clickhouse/changes/0004_documents.sql` | Creates `data_meta.documents`, the registry of company documents |
 | `litellm/Dockerfile` | The pinned upstream LiteLLM image with patched bundled packages the upstream still ships at a vulnerable version (see SECURITY.md) |
 | `litellm/config.yaml` | Gateway settings shared by every model: callbacks, guardrail and master key |
 | `litellm/catalog/*.yaml` | One file per provider (OpenAI, Anthropic, Gemini, Ollama) with its aliases, named `<provider>-<size>`, and the variables it needs |
@@ -28,12 +29,24 @@ See [DECISIONS §3](../docs/DECISIONS.md#3-docker-compose) and the [Phase 0 plan
 ## ClickHouse users and databases
 
 The image entrypoint creates the admin user from `CLICKHOUSE_ADMIN_USER` and `CLICKHOUSE_ADMIN_PASSWORD`.
-Scripts in `initdb/` run only when the `clickhouse-data` volume is empty.
-The script is idempotent; apply it to an existing volume with:
+The files in `clickhouse/changes/` are numbered schema changes (`NNNN_name.sql`, no gaps). The ClickHouse entrypoint runs them only when the `clickhouse-data` volume is empty; `jobs.migrate` applies the ones a volume has not recorded in `data_meta.schema_changes`, so a fresh volume and an older one end at the same version. ClickHouse has no transactional DDL, so every change must be idempotent (`CREATE ... IF NOT EXISTS`, `ADD COLUMN IF NOT EXISTS`). Never edit a change that has shipped; add the next number.
 
 ```bash
-docker compose exec -T clickhouse sh -c 'clickhouse-client --user "$CLICKHOUSE_USER" --password "$CLICKHOUSE_PASSWORD" --queries-file /docker-entrypoint-initdb.d/001-databases.sql'
+docker compose run --rm jobs python -m jobs.migrate
 ```
+
+A second run applies nothing. A volume that records a change this version does not know was written by a newer image and is refused.
+
+## Data directory and secret key
+
+`FITCHER_DATA_DIR` (default `/data`) is the single root of persistent application files. In Compose the named volume `fitcher-data` is mounted there for `api` and `jobs`.
+
+| File | Purpose |
+| --- | --- |
+| `app.db` | The app state in SQLite (settings, encrypted secrets, setup state); numbered changes live in `apps/api/app/state/changes/` and are recorded in its `schema_changes` table. The api and `jobs.migrate` apply them |
+| `secret.key` | The instance key that encrypts stored secrets (AES-256-GCM), generated on first use with mode 0600 |
+
+`FITCHER_SECRET_KEY` (base64 of 32 random bytes, for example `openssl rand -base64 32`) replaces `secret.key` when set. Losing the key makes stored secrets unreadable, so the data volume is the backup unit; if `secret.key` is missing while secrets exist, the api refuses to start instead of generating a new key. SQLite can corrupt on a network file system, so the data volume must be a local disk.
 
 Changing the admin password in `.env` after the first start also needs only a container recreate, because the entrypoint rewrites the user file on every start.
 
@@ -41,7 +54,7 @@ The agent runs every generated query as the ClickHouse user of the asking role, 
 `compile_pack` creates these users, their roles, column grants, row policies, aggregate-only views and the shared read-only profile from the pack's `policies.yaml` (see [packs/](../packs/README.md#compiling-a-pack)); they live in the data volume and are reconciled on every compile.
 Their passwords derive from `CLICKHOUSE_AGENT_PASSWORD`; after changing it, run `compile_pack` again.
 
-Run logs live in `agent_logs`. On a volume created before `010-agent-logs.sql`, `020-model-tiers.sql` or `030-documents.sql` existed, or before one of their tables or columns was added, create what is missing with `docker compose run --rm jobs python -m jobs.apply_log_schema`.
+Run logs live in `agent_logs`. On a volume created before one of the `clickhouse/changes/` files existed, or before one of their tables or columns was added, create what is missing with `docker compose run --rm jobs python -m jobs.migrate`.
 Six configuration users reach it and the registries in `data_meta`, each with its own password:
 
 | User | Password | Access |

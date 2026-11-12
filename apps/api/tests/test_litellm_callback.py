@@ -9,7 +9,7 @@ import re
 import httpx
 
 ROOT = Path(__file__).resolve().parents[3]
-SCHEMA = ROOT / "infra" / "clickhouse" / "initdb" / "010-agent-logs.sql"
+SCHEMA = ROOT / "infra" / "clickhouse" / "changes" / "0002_agent_logs.sql"
 
 
 def load_callback():

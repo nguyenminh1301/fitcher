@@ -26,4 +26,4 @@ docker compose exec -T clickhouse sh -c 'clickhouse-client --user agent_logs_tra
 - `llm_calls_sent` counts the gateway requests the api sent; `llm_calls_logged` counts the rows the LiteLLM callback wrote. A difference means callback writes failed (see the `litellm` service log), since those rows are not part of `log_complete`.
 - `system.query_log` is flushed every few seconds, so a trace read right after its run may miss its last queries. Run `SYSTEM FLUSH LOGS` as the ClickHouse admin first when the query log matters.
 
-Rows expire after 90 days. On a volume created before the tables existed, create them with `docker compose run --rm jobs python -m jobs.apply_log_schema`.
+Rows expire after 90 days. On a volume created before the tables existed, create them with `docker compose run --rm jobs python -m jobs.migrate`.

@@ -1,10 +1,10 @@
 -- Agent run logs (DECISIONS §10). The ClickHouse entrypoint runs this file on a
--- fresh volume; `python -m jobs.apply_log_schema` applies it to an existing one.
+-- fresh volume; `python -m jobs.migrate` applies it to an existing one.
 -- Every statement only creates what is missing, or adds a column that is
 -- missing, so both paths are idempotent; any other change to an existing table
 -- needs its own deliberate migration.
 --
--- jobs.apply_log_schema splits this file on semicolons after dropping comment
+-- jobs.migrate splits this file on semicolons after dropping comment
 -- lines, so no statement may contain a semicolon inside a string literal.
 --
 -- Trace tables are sorted by (trace_id, ts) and user tables by (user_id, ts).

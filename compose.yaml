@@ -63,7 +63,7 @@ services:
       - ./infra/clickhouse/users.d/pack_review.xml:/etc/clickhouse-server/users.d/pack_review.xml:ro
       - ./infra/clickhouse/users.d/sources.xml:/etc/clickhouse-server/users.d/sources.xml:ro
       - ./infra/clickhouse/config.d/sources.xml:/etc/clickhouse-server/config.d/sources.xml:ro
-      - ./infra/clickhouse/initdb:/docker-entrypoint-initdb.d:ro
+      - ./infra/clickhouse/changes:/docker-entrypoint-initdb.d:ro
     ulimits:
       nofile:
         soft: 262144
@@ -226,6 +226,7 @@ services:
     ports:
       - "127.0.0.1:8000:8000"
     volumes:
+      - fitcher-data:/data
       - compiled-packs:/app/build/packs:ro
       - guard-models:/app/build/guard_model:ro
       - documents:/app/build/documents
@@ -289,6 +290,7 @@ services:
       PACKS_DIR: /app/packs
     volumes:
       - ./data:/app/data
+      - fitcher-data:/data
       - compiled-packs:/app/build/packs
       - guard-models:/app/build/guard_model:ro
       - documents:/app/build/documents
@@ -448,6 +450,8 @@ services:
 
 volumes:
   clickhouse-data:
+  # The app state (app.db) and the instance secret key; the api and jobs services share it (DECISIONS §3).
+  fitcher-data:
   qdrant-data:
   # compiled.json of each pack, written by compile_pack in jobs and read by api.
   compiled-packs:

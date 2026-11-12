@@ -2,8 +2,12 @@ import re
 
 import pytest
 
-from jobs import apply_log_schema
+from app.state.migrate import split_statements
+from jobs import migrate
 
+AGENT_LOGS = migrate.CLICKHOUSE_CHANGES_DIR / "0002_agent_logs.sql"
+MODEL_TIERS = migrate.CLICKHOUSE_CHANGES_DIR / "0003_model_tiers.sql"
+DOCUMENTS = migrate.CLICKHOUSE_CHANGES_DIR / "0004_documents.sql"
 TABLES = [
     "runs", "events", "llm_calls", "sql_runs", "audit",
     "chat_messages", "feedback", "eval_reports", "example_proposals", "admin_actions",
@@ -12,16 +16,8 @@ TABLES = [
 REPLACED_TABLES = ["conversations", "conversation_groups"]
 
 
-class FakeClient:
-    def __init__(self):
-        self.commands = []
-
-    def command(self, sql):
-        self.commands.append(sql)
-
-
 def schema_statements():
-    return apply_log_schema.split_statements(apply_log_schema.SCHEMA_FILE.read_text(encoding="utf-8"))
+    return split_statements(AGENT_LOGS.read_text(encoding="utf-8"))
 
 
 def table_statement(table):
@@ -29,11 +25,6 @@ def table_statement(table):
     matches = [s for s in schema_statements() if pattern.match(s)]
     assert len(matches) == 1, f"expected one CREATE TABLE for {table}"
     return matches[0]
-
-
-def test_split_statements_ignores_comments_and_blank_parts():
-    sql = "-- header; with a semicolon\nCREATE X;\n\n  -- note\nCREATE Y\n  (a);\n\n"
-    assert apply_log_schema.split_statements(sql) == ["CREATE X", "CREATE Y\n  (a)"]
 
 
 def test_schema_only_creates_objects_that_do_not_exist():
@@ -67,7 +58,7 @@ def test_model_routing_columns_reach_existing_volumes(table, column):
 
 
 def test_model_tiers_keep_the_latest_change_per_tier():
-    statements = apply_log_schema.split_statements(apply_log_schema.SCHEMA_FILES[1].read_text(encoding="utf-8"))
+    statements = split_statements(MODEL_TIERS.read_text(encoding="utf-8"))
     assert len(statements) == 1
     assert statements[0].startswith("CREATE TABLE IF NOT EXISTS data_meta.model_tiers")
     assert "ENGINE = ReplacingMergeTree(changed_at)\nORDER BY tier" in statements[0]
@@ -123,7 +114,7 @@ def test_query_log_exists_before_the_view_reads_it():
 
 
 def test_trace_query_reads_every_trace_source_for_one_parameter():
-    sql = (apply_log_schema.SCHEMA_FILE.parents[1] / "queries" / "trace.sql").read_text(encoding="utf-8")
+    sql = (migrate.CLICKHOUSE_CHANGES_DIR.parent / "queries" / "trace.sql").read_text(encoding="utf-8")
     for source in ("runs FINAL", "events", "llm_calls", "sql_runs", "trace_query_log"):
         assert f"agent_logs.{source}" in sql
     assert sql.count("{trace_id:String}") >= 5
@@ -136,36 +127,18 @@ def test_runs_keeps_the_latest_row_per_trace():
     assert "ENGINE = ReplacingMergeTree(updated_at)" in table_statement("runs")
 
 
-def test_apply_schema_runs_each_statement_in_order():
-    client = FakeClient()
-    count = apply_log_schema.apply_schema(client, "CREATE DATABASE IF NOT EXISTS a;\nCREATE TABLE IF NOT EXISTS a.b (x UInt8);")
-    assert count == 2
-    assert client.commands == ["CREATE DATABASE IF NOT EXISTS a", "CREATE TABLE IF NOT EXISTS a.b (x UInt8)"]
 
 
-def test_main_reports_missing_credentials(monkeypatch, capsys):
-    monkeypatch.delenv("CLICKHOUSE_ADMIN_USER", raising=False)
-    monkeypatch.delenv("CLICKHOUSE_ADMIN_PASSWORD", raising=False)
-    assert apply_log_schema.main([]) == 1
-    assert "CLICKHOUSE_ADMIN_USER" in capsys.readouterr().err
 
 
-def test_main_applies_every_schema_file_in_order(monkeypatch, capsys):
-    client = FakeClient()
-    monkeypatch.setattr(apply_log_schema, "admin_client", lambda: client)
-    tiers = apply_log_schema.split_statements(apply_log_schema.SCHEMA_FILES[1].read_text(encoding="utf-8"))
-    documents = apply_log_schema.split_statements(apply_log_schema.SCHEMA_FILES[2].read_text(encoding="utf-8"))
-    assert apply_log_schema.main([]) == 0
-    assert client.commands == [*schema_statements(), *tiers, *documents]
-    output = capsys.readouterr().out
-    assert f"{len(schema_statements())} statements from 010-agent-logs.sql" in output
-    assert "1 statements from 020-model-tiers.sql" in output
-    assert "1 statements from 030-documents.sql" in output
+
+
+
 
 
 def test_document_registry_is_applied_to_existing_volumes():
-    assert apply_log_schema.SCHEMA_FILES[-1].name == "030-documents.sql"
-    statements = apply_log_schema.split_statements(apply_log_schema.SCHEMA_FILES[-1].read_text(encoding="utf-8"))
+    assert DOCUMENTS.name == "0004_documents.sql"
+    statements = split_statements(DOCUMENTS.read_text(encoding="utf-8"))
     assert len(statements) == 1
     statement = statements[0]
     assert statement.startswith("CREATE TABLE IF NOT EXISTS data_meta.documents")
