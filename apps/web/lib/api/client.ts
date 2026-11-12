@@ -22,6 +22,8 @@ import type {
   ModelTiers,
   ReviewItem,
   ReviewItemPatch,
+  SetupModeChange,
+  SetupStatus,
 } from "@/lib/contracts";
 
 import type { Conversation, ConversationGroup, ConversationThread } from "./conversations";
@@ -102,6 +104,13 @@ export interface FitcherApi {
     list(): Promise<ModelTiers>;
     /** Map a chat tier to an eligible alias; the api refuses embed and any ineligible alias. */
     set(tier: string, alias: string): Promise<ModelTier>;
+  };
+  /** First-run setup (DECISIONS §15); the changes need the admin role. */
+  setup: {
+    status(): Promise<SetupStatus>;
+    setMode(mode: SetupModeChange["mode"]): Promise<SetupStatus>;
+    skip(id: string): Promise<SetupStatus>;
+    complete(): Promise<SetupStatus>;
   };
 }
 

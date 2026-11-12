@@ -427,5 +427,30 @@
     "tierDesc_sql_gen": "SQL cho mọi câu hỏi khác, và lần thử lại đầu tiên sau khi lần đơn giản thất bại.",
     "tierDesc_sql_gen_hard": "Lần thử lại SQL cuối cùng.",
     "tierDesc_embed": "Vector cho tìm kiếm trong gói."
+  },
+  "setup": {
+    "title": "Thiết lập fitcher",
+    "intro": "Trả lời vài câu hỏi để bắt đầu. Mỗi câu trả lời có thể đổi lại sau trong bảng điều khiển.",
+    "steps": "Các bước",
+    "step_mode": "Ai dùng hệ thống này",
+    "state_pending": "Cần làm",
+    "state_done": "Xong",
+    "state_skipped": "Đã bỏ qua",
+    "modeQuestion": "Ai dùng hệ thống này?",
+    "modeHint": "Lựa chọn được lưu ngay và chỉ đổi cách đăng nhập khi đăng nhập được tích hợp vào ứng dụng.",
+    "individual": "Một người",
+    "individualHint": "Bạn dùng trên máy của mình. Không cần đăng nhập.",
+    "team": "Một nhóm",
+    "teamHint": "Mọi người đăng nhập bằng tài khoản riêng và quản trị viên quản lý họ.",
+    "save": "Lưu và tiếp tục",
+    "saving": "Đang lưu",
+    "finish": "Hoàn tất thiết lập",
+    "finished": "Đã thiết lập xong.",
+    "openChat": "Mở khung chat",
+    "backupNote": "Mọi thứ bạn thiết lập nằm trong ổ dữ liệu. Hãy sao lưu ổ này; mất khóa bí mật thì không đọc lại được các bí mật đã lưu.",
+    "failed": "Không lưu được thiết lập. Hãy thử lại.",
+    "loadFailed": "Không tải được thiết lập.",
+    "notice": "Quản trị viên đang thiết lập hệ thống này. Hãy quay lại khi đã sẵn sàng.",
+    "adminOnly": "Chỉ quản trị viên mới thiết lập được hệ thống này."
   }
 }
