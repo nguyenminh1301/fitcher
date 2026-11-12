@@ -27,6 +27,7 @@ from app.contracts.model_tiers import ModelTierChange, ModelTiers  # noqa: E402
 from app.contracts.query_spec import QuerySpec  # noqa: E402
 from app.contracts.result import Result  # noqa: E402
 from app.contracts.review import DatasetView, ReviewItem, ReviewItemPatch  # noqa: E402
+from app.contracts.setup import SetupModeChange, SetupStatus  # noqa: E402
 from app.contracts.users import UserRoles, UserView  # noqa: E402
 
 # Each contract with the JSON Schema mode of its direction: what the api accepts ("validation") or
@@ -62,6 +63,8 @@ CONTRACTS = {
     "eval_run_started": (EvalRunStarted, "serialization"),
     "user_view": (UserView, "serialization"),
     "user_roles": (UserRoles, "validation"),
+    "setup_status": (SetupStatus, "serialization"),
+    "setup_mode_change": (SetupModeChange, "validation"),
 }
 SCHEMAS = ROOT / "apps" / "web" / "lib" / "contracts" / "schemas"
 

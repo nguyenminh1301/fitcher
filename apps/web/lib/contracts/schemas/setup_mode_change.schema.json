@@ -1,0 +1,18 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "mode": {
+      "enum": [
+        "individual",
+        "team"
+      ],
+      "title": "Mode",
+      "type": "string"
+    }
+  },
+  "required": [
+    "mode"
+  ],
+  "title": "SetupModeChange",
+  "type": "object"
+}
