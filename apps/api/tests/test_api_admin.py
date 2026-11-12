@@ -76,7 +76,10 @@ def test_a_trace_merges_nodes_llm_calls_sql_and_access_in_time_order(client):
     reader, _ = logs([
         (r"r\.trace_id = \{trace_id", [RUN]),
         (r"FROM agent_logs\.events", [(TS, "extract", "ok", 300)]),
-        (r"FROM agent_logs\.llm_calls", [(TS.replace(second=1), "extract", "openai-small", "gpt-x", 120, 0.0004, 290, "ok", "")]),
+        (r"FROM agent_logs\.llm_calls", [
+            (TS.replace(second=1), "extract", "openai-small", "", "gpt-x", 120, 0.0004, 290, "ok", ""),
+            (TS.replace(second=2), "summarize", "", "lab", "openai/house-model", 80, None, 150, "success", ""),
+        ]),
         (r"FROM agent_logs\.sql_runs", [(later, 1, "SELECT 1", 1, "")]),
         (r"FROM agent_logs\.audit", [(TS.replace(second=3), "viewer", "ALLOW", "widget_sales", "")]),
     ])
@@ -86,11 +89,13 @@ def test_a_trace_merges_nodes_llm_calls_sql_and_access_in_time_order(client):
 
     assert body["run"]["trace_id"] == "t1"
     assert [(item["kind"], item["name"], item["status"]) for item in body["items"]] == [
-        ("node", "extract", "ok"), ("llm", "LLM extract", "ok"), ("access", "Access widget_sales", "ok"),
-        ("sql", "SQL attempt 1", "ok"),
+        ("node", "extract", "ok"), ("llm", "LLM extract", "ok"), ("llm", "LLM summarize", "ok"),
+        ("access", "Access widget_sales", "ok"), ("sql", "SQL attempt 1", "ok"),
     ]
     assert body["items"][1]["meta"] == ["openai-small", "gpt-x", "120 tokens", "$0.000400"]
-    assert body["items"][3]["sql"] == "SELECT 1"
+    # A gateway row names its provider; a model without a known price has no cost estimate.
+    assert body["items"][2]["meta"] == ["lab", "openai/house-model", "80 tokens", "no price"]
+    assert body["items"][4]["sql"] == "SELECT 1"
 
 
 def test_an_unknown_trace_is_404(client):
@@ -115,13 +120,21 @@ def test_audit_denials_and_screening_verdicts(client):
 
 
 def test_costs_are_grouped_with_their_provider(client):
-    reader, script = logs([(r"FROM agent_logs\.llm_calls", [("2026-11-05", "openai-small", "gpt-x", "fast", 12, 0.0123)])])
+    reader, script = logs([(r"FROM agent_logs\.llm_calls", [
+        ("2026-11-05", "openai-small", "", "gpt-x", "fast", 12, 0.0123),
+        ("2026-11-06", "", "lab", "openai/house-model", "sql-gen", 3, None),
+    ])])
     use(reader)
 
     rows = client.get("/admin/costs", headers=ADMIN, params={"from": "2026-11-01", "to": "2026-11-06"}).json()
 
-    assert rows == [{"day": "2026-11-05", "alias": "openai-small", "model": "gpt-x", "tier": "fast",
-                     "provider": "openai", "calls": 12, "cost_usd": 0.0123}]
+    # Rows of the proxy era take their provider from the alias; gateway rows store it.
+    assert rows == [
+        {"day": "2026-11-05", "alias": "openai-small", "model": "gpt-x", "tier": "fast", "provider": "openai", "calls": 12,
+         "cost_usd": 0.0123},
+        {"day": "2026-11-06", "alias": "", "model": "openai/house-model", "tier": "sql-gen", "provider": "lab", "calls": 3,
+         "cost_usd": 0.0},
+    ]
     assert script.calls[0][1] == {"start": date(2026, 11, 1), "end": date(2026, 11, 6)}
 
 

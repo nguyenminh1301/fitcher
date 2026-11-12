@@ -31,7 +31,7 @@ def shipped():
 
 def test_shipped_clickhouse_changes_keep_the_original_files_in_order():
     names = [c.label for c in migrate.discover(migrate.CLICKHOUSE_CHANGES_DIR)]
-    assert names == ["0001_databases", "0002_agent_logs", "0003_model_tiers", "0004_documents"]
+    assert names == ["0001_databases", "0002_agent_logs", "0003_model_tiers", "0004_documents", "0005_llm_calls_provider"]
 
 
 def test_fresh_volume_applies_and_records_every_change_then_nothing():
@@ -48,9 +48,11 @@ def test_existing_volume_is_brought_up_to_date_with_the_same_statements():
     migrate.apply_clickhouse(fresh)
     migrate.apply_clickhouse(existing)  # a volume the entrypoint created, then recorded by the first run
     assert fresh.commands == existing.commands
+    # Each statement is idempotent: it creates what is missing, adds a missing column, or sets a column's
+    # type, which ClickHouse leaves alone without a new mutation when the column already has that type.
     assert all(
         statement.startswith(("CREATE ", "ALTER TABLE ", "SYSTEM FLUSH LOGS"))
-        and ("IF NOT EXISTS" in statement or statement.startswith("SYSTEM"))
+        and ("IF NOT EXISTS" in statement or " MODIFY COLUMN " in statement or statement.startswith("SYSTEM"))
         for statement in fresh.commands
     )
 

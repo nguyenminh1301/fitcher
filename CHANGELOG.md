@@ -156,6 +156,7 @@
 
 ### Changed
 
+- `agent_logs.llm_calls` gains a `provider` column and a nullable `cost_usd` (`infra/clickhouse/changes/0005_llm_calls_provider.sql`, applied to existing volumes by `jobs.migrate`); the Costs page groups by the stored provider and falls back to the alias prefix for rows written through the LiteLLM Proxy, and a run's trace shows "no price" for a call without a cost estimate.
 - Lock `litellm==1.106.6` (the SDK only, no proxy extras; published after the compromised 1.82.7 and 1.82.8 releases) with hashes in `apps/api/uv.lock`, and move the jobs group to `huggingface-hub==1.33.0`, because litellm and fastembed both require a version below 2.0.
 - Number the ClickHouse initialization files as schema changes in `infra/clickhouse/changes` (`0001_databases` to `0004_documents`, statements unchanged), mount that directory into the ClickHouse entrypoint, and turn `jobs.apply_log_schema` into an alias of `jobs.migrate`.
 - Move `docs/DECISIONS.md` to v4: fitcher is a self-hosted product shipped as one image with one container, volume and port; Keycloak, the LiteLLM Proxy service and the Qdrant service are dropped in favour of built-in individual and team sign-in, the LiteLLM SDK inside the api, local embeddings and search in ClickHouse; sources, models and documents are chosen in a first-run setup; a connected source gets an instant, unreviewed pack; eval results inform rather than gate. §16 maps each behaviour of Phases 0 to 12 to the phase that replaces it, and the code keeps the earlier behaviour until then.

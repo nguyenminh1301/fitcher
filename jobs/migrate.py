@@ -6,11 +6,12 @@ Each store records what it applied: ``schema_changes`` in
 ``<FITCHER_DATA_DIR>/app.db`` and ``data_meta.schema_changes`` in ClickHouse.
 A second run applies nothing. The ClickHouse files in
 ``infra/clickhouse/changes`` are also what the ClickHouse entrypoint runs on a
-fresh volume; every statement only creates what is missing or adds a missing
-column, so applying them to a volume created before this runner existed
-changes nothing and records them as applied. ClickHouse has no transactional
-DDL, so a ClickHouse change must stay idempotent. A store that records a
-change this version does not know was written by a newer one and is refused.
+fresh volume; every statement only creates what is missing, adds a missing
+column or sets a column to the type it may already have, so applying them to
+a volume created before this runner existed changes nothing and records them
+as applied. ClickHouse has no transactional DDL, so a ClickHouse change must
+stay idempotent. A store that records a change this version does not know was
+written by a newer one and is refused.
 """
 
 import argparse
