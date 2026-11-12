@@ -17,6 +17,7 @@ describe("generated contract types", () => {
       "feedback_input.schema.json", "feedback_row.schema.json", "group_input.schema.json", "model_tier_change.schema.json",
       "model_tiers.schema.json", "proposal_result.schema.json", "query_spec.schema.json", "result.schema.json",
       "review_item.schema.json", "review_item_patch.schema.json", "run_row.schema.json", "run_trace.schema.json",
+      "setup_mode_change.schema.json", "setup_status.schema.json",
       "user_roles.schema.json", "user_view.schema.json",
     ]);
   });

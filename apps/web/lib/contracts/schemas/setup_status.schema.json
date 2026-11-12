@@ -1,0 +1,64 @@
+{
+  "$defs": {
+    "SetupStep": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "state": {
+          "enum": [
+            "pending",
+            "done",
+            "skipped"
+          ],
+          "title": "State",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "state"
+      ],
+      "title": "SetupStep",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "mode": {
+      "anyOf": [
+        {
+          "enum": [
+            "individual",
+            "team"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Mode"
+    },
+    "steps": {
+      "items": {
+        "$ref": "#/$defs/SetupStep"
+      },
+      "title": "Steps",
+      "type": "array"
+    },
+    "complete": {
+      "title": "Complete",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "mode",
+    "steps",
+    "complete"
+  ],
+  "title": "SetupStatus",
+  "type": "object"
+}

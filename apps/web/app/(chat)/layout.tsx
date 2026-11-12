@@ -4,6 +4,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useCallback, type ReactNode } from "react";
 
 import { ChatLayout } from "@/components/chat/ChatLayout";
+import { SetupGate } from "@/components/setup/SetupGate";
 import { api } from "@/lib/api";
 import { ChatProvider } from "@/lib/chat/ChatContext";
 
@@ -17,9 +18,11 @@ export default function ChatAppLayout({ children }: { children: ReactNode }) {
   const navigate = useCallback((id: string | null) => router.push(id ? `/c/${encodeURIComponent(id)}` : "/"), [router]);
   return (
     <ChatProvider api={api} navigate={navigate} activeId={activeId} onSignedOut={signIn}>
-      <ChatLayout onConsole={() => router.push("/console")} onSignOut={signOut}>
-        {children}
-      </ChatLayout>
+      <SetupGate api={api} redirect={router.replace}>
+        <ChatLayout onConsole={() => router.push("/console")} onSignOut={signOut}>
+          {children}
+        </ChatLayout>
+      </SetupGate>
     </ChatProvider>
   );
 }

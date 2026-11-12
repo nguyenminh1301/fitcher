@@ -427,5 +427,30 @@
     "tierDesc_sql_gen": "SQL for every other question, and the first retry after a failed simple attempt.",
     "tierDesc_sql_gen_hard": "The last SQL retry.",
     "tierDesc_embed": "Vectors for search over the pack."
+  },
+  "setup": {
+    "title": "Set up fitcher",
+    "intro": "Answer a few questions to get started. Each answer can be changed later in the console.",
+    "steps": "Steps",
+    "step_mode": "Who uses this instance",
+    "state_pending": "To do",
+    "state_done": "Done",
+    "state_skipped": "Skipped",
+    "modeQuestion": "Who uses this instance?",
+    "modeHint": "This is stored now and changes how people sign in once sign-in moves into the app.",
+    "individual": "One person",
+    "individualHint": "You use it on your own machine. There is no sign-in.",
+    "team": "A team",
+    "teamHint": "People sign in with their own accounts and an admin manages them.",
+    "save": "Save and continue",
+    "saving": "Saving",
+    "finish": "Finish setup",
+    "finished": "Setup is complete.",
+    "openChat": "Open the chat",
+    "backupNote": "Everything you set up lives in the data volume. Back up that volume; if its secret key is lost, stored secrets cannot be read.",
+    "failed": "The setup could not be saved. Try again.",
+    "loadFailed": "The setup could not be loaded.",
+    "notice": "This instance is being set up by an admin. Come back when it is ready.",
+    "adminOnly": "Only an admin can set up this instance."
   }
 }

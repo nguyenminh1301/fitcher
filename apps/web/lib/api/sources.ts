@@ -8,7 +8,7 @@ export type Sources = Record<Feature, Source>;
 
 export const FEATURES: Feature[] = [
   "auth", "chat", "conversations", "feedback", "datasets", "review", "documents",
-  "feedbackReview", "evaluation", "runs", "audit", "costs", "users", "models",
+  "feedbackReview", "evaluation", "runs", "audit", "costs", "users", "models", "setup",
 ];
 
 export const sources: Sources = {
@@ -26,6 +26,7 @@ export const sources: Sources = {
   costs: "http",
   users: "http",
   models: "http",
+  setup: "http",
 };
 
 export function isSample(feature: Feature, current: Partial<Sources> = sources): boolean {

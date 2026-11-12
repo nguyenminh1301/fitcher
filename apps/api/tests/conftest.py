@@ -52,3 +52,14 @@ def edit_pack(pack_dir: Path) -> Callable[[str, Callable[[Any], None]], None]:
         path.write_text(yaml.safe_dump(data, allow_unicode=True, sort_keys=False), encoding="utf-8")
 
     return edit
+
+
+@pytest.fixture(autouse=True)
+def isolated_data_dir(tmp_path, monkeypatch):
+    """Keep the app state of any test that starts the app out of the real data directory."""
+    from app.state.db import reset_shared_state
+
+    monkeypatch.setenv("FITCHER_DATA_DIR", str(tmp_path / "fitcher-data"))
+    reset_shared_state()
+    yield
+    reset_shared_state()
