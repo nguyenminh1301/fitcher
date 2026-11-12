@@ -1,0 +1,425 @@
+# Finch-Lab: Settled Decisions (v3)
+
+This document is the source of truth for implementation.
+Every decision here is binding; to change one, edit this file first.
+
+The v3 architecture diagram is [finch-architecture.excalidraw](finch-architecture.excalidraw), with one SVG per section in [architecture/](architecture/); `scripts/build_architecture_diagram.py` rebuilds both. Where the diagram and this document disagree, this document wins.
+
+The repository and package names remain `fitcher`; Finch-Lab names the architecture.
+
+## 1. Goals and scope
+
+- A natural-language data question-answering agent (text-to-SQL) with reports and charts, **industry-neutral**.
+- It plugs into a new company by loading a **Domain Pack** (YAML) and connecting the company's data through ClickHouse (§4): a source is read live through a ClickHouse database or table engine or copied into ClickHouse on a schedule. The engine contains no industry knowledge and queries only ClickHouse.
+- Acceptance question: "Top 10 best-selling products in Q1 2024 compared with Q1 2025".
+- Uber Finch is only a source of ideas. Uber/taxi data is not reproduced.
+- This is a **lab**, not production.
+
+### Out of scope
+
+- Querying a source database from the engine in its own dialect or over its own driver. Every source is reached through ClickHouse (§4), so the agent writes one SQL dialect and RBAC stays in ClickHouse (§9).
+- Writing to a source database.
+- Caching (Redis, result cache, answer cache).
+- Production components: HA, autoscaling, multi-region, Kubernetes, secret manager.
+- Multi-tenancy within one instance. Each run serves one active pack.
+- Model fine-tuning.
+
+## 2. Stack
+
+| Component | Choice | Notes |
+|---|---|---|
+| Frontend | Next.js | Chat app and workspace console (§15): chat, tables, charts, SQL view, Review, Documents and Admin pages; English/Vietnamese interface, light and dark themes |
+| Auth | Keycloak (OIDC) | JWT carries roles; realm imported from a file |
+| API | FastAPI | sync/async, SSE |
+| Orchestration | LangGraph | one graph; nodes deterministic where possible |
+| LLM gateway | LiteLLM Proxy | change models without code changes |
+| Model | OpenAI by default; Anthropic, Gemini and a local model (Ollama) allowed | chat + embeddings, called through LiteLLM; a provider is enabled for a tier only after the pack eval passes with it (§2 Model tiers) |
+| Input screening | Llama Prompt Guard 2 86M, local ONNX in `api`, plus rules | a security classifier, not an answering model (§9) |
+| Data database | ClickHouse | databases `raw`, `marts`; sources attached through engines or copied (§4) |
+| Logs / audit | ClickHouse | database `agent_logs`, dedicated user, 90-day TTL |
+| Semantic search | Qdrant | hybrid dense + BM25 sparse vectors, fused with RRF on the server |
+| Transform | dbt-clickhouse | raw -> wide marts |
+| SQL parsing | sqlglot (clickhouse dialect) | |
+| Charts | Own ChartSpec + adapter -> **Apache ECharts** (`echarts-for-react`) | changing library only requires rewriting the adapter |
+| Data tables | TanStack Table | |
+| Deploy | Docker Compose | 6 long-running services + jobs |
+
+**Dropped since v2:** ScyllaDB and the ClickHouse log syncer, replaced by ClickHouse `agent_logs`. Row-filter injection into SQL by sqlglot. Uber-specific marts.
+
+### Model tiers
+
+The engine calls a task tier; each tier maps to one model alias of the LiteLLM catalog (`infra/litellm/config.yaml`):
+
+- `fast`: router, extractor, summarizer, chart tie-break
+- `sql-small`: SQL generation for a query spec the complexity rule scores as simple (§6)
+- `sql-gen`: SQL generation otherwise, the first retry after a `sql-small` failure, onboarding drafter
+- `sql-gen-hard`: third retry
+- `embed`: embeddings
+
+Code may only call tiers and catalog aliases, never model names directly. The tier-to-alias mapping defaults come from `.env`; an `admin` changes the chat tiers on the console's Models page (§15), which offers only aliases whose provider passed the pack eval for that tier. `embed` is not changed from the console, because a new embedding model needs a full reindex (§14).
+
+## 3. Docker Compose
+
+Long-running services:
+
+- `web` (:3000)
+- `keycloak` (:8080)
+- `api` (:8000, runs FastAPI + LangGraph + log writer)
+- `litellm` (:4000)
+- `qdrant` (:6333)
+- `clickhouse` (:8123 / :9000)
+
+The optional Compose profile `sources` starts lab-only fixtures that play a company's source systems (PostgreSQL, MySQL, MongoDB and an S3-compatible object store); they are not fitcher services. The optional profile `local-models` starts Ollama for a local model tier (§2).
+
+Jobs share the `api` image and run manually or from CI; an admin can also start an eval run from the Evaluation page (§15), which runs the same code inside `api`:
+
+- `load_data.py`
+- `dbt run`
+- `profile.py`
+- `ingest_docs.py`
+- `draft_pack.py`
+- `compile_pack.py`
+- `eval.py`
+
+## 4. Lab dataset
+
+- **Primary:** `ziadatalabs/FreeEcommerceTwin14M` on Hugging Face.
+  - 7 tables: customers, products, sessions, orders, order_items, returns, support_tickets
+  - 14.3 million rows, about 184 MB, period 2022-2026
+  - License CC BY-NC 4.0, non-commercial use only
+- **Marts (dbt):**
+  - `sales_lines` = order_items JOIN orders JOIN products JOIN customers, one row per line item
+  - `returns_fact`
+  - `sessions_daily`
+- **Second dataset** (to prove industry neutrality): Iowa Liquor Sales 2025, chosen over `SDataPro/maycee-retail-dataset` because it is real data from a clearly different industry (state-regulated spirits wholesale) under a clear licence.
+  - Iowa Data Hub dataset 1262: every Class E liquor licensee purchase in Iowa from 2025-01-01 to 2025-12-31, one wide table of invoice lines (store, county, category, vendor, item, bottle size, state cost and retail, bottles, dollars, volume)
+  - License CC BY 4.0, published by the Iowa Department of Revenue, Alcohol Operations Bureau; the download stays in the Git-ignored `data/` directory
+  - Served from the fixture PostgreSQL (`infra/sources/iowa_liquor`) and copied into ClickHouse through its source manifest like a company's own database; pack `iowa_liquor`
+
+Principle: the agent queries only **marts** (2-5 wide tables, few joins), never `raw`.
+
+### Data sources
+
+A company's data is declared in a source manifest (`jobs/sources/<pack>.yaml`) and always reached through ClickHouse:
+
+| Kind | Live mode | Copy mode |
+|---|---|---|
+| PostgreSQL | `PostgreSQL` database engine in database `src_<source>` | scheduled `INSERT INTO raw.* SELECT` from the source |
+| MySQL / MariaDB | `MySQL` database engine in database `src_<source>` | same |
+| MongoDB | `MongoDB` table engine with declared columns (flat collections only) | same |
+| CSV / Parquet / S3 | `S3` or `File` table engine | load into `raw` |
+
+- **Copy** is the default: queries never load the source and run at ClickHouse speed; data is as fresh as the last sync. **Live** suits small sources that must be fresh; dbt builds the marts as views over `src_<source>`.
+- The agent still queries only marts, writes ClickHouse SQL and runs under the ClickHouse RBAC of §9; `src_*` databases are granted to no agent role.
+- Each source has a read-only user on the source system. Its credentials come from `.env`, are held only by ClickHouse engine definitions and the sync job, and never reach the api's prompts or the LLM.
+- Generating MongoDB queries (or any non-SQL query language) is out of scope: a document collection that is not flat is copied and flattened by dbt.
+
+## 5. Domain Pack
+
+Path: `packs/<company>/`. Git is the source of truth. Packs live in Git and are validated with JSON Schema.
+
+| File | Contents |
+|---|---|
+| `business_profile.yaml` | industry, currency, fiscal year start month, default conventions (e.g. "best-selling" = by revenue); never the user's time zone or answer language (§6) |
+| `datasets.yaml` | marts: table/column descriptions, types, roles (dimension/measure/time), grain, primary time column, allowed_roles |
+| `glossary.yaml` | terms with **Vietnamese + English** aliases, pointing to metrics/columns/values |
+| `metrics.yaml` | id, sql_expr, dataset, grain, unit, owner |
+| `relationships.yaml` | allowed join paths (if any); the LLM may not invent joins |
+| `examples.yaml` | question -> canonical SQL (used as few-shot), optionally with a reviewed spec (§6 step 7) |
+| `policies.yaml` | role -> dataset/columns, row filters, aggregate-only (granted through views) |
+| `eval.yaml` | question -> correct result (or correct SQL), labelled per layer |
+
+Every drafter-generated item has `status: draft|approved`, `evidence` and `confidence`. The compiler uses only `approved` items.
+
+### Search collections (Qdrant)
+
+Each index below is a Qdrant collection with a dense vector (`embed`) and a BM25 sparse vector per point. Collection names carry a version `_v1` and are accessed through aliases so they can be reindexed when the embedding model changes:
+
+- `glossary_terms`
+- `metrics`
+- `datasets` (including columns)
+- `column_values`: real values of low-cardinality string columns (top-K), with aliases
+- `examples`
+- `kb_docs`: company document chunks, with tags and allowed_roles
+
+Every query filters by `allowed_roles` (a payload filter) and fuses the dense and sparse results with RRF on the server.
+
+### Company documents
+
+- **Path 1:** the drafter reads documents -> extracts glossary, metrics and conventions -> human review -> YAML.
+- **Path 2:** chunk by heading -> `kb_docs`, used only to answer definition questions or annotations.
+- **Numbers are never taken from text.** Figures only come from SQL.
+
+Documents are runtime content managed in the application, not files in Git; the pack YAML stays the reviewed source for datasets, metrics and policies.
+
+- **Formats:** PDF (text layer only, no OCR), DOCX, Markdown, plain text and XLSX (cell values with the sheet's header row; formulas are not evaluated and macro-enabled workbooks are rejected). A spreadsheet of business data is data, not a document: it is loaded into ClickHouse (§1).
+- **Upload and delete at any time:** a `pack_reviewer` uploads, lists and deletes documents on the Documents page of the web app, choosing each document's `allowed_roles` from the pack's roles. `ingest_docs.py` loads a folder through the same code path for bulk onboarding.
+- **Storage:** original files live in the `api` service's documents volume. The registry table `data_meta.documents` records id, pack, file name, type, size, SHA-256, uploader, `allowed_roles`, status (`processing`, `indexed`, `failed`) with the error, and upload and delete times; a dedicated ClickHouse user writes only that table. A file whose SHA-256 is already registered for the pack is rejected as a duplicate.
+- **Upload:** check the type from the file content and a size cap, store the file, parse, chunk, screen each chunk (§9), embed through `embed` and index the chunks into the pack's live `kb_docs` alias. A failure marks the document `failed` and leaves no chunks.
+- **Delete:** remove the document's chunks from `kb_docs`, delete the stored file and mark the registry row deleted. Pack items whose evidence cites the document are flagged in the Review UI; approved YAML is never changed automatically.
+- **Drafting from a document** is an explicit, billable reviewer action; its items go through review like every draft.
+- **Compile:** each pack generation rebuilds `kb_docs` from the registry's indexed documents, copying the chunks of the live generation when the embedding model is unchanged and re-embedding the stored files otherwise. Uploads and deletes are rejected while that pack compiles, so a compile never drops or restores a document.
+
+## 6. Runtime flow (LangGraph)
+
+Nodes in order:
+
+0. **screen** (deterministic rules + local classifier, §9): screens the new question before any LLM call. `block` ends the run with a `blocked` reply; `flag` continues and is logged.
+1. **load_context**: load business_profile (always), the last N chat turns, and the previous turn's QuerySpec and result.
+2. **router** (`fast`, structured output). Classifies intent as one of four:
+   - `data_query`
+   - `metadata_qa`
+   - `chart_edit`
+   - `out_of_scope`
+3. Branch by intent:
+   - `metadata_qa` -> answer from glossary + kb_docs, no SQL.
+   - `chart_edit` -> reuse the previous result -> chart_recommender. No SQL execution, no SQL generation.
+   - `out_of_scope` -> short reply.
+4. **extract** (`fast`, JSON schema): metric, dimensions, `periods[]`, filters, `top_n`, `rank_by`, `compare`.
+5. **resolve_time** (deterministic): convert periods to half-open date ranges `[start, end)` using the pack's fiscal calendar and the user's time zone. Supports multiple periods and relative phrases ("last quarter").
+   The browser sends its IANA time zone with every request; clients without one (CLI, eval) pass it explicitly, otherwise UTC is used.
+6. **retrieve**: Qdrant hybrid search over the 6 collections. Candidates for the question's own terms (metrics, dimensions, filter values) are searched across all of the pack's roles, so a term resolves to what it means and the gate can deny it rather than replace it with the nearest item the role may read; the context given to SQL generation (examples, dataset hits) is filtered by the asking role.
+7. **build_spec** -> `QuerySpec`, with a coverage check (dataset min/max dates versus the requested periods).
+   When an approved example readable by the asking role asks the same question (compared case-, diacritic- and punctuation-insensitively) and carries a reviewed spec, that spec's metrics, dataset, dimensions, filters, top N and ranking replace the term resolution; periods and time grain still come from the question, and the gate checks the result as usual. A reviewed spec names only pack items and pack values, never a value taken from a user's run.
+8. **gate**:
+   - ambiguous -> **clarify** (ask the user with options, or apply the pack's default convention if one exists)
+   - no permission or no dataset -> **deny** + audit record
+   - sufficient -> continue
+9. **generate_sql**: tier `sql-small` when the deterministic complexity rule scores the QuerySpec as simple (one metric, at most one dimension, one period, no comparison, no top N, one dataset), otherwise `sql-gen`. Input: QuerySpec + permitted schema + declared join paths + few-shot.
+10. **guard** (sqlglot):
+    - allow exactly one SELECT statement
+    - table/column allowlist by role
+    - block dangerous functions: `file`, `url`, `remote`, `s3`, `system.*` except a whitelist
+    - enforce LIMIT
+11. **explain**: run `EXPLAIN` on ClickHouse.
+12. **execute**: run as the ClickHouse user for the role. Settings profile `readonly`, `max_execution_time`, `max_result_rows`, `max_memory_usage`. Set `log_comment = trace_id`.
+13. **check**:
+    - SQL or runtime error -> feed the error back to generate_sql, **at most 3 retries** after the first generation; a retry after a `sql-small` attempt moves to `sql-gen`, and the third retry uses `sql-gen-hard`
+    - **policy violation -> stop, no retry**
+    - 0 rows or outside coverage -> return the result with a warning
+14. **shape_result**: attach types and roles to columns, cap at 5,000 rows.
+15. **chart_recommender**: choose by rules; call the `fast` LLM only when rules tie.
+16. **summarize** (`fast`): reads only the returned rows. Every calculation (%, differences) must already be done in SQL.
+
+Every reply (summary, blocked, clarify, deny, out-of-scope) is written in the language of the user's question; packs set no answer language.
+17. **stream**: send SSE to the UI.
+
+If all 3 retries fail: return the last SQL + error. Never guess a result.
+
+### SSE events (in order)
+
+1. `status` (repeated per node)
+2. `blocked`, `clarify`, `deny` or `sql`
+3. `result`
+4. `chart_spec`
+5. `summary`
+6. `done` or `error`
+
+Every event carries `trace_id`. Events 3-5 belong to the SQL path only; per branch the streams are:
+
+- blocked: `status* -> blocked -> done`
+- clarify: `status* -> clarify -> done`
+- deny: `status* -> deny -> done`
+- data success: `status* -> sql -> result -> chart_spec -> summary -> done`
+- failure: `status* -> [sql] -> error`
+- out_of_scope: `status* -> summary -> done`
+- metadata_qa: `status* -> summary -> done`
+- chart_edit: `status* -> result -> chart_spec -> done`, re-sending the stored result so the client always has the rows it draws
+
+## 7. Data contracts
+
+```jsonc
+// QuerySpec
+{
+  "intent": "data_query",
+  "metric_ids": ["net_sales"],
+  "dimensions": ["product_name"],
+  "periods": [
+    {"label": "Q1 2024", "start": "2024-01-01", "end": "2024-04-01"},
+    {"label": "Q1 2025", "start": "2025-01-01", "end": "2025-04-01"}
+  ],
+  "filters": [{"column": "region", "op": "=", "value": "West"}],
+  "top_n": 10,
+  "rank_by": "net_sales",
+  "rank_period": "Q1 2025",
+  "compare": true,
+  "dataset": "sales_lines",
+  "warnings": []
+}
+
+// Result
+{
+  "columns": [
+    {"name": "period", "type": "string", "role": "dimension"},
+    {"name": "product_name", "type": "string", "role": "dimension"},
+    {"name": "net_sales", "type": "number", "role": "measure", "format": "currency"}
+  ],
+  "rows": [["Q1 2025", "Product A", 12345.6]],
+  "row_count": 20,
+  "truncated": false
+}
+
+// ChartSpec
+{
+  "type": "bar",              // bar | line | pie | scatter | kpi | table | grouped_bar
+  "x": "product_name",
+  "y": ["net_sales"],
+  "series": "period",
+  "sort": "desc",
+  "format": "currency",
+  "orientation": "vertical",  // optional, bar only: vertical | horizontal (long labels)
+  "allowed_types": ["grouped_bar", "bar", "table"]
+}
+```
+
+These schemas are defined in Pydantic on the backend and TypeScript types are generated from them for the frontend. They are never written by hand twice. Until a contract has its Pydantic model, the web app's sample-data mode (§15) keeps its type in one provisional file, which the phase that adds the model deletes.
+
+## 8. Charts
+
+Default chart rules (written in code, run on the backend; the frontend uses `allowed_types`):
+
+| Data shape | Default chart |
+|---|---|
+| 1 row x 1 number | KPI |
+| time + number | Line (at most 6 series) |
+| category + number, at most 20 groups | Bar (long labels -> horizontal bar) |
+| category + number + comparison group | Grouped bar |
+| share, at most 6 groups, no negative values | Pie/Donut |
+| number + number | Scatter |
+| otherwise | Table |
+
+Principles:
+
+- Changing the chart type only edits the ChartSpec on the client. No API call, no LLM call.
+- Chart types invalid for the data are disabled in the UI.
+- The LLM never generates chart data.
+- PNG and CSV export are available.
+- The interface labels the `pie` type as a donut; the contract keeps `pie`.
+
+## 9. RBAC
+
+- **Single source of truth:** `policies.yaml`. The compiler generates:
+  - `CREATE ROLE`, `GRANT SELECT` on marts or views
+  - `ROW POLICY`
+  - settings profiles
+  - the guard allowlist
+  - `allowed_roles` for the indices
+- **Layer 1, retrieval:** reduces noise in the context given to SQL generation. Not a security layer: term resolution may see items the role cannot read, and the gate denies them.
+- **Layer 2, guard:** blocks early with an understandable message.
+- **Layer 3, ClickHouse:** the real security layer.
+- **Aggregate-only:** grant only on pre-aggregated views that also hide groups with fewer than k records. Never enforced by analysing SQL.
+- Keycloak roles map 1:1 to ClickHouse users/roles. The API never gives credentials to the LLM.
+- Users still sign in only through Keycloak. An `admin` may change another user's pack roles and disable or enable that user on the Users page (§15); the api does this through the Keycloak Admin API with a dedicated confidential client whose service account holds only `view-users` and `manage-users`. The api never creates or deletes users, sets credentials or changes the acting admin's own account, and writes every change to `agent_logs.admin_actions`. A changed role takes effect when the user's access token is next refreshed.
+- Every per-query limit in a ClickHouse settings profile has a minimum of 1 as well as a maximum, because 0 means unlimited.
+- Every ALLOW/DENY decision is written to `agent_logs.audit`.
+- Retrieved content (documents, column values) is **data, not instructions**. Prompts must state this explicitly to resist prompt injection, and the LLM client sends instructions in a `system` message and untrusted content in the `user` message.
+- **Layer 0, input screening** (before any LLM call):
+  - Screened: every new question (graph node `screen`), and document chunks and low-cardinality column values when they are indexed. History is not screened again: each turn was screened when asked, and a blocked turn is not stored. Reviewed pack content is trusted.
+  - Screener: EN/VI rules on folded text (known attack phrases, fake prompt boundaries), then the local classifier score over 512-token windows. Verdicts `allow`, `flag` and `block` by thresholds in `.env`; a rule hit blocks.
+  - `SCREEN_MODE=log` records verdicts without blocking; `enforce` blocks. Enforcement starts only after `screen_eval.py` shows no false positive on the benign set and at least 90% recall on the attack set, in English and in Vietnamese.
+  - **Fail closed:** without the classifier, no question reaches an LLM; the reply is the `blocked` notice that screening is unavailable.
+  - A blocked chunk is not indexed. A flagged column value is reported by the compiler and still indexed, because it is real data the filters need.
+  - The LiteLLM gateway rejects any request without the api's `screening` metadata and reruns the rules on the whole request. It closes code paths that forgot to screen; it is not an authentication boundary.
+  - Out of scope: scanning model output, and fine-tuning the classifier.
+- Source database users are read-only; their credentials stay in `.env` and ClickHouse engine definitions (§4).
+
+## 10. Logging (ClickHouse `agent_logs`)
+
+Tables (MergeTree, 90-day TTL, ordered by `(trace_id, ts)`, `(user_id, ts)` or, for pack-level tables, `(pack, ts)`):
+
+| Table | Contents |
+|---|---|
+| `runs` | trace_id, user, question, intent, status, latency |
+| `events` | trace_id, node, start/end, status, payload JSON |
+| `llm_calls` | alias, model, tokens, cost, errors (written through a LiteLLM callback) |
+| `sql_runs` | SQL, ch_query_id, rows, errors, retry count |
+| `audit` | ALLOW/DENY, blocked tables, role |
+| `chat_messages` | conversation_id, turn, revision, role, content, QuerySpec, shaped Result (at most 5,000 rows), the answer's other stream events so a conversation shows again as it was answered |
+| `conversations` | conversation_id, user, title, pinned, group, deleted flag, update time (§15) |
+| `conversation_groups` | group id, user, name, deleted flag, update time (§15) |
+| `feedback` | like/dislike, notes |
+| `eval_reports` | pack, execution rate, threshold result, full JSON report from `eval.py` (§12) |
+| `example_proposals` | pack, question, SQL and source trace proposed from dislikes or failed runs (§11 step 8) |
+| `admin_actions` | acting admin, action, target user, old and new value (§9) |
+| `input_screening` | trace_id, user, source (question, document, column value), verdict, mode, score, rule hits, classifier version (§9) |
+
+- Log writer: async batches inside the `api` process. `trace_id` comes from the OpenTelemetry context.
+- JOIN with `system.query_log` through `log_comment`; no syncer needed.
+- Conversation state for follow-up questions is read back from `chat_messages`: for each turn the latest revision, without the turns that an edit or retry of an earlier turn replaced (§15).
+- `conversations` and `conversation_groups` are `ReplacingMergeTree` tables keyed by user and id with the update time as version, so a rename, pin, move or delete is a new row; they expire 90 days after their last update, like the messages.
+
+## 11. Onboarding a new company
+
+1. **Connect** the company's sources (§4): each one live through a ClickHouse engine or copied into `raw`; dbt builds the marts.
+2. **Profiler** (deterministic): reads `system.columns`, row counts, min/max dates, top-K values, join-key candidates, sample rows.
+3. **Documents**: a reviewer uploads PDF/DOCX/MD/TXT/XLSX files on the Documents page, or `ingest_docs.py` loads a folder; they are parsed, chunked, screened (§9) and indexed into `kb_docs`, can be deleted at any time (§5) and can be passed to the drafter.
+4. **Drafter** (`sql-gen`): drafts the whole pack; every item has `evidence` + `confidence`.
+5. **Review UI**: a reviewer approves, edits or deletes each item, and can test-run a metric's `sql_expr`. Approved items are committed to Git.
+6. **compile_pack**:
+   - validate the schema
+   - test-run every `sql_expr`
+   - index into Qdrant
+   - generate ClickHouse permissions
+7. **eval**: run `eval.yaml`, measured per layer (intent, dataset/columns, result). The pack is enabled only after reaching the threshold.
+8. **Feedback loop:** dislikes or failed runs in `agent_logs` -> propose new examples (in bulk with `propose_examples.py`, or for one run from the Feedback page) -> back to Review.
+
+## 12. Eval
+
+- Measured per layer:
+  - router picks the correct intent
+  - extractor gets the correct periods, top_n, rank_by
+  - retrieval finds the correct dataset/columns (recall)
+  - **execution results match** (compare result sets, not SQL strings)
+- Required question set for every pack:
+  - two-period comparison
+  - top N
+  - filter by a string value
+  - monthly trend
+  - ambiguous question (must return clarify)
+  - unauthorized question (must return deny)
+  - out-of-scope question
+- Run with `eval.py --pack <company>`, or by an `admin` from the Evaluation page (§15). Reports are stored in `agent_logs` and printed as Markdown.
+
+## 13. Code conventions
+
+- Monorepo:
+  - `apps/web`
+  - `apps/api`
+  - `packs/`
+  - `dbt/`
+  - `jobs/`
+  - `infra/` (compose, Keycloak realm, LiteLLM config, ClickHouse init)
+  - `docs/`
+- Configuration lives in `.env` + YAML. Never hard-code table names, metrics or industries in `apps/`.
+- The most important check: `grep` must not find any pack table or metric name in `apps/api`.
+- Each LangGraph node is a pure function, testable in isolation. LLMs are mocked in unit tests.
+- Prompts live in `apps/api/prompts/*.md` and are versioned.
+
+## 14. Open decisions (with defaults)
+
+- Chart library: ECharts. Can switch to Plotly by rewriting the adapter.
+- Ambiguous "best-selling": use the default convention in `business_profile.yaml` if present; otherwise clarify.
+- Embedding model: the latest OpenAI embedding model available on LiteLLM. Changing the model requires a full reindex.
+- Pack eval threshold (§11): execution match >= 80% of the active eval cases; below it `eval.py` exits 1.
+- Screening thresholds (§9): `flag` from 0.5 and `block` from 0.9, tuned from the `screen_eval.py` report before enforcement.
+- SQL complexity rule (§6): simple means one metric, at most one dimension, one period, no comparison, no top N and one dataset; it can be widened only if the pack eval does not regress.
+- A provider passes for a tier when the pack eval run with that tier's alias on the provider meets the threshold and does not regress against the baseline.
+
+## 15. Web application
+
+The interface follows the Fitcher web app design, summarized in [design/web-app.md](design/web-app.md); its component names are the names used in `apps/web`.
+
+- **Two surfaces, one sign-in.** The Chat app is for every role. The workspace console is for console roles: `pack_reviewer` sees Review, Documents, Datasets, Feedback and Evaluation; `admin` sees Runs and trace, Audit, Costs, Evaluation, Models and Users. Navigation lists only the sections the user's roles allow, and the api enforces the same rule on every endpoint. A console role reaches the console from the account menu.
+- **Conversations.** A user can start, list, search, pin, rename and delete their own conversations and sort them into personal groups. The sidebar shows Pinned, Groups and Recent (today, past week, past month). A group is a folder only: conversations never share context, and there is no sharing or collaboration. A conversation's title is its first question cut to 80 characters; no LLM call names it. Search matches titles and the user's own questions, inside the user's conversations only. Delete only hides the conversation from its owner, at once: nothing is removed, and an `admin` can still read every conversation, deleted or not, with its messages and runs in the console's Runs and trace section. The rows expire with the 90-day log TTL, after which history is gone for everyone.
+- **Messages.** Under an answer: copy, like, dislike with an optional note, and retry. Under the user's own message: copy and edit. Edit and retry write a new revision of that turn and answer it again; the turns after it in the older revision leave the conversation and its context.
+- **Language.** The English/Vietnamese switch translates the interface only: navigation, labels, step names, notices the app raises, chart axes and number and date formats. User messages, answers and pack content keep the language they were written in (§6). The choice is kept per browser.
+- **Theme.** Light and dark, following the system setting unless the user picks one; the choice is kept per browser.
+- **Visual system.** Primer-based colour, type and spacing tokens with the fitcher neutrals from `docs/brand`, the Inter font with its Vietnamese subset, Lucide icons; WCAG 2.2 AA in both themes.
+- **Datasets page.** A read-only view of the compiled pack's datasets: columns, types, roles and which pack roles may read each dataset.
+- **Feedback page.** Likes and dislikes with their notes, question and trace; a reviewer can propose an example from one disliked or failed run, which runs the same proposal code as `propose_examples.py` (§11 step 8).
+- **Evaluation page.** Reads `eval_reports`: per-layer rates, the threshold result, the required question categories and failed cases. An `admin` can start a run of the active pack's eval set: it is labelled as using paid AI, asks for confirmation, runs one at a time per pack inside `api`, and stores its report like `eval.py`.
+- **Users page.** Lists realm users with their pack roles and status; an `admin` changes roles and disables or enables users as set in §9.
+- **Costs page.** LLM cost by day, alias, model, tier and provider from `llm_calls`, always labelled as an estimate.
+- **Models page** (`admin`). Lists the model tiers with their current alias, provider and the eval result that enabled it; an `admin` maps a chat tier to another alias that passed the pack eval for it (§2). Each change is written to `agent_logs.admin_actions`.
+- **Audit page.** Shows the access decisions of `audit` and the input-screening verdicts of `input_screening`.
+- **Sample-data mode.** Each web feature reads either the real api or the active pack's `sample_data/`, chosen per feature in one place. A feature on sample data shows a Sample data badge, so a demo is never mistaken for a real answer. Sample data belongs to the pack, is hand-written and is never copied or derived from a licensed dataset; the engine code in `apps/web` stays free of pack names. Each phase plan's Web wiring section names the features it moves to the real api.

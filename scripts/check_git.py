@@ -23,7 +23,7 @@ def check_message(message):
         errors.append("must use type(scope): subject with an allowed type/scope and lowercase subject")
     if message != message.strip():
         errors.append("must not have leading or trailing whitespace")
-    if re.search(r"co-authored-by|generated (?:with|by)|\b(?:codex|claude|chatgpt)\b", message, re.I):
+    if re.search(r"co-authored-by|generated (?:with|by)|\b(?:codex|claude|chatgpt|anthropic|copilot)\b", message, re.I):
         errors.append("must not contain author trailers or agent attribution")
     return errors
 

@@ -1,0 +1,950 @@
+# Labelled questions covering every required category (DECISIONS §12), at
+# least three per category. previous_question is asked first in the same
+# conversation for a follow_up case. active_from_phase marks cases whose branch a later
+# phase builds; they are reported as not yet scored until then.
+# expected.columns lists the columns retrieval must find; the time column is
+# not listed because the agent takes it from the dataset definition.
+# reference_date is "today" for every case, inside the data's 2022-2026 range.
+reference_date: "2026-01-15"
+cases:
+  - id: top_products_q1_2024_vs_q1_2025
+    question: Top 10 sản phẩm bán chạy nhất quý 1 năm 2024 so với quý 1 năm 2025
+    language: vi
+    category: two_period_compare
+    role: analyst
+    expected:
+      intent: data_query
+      outcome: answer
+      metrics: [net_sales]
+      periods:
+        - {label: Q1 2024, start: "2024-01-01", end: "2024-04-01"}
+        - {label: Q1 2025, start: "2025-01-01", end: "2025-04-01"}
+      top_n: 10
+      rank_by: net_sales
+      dataset: sales_lines
+      columns: [product_id]
+    expected_sql: |-
+      SELECT
+          product_id,
+          sumIf(line_amount, order_date >= toDate('2025-01-01') AND order_date < toDate('2025-04-01')) AS net_sales_q1_2025,
+          sumIf(line_amount, order_date >= toDate('2024-01-01') AND order_date < toDate('2024-04-01')) AS net_sales_q1_2024
+      FROM marts.sales_lines
+      WHERE order_status != 'cancelled'
+        AND order_date >= toDate('2024-01-01')
+        AND order_date < toDate('2025-04-01')
+      GROUP BY product_id
+      ORDER BY net_sales_q1_2025 DESC, product_id
+      LIMIT 10
+    status: approved
+    evidence: &owner [{kind: manual, ref: docs/DECISIONS.md#1-goals-and-scope}]
+    confidence: 1.0
+
+  - id: top_brands_by_units_2025
+    question: Top 5 brands by units sold in 2025
+    language: en
+    category: top_n
+    role: analyst
+    expected:
+      intent: data_query
+      outcome: answer
+      metrics: [units_sold]
+      periods:
+        - {label: "2025", start: "2025-01-01", end: "2026-01-01"}
+      top_n: 5
+      rank_by: units_sold
+      dataset: sales_lines
+      columns: [product_brand]
+    expected_sql: |-
+      SELECT product_brand, sumIf(quantity, order_status != 'cancelled') AS units_sold
+      FROM marts.sales_lines
+      WHERE order_date >= toDate('2025-01-01') AND order_date < toDate('2026-01-01')
+      GROUP BY product_brand
+      ORDER BY units_sold DESC, product_brand
+      LIMIT 5
+    status: approved
+    evidence: &cases [{kind: manual, ref: docs/DECISIONS.md#12-eval}]
+    confidence: 1.0
+
+  - id: electronics_net_sales_west_2024
+    question: Doanh thu ngành hàng Electronics ở khu vực West năm 2024 là bao nhiêu?
+    language: vi
+    category: string_filter
+    role: analyst
+    expected:
+      intent: data_query
+      outcome: answer
+      metrics: [net_sales]
+      periods:
+        - {label: "2024", start: "2024-01-01", end: "2025-01-01"}
+      dataset: sales_lines
+      columns: [product_category, customer_region]
+    expected_sql: |-
+      SELECT sumIf(line_amount, order_status != 'cancelled') AS net_sales
+      FROM marts.sales_lines
+      WHERE product_category = 'Electronics'
+        AND customer_region = 'West'
+        AND order_date >= toDate('2024-01-01') AND order_date < toDate('2025-01-01')
+    expected_sources:
+      - "column_values:sales_lines.product_category=Electronics"
+      - "column_values:sales_lines.customer_region=West"
+    status: approved
+    evidence: *cases
+    confidence: 1.0
+
+  - id: monthly_conversion_rate_2025
+    question: Monthly conversion rate in 2025
+    language: en
+    category: monthly_trend
+    role: analyst
+    expected:
+      intent: data_query
+      outcome: answer
+      metrics: [conversion_rate]
+      periods:
+        - {label: "2025", start: "2025-01-01", end: "2026-01-01"}
+      dataset: sessions_daily
+    expected_sql: |-
+      SELECT
+          toStartOfMonth(session_date) AS month,
+          sum(converted_sessions) / nullIf(sum(sessions), 0) AS conversion_rate
+      FROM marts.sessions_daily
+      WHERE session_date >= toDate('2025-01-01') AND session_date < toDate('2026-01-01')
+      GROUP BY month
+      ORDER BY month
+    status: approved
+    evidence: *cases
+    confidence: 1.0
+
+  - id: best_product_without_measure
+    question: Sản phẩm nào tốt nhất năm 2025?
+    language: vi
+    category: ambiguous
+    role: analyst
+    expected:
+      intent: data_query
+      outcome: clarify
+      periods:
+        - {label: "2025", start: "2025-01-01", end: "2026-01-01"}
+    status: approved
+    evidence: *cases
+    confidence: 1.0
+
+  - id: marketing_asks_for_refunds
+    question: Tổng tiền hoàn trả năm 2025 là bao nhiêu?
+    language: vi
+    category: unauthorized
+    role: marketing
+    expected:
+      intent: data_query
+      outcome: deny
+      metrics: [refund_total]
+      dataset: returns_fact
+    active_from_phase: 6
+    status: approved
+    evidence: *cases
+    confidence: 1.0
+
+  - id: weather_question
+    question: Thời tiết Hà Nội hôm nay thế nào?
+    language: vi
+    category: out_of_scope
+    role: analyst
+    expected:
+      intent: out_of_scope
+      outcome: answer
+    status: approved
+    evidence: *cases
+    confidence: 1.0
+
+  # two_period_compare
+
+  - id: net_sales_by_region_2024_vs_2025
+    question: Net sales by region in 2024 compared with 2025
+    language: en
+    category: two_period_compare
+    role: analyst
+    expected:
+      intent: data_query
+      outcome: answer
+      metrics: [net_sales]
+      periods:
+        - {label: "2024", start: "2024-01-01", end: "2025-01-01"}
+        - {label: "2025", start: "2025-01-01", end: "2026-01-01"}
+      dataset: sales_lines
+      columns: [customer_region]
+    expected_sql: |-
+      SELECT
+          customer_region,
+          sumIf(line_amount, order_date >= toDate('2025-01-01') AND order_date < toDate('2026-01-01')) AS net_sales_2025,
+          sumIf(line_amount, order_date >= toDate('2024-01-01') AND order_date < toDate('2025-01-01')) AS net_sales_2024
+      FROM marts.sales_lines
+      WHERE order_status != 'cancelled'
+        AND order_date >= toDate('2024-01-01') AND order_date < toDate('2026-01-01')
+      GROUP BY customer_region
+    status: approved
+    evidence: *cases
+    confidence: 1.0
+
+  - id: orders_q4_2025_vs_q4_2024
+    question: Số đơn hàng quý 4 năm 2025 so với quý 4 năm 2024
+    language: vi
+    category: two_period_compare
+    role: analyst
+    expected:
+      intent: data_query
+      outcome: answer
+      metrics: [order_count]
+      periods:
+        - {label: Q4 2025, start: "2025-10-01", end: "2026-01-01"}
+        - {label: Q4 2024, start: "2024-10-01", end: "2025-01-01"}
+      dataset: sales_lines
+    expected_sql: |-
+      SELECT
+          uniqExactIf(order_id, order_status != 'cancelled' AND order_date >= toDate('2025-10-01') AND order_date < toDate('2026-01-01')) AS order_count_q4_2025,
+          uniqExactIf(order_id, order_status != 'cancelled' AND order_date >= toDate('2024-10-01') AND order_date < toDate('2025-01-01')) AS order_count_q4_2024
+      FROM marts.sales_lines
+      WHERE order_date >= toDate('2024-10-01') AND order_date < toDate('2026-01-01')
+    status: approved
+    evidence: *cases
+    confidence: 1.0
+
+  - id: conversion_rate_by_device_dec_2025_vs_dec_2024
+    question: Conversion rate by device in December 2025 versus December 2024
+    language: en
+    category: two_period_compare
+    role: analyst
+    expected:
+      intent: data_query
+      outcome: answer
+      metrics: [conversion_rate]
+      periods:
+        - {label: 2025-12, start: "2025-12-01", end: "2026-01-01"}
+        - {label: 2024-12, start: "2024-12-01", end: "2025-01-01"}
+      dataset: sessions_daily
+      columns: [device]
+    expected_sql: |-
+      SELECT
+          device,
+          sumIf(converted_sessions, session_date >= toDate('2025-12-01') AND session_date < toDate('2026-01-01'))
+              / nullIf(sumIf(sessions, session_date >= toDate('2025-12-01') AND session_date < toDate('2026-01-01')), 0) AS conversion_rate_2025_12,
+          sumIf(converted_sessions, session_date >= toDate('2024-12-01') AND session_date < toDate('2025-01-01'))
+              / nullIf(sumIf(sessions, session_date >= toDate('2024-12-01') AND session_date < toDate('2025-01-01')), 0) AS conversion_rate_2024_12
+      FROM marts.sessions_daily
+      WHERE (session_date >= toDate('2025-12-01') AND session_date < toDate('2026-01-01'))
+         OR (session_date >= toDate('2024-12-01') AND session_date < toDate('2025-01-01'))
+      GROUP BY device
+    status: approved
+    evidence: *cases
+    confidence: 1.0
+
+  - id: refunds_last_quarter_vs_same_quarter_last_year
+    question: Tiền hoàn trả quý trước so với cùng kỳ năm ngoái
+    language: vi
+    category: two_period_compare
+    role: analyst
+    expected:
+      intent: data_query
+      outcome: answer
+      metrics: [refund_total]
+      periods:
+        - {label: Q4 2025, start: "2025-10-01", end: "2026-01-01"}
+        - {label: Q4 2024, start: "2024-10-01", end: "2025-01-01"}
+      dataset: returns_fact
+    expected_sql: |-
+      SELECT
+          sumIf(refund_amount, return_date >= toDate('2025-10-01') AND return_date < toDate('2026-01-01')) AS refund_total_q4_2025,
+          sumIf(refund_amount, return_date >= toDate('2024-10-01') AND return_date < toDate('2025-01-01')) AS refund_total_q4_2024
+      FROM marts.returns_fact
+      WHERE return_date >= toDate('2024-10-01') AND return_date < toDate('2026-01-01')
+    status: approved
+    evidence: *cases
+    confidence: 1.0
+
+  # top_n
+
+  - id: top_categories_by_net_sales_2025
+    question: Top 3 ngành hàng có doanh thu cao nhất năm 2025
+    language: vi
+    category: top_n
+    role: analyst
+    expected:
+      intent: data_query
+      outcome: answer
+      metrics: [net_sales]
+      periods:
+        - {label: "2025", start: "2025-01-01", end: "2026-01-01"}
+      top_n: 3
+      rank_by: net_sales
+      dataset: sales_lines
+      columns: [product_category]
+    expected_sql: |-
+      SELECT product_category, sumIf(line_amount, order_status != 'cancelled') AS net_sales
+      FROM marts.sales_lines
+      WHERE order_date >= toDate('2025-01-01') AND order_date < toDate('2026-01-01')
+      GROUP BY product_category
+      ORDER BY net_sales DESC, product_category
+      LIMIT 3
+    status: approved
+    evidence: *cases
+    confidence: 1.0
+
+  - id: top_subcategories_by_units_last_month
+    question: Top 5 subcategories by units sold last month
+    language: en
+    category: top_n
+    role: analyst
+    expected:
+      intent: data_query
+      outcome: answer
+      metrics: [units_sold]
+      periods:
+        - {label: 2025-12, start: "2025-12-01", end: "2026-01-01"}
+      top_n: 5
+      rank_by: units_sold
+      dataset: sales_lines
+      columns: [product_subcategory]
+    expected_sql: |-
+      SELECT product_subcategory, sumIf(quantity, order_status != 'cancelled') AS units_sold
+      FROM marts.sales_lines
+      WHERE order_date >= toDate('2025-12-01') AND order_date < toDate('2026-01-01')
+      GROUP BY product_subcategory
+      ORDER BY units_sold DESC, product_subcategory
+      LIMIT 5
+    status: approved
+    evidence: *cases
+    confidence: 1.0
+
+  - id: top_channels_by_sessions_2025
+    question: Top 3 traffic channels by sessions in 2025
+    language: en
+    category: top_n
+    role: analyst
+    expected:
+      intent: data_query
+      outcome: answer
+      metrics: [session_count]
+      periods:
+        - {label: "2025", start: "2025-01-01", end: "2026-01-01"}
+      top_n: 3
+      rank_by: session_count
+      dataset: sessions_daily
+      columns: [channel]
+    expected_sql: |-
+      SELECT channel, sum(sessions) AS session_count
+      FROM marts.sessions_daily
+      WHERE session_date >= toDate('2025-01-01') AND session_date < toDate('2026-01-01')
+      GROUP BY channel
+      ORDER BY session_count DESC, channel
+      LIMIT 3
+    status: approved
+    evidence: *cases
+    confidence: 1.0
+
+  - id: top_return_reasons_by_refunds_2025
+    question: Top 3 lý do trả hàng có tổng tiền hoàn trả lớn nhất năm 2025
+    language: vi
+    category: top_n
+    role: analyst
+    expected:
+      intent: data_query
+      outcome: answer
+      metrics: [refund_total]
+      periods:
+        - {label: "2025", start: "2025-01-01", end: "2026-01-01"}
+      top_n: 3
+      rank_by: refund_total
+      dataset: returns_fact
+      columns: [return_reason]
+    expected_sql: |-
+      SELECT return_reason, sum(refund_amount) AS refund_total
+      FROM marts.returns_fact
+      WHERE return_date >= toDate('2025-01-01') AND return_date < toDate('2026-01-01')
+      GROUP BY return_reason
+      ORDER BY refund_total DESC, return_reason
+      LIMIT 3
+    status: approved
+    evidence: *cases
+    confidence: 1.0
+
+  - id: top_customers_by_net_sales_q2_2025
+    question: Top 10 customers by net sales in Q2 2025
+    language: en
+    category: top_n
+    role: analyst
+    expected:
+      intent: data_query
+      outcome: answer
+      metrics: [net_sales]
+      periods:
+        - {label: Q2 2025, start: "2025-04-01", end: "2025-07-01"}
+      top_n: 10
+      rank_by: net_sales
+      dataset: sales_lines
+      columns: [customer_id]
+    expected_sql: |-
+      SELECT customer_id, sumIf(line_amount, order_status != 'cancelled') AS net_sales
+      FROM marts.sales_lines
+      WHERE order_date >= toDate('2025-04-01') AND order_date < toDate('2025-07-01')
+      GROUP BY customer_id
+      ORDER BY net_sales DESC, customer_id
+      LIMIT 10
+    status: approved
+    evidence: *cases
+    confidence: 1.0
+
+  # string_filter
+
+  - id: vip_net_sales_2025
+    question: Net sales from VIP customers in 2025
+    language: en
+    category: string_filter
+    role: analyst
+    expected:
+      intent: data_query
+      outcome: answer
+      metrics: [net_sales]
+      periods:
+        - {label: "2025", start: "2025-01-01", end: "2026-01-01"}
+      dataset: sales_lines
+      columns: [customer_segment]
+    expected_sql: |-
+      SELECT sumIf(line_amount, order_status != 'cancelled') AS net_sales
+      FROM marts.sales_lines
+      WHERE customer_segment = 'vip'
+        AND order_date >= toDate('2025-01-01') AND order_date < toDate('2026-01-01')
+    expected_sources:
+      - "column_values:sales_lines.customer_segment=vip"
+    status: approved
+    evidence: *cases
+    confidence: 1.0
+
+  - id: paypal_orders_q3_2025
+    question: Số đơn hàng thanh toán bằng PayPal trong quý 3 năm 2025
+    language: vi
+    category: string_filter
+    role: analyst
+    expected:
+      intent: data_query
+      outcome: answer
+      metrics: [order_count]
+      periods:
+        - {label: Q3 2025, start: "2025-07-01", end: "2025-10-01"}
+      dataset: sales_lines
+      columns: [payment_method]
+    expected_sql: |-
+      SELECT uniqExactIf(order_id, order_status != 'cancelled') AS order_count
+      FROM marts.sales_lines
+      WHERE payment_method = 'paypal'
+        AND order_date >= toDate('2025-07-01') AND order_date < toDate('2025-10-01')
+    expected_sources:
+      - "column_values:sales_lines.payment_method=paypal"
+    status: approved
+    evidence: *cases
+    confidence: 1.0
+
+  - id: mobile_sessions_last_month
+    question: Sessions on mobile last month
+    language: en
+    category: string_filter
+    role: analyst
+    expected:
+      intent: data_query
+      outcome: answer
+      metrics: [session_count]
+      periods:
+        - {label: 2025-12, start: "2025-12-01", end: "2026-01-01"}
+      dataset: sessions_daily
+      columns: [device]
+    expected_sql: |-
+      SELECT sum(sessions) AS session_count
+      FROM marts.sessions_daily
+      WHERE device = 'mobile'
+        AND session_date >= toDate('2025-12-01') AND session_date < toDate('2026-01-01')
+    expected_sources:
+      - "column_values:sessions_daily.device=mobile"
+    status: approved
+    evidence: *cases
+    confidence: 1.0
+
+  - id: defective_returns_2025
+    question: Có bao nhiêu lượt trả hàng với lý do defective trong năm 2025?
+    language: vi
+    category: string_filter
+    role: analyst
+    expected:
+      intent: data_query
+      outcome: answer
+      metrics: [return_count]
+      periods:
+        - {label: "2025", start: "2025-01-01", end: "2026-01-01"}
+      dataset: returns_fact
+      columns: [return_reason]
+    expected_sql: |-
+      SELECT count() AS return_count
+      FROM marts.returns_fact
+      WHERE return_reason = 'defective'
+        AND return_date >= toDate('2025-01-01') AND return_date < toDate('2026-01-01')
+    expected_sources:
+      - "column_values:returns_fact.return_reason=defective"
+    status: approved
+    evidence: *cases
+    confidence: 1.0
+
+  - id: apparel_average_order_value_northeast_2024
+    question: Average order value for Apparel in the Northeast region in 2024
+    language: en
+    category: string_filter
+    role: analyst
+    expected:
+      intent: data_query
+      outcome: answer
+      metrics: [average_order_value]
+      periods:
+        - {label: "2024", start: "2024-01-01", end: "2025-01-01"}
+      dataset: sales_lines
+      columns: [product_category, customer_region]
+    expected_sql: |-
+      SELECT
+          sumIf(line_amount, order_status != 'cancelled')
+              / nullIf(uniqExactIf(order_id, order_status != 'cancelled'), 0) AS average_order_value
+      FROM marts.sales_lines
+      WHERE product_category = 'Apparel'
+        AND customer_region = 'Northeast'
+        AND order_date >= toDate('2024-01-01') AND order_date < toDate('2025-01-01')
+    expected_sources:
+      - "column_values:sales_lines.product_category=Apparel"
+      - "column_values:sales_lines.customer_region=Northeast"
+    status: approved
+    evidence: *cases
+    confidence: 1.0
+
+  # monthly_trend
+
+  - id: monthly_orders_2024
+    question: Số đơn hàng theo tháng năm 2024
+    language: vi
+    category: monthly_trend
+    role: analyst
+    expected:
+      intent: data_query
+      outcome: answer
+      metrics: [order_count]
+      periods:
+        - {label: "2024", start: "2024-01-01", end: "2025-01-01"}
+      dataset: sales_lines
+    expected_sql: |-
+      SELECT toStartOfMonth(order_date) AS month, uniqExactIf(order_id, order_status != 'cancelled') AS order_count
+      FROM marts.sales_lines
+      WHERE order_date >= toDate('2024-01-01') AND order_date < toDate('2025-01-01')
+      GROUP BY month
+      ORDER BY month
+    status: approved
+    evidence: *cases
+    confidence: 1.0
+
+  - id: monthly_refunds_2025
+    question: Monthly refunds in 2025
+    language: en
+    category: monthly_trend
+    role: analyst
+    expected:
+      intent: data_query
+      outcome: answer
+      metrics: [refund_total]
+      periods:
+        - {label: "2025", start: "2025-01-01", end: "2026-01-01"}
+      dataset: returns_fact
+    expected_sql: |-
+      SELECT toStartOfMonth(return_date) AS month, sum(refund_amount) AS refund_total
+      FROM marts.returns_fact
+      WHERE return_date >= toDate('2025-01-01') AND return_date < toDate('2026-01-01')
+      GROUP BY month
+      ORDER BY month
+    status: approved
+    evidence: *cases
+    confidence: 1.0
+
+  - id: monthly_return_rate_jan_to_jun_2025
+    question: Line return rate per month from January to June 2025
+    language: en
+    category: monthly_trend
+    role: analyst
+    expected:
+      intent: data_query
+      outcome: answer
+      metrics: [line_return_rate]
+      periods:
+        - {label: 2025-01-01 to 2025-06-30, start: "2025-01-01", end: "2025-07-01"}
+      dataset: sales_lines
+    expected_sql: |-
+      SELECT
+          toStartOfMonth(order_date) AS month,
+          countIf(is_returned AND order_status != 'cancelled') / nullIf(countIf(order_status != 'cancelled'), 0) AS line_return_rate
+      FROM marts.sales_lines
+      WHERE order_date >= toDate('2025-01-01') AND order_date < toDate('2025-07-01')
+      GROUP BY month
+      ORDER BY month
+    status: approved
+    evidence: *cases
+    confidence: 1.0
+
+  - id: monthly_email_sessions_2025
+    question: Số phiên truy cập theo tháng từ kênh email năm 2025
+    language: vi
+    category: monthly_trend
+    role: analyst
+    expected:
+      intent: data_query
+      outcome: answer
+      metrics: [session_count]
+      periods:
+        - {label: "2025", start: "2025-01-01", end: "2026-01-01"}
+      dataset: sessions_daily
+      columns: [channel]
+    expected_sql: |-
+      SELECT toStartOfMonth(session_date) AS month, sum(sessions) AS session_count
+      FROM marts.sessions_daily
+      WHERE channel = 'email'
+        AND session_date >= toDate('2025-01-01') AND session_date < toDate('2026-01-01')
+      GROUP BY month
+      ORDER BY month
+    status: approved
+    evidence: *cases
+    confidence: 1.0
+
+  # ambiguous: must return clarify
+
+  - id: performance_last_quarter_without_measure
+    question: How did we do last quarter?
+    language: en
+    category: ambiguous
+    role: analyst
+    expected:
+      intent: data_query
+      outcome: clarify
+      periods:
+        - {label: Q4 2025, start: "2025-10-01", end: "2026-01-01"}
+    status: approved
+    evidence: *cases
+    confidence: 1.0
+
+  - id: best_region_last_year_without_measure
+    question: Khu vực nào tốt nhất năm ngoái?
+    language: vi
+    category: ambiguous
+    role: analyst
+    expected:
+      intent: data_query
+      outcome: clarify
+      periods:
+        - {label: "2025", start: "2025-01-01", end: "2026-01-01"}
+    status: approved
+    evidence: *cases
+    confidence: 1.0
+
+  # unauthorized: scored once roles are enforced (Phase 6)
+
+  - id: marketing_asks_for_net_sales_by_category
+    question: Net sales by category in 2025
+    language: en
+    category: unauthorized
+    role: marketing
+    expected:
+      intent: data_query
+      outcome: deny
+      metrics: [net_sales]
+      dataset: sales_lines
+    active_from_phase: 6
+    status: approved
+    evidence: *cases
+    confidence: 1.0
+
+  - id: marketing_asks_for_top_customers
+    question: Top 10 khách hàng mua nhiều nhất năm 2025
+    language: vi
+    category: unauthorized
+    role: marketing
+    expected:
+      intent: data_query
+      outcome: deny
+      metrics: [net_sales]
+      dataset: sales_lines
+    active_from_phase: 6
+    status: approved
+    evidence: *cases
+    confidence: 1.0
+
+  # out_of_scope: a short reply without SQL
+
+  - id: poem_request
+    question: Write a short poem about our store
+    language: en
+    category: out_of_scope
+    role: analyst
+    expected:
+      intent: out_of_scope
+      outcome: answer
+    status: approved
+    evidence: *cases
+    confidence: 1.0
+
+  - id: stock_price_question
+    question: Giá cổ phiếu Apple hôm nay là bao nhiêu?
+    language: vi
+    category: out_of_scope
+    role: analyst
+    expected:
+      intent: out_of_scope
+      outcome: answer
+    status: approved
+    evidence: *cases
+    confidence: 1.0
+
+  # follow_up: the question continues previous_question
+
+  - id: top_products_last_year_follow_up
+    previous_question: Top 10 best-selling products in Q1 2024 compared with Q1 2025
+    question: What about last year?
+    language: en
+    category: follow_up
+    role: analyst
+    expected:
+      intent: data_query
+      outcome: answer
+      metrics: [net_sales]
+      periods:
+        - {label: Q1 2023, start: "2023-01-01", end: "2023-04-01"}
+        - {label: Q1 2024, start: "2024-01-01", end: "2024-04-01"}
+      top_n: 10
+      rank_by: net_sales
+      dataset: sales_lines
+      columns: [product_id]
+    expected_sql: |-
+      SELECT
+          product_id,
+          sumIf(line_amount, order_date >= toDate('2024-01-01') AND order_date < toDate('2024-04-01')) AS net_sales_q1_2024,
+          sumIf(line_amount, order_date >= toDate('2023-01-01') AND order_date < toDate('2023-04-01')) AS net_sales_q1_2023
+      FROM marts.sales_lines
+      WHERE order_status != 'cancelled'
+        AND order_date >= toDate('2023-01-01')
+        AND order_date < toDate('2024-04-01')
+      GROUP BY product_id
+      ORDER BY net_sales_q1_2024 DESC, product_id
+      LIMIT 10
+    status: approved
+    evidence: *cases
+    confidence: 1.0
+
+  - id: net_sales_by_category_follow_up
+    previous_question: Net sales by region in 2024 compared with 2025
+    question: Còn theo danh mục sản phẩm thì sao?
+    language: vi
+    category: follow_up
+    role: analyst
+    expected:
+      intent: data_query
+      outcome: answer
+      metrics: [net_sales]
+      periods:
+        - {label: "2024", start: "2024-01-01", end: "2025-01-01"}
+        - {label: "2025", start: "2025-01-01", end: "2026-01-01"}
+      dataset: sales_lines
+      columns: [product_category]
+    expected_sql: |-
+      SELECT
+          product_category,
+          sumIf(line_amount, order_date >= toDate('2025-01-01') AND order_date < toDate('2026-01-01')) AS net_sales_2025,
+          sumIf(line_amount, order_date >= toDate('2024-01-01') AND order_date < toDate('2025-01-01')) AS net_sales_2024
+      FROM marts.sales_lines
+      WHERE order_status != 'cancelled'
+        AND order_date >= toDate('2024-01-01') AND order_date < toDate('2026-01-01')
+      GROUP BY product_category
+    status: approved
+    evidence: *cases
+    confidence: 1.0
+
+  - id: monthly_orders_next_year_follow_up
+    previous_question: Số đơn hàng theo tháng năm 2024
+    question: Và năm 2025?
+    language: vi
+    category: follow_up
+    role: analyst
+    expected:
+      intent: data_query
+      outcome: answer
+      metrics: [order_count]
+      periods:
+        - {label: "2025", start: "2025-01-01", end: "2026-01-01"}
+      dataset: sales_lines
+    expected_sql: |-
+      SELECT toStartOfMonth(order_date) AS month, uniqExactIf(order_id, order_status != 'cancelled') AS order_count
+      FROM marts.sales_lines
+      WHERE order_date >= toDate('2025-01-01') AND order_date < toDate('2026-01-01')
+      GROUP BY month
+      ORDER BY month
+    status: approved
+    evidence: *cases
+    confidence: 1.0
+
+  # chart_edit: the previous answer redrawn without SQL
+
+  - id: monthly_orders_as_line_chart
+    previous_question: Số đơn hàng theo tháng năm 2024
+    question: Vẽ thành biểu đồ đường
+    language: vi
+    category: chart_edit
+    role: analyst
+    expected:
+      intent: chart_edit
+      outcome: answer
+    status: approved
+    evidence: *cases
+    confidence: 1.0
+
+  - id: region_net_sales_as_bars
+    previous_question: Net sales by region in 2024 compared with 2025
+    question: Show that as a bar chart
+    language: en
+    category: chart_edit
+    role: analyst
+    expected:
+      intent: chart_edit
+      outcome: answer
+    status: approved
+    evidence: *cases
+    confidence: 1.0
+
+  - id: top_brands_as_pie
+    previous_question: Top 5 brands by units sold in 2025
+    question: Draw it as a pie chart
+    language: en
+    category: chart_edit
+    role: analyst
+    expected:
+      intent: chart_edit
+      outcome: answer
+    status: approved
+    evidence: *cases
+    confidence: 1.0
+
+  # definition: what a term, metric or column means, answered by metadata_qa from these search hits
+
+  - id: net_sales_meaning
+    question: "What does net sales mean?"
+    language: en
+    category: definition
+    role: analyst
+    expected:
+      intent: metadata_qa
+      outcome: answer
+    expected_sources:
+      - "glossary_terms:net_sales"
+      - "metrics:net_sales"
+    status: approved
+    evidence: *cases
+    confidence: 1.0
+
+  - id: conversion_rate_definition
+    question: "How is the conversion rate calculated?"
+    language: en
+    category: definition
+    role: analyst
+    expected:
+      intent: metadata_qa
+      outcome: answer
+    expected_sources:
+      - "glossary_terms:conversion_rate"
+      - "metrics:conversion_rate"
+    status: approved
+    evidence: *cases
+    confidence: 1.0
+
+  - id: return_rate_definition
+    question: "What is the return rate?"
+    language: en
+    category: definition
+    role: analyst
+    expected:
+      intent: metadata_qa
+      outcome: answer
+    expected_sources:
+      - "glossary_terms:return_rate"
+      - "metrics:line_return_rate"
+    status: approved
+    evidence: *cases
+    confidence: 1.0
+
+  - id: customer_segment_meaning
+    question: "What does customer segment mean?"
+    language: en
+    category: definition
+    role: analyst
+    expected:
+      intent: metadata_qa
+      outcome: answer
+    expected_sources:
+      - "glossary_terms:customer_segment"
+      - "datasets:sales_lines.customer_segment"
+    status: approved
+    evidence: *cases
+    confidence: 1.0
+
+  - id: doanh_thu_thuan_definition
+    question: "Doanh thu thuần là gì?"
+    language: vi
+    category: definition
+    role: analyst
+    expected:
+      intent: metadata_qa
+      outcome: answer
+    expected_sources:
+      - "glossary_terms:net_sales"
+      - "metrics:net_sales"
+    status: approved
+    evidence: *cases
+    confidence: 1.0
+
+  - id: gia_tri_don_trung_binh_definition
+    question: "Giá trị đơn hàng trung bình được tính thế nào?"
+    language: vi
+    category: definition
+    role: analyst
+    expected:
+      intent: metadata_qa
+      outcome: answer
+    expected_sources:
+      - "glossary_terms:average_order_value"
+      - "metrics:average_order_value"
+    status: approved
+    evidence: *cases
+    confidence: 1.0
+
+  - id: tien_hoan_tra_definition
+    question: "Tiền hoàn trả nghĩa là gì?"
+    language: vi
+    category: definition
+    role: analyst
+    expected:
+      intent: metadata_qa
+      outcome: answer
+    expected_sources:
+      - "glossary_terms:refunds"
+      - "metrics:refund_total"
+    status: approved
+    evidence: *cases
+    confidence: 1.0
+
+  - id: phien_truy_cap_definition
+    question: "Phiên truy cập là gì?"
+    language: vi
+    category: definition
+    role: analyst
+    expected:
+      intent: metadata_qa
+      outcome: answer
+    expected_sources:
+      - "glossary_terms:sessions"
+      - "metrics:session_count"
+    status: approved
+    evidence: *cases
+    confidence: 1.0

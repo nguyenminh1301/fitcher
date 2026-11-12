@@ -1,0 +1,398 @@
+{
+  "$defs": {
+    "ColumnInfo": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "type": {
+          "enum": [
+            "string",
+            "number",
+            "date",
+            "datetime",
+            "boolean"
+          ],
+          "title": "Type",
+          "type": "string"
+        },
+        "role": {
+          "enum": [
+            "dimension",
+            "measure",
+            "time"
+          ],
+          "title": "Role",
+          "type": "string"
+        },
+        "format": {
+          "anyOf": [
+            {
+              "enum": [
+                "currency",
+                "count",
+                "ratio",
+                "percent",
+                "days",
+                "number"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Format"
+        }
+      },
+      "required": [
+        "name",
+        "type",
+        "role"
+      ],
+      "title": "ColumnInfo",
+      "type": "object"
+    },
+    "EvidenceRef": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "enum": [
+            "manual",
+            "profile",
+            "doc",
+            "error",
+            "trace"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "ref": {
+          "title": "Ref",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "ref"
+      ],
+      "title": "EvidenceRef",
+      "type": "object"
+    },
+    "Result": {
+      "additionalProperties": false,
+      "properties": {
+        "columns": {
+          "items": {
+            "$ref": "#/$defs/ColumnInfo"
+          },
+          "minItems": 1,
+          "title": "Columns",
+          "type": "array"
+        },
+        "rows": {
+          "items": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "type": "array"
+          },
+          "maxItems": 5000,
+          "title": "Rows",
+          "type": "array"
+        },
+        "row_count": {
+          "minimum": 0,
+          "title": "Row Count",
+          "type": "integer"
+        },
+        "truncated": {
+          "default": false,
+          "title": "Truncated",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "columns",
+        "rows",
+        "row_count"
+      ],
+      "title": "Result",
+      "type": "object"
+    },
+    "ReviewEvidence": {
+      "additionalProperties": false,
+      "description": "The evidence shown first: a cited document, else the first entry.",
+      "properties": {
+        "source": {
+          "title": "Source",
+          "type": "string"
+        },
+        "quote": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Quote"
+        },
+        "deleted": {
+          "default": false,
+          "title": "Deleted",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "source"
+      ],
+      "title": "ReviewEvidence",
+      "type": "object"
+    },
+    "ReviewedSpec": {
+      "additionalProperties": false,
+      "description": "The QuerySpec a proposal's example settles for its question, without periods (DECISIONS §6 step 7).",
+      "properties": {
+        "metric_ids": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Metric Ids",
+          "type": "array"
+        },
+        "dataset": {
+          "minLength": 1,
+          "title": "Dataset",
+          "type": "string"
+        },
+        "dimensions": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Dimensions",
+          "type": "array"
+        },
+        "filters": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/SpecFilter"
+          },
+          "title": "Filters",
+          "type": "array"
+        },
+        "top_n": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Top N"
+        },
+        "rank_by": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Rank By"
+        }
+      },
+      "required": [
+        "metric_ids",
+        "dataset"
+      ],
+      "title": "ReviewedSpec",
+      "type": "object"
+    },
+    "SpecFilter": {
+      "additionalProperties": false,
+      "properties": {
+        "column": {
+          "minLength": 1,
+          "title": "Column",
+          "type": "string"
+        },
+        "op": {
+          "enum": [
+            "=",
+            "!=",
+            "in",
+            "not in"
+          ],
+          "title": "Op",
+          "type": "string"
+        },
+        "values": {
+          "items": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "boolean"
+              }
+            ]
+          },
+          "minItems": 1,
+          "title": "Values",
+          "type": "array"
+        }
+      },
+      "required": [
+        "column",
+        "op",
+        "values"
+      ],
+      "title": "SpecFilter",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "title": "Id",
+      "type": "string"
+    },
+    "file": {
+      "title": "File",
+      "type": "string"
+    },
+    "name": {
+      "title": "Name",
+      "type": "string"
+    },
+    "kind": {
+      "enum": [
+        "item",
+        "proposal"
+      ],
+      "title": "Kind",
+      "type": "string"
+    },
+    "status": {
+      "enum": [
+        "draft",
+        "approved"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "confidence": {
+      "title": "Confidence",
+      "type": "number"
+    },
+    "body": {
+      "title": "Body",
+      "type": "string"
+    },
+    "formula": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Formula"
+    },
+    "evidence": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ReviewEvidence"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "evidence_refs": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/EvidenceRef"
+      },
+      "title": "Evidence Refs",
+      "type": "array"
+    },
+    "test_result": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Result"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "spec": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ReviewedSpec"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "spec_reviewed": {
+      "default": false,
+      "title": "Spec Reviewed",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "id",
+    "file",
+    "name",
+    "kind",
+    "status",
+    "confidence",
+    "body"
+  ],
+  "title": "ReviewItem",
+  "type": "object"
+}

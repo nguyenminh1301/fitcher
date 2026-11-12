@@ -1,0 +1,7 @@
+# Fixable High/Critical advisories in ghcr.io/berriai/litellm:v1.106.7 that only an upstream release can fix.
+# The tag was the newest stable release when scanned on 2026-11-04; see SECURITY.md, Image exceptions.
+# Each entry expires; after that date the finding blocks the image audit again.
+vulnerabilities:
+  - id: CVE-2026-112940
+    statement: Bundled filelock in the upstream image; fixed only by a new upstream release.
+    expired_at: 2026-12-31

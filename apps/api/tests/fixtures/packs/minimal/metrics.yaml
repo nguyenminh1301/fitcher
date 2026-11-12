@@ -1,0 +1,23 @@
+metrics:
+  - id: widget_revenue
+    name: Widget revenue
+    description: Total amount paid for widgets.
+    dataset: widget_sales
+    sql_expr: sum(sale_amount)
+    grain: day
+    unit: currency
+    owner: fixture
+    status: approved
+    evidence: [{kind: manual, ref: fixture}]
+    confidence: 1.0
+  - id: refunded_value
+    name: Refunded value
+    description: Total amount refunded.
+    dataset: widget_refunds
+    sql_expr: sum(refund_total)
+    grain: day
+    unit: currency
+    owner: fixture
+    status: approved
+    evidence: [{kind: manual, ref: fixture}]
+    confidence: 1.0

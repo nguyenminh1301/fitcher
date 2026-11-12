@@ -23,7 +23,10 @@ reviews:
     drafts: false
     base_branches: ["^develop$", "^main$"]
     ignore_title_keywords: ["WIP", "[skip review]"]
+  # Code only, by owner decision: agent instructions and documentation are
+  # never reviewed. Keep these exclusions; do not re-add those paths.
   path_filters:
+    - "**"
     - "!**/node_modules/**"
     - "!**/.next/**"
     - "!**/.venv/**"
@@ -31,31 +34,56 @@ reviews:
     - "!.workspace/**"
     - "!data/**"
     - "!**/*.parquet"
+    - "!AGENTS.md"
+    - "!CLAUDE.md"
+    - "!.agents/**"
+    - "!.claude/**"
+    - "!docs/**"
+    - "!*.md"
+    - "!**/README.md"
+    - "!.github/pull_request_template.md"
+    - "!.github/ISSUE_TEMPLATE/**"
   path_instructions:
     - path: "**/*"
       instructions: >-
-        fitcher currently contains documentation and repository governance only.
-        Next.js, FastAPI, LangGraph, DuckDB and pgvector are planned, not implemented.
-        Review against the stated change and AGENTS.md. Prioritize correctness,
-        security and regressions. Do not require speculative services or abstractions.
+        fitcher follows the domain-neutral architecture in docs/DECISIONS.md and
+        delivers it phase by phase per docs/MASTER_PLAN.md and docs/plans/. The
+        repository is currently a monorepo scaffold (apps/api, apps/web, packs, dbt,
+        jobs, infra). Review against the stated change, its phase plan and AGENTS.md.
+        Prioritize correctness, security and regressions. Do not require features
+        from later phases or components DECISIONS lists as out of scope.
         Tests should prove changed behavior or a real boundary.
     - path: "**/*.py"
       instructions: >-
         Preserve Windows and Linux support. Keep credentials server-side and avoid
-        logging keys or private data. For future API/agent code, check cancellation,
-        bounded outbound calls, SELECT-only SQL validation, query resource limits
-        and consistent embedding model/dimensions. Do not require absent features.
+        logging keys or private data. Verify GET /health remains a local liveness
+        probe. LLM calls must use LiteLLM aliases, never model names, and unit tests
+        must mock LLM, search and embedding clients. Engine code under apps/ must not
+        hard-code pack table, column, metric or industry names. When present, check
+        SELECT-only SQL guarding, role-scoped execution, query resource limits,
+        cancellation and consistent embedding dimensions. Do not require absent features.
     - path: "**/*.{ts,tsx,js,jsx}"
       instructions: >-
         Preserve server/client boundaries. Never expose secrets through NEXT_PUBLIC
         variables or browser code. Check loading/error/cancellation behavior and
         accessibility when UI behavior changes.
+    - path: "{compose.yaml,**/Dockerfile,infra/**}"
+      instructions: >-
+        Preserve loopback-bound local services, health/readiness behavior and
+        persistent volume contents. Initialization scripts run only for new
+        volumes; editing them does not upgrade existing databases.
+        Require an explicit existing-database upgrade plan when relevant, without
+        assuming a migration framework or deleting volumes as a shortcut.
     - path: ".github/**"
       instructions: >-
         Use least-privilege permissions and pinned action versions. Never interpolate
         untrusted PR titles or branch names directly into executable shell text.
         Do not run untrusted code under pull_request_target. Keep Git policy checks
         aligned with .github/git-policy.json and .agents/rules/git_workflow.md.
+        Verification reports must use actual Python/uv and Next.js/npm commands
+        when relevant; do not require removed PR checklist sections. CI runs governance,
+        Linux API tests, web checks and security scans. Image gates block fixable High/Critical
+        advisories and retain all findings; assess reachability and unfixed risks separately.
   pre_merge_checks:
     docstrings:
       mode: "off"
@@ -82,5 +110,6 @@ knowledge_base:
     enabled: true
     filePatterns:
       - AGENTS.md
-      - .agents/rules/git_workflow.md
+      - docs/DECISIONS.md
+      - .agents/rules/*.md
       - CONTRIBUTING.md

@@ -1,0 +1,73 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "title": "Id",
+      "type": "string"
+    },
+    "name": {
+      "title": "Name",
+      "type": "string"
+    },
+    "size": {
+      "title": "Size",
+      "type": "integer"
+    },
+    "media_type": {
+      "title": "Media Type",
+      "type": "string"
+    },
+    "status": {
+      "enum": [
+        "processing",
+        "indexed",
+        "failed"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "error": {
+      "default": "",
+      "title": "Error",
+      "type": "string"
+    },
+    "roles": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Roles",
+      "type": "array"
+    },
+    "chunk_count": {
+      "title": "Chunk Count",
+      "type": "integer"
+    },
+    "blocked_chunks": {
+      "title": "Blocked Chunks",
+      "type": "integer"
+    },
+    "uploaded_by": {
+      "title": "Uploaded By",
+      "type": "string"
+    },
+    "uploaded_at": {
+      "format": "date-time",
+      "title": "Uploaded At",
+      "type": "string"
+    }
+  },
+  "required": [
+    "id",
+    "name",
+    "size",
+    "media_type",
+    "status",
+    "roles",
+    "chunk_count",
+    "blocked_chunks",
+    "uploaded_by",
+    "uploaded_at"
+  ],
+  "title": "DocumentView",
+  "type": "object"
+}

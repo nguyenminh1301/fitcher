@@ -1,0 +1,17 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "roles": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Roles",
+      "type": "array"
+    }
+  },
+  "required": [
+    "roles"
+  ],
+  "title": "UserRoles",
+  "type": "object"
+}

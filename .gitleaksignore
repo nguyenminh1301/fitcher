@@ -1,0 +1,6 @@
+# Findings the Git secret scan reports that were checked and are not secrets, one gitleaks fingerprint
+# (commit:file:rule:line) per line. Add an entry only for a verified false positive in a pushed commit,
+# and change the flagged text so later commits do not repeat it.
+
+# The api URL of a conversation route test, read as a generic API key; the test now compares only the path.
+0beccd17f329e2cd3de440710afeabede8a1589d:apps/web/tests/conversation-routes.test.ts:generic-api-key:73

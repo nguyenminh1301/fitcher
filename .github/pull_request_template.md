@@ -1,21 +1,20 @@
-## Change
+## Summary
 
-Describe the concrete problem and resulting behavior.
-Link an issue when relevant; include screenshots for visual changes and call out configuration, contract or migration changes.
+<!-- Describe what this PR does and why. Include context a reviewer needs to understand the change. -->
 
-## Validation
+## Type of change
 
-List commands run and actual results; mark unavailable or irrelevant checks with a reason.
+- [ ] New feature
+- [ ] Bug fix
+- [ ] Refactor (no behavior change)
+- [ ] Database schema / initialization change
+- [ ] Configuration / infrastructure change
+- [ ] Tests only
 
-- [ ] Repository and Git policy checks pass
-- [ ] Workflow lint passes when Actions files change
-- [ ] Relevant application checks pass, or N/A because no application code is affected
-- [ ] CHANGELOG.md updated
-- [ ] No secrets or private datasets in the diff
-- [ ] CodeRabbit reviewed the latest commit; all actionable findings fixed or answered
+## Module(s) affected
 
-## Branches and review
+<!-- List affected areas: api, web, agent, pack, db, infra, deps, common or ci. Name the phase from docs/MASTER_PLAN.md when relevant. -->
 
-- [ ] Normal work starts from and targets `develop`, or this is an owner-approved release to `main`
-- [ ] Commits and title follow the one-line conventional format and scope allowlist
-- [ ] PR is at most 1000 changed lines where practical and fewer than 100 changed files
+## Related issues
+
+Closes #ISSUE_NUMBER

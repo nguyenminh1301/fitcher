@@ -1,0 +1,116 @@
+{
+  "$defs": {
+    "EvalLayer": {
+      "additionalProperties": false,
+      "properties": {
+        "passed": {
+          "title": "Passed",
+          "type": "integer"
+        },
+        "failed": {
+          "title": "Failed",
+          "type": "integer"
+        },
+        "not_scored": {
+          "title": "Not Scored",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "passed",
+        "failed",
+        "not_scored"
+      ],
+      "title": "EvalLayer",
+      "type": "object"
+    },
+    "FailedCase": {
+      "additionalProperties": false,
+      "properties": {
+        "case_id": {
+          "title": "Case Id",
+          "type": "string"
+        },
+        "category": {
+          "title": "Category",
+          "type": "string"
+        },
+        "reason": {
+          "title": "Reason",
+          "type": "string"
+        }
+      },
+      "required": [
+        "case_id",
+        "category",
+        "reason"
+      ],
+      "title": "FailedCase",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "title": "Id",
+      "type": "string"
+    },
+    "ts": {
+      "format": "date-time",
+      "title": "Ts",
+      "type": "string"
+    },
+    "passed": {
+      "title": "Passed",
+      "type": "boolean"
+    },
+    "threshold": {
+      "title": "Threshold",
+      "type": "number"
+    },
+    "layers": {
+      "additionalProperties": {
+        "$ref": "#/$defs/EvalLayer"
+      },
+      "title": "Layers",
+      "type": "object"
+    },
+    "categories": {
+      "additionalProperties": {
+        "type": "string"
+      },
+      "title": "Categories",
+      "type": "object"
+    },
+    "failed_cases": {
+      "items": {
+        "$ref": "#/$defs/FailedCase"
+      },
+      "title": "Failed Cases",
+      "type": "array"
+    },
+    "regressed": {
+      "anyOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Regressed"
+    }
+  },
+  "required": [
+    "id",
+    "ts",
+    "passed",
+    "threshold",
+    "layers",
+    "categories",
+    "failed_cases"
+  ],
+  "title": "EvalReportView",
+  "type": "object"
+}

@@ -1,0 +1,51 @@
+<clickhouse>
+    <!--
+        One named collection per source manifest under jobs/sources (DECISIONS §4
+        Data sources), named after the manifest. Every value is read from the
+        environment, so the read-only source credentials live only in .env and in
+        this server: engine definitions and sync queries name the collection, and
+        system.named_collections hides the secrets. Only the source_loader user
+        (users.d/sources.xml) may use these collections.
+
+        A new source adds a block here and its <PREFIX>_* variables to the
+        clickhouse service in compose.yaml. The fixture blocks serve the
+        `sources` Compose profile.
+    -->
+    <named_collections>
+        <fixture_postgres>
+            <host from_env="FIXTURE_POSTGRES_HOST"/>
+            <port from_env="FIXTURE_POSTGRES_PORT"/>
+            <database from_env="FIXTURE_POSTGRES_DATABASE"/>
+            <user from_env="FIXTURE_POSTGRES_USER"/>
+            <password from_env="FIXTURE_POSTGRES_PASSWORD"/>
+        </fixture_postgres>
+        <!-- Iowa Liquor Sales 2025 in the fixture PostgreSQL (infra/sources/iowa_liquor). -->
+        <iowa_liquor>
+            <host from_env="IOWA_LIQUOR_POSTGRES_HOST"/>
+            <port from_env="IOWA_LIQUOR_POSTGRES_PORT"/>
+            <database from_env="IOWA_LIQUOR_POSTGRES_DATABASE"/>
+            <user from_env="IOWA_LIQUOR_POSTGRES_USER"/>
+            <password from_env="IOWA_LIQUOR_POSTGRES_PASSWORD"/>
+        </iowa_liquor>
+        <fixture_mysql>
+            <host from_env="FIXTURE_MYSQL_HOST"/>
+            <port from_env="FIXTURE_MYSQL_PORT"/>
+            <database from_env="FIXTURE_MYSQL_DATABASE"/>
+            <user from_env="FIXTURE_MYSQL_USER"/>
+            <password from_env="FIXTURE_MYSQL_PASSWORD"/>
+        </fixture_mysql>
+        <fixture_mongodb>
+            <host from_env="FIXTURE_MONGODB_HOST"/>
+            <port from_env="FIXTURE_MONGODB_PORT"/>
+            <database from_env="FIXTURE_MONGODB_DATABASE"/>
+            <user from_env="FIXTURE_MONGODB_USER"/>
+            <password from_env="FIXTURE_MONGODB_PASSWORD"/>
+        </fixture_mongodb>
+        <!-- compose.yaml builds the bucket URL from FIXTURE_FILES_HOST, _PORT and _DATABASE. -->
+        <fixture_files>
+            <url from_env="FIXTURE_FILES_URL"/>
+            <access_key_id from_env="FIXTURE_FILES_USER"/>
+            <secret_access_key from_env="FIXTURE_FILES_PASSWORD"/>
+        </fixture_files>
+    </named_collections>
+</clickhouse>

@@ -15,11 +15,28 @@ REQUIRED = [
     ".github/pull_request_template.md", ".github/dependabot.yml",
     ".github/workflows/ci.yml", ".github/workflows/pr-lint.yml",
     ".github/workflows/pr-size.yml",
+    "CLAUDE.md", ".workspace/README.md", ".workspace/.gitignore",
+    *[f".workspace/{folder}/.gitkeep" for folder in ("plans", "progress", "reports", "scripts", "tmp")],
 ]
 
 
 def main():
     errors = [f"Missing required file: {name}" for name in REQUIRED if not (ROOT / name).is_file()]
+    agent_files = {str(path.relative_to(ROOT / ".agents")) for path in (ROOT / ".agents").rglob("*") if path.is_file()}
+    claude_files = {str(path.relative_to(ROOT / ".claude")) for path in (ROOT / ".claude").rglob("*") if path.is_file()}
+    if agent_files != claude_files:
+        errors.append("Agent rule and skill mirrors must contain the same files")
+    for name in agent_files & claude_files:
+        if (ROOT / ".agents" / name).read_bytes() != (ROOT / ".claude" / name).read_bytes():
+            errors.append(f"Agent instruction mirrors differ: {name}")
+    scratch_paths = [f".workspace/{folder}/nested/README.md" for folder in ("plans", "progress", "reports", "scripts", "tmp")]
+    structure_paths = [name for name in REQUIRED if name.startswith(".workspace/")]
+    ignored = subprocess.run(
+        ["git", "check-ignore", "--no-index", "--stdin", "-z"], cwd=ROOT,
+        input=("\0".join(scratch_paths + structure_paths) + "\0").encode("utf-8"), capture_output=True,
+    )
+    if ignored.returncode not in (0, 1) or set(ignored.stdout.decode("utf-8").rstrip("\0").split("\0")) != set(scratch_paths):
+        errors.append("Workspace ignore rules must preserve structure files and exclude working content")
     result = subprocess.run(
         ["git", "ls-files", "--cached", "--others", "--exclude-standard", "-z"],
         cwd=ROOT, capture_output=True, check=True,
@@ -33,6 +50,8 @@ def main():
         if path.suffix.lower() in {".png", ".jpg", ".jpeg", ".ico", ".pdf", ".woff", ".woff2"}:
             continue
         raw = path.read_bytes()
+        if path.name == ".gitkeep" and not raw:
+            continue
         if b"\0" in raw:
             continue
         try:

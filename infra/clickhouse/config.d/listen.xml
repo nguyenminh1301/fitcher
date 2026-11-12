@@ -1,0 +1,4 @@
+<clickhouse>
+    <!-- Listen on all container interfaces; Compose publishes the ports on host loopback only. -->
+    <listen_host replace="replace">0.0.0.0</listen_host>
+</clickhouse>

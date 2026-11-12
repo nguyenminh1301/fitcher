@@ -1,0 +1,11 @@
+# Gemini models of the catalog (DECISIONS §2). Loaded only when GEMINI_API_KEY is set.
+requires: [GEMINI_API_KEY]
+model_list:
+  - model_name: gemini-small
+    litellm_params:
+      model: gemini/gemini-2.5-flash
+      api_key: os.environ/GEMINI_API_KEY
+  - model_name: gemini-medium
+    litellm_params:
+      model: gemini/gemini-2.5-pro
+      api_key: os.environ/GEMINI_API_KEY

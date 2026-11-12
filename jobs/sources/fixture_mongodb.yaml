@@ -1,0 +1,35 @@
+# Lab fixture: the synthetic widget dataset of infra/sources/fixtures served by
+# the MongoDB fixture of the `sources` Compose profile. Its credentials are the
+# FIXTURE_MONGODB_* variables, read by the fixture_mongodb named collection in
+# infra/clickhouse/config.d/sources.xml. The four fixture manifests feed the
+# same fixture_widgets dbt models, one source at a time.
+# Collections are flat, so they are read live with declared columns as well.
+name: fixture_mongodb
+kind: mongodb
+mode: copy
+connection_env: FIXTURE_MONGODB
+dbt_tag: fixture_widgets
+tables:
+  - name: widgets
+    expected_rows: 40
+    columns:
+      - {name: widget_id, type: String}
+      - {name: widget_name, type: String}
+      - {name: category, type: String}
+      - {name: list_price, type: String}
+  - name: sales
+    expected_rows: 3000
+    columns:
+      - {name: sale_id, type: String}
+      - {name: sold_on, type: String}
+      - {name: widget_id, type: String}
+      - {name: region, type: String}
+      - {name: quantity, type: Int32}
+      - {name: sale_amount, type: String}
+  - name: refunds
+    expected_rows: 300
+    columns:
+      - {name: refund_id, type: String}
+      - {name: sale_id, type: String}
+      - {name: refunded_on, type: String}
+      - {name: refund_total, type: String}

@@ -1,0 +1,7 @@
+# Fixable High/Critical advisories in quay.io/keycloak/keycloak:26.8.1 that only an upstream release can fix.
+# The tag was the newest stable release when scanned on 2026-10-30; see SECURITY.md, Image exceptions.
+# Each entry expires; after that date the finding blocks the image audit again.
+vulnerabilities:
+  - id: CVE-2026-102554
+    statement: Bundled com.google.guava:guava in the upstream image; fixed only by a new upstream release.
+    expired_at: 2026-12-31

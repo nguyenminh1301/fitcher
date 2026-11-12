@@ -1,0 +1,122 @@
+metrics:
+  - id: net_sales
+    name: Net sales
+    description: Amount of order lines in orders that were not cancelled; returns are not deducted.
+    dataset: sales_lines
+    sql_expr: sumIf(line_amount, order_status != 'cancelled')
+    grain: day
+    unit: currency
+    owner: sales analytics
+    status: approved
+    evidence: &marts [{kind: manual, ref: dbt/models/ecommerce_twin/marts/schema.yml}]
+    confidence: 1.0
+
+  - id: units_sold
+    name: Units sold
+    description: Units on order lines in orders that were not cancelled.
+    dataset: sales_lines
+    sql_expr: sumIf(quantity, order_status != 'cancelled')
+    grain: day
+    unit: count
+    owner: sales analytics
+    status: approved
+    evidence: *marts
+    confidence: 1.0
+
+  - id: order_count
+    name: Orders
+    description: Number of distinct orders that were not cancelled.
+    dataset: sales_lines
+    sql_expr: uniqExactIf(order_id, order_status != 'cancelled')
+    grain: day
+    unit: count
+    owner: sales analytics
+    status: approved
+    evidence: *marts
+    confidence: 1.0
+
+  - id: average_order_value
+    name: Average order value
+    description: Net sales divided by the number of orders that were not cancelled.
+    dataset: sales_lines
+    sql_expr: >-
+      sumIf(line_amount, order_status != 'cancelled')
+      / nullIf(uniqExactIf(order_id, order_status != 'cancelled'), 0)
+    grain: day
+    unit: currency
+    owner: sales analytics
+    status: approved
+    evidence: *marts
+    confidence: 1.0
+
+  - id: line_return_rate
+    name: Line return rate
+    description: Share of order lines that were returned, among lines in orders that were not cancelled.
+    dataset: sales_lines
+    sql_expr: countIf(is_returned AND order_status != 'cancelled') / nullIf(countIf(order_status != 'cancelled'), 0)
+    grain: day
+    unit: ratio
+    owner: sales analytics
+    status: approved
+    evidence: *marts
+    confidence: 1.0
+
+  - id: refund_total
+    name: Refunds
+    description: Amount refunded for returned lines, dated by the return date.
+    dataset: returns_fact
+    sql_expr: sum(refund_amount)
+    grain: day
+    unit: currency
+    owner: customer operations
+    status: approved
+    evidence: *marts
+    confidence: 1.0
+
+  - id: return_count
+    name: Returns
+    description: Number of returned order lines, dated by the return date.
+    dataset: returns_fact
+    sql_expr: count()
+    grain: day
+    unit: count
+    owner: customer operations
+    status: approved
+    evidence: *marts
+    confidence: 1.0
+
+  - id: average_days_to_return
+    name: Average days to return
+    description: Average number of days between the order and its return.
+    dataset: returns_fact
+    sql_expr: avg(days_to_return)
+    grain: day
+    unit: days
+    owner: customer operations
+    status: approved
+    evidence: *marts
+    confidence: 1.0
+
+  - id: session_count
+    name: Sessions
+    description: Number of site sessions.
+    dataset: sessions_daily
+    sql_expr: sum(sessions)
+    grain: day
+    unit: count
+    owner: marketing
+    status: approved
+    evidence: *marts
+    confidence: 1.0
+
+  - id: conversion_rate
+    name: Conversion rate
+    description: Share of sessions that converted into an order.
+    dataset: sessions_daily
+    sql_expr: sum(converted_sessions) / nullIf(sum(sessions), 0)
+    grain: day
+    unit: ratio
+    owner: marketing
+    status: approved
+    evidence: *marts
+    confidence: 1.0

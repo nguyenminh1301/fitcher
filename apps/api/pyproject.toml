@@ -1,0 +1,49 @@
+[project]
+name = "fitcher-api"
+version = "0.1.0"
+description = "Domain-neutral natural-language data analysis API"
+requires-python = ">=3.13,<3.14"
+dependencies = [
+    "clickhouse-connect==1.11.0",
+    "fastapi==0.162.0",
+    "httpx==0.28.1",
+    "jsonschema==4.26.0",
+    "langgraph==1.2.16",
+    # The screening classifier (app/screening/classifier.py) runs on CPU with ONNX Runtime.
+    "numpy==2.5.4",
+    "onnxruntime==1.31.1",
+    "opentelemetry-sdk==1.45.1",
+    # Company documents (app/onboarding): read-only parsers; uploads are multipart forms.
+    "openpyxl==3.1.5",
+    "pydantic==2.14.1",
+    "pyjwt[crypto]==2.15.1",
+    "pypdf==6.21.4",
+    "python-docx==1.2.0",
+    "python-multipart==0.0.32",
+    "pyyaml==6.0.3",
+    # Reviewed pack YAML is rewritten keeping comments, anchors and order.
+    "ruamel.yaml==0.19.1",
+    "sqlglot==30.23.0",
+    "tokenizers==0.23.3",
+    # zoneinfo reads IANA zones from this package on Windows, which has no system zone database.
+    "tzdata==2026.6; sys_platform == 'win32'",
+    "uvicorn==0.54.0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest==9.2.0",
+]
+jobs = [
+    "dbt-clickhouse==1.10.3",
+    "dbt-core==1.12.6",
+    "huggingface-hub==2.4.0",
+    "pyarrow==26.0.0",
+]
+
+[tool.uv]
+default-groups = ["dev", "jobs"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests", "../../jobs/tests"]
+pythonpath = [".", "../.."]

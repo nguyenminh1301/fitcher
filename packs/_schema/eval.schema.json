@@ -1,0 +1,89 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "eval.yaml",
+  "description": "Questions labelled with the expected result per layer: intent, extraction, retrieval and execution.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["cases"],
+  "properties": {
+    "reference_date": {
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+      "description": "Date every case is asked on, so relative periods resolve the same way in every run."
+    },
+    "cases": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "question", "language", "category", "role", "expected", "status", "evidence", "confidence"],
+        "properties": {
+          "id": {"$ref": "common.schema.json#/$defs/id"},
+          "question": {"$ref": "common.schema.json#/$defs/text"},
+          "language": {"$ref": "common.schema.json#/$defs/language"},
+          "category": {
+            "type": "string",
+            "enum": [
+              "two_period_compare", "top_n", "string_filter", "monthly_trend", "ambiguous", "unauthorized", "out_of_scope",
+              "follow_up", "chart_edit", "definition"
+            ]
+          },
+          "expected_sources": {
+            "description": "Search hits retrieval must return, as <index>:<key>: the item id, dataset.column for a column, dataset.column=value for a column value. Required for definition cases, whose answer comes from these hits.",
+            "type": "array",
+            "uniqueItems": true,
+            "items": {"type": "string", "pattern": "^(glossary_terms|metrics|datasets|column_values|examples|kb_docs):.+$"}
+          },
+          "role": {"$ref": "common.schema.json#/$defs/id", "description": "Role the question is asked as."},
+          "previous_question": {
+            "$ref": "common.schema.json#/$defs/text",
+            "description": "Asked first in the same conversation; the case's question follows it up. Required for follow_up and chart_edit cases."
+          },
+          "expected": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["intent", "outcome"],
+            "properties": {
+              "intent": {"type": "string", "enum": ["data_query", "metadata_qa", "chart_edit", "out_of_scope"]},
+              "outcome": {"type": "string", "enum": ["answer", "clarify", "deny"]},
+              "metrics": {"type": "array", "items": {"$ref": "common.schema.json#/$defs/id"}},
+              "periods": {
+                "description": "Half-open date ranges [start, end).",
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["label", "start", "end"],
+                  "properties": {
+                    "label": {"$ref": "common.schema.json#/$defs/text"},
+                    "start": {"type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}$"},
+                    "end": {"type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}$"}
+                  }
+                }
+              },
+              "top_n": {"type": "integer", "minimum": 1},
+              "rank_by": {"$ref": "common.schema.json#/$defs/id", "description": "Metric the result is ranked by."},
+              "dataset": {"$ref": "common.schema.json#/$defs/id"},
+              "columns": {"type": "array", "items": {"$ref": "common.schema.json#/$defs/name"}}
+            }
+          },
+          "expected_sql": {"$ref": "common.schema.json#/$defs/text", "description": "Reference SQL whose result the answer must match."},
+          "expected_rows": {
+            "description": "Reference rows the answer must match, as column name -> value; set instead of expected_sql.",
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "minProperties": 1,
+              "additionalProperties": {"type": ["string", "number", "boolean", "null"]}
+            }
+          },
+          "active_from_phase": {"type": "integer", "minimum": 0, "description": "Delivery phase that builds the feature this case needs; earlier phases skip the case."},
+          "status": {"$ref": "common.schema.json#/$defs/status"},
+          "evidence": {"$ref": "common.schema.json#/$defs/evidence"},
+          "confidence": {"$ref": "common.schema.json#/$defs/confidence"}
+        }
+      }
+    }
+  }
+}

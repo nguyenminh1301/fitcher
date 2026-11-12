@@ -15,13 +15,12 @@ venv/
 node_modules/
 .next/
 out/
+*.tsbuildinfo
 
 # Local datasets and databases
 data/
+!apps/api/app/data/
 *.parquet
-*.duckdb
-*.duckdb.wal
-pgdata/
 
 # Local files
 *.log
@@ -29,5 +28,14 @@ pgdata/
 Thumbs.db
 
 # Local agent scratch files
-.workspace/
 .worktrees/
+
+# dbt build output
+dbt/target/
+dbt/logs/
+
+# Compiled Domain Packs
+build/
+
+# Written by `next dev` on every start; the repository keeps agent instructions in AGENTS.md and .agents/ only.
+apps/web/AGENTS.md

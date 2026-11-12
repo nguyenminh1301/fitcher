@@ -1,0 +1,17 @@
+# Free Synthetic E-commerce Twin, the Phase 1 lab dataset.
+# Licence: CC BY-NC 4.0, non-commercial use only. Downloads stay in ignored data/.
+# Every date column, sessions.session_start included, is a YYYY-MM-DD string with
+# no time of day, so staging types them as Date without a timezone conversion.
+# Row counts match the dataset card at this revision.
+name: ecommerce_twin
+hf_repo: ziadatalabs/FreeEcommerceTwin14M
+revision: d1bddd9a97a4fe31fd193e48c5826bbcd2b3022f
+dbt_tag: ecommerce_twin
+tables:
+  - {name: customers, file: customers.parquet, format: parquet, expected_rows: 1000000}
+  - {name: products, file: products.parquet, format: parquet, expected_rows: 50000}
+  - {name: sessions, file: sessions.parquet, format: parquet, expected_rows: 7455296}
+  - {name: orders, file: orders.parquet, format: parquet, expected_rows: 1075683}
+  - {name: order_items, file: order_items.parquet, format: parquet, expected_rows: 4280732}
+  - {name: returns, file: returns.parquet, format: parquet, expected_rows: 400293}
+  - {name: support_tickets, file: support_tickets.parquet, format: parquet, expected_rows: 66938}

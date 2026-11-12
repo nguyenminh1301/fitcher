@@ -1,0 +1,31 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "trace_id": {
+      "maxLength": 64,
+      "minLength": 1,
+      "title": "Trace Id",
+      "type": "string"
+    },
+    "rating": {
+      "enum": [
+        "like",
+        "dislike"
+      ],
+      "title": "Rating",
+      "type": "string"
+    },
+    "note": {
+      "default": "",
+      "maxLength": 1000,
+      "title": "Note",
+      "type": "string"
+    }
+  },
+  "required": [
+    "trace_id",
+    "rating"
+  ],
+  "title": "FeedbackInput",
+  "type": "object"
+}

@@ -1,0 +1,87 @@
+{
+  "realm": "finch",
+  "enabled": true,
+  "sslRequired": "external",
+  "registrationAllowed": false,
+  "roles": {
+    "realm": [
+      {"name": "analyst", "description": "Pack role: reads every mart and column."},
+      {"name": "marketing", "description": "Pack role: reads site traffic and conversion only."},
+      {"name": "northwest_sales", "description": "Pack role: reads sales and returns of the Northwest region only."},
+      {"name": "category_partner", "description": "Pack role: reads daily totals by product category only."},
+      {"name": "pack_reviewer", "description": "Console role: reviews pack items, documents, datasets, feedback and evaluation."},
+      {"name": "admin", "description": "Console role: runs, audit, costs, evaluation and users."}
+    ]
+  },
+  "users": [
+    {"username": "lab.analyst", "email": "lab.analyst@fitcher.test", "emailVerified": true, "firstName": "Lab", "lastName": "Analyst", "enabled": true, "realmRoles": ["analyst"]},
+    {"username": "lab.marketing", "email": "lab.marketing@fitcher.test", "emailVerified": true, "firstName": "Lab", "lastName": "Marketing", "enabled": true, "realmRoles": ["marketing"]},
+    {"username": "lab.northwest", "email": "lab.northwest@fitcher.test", "emailVerified": true, "firstName": "Lab", "lastName": "Northwest", "enabled": true, "realmRoles": ["northwest_sales"]},
+    {"username": "lab.partner", "email": "lab.partner@fitcher.test", "emailVerified": true, "firstName": "Lab", "lastName": "Partner", "enabled": true, "realmRoles": ["category_partner"]},
+    {"username": "lab.reviewer", "email": "lab.reviewer@fitcher.test", "emailVerified": true, "firstName": "Lab", "lastName": "Reviewer", "enabled": true, "realmRoles": ["pack_reviewer", "analyst"]},
+    {"username": "lab.admin", "email": "lab.admin@fitcher.test", "emailVerified": true, "firstName": "Lab", "lastName": "Admin", "enabled": true, "realmRoles": ["admin", "analyst"]},
+    {"username": "service-account-fitcher-admin-api", "enabled": true, "serviceAccountClientId": "fitcher-admin-api", "clientRoles": {"realm-management": ["view-users", "manage-users"]}}
+  ],
+  "clients": [
+    {
+      "clientId": "finch-web",
+      "name": "fitcher web",
+      "enabled": true,
+      "publicClient": true,
+      "protocol": "openid-connect",
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "rootUrl": "http://localhost:3000",
+      "redirectUris": ["http://localhost:3000/auth/callback"],
+      "webOrigins": ["http://localhost:3000"],
+      "defaultClientScopes": ["web-origins", "acr", "profile", "roles", "basic", "email"],
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "http://localhost:3000/*"
+      },
+      "protocolMappers": [
+        {
+          "name": "finch-api audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {"included.custom.audience": "finch-api", "access.token.claim": "true", "id.token.claim": "false"}
+        }
+      ]
+    },
+    {
+      "clientId": "finch-cli",
+      "name": "fitcher lab command line",
+      "description": "Lab only: password grant for curl against the api; no browser sign-in.",
+      "enabled": true,
+      "publicClient": true,
+      "protocol": "openid-connect",
+      "standardFlowEnabled": false,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": true,
+      "serviceAccountsEnabled": false,
+      "defaultClientScopes": ["acr", "profile", "roles", "basic", "email"],
+      "protocolMappers": [
+        {
+          "name": "finch-api audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {"included.custom.audience": "finch-api", "access.token.claim": "true", "id.token.claim": "false"}
+        }
+      ]
+    },
+    {
+      "clientId": "fitcher-admin-api",
+      "name": "fitcher api user administration",
+      "enabled": true,
+      "publicClient": false,
+      "protocol": "openid-connect",
+      "secret": "${KEYCLOAK_ADMIN_API_SECRET}",
+      "standardFlowEnabled": false,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": true
+    }
+  ]
+}

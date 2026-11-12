@@ -1,0 +1,9 @@
+# A local model served by Ollama (Compose profile local-models; DECISIONS §2).
+# Loaded only when OLLAMA_URL is set; pull the model once with
+# docker compose --profile local-models exec ollama ollama pull qwen2.5-coder:7b
+requires: [OLLAMA_URL]
+model_list:
+  - model_name: local-small
+    litellm_params:
+      model: ollama_chat/qwen2.5-coder:7b
+      api_base: os.environ/OLLAMA_URL

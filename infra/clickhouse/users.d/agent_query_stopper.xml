@@ -1,0 +1,26 @@
+<clickhouse>
+    <!--
+        agent_query_stopper lets the api stop the query of an answer whose
+        client went away (KILL QUERY). KILL QUERY WHERE reads system.processes,
+        which shows every user's running SQL, so the per-role agent users may
+        not run it themselves. This user reads no data: it may only list
+        running queries and stop them, and the api only ever stops one agent
+        query by its id and user. Its password comes from the clickhouse
+        container environment; being configuration, it applies to new and
+        existing volumes on every server start.
+    -->
+    <users>
+        <agent_query_stopper>
+            <password from_env="CLICKHOUSE_QUERY_STOPPER_PASSWORD"/>
+            <profile>default</profile>
+            <quota>default</quota>
+            <networks>
+                <ip>::/0</ip>
+            </networks>
+            <grants>
+                <query>GRANT SELECT ON system.processes</query>
+                <query>GRANT KILL QUERY ON *.*</query>
+            </grants>
+        </agent_query_stopper>
+    </users>
+</clickhouse>

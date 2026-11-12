@@ -1,0 +1,24 @@
+# Gateway settings shared by every catalog block. The model list is not here:
+# build_config.py adds each block of catalog/ whose provider key is set and
+# writes the merged file LiteLLM starts with (DECISIONS §2 Model tiers).
+
+# A model that rejects a request parameter, such as a fixed temperature,
+# receives the request without it instead of failing.
+litellm_settings:
+  drop_params: true
+  # One agent_logs.llm_calls row per call (callbacks/clickhouse_logger.py,
+  # mounted next to this file).
+  callbacks: clickhouse_logger.proxy_handler_instance
+
+general_settings:
+  master_key: os.environ/LITELLM_MASTER_KEY
+
+# Rejects any request without the api's screening metadata and reruns the
+# EN/VI rules on every message (callbacks/screening_guard.py and its rules
+# copy screening_rules.py, mounted next to this file; DECISIONS §9).
+guardrails:
+  - guardrail_name: screening-guard
+    litellm_params:
+      guardrail: screening_guard.ScreeningGuard
+      mode: pre_call
+      default_on: true

@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "metrics.yaml",
+  "description": "Named measures, each a single ClickHouse aggregate expression over one dataset.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["metrics"],
+  "properties": {
+    "metrics": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "name", "description", "dataset", "sql_expr", "grain", "unit", "owner", "status", "evidence", "confidence"],
+        "properties": {
+          "id": {"$ref": "common.schema.json#/$defs/id"},
+          "name": {"$ref": "common.schema.json#/$defs/text"},
+          "description": {"$ref": "common.schema.json#/$defs/text"},
+          "dataset": {"$ref": "common.schema.json#/$defs/id"},
+          "sql_expr": {"$ref": "common.schema.json#/$defs/text", "description": "One aggregate expression over the dataset columns."},
+          "grain": {"type": "string", "enum": ["day", "week", "month", "quarter", "year"], "description": "Finest time grain the metric can be reported at."},
+          "unit": {"type": "string", "enum": ["currency", "count", "ratio", "percent", "days", "number"]},
+          "owner": {"$ref": "common.schema.json#/$defs/text"},
+          "status": {"$ref": "common.schema.json#/$defs/status"},
+          "evidence": {"$ref": "common.schema.json#/$defs/evidence"},
+          "confidence": {"$ref": "common.schema.json#/$defs/confidence"}
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,307 @@
+"""Scoring one eval case per layer from the final graph state."""
+
+from agent_fixtures import GOOD_SQL, deps, extraction_reply, routing_reply
+
+from app.agent.errors import AgentError
+from app.agent.graph import run_question
+from app.agent.nodes.retrieve import Hit, Retrieval
+from app.agent.state import Attempt
+from app.contracts.result import ColumnInfo, Result
+from app.agent.nodes.gate import Denial
+from app.eval.scorers import (
+    LAYERS, retrieved_candidates, score_case, score_execution, score_extraction, score_retrieval,
+)
+from app.packs.models import EvalCase, EvalExpected, EvalPeriod
+from app.packs.search_indices import value_id
+
+Q1_2024 = EvalPeriod(label="Q1 2024", start="2024-01-01", end="2024-04-01")
+Q1_2025 = EvalPeriod(label="Q1 2025", start="2025-01-01", end="2025-04-01")
+
+
+def _expected(**updates) -> EvalExpected:
+    base = EvalExpected(
+        intent="data_query", outcome="answer", periods=[Q1_2024, Q1_2025], top_n=10, rank_by="widget_revenue",
+        dataset="widget_sales", columns=["widget_name"],
+    )
+    return base.model_copy(update=updates)
+
+
+def _case(**updates) -> EvalCase:
+    case = EvalCase(
+        id="top_widgets", question="Top 10 widgets in Q1 2024 vs Q1 2025", language="en", category="two_period_compare",
+        role="viewer", expected=_expected(), expected_sql="SELECT 1", status="approved",
+        evidence=[{"kind": "manual", "ref": "fixture"}], confidence=1.0,
+    )
+    return case.model_copy(update=updates)
+
+
+def _answered_state():
+    return run_question("Top widgets", deps([routing_reply(), extraction_reply(), GOOD_SQL, "Blue led."]))
+
+
+def _reference(rows) -> Result:
+    columns = [
+        ColumnInfo(name="widget", type="string", role="dimension"),
+        ColumnInfo(name="revenue", type="number", role="measure"),
+    ]
+    return Result(columns=columns, rows=rows, row_count=len(rows))
+
+
+def _hit(index: str, **source) -> Hit:
+    return Hit(index=index, id="doc", score=1.0, source=source)
+
+
+# extraction
+
+def test_extraction_passes_when_periods_top_n_and_rank_by_match():
+    assert score_extraction(_expected(), _answered_state()).status == "pass"
+
+
+def test_extraction_reports_each_differing_field():
+    score = score_extraction(_expected(top_n=5, periods=[Q1_2025]), _answered_state())
+
+    assert score.status == "fail"
+    assert "top_n: expected 5, got 10" in score.reason
+    assert "periods: expected" in score.reason
+    assert "rank_by" not in score.reason
+
+
+def test_extraction_fails_without_extraction():
+    score = score_extraction(_expected(), {"rejection": "the question could not be read: boom"})
+
+    assert (score.status, score.reason) == ("fail", "no extraction")
+
+
+# retrieval
+
+def test_retrieval_recall_counts_dataset_and_columns():
+    retrieval = Retrieval(dimension_terms={"widgets": [
+        _hit("datasets", type="column", dataset="widget_sales", payload={"column": "widget_name"}),
+    ]})
+
+    score = score_retrieval(_expected(columns=["widget_name", "sale_amount"]), {"retrieval": retrieval})
+
+    assert score.status == "fail"
+    assert score.recall == 2 / 3
+    assert score.reason == "missing: widget_sales.sale_amount"
+
+
+def test_retrieval_counts_time_column_of_a_retrieved_dataset():
+    retrieval = Retrieval(datasets=[
+        _hit("datasets", type="dataset", dataset="widget_sales", payload={"time_column": "sold_on"}),
+    ])
+
+    score = score_retrieval(_expected(columns=["sold_on"]), {"retrieval": retrieval})
+
+    assert (score.status, score.recall) == ("pass", 1.0)
+
+
+def test_retrieval_counts_glossary_value_and_example_targets():
+    retrieval = Retrieval(
+        metric_terms={"revenue": [_hit("glossary_terms", payload={"targets": [
+            {"kind": "column", "dataset": "widget_sales", "column": "sale_amount"},
+        ]})]},
+        values={"Blue": [_hit("column_values", dataset="widget_sales", payload={"column": "widget_name", "value": "Blue"})]},
+        examples=[_hit("examples", payload={"datasets": ["widget_refunds"]})],
+    )
+
+    datasets, columns = retrieved_candidates(retrieval)
+
+    assert datasets == {"widget_sales", "widget_refunds"}
+    assert columns == {("widget_sales", "sale_amount"), ("widget_sales", "widget_name")}
+
+
+def test_retrieval_not_scored_without_labels():
+    score = score_retrieval(_expected(dataset=None, columns=[]), {"retrieval": Retrieval()})
+
+    assert score.status == "not_scored"
+
+
+def test_retrieval_fails_when_it_did_not_run():
+    score = score_retrieval(_expected(), {"rejection": "the question names no period"})
+
+    assert (score.status, score.reason, score.recall) == ("fail", "retrieval did not run", 0.0)
+
+
+# execution
+
+def test_execution_matches_reference():
+    score = score_execution(_case(), _answered_state(), _reference([[f"Widget {number}", 10.5] for number in range(7)]))
+
+    assert score.status == "pass"
+
+
+def test_execution_reports_the_comparison_reason():
+    score = score_execution(_case(), _answered_state(), _reference([["Widget 0", 10.5]]))
+
+    assert (score.status, score.reason) == ("fail", "expected 1 rows, got 7")
+
+
+def test_execution_fails_with_rejection_reason():
+    state = run_question("Widgets on Mars?", deps([routing_reply(), extraction_reply(filters=[{"column_term": None, "op": "=", "values": ["Mars"]}])]))
+
+    score = score_execution(_case(), state, _reference([["Widget 0", 10.5]]))
+
+    assert (score.status, score.reason) == ("fail", "rejected: no value of widget_sales matches \'Mars\'")
+
+
+def test_execution_fails_with_last_sql_error():
+    error = AgentError("sql", "execute", "Unknown identifier")
+    state = {"attempts": [Attempt(tier="sql-gen", sql="SELECT x", error=error)], "result": None}
+
+    score = score_execution(_case(), state, _reference([["Widget 0", 10.5]]))
+
+    assert (score.status, score.reason) == ("fail", "sql error in execute: Unknown identifier")
+
+
+# whole case
+
+def test_active_case_scores_every_layer():
+    score = score_case(_case(), _answered_state(), _reference([[f"Widget {number}", 10.5] for number in range(7)]), active=True)
+
+    assert list(score.layers) == list(LAYERS)
+    assert score.layers["intent"].status == "pass"
+    assert [score.layers[layer].status for layer in ("extraction", "retrieval", "execution")] == ["pass", "fail", "pass"]
+    assert (score.case_id, score.category, score.active) == ("top_widgets", "two_period_compare", True)
+
+
+def test_inactive_case_is_not_scored_on_any_layer():
+    score = score_case(_case(active_from_phase=8), {}, None, active=False)
+
+    assert {layer.status for layer in score.layers.values()} == {"not_scored"}
+    assert "active from phase 8" in score.layers["execution"].reason
+
+
+# deny cases
+
+def _deny_case():
+    expected = EvalExpected(intent="data_query", outcome="deny", metrics=["widget_revenue"], dataset="widget_sales")
+    return _case(category="unauthorized", expected=expected, expected_sql=None, active_from_phase=6)
+
+
+def test_deny_case_passes_when_the_run_was_denied():
+    denied = {"intent": "data_query", "denial": Denial(dataset="widget_sales", blocked=["widget_sales"], message="Your role ...")}
+
+    score = score_case(_deny_case(), denied, None, active=True)
+
+    assert (score.layers["intent"].status, score.layers["execution"].status) == ("pass", "pass")
+    assert {score.layers[layer].status for layer in ("extraction", "retrieval")} == {"not_scored"}
+
+
+def test_deny_case_fails_when_the_run_answered():
+    score = score_case(_deny_case(), _answered_state(), None, active=True)
+
+    assert score.layers["execution"].status == "fail"
+    assert score.layers["execution"].reason == "expected a denial, but the question was answered"
+
+
+# intent, clarify and out-of-scope cases
+
+def test_intent_is_scored_from_the_router():
+    misrouted = {**_answered_state(), "intent": "out_of_scope"}
+
+    score = score_case(_case(), misrouted, None, active=True)
+
+    assert (score.layers["intent"].status, score.layers["intent"].reason) == ("fail", "expected data_query, got out_of_scope")
+
+
+def _clarify_case():
+    return _case(category="ambiguous", expected=_expected(outcome="clarify", rank_by=None, dataset=None, columns=[]), expected_sql=None)
+
+
+def test_clarify_case_passes_when_the_run_clarifies():
+    state = run_question("Best widgets?", deps([routing_reply(), extraction_reply(rank_term="best")]))
+
+    score = score_case(_clarify_case(), state, None, active=True)
+
+    assert {name: layer.status for name, layer in score.layers.items()} == {
+        "intent": "pass", "extraction": "pass", "retrieval": "not_scored", "execution": "pass",
+    }
+
+
+def test_clarify_case_fails_when_the_run_answered():
+    score = score_case(_clarify_case(), _answered_state(), None, active=True)
+
+    assert score.layers["execution"].reason == "expected a clarifying question, but the question was answered"
+
+
+def _out_of_scope_case():
+    return _case(category="out_of_scope", expected=EvalExpected(intent="out_of_scope", outcome="answer"), expected_sql=None)
+
+
+def test_out_of_scope_case_passes_on_a_reply_without_sql():
+    state = run_question("Write a poem", deps([routing_reply("out_of_scope"), "I answer data questions."]))
+
+    score = score_case(_out_of_scope_case(), state, None, active=True)
+
+    assert {name: layer.status for name, layer in score.layers.items()} == {
+        "intent": "pass", "extraction": "not_scored", "retrieval": "not_scored", "execution": "pass",
+    }
+
+
+def test_out_of_scope_case_fails_when_the_question_was_answered_with_sql():
+    score = score_case(_out_of_scope_case(), _answered_state(), None, active=True)
+
+    assert score.layers["intent"].status == "fail"
+    assert score.layers["execution"].reason == "expected an out-of-scope reply, but SQL was generated"
+
+
+def test_deny_case_names_a_clarifying_question_it_got_instead():
+    asked = run_question("Best widgets?", deps([routing_reply(), extraction_reply(rank_term="best")]))
+
+    score = score_case(_deny_case(), asked, None, active=True)
+
+    assert score.layers["execution"].reason == "expected a denial, but the run asked a clarifying question"
+
+
+def _chart_edit_case():
+    return _case(category="chart_edit", expected=EvalExpected(intent="chart_edit", outcome="answer"), expected_sql=None,
+                 previous_question="Top widgets")
+
+
+def test_chart_edit_case_passes_on_a_chart_spec_without_sql():
+    answered = _answered_state()
+    redrawn = {"intent": "chart_edit", "result": answered["result"], "chart_spec": object(), "attempts": []}
+
+    score = score_case(_chart_edit_case(), redrawn, None, active=True)
+
+    assert {name: layer.status for name, layer in score.layers.items()} == {
+        "intent": "pass", "extraction": "not_scored", "retrieval": "not_scored", "execution": "pass",
+    }
+
+
+def test_chart_edit_case_fails_when_sql_ran():
+    score = score_case(_chart_edit_case(), {**_answered_state(), "intent": "chart_edit"}, None, active=True)
+
+    assert score.layers["execution"].reason == "expected the previous result redrawn, but SQL was generated"
+
+
+def _definition(**updates) -> EvalCase:
+    return _case(
+        id="revenue_meaning", question="What does widget revenue mean?", category="definition", expected_sql=None,
+        expected=EvalExpected(intent="metadata_qa", outcome="answer"),
+        expected_sources=["glossary_terms:revenue", "column_values:widget_sales.widget_name=Blue Widget"], **updates,
+    )
+
+
+def test_a_definition_case_scores_its_sources_and_the_reply():
+    value = value_id("widget_sales", "widget_name", "Blue Widget")
+    state = {"intent": "metadata_qa", "reply": "Revenue is ...", "sources": ["glossary_terms:revenue", f"column_values:{value}"]}
+
+    score = score_case(_definition(), state, None, active=True)
+
+    assert {layer: item.status for layer, item in score.layers.items()} == {
+        "intent": "pass", "extraction": "not_scored", "retrieval": "pass", "execution": "pass",
+    }
+    assert score.layers["retrieval"].recall == 1.0
+
+
+def test_a_definition_case_names_the_missing_source_and_fails_on_sql():
+    state = {"intent": "metadata_qa", "reply": "Revenue is ...", "sources": ["glossary_terms:revenue"], "attempts": [object()]}
+
+    score = score_case(_definition(), state, None, active=True)
+
+    retrieval = score.layers["retrieval"]
+    assert (retrieval.status, retrieval.recall) == ("fail", 0.5)
+    assert retrieval.reason == "missing: column_values:widget_sales.widget_name=Blue Widget"
+    assert score.layers["execution"].reason == "expected a definition, but SQL was generated"

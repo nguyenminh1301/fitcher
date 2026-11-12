@@ -1,0 +1,11 @@
+# Anthropic models of the catalog (DECISIONS §2). Loaded only when ANTHROPIC_API_KEY is set.
+requires: [ANTHROPIC_API_KEY]
+model_list:
+  - model_name: anthropic-small
+    litellm_params:
+      model: anthropic/claude-haiku-5-5
+      api_key: os.environ/ANTHROPIC_API_KEY
+  - model_name: anthropic-medium
+    litellm_params:
+      model: anthropic/claude-sonnet-5-5
+      api_key: os.environ/ANTHROPIC_API_KEY

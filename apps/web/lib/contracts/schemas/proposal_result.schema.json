@@ -1,0 +1,51 @@
+{
+  "additionalProperties": false,
+  "description": "The proposal stored from one run, or why the run cannot become one.",
+  "properties": {
+    "proposed": {
+      "title": "Proposed",
+      "type": "boolean"
+    },
+    "proposal_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Proposal Id"
+    },
+    "question": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Question"
+    },
+    "reason": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Reason"
+    }
+  },
+  "required": [
+    "proposed"
+  ],
+  "title": "ProposalResult",
+  "type": "object"
+}

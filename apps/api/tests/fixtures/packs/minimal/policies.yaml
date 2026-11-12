@@ -1,0 +1,11 @@
+roles:
+  - id: viewer
+    description: Reads every fixture dataset.
+    datasets:
+      - dataset: widget_sales
+        columns: [sale_ref, sold_on, widget_name, sale_amount]
+      - dataset: widget_refunds
+        columns: [refund_ref, refunded_on, sale_ref, refund_total]
+    status: approved
+    evidence: [{kind: manual, ref: fixture}]
+    confidence: 1.0

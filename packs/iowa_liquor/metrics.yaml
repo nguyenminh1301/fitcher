@@ -1,0 +1,178 @@
+metrics:
+  - id: total_sales_dollars
+    confidence: 0.98
+    name: Total Sales Dollars
+    description: Total dollar value of liquor sales recorded in the dataset.
+    dataset: liquor_sales
+    sql_expr: sum(sale_dollars)
+    grain: day
+    unit: currency
+    owner: Revenue Operations
+    evidence:
+      - kind: profile
+        ref: liquor_sales.sale_dollars
+    status: approved
+  - id: total_bottles_sold
+    confidence: 0.98
+    name: Total Bottles Sold
+    description: Total number of bottles sold across all liquor sales transactions.
+    dataset: liquor_sales
+    sql_expr: sum(bottles_sold)
+    grain: day
+    unit: count
+    owner: Sales Operations
+    evidence:
+      - kind: profile
+        ref: liquor_sales.bottles_sold
+    status: approved
+  - id: total_liters_sold
+    confidence: 0.97
+    name: Total Liters Sold
+    description: Total liters of liquor sold across all recorded sales.
+    dataset: liquor_sales
+    sql_expr: sum(liters_sold)
+    grain: day
+    unit: number
+    owner: Sales Operations
+    evidence:
+      - kind: profile
+        ref: liquor_sales.liters_sold
+    status: approved
+  - id: total_state_margin
+    confidence: 0.96
+    name: Total State Margin
+    description: Total state margin amount captured on liquor sales transactions.
+    dataset: liquor_sales
+    sql_expr: sum(state_margin)
+    grain: day
+    unit: currency
+    owner: Finance
+    evidence:
+      - kind: profile
+        ref: liquor_sales.state_margin
+    status: approved
+  - id: average_sale_dollars_per_invoice_line
+    confidence: 0.9
+    name: Average Sale Dollars per Invoice Line
+    description: Average sales dollars per recorded invoice line in the liquor sales dataset.
+    dataset: liquor_sales
+    sql_expr: avg(sale_dollars)
+    grain: day
+    unit: currency
+    owner: Revenue Operations
+    evidence:
+      - kind: profile
+        ref: liquor_sales.sale_dollars
+      - kind: profile
+        ref: liquor_sales.invoice_id
+    status: approved
+  - id: average_bottles_sold_per_line
+    confidence: 0.92
+    name: Average Bottles Sold per Line
+    description: Average number of bottles sold per recorded sales line.
+    dataset: liquor_sales
+    sql_expr: avg(bottles_sold)
+    grain: day
+    unit: number
+    owner: Sales Operations
+    evidence:
+      - kind: profile
+        ref: liquor_sales.bottles_sold
+    status: approved
+  - id: average_liters_sold_per_line
+    confidence: 0.92
+    name: Average Liters Sold per Line
+    description: Average liters sold per recorded sales line.
+    dataset: liquor_sales
+    sql_expr: avg(liters_sold)
+    grain: day
+    unit: number
+    owner: Sales Operations
+    evidence:
+      - kind: profile
+        ref: liquor_sales.liters_sold
+    status: approved
+  - id: distinct_invoices
+    confidence: 0.95
+    name: Distinct Invoices
+    description: Count of distinct invoice identifiers appearing in liquor sales records.
+    dataset: liquor_sales
+    sql_expr: uniqExact(invoice_id)
+    grain: day
+    unit: count
+    owner: Sales Operations
+    evidence:
+      - kind: profile
+        ref: liquor_sales.invoice_id
+    status: approved
+  - id: distinct_stores_selling
+    confidence: 0.95
+    name: Distinct Stores Selling
+    description: Count of distinct stores with recorded liquor sales.
+    dataset: liquor_sales
+    sql_expr: uniqExact(store_number)
+    grain: day
+    unit: count
+    owner: Sales Operations
+    evidence:
+      - kind: profile
+        ref: liquor_sales.store_number
+    status: approved
+  - id: distinct_items_sold
+    confidence: 0.94
+    name: Distinct Items Sold
+    description: Count of distinct item numbers sold in recorded liquor transactions.
+    dataset: liquor_sales
+    sql_expr: uniqExact(item_number)
+    grain: day
+    unit: count
+    owner: Category Management
+    evidence:
+      - kind: profile
+        ref: liquor_sales.item_number
+    status: approved
+  - id: average_state_margin_rate
+    confidence: 0.88
+    name: Average State Margin Rate
+    description: 'State margin as a share of sales dollars: total state margin divided by total sales dollars.'
+    dataset: liquor_sales
+    sql_expr: sum(state_margin) / nullIf(sum(sale_dollars), 0)
+    grain: day
+    unit: ratio
+    owner: Finance
+    evidence:
+      - kind: profile
+        ref: liquor_sales.state_margin
+      - kind: profile
+        ref: liquor_sales.sale_dollars
+    status: approved
+  - id: average_retail_per_bottle
+    confidence: 0.9
+    name: Average Retail per Bottle
+    description: 'Sales dollars per bottle sold: total sales dollars divided by total bottles sold.'
+    dataset: liquor_sales
+    sql_expr: sum(sale_dollars) / nullIf(sum(bottles_sold), 0)
+    grain: day
+    unit: currency
+    owner: Pricing
+    evidence:
+      - kind: profile
+        ref: liquor_sales.sale_dollars
+      - kind: profile
+        ref: liquor_sales.bottles_sold
+    status: approved
+  - id: average_retail_per_liter
+    confidence: 0.9
+    name: Average Retail per Liter
+    description: 'Sales dollars per liter sold: total sales dollars divided by total liters sold.'
+    dataset: liquor_sales
+    sql_expr: sum(sale_dollars) / nullIf(sum(liters_sold), 0)
+    grain: day
+    unit: currency
+    owner: Pricing
+    evidence:
+      - kind: profile
+        ref: liquor_sales.sale_dollars
+      - kind: profile
+        ref: liquor_sales.liters_sold
+    status: approved

@@ -1,0 +1,938 @@
+{
+  "pack": "ecommerce_twin",
+  "reference_date": "2026-01-15",
+  "threshold": 0.8,
+  "cases": [
+    {
+      "case_id": "top_products_q1_2024_vs_q1_2025",
+      "category": "two_period_compare",
+      "question": "Top 10 sản phẩm bán chạy nhất quý 1 năm 2024 so với quý 1 năm 2025",
+      "active": true,
+      "layers": {
+        "intent": {
+          "status": "not_scored",
+          "reason": "router not built",
+          "recall": null
+        },
+        "extraction": {
+          "status": "pass",
+          "reason": null,
+          "recall": null
+        },
+        "retrieval": {
+          "status": "pass",
+          "reason": null,
+          "recall": 1.0
+        },
+        "execution": {
+          "status": "pass",
+          "reason": null,
+          "recall": null
+        }
+      },
+      "error": null,
+      "seconds": 8.643
+    },
+    {
+      "case_id": "top_brands_by_units_2025",
+      "category": "top_n",
+      "question": "Top 5 brands by units sold in 2025",
+      "active": true,
+      "layers": {
+        "intent": {
+          "status": "not_scored",
+          "reason": "router not built",
+          "recall": null
+        },
+        "extraction": {
+          "status": "pass",
+          "reason": null,
+          "recall": null
+        },
+        "retrieval": {
+          "status": "pass",
+          "reason": null,
+          "recall": 1.0
+        },
+        "execution": {
+          "status": "pass",
+          "reason": null,
+          "recall": null
+        }
+      },
+      "error": null,
+      "seconds": 5.163
+    },
+    {
+      "case_id": "electronics_net_sales_west_2024",
+      "category": "string_filter",
+      "question": "Doanh thu ngành hàng Electronics ở khu vực West năm 2024 là bao nhiêu?",
+      "active": true,
+      "layers": {
+        "intent": {
+          "status": "not_scored",
+          "reason": "router not built",
+          "recall": null
+        },
+        "extraction": {
+          "status": "pass",
+          "reason": null,
+          "recall": null
+        },
+        "retrieval": {
+          "status": "pass",
+          "reason": null,
+          "recall": 1.0
+        },
+        "execution": {
+          "status": "pass",
+          "reason": null,
+          "recall": null
+        }
+      },
+      "error": null,
+      "seconds": 5.736
+    },
+    {
+      "case_id": "monthly_conversion_rate_2025",
+      "category": "monthly_trend",
+      "question": "Monthly conversion rate in 2025",
+      "active": true,
+      "layers": {
+        "intent": {
+          "status": "not_scored",
+          "reason": "router not built",
+          "recall": null
+        },
+        "extraction": {
+          "status": "pass",
+          "reason": null,
+          "recall": null
+        },
+        "retrieval": {
+          "status": "pass",
+          "reason": null,
+          "recall": 1.0
+        },
+        "execution": {
+          "status": "pass",
+          "reason": null,
+          "recall": null
+        }
+      },
+      "error": null,
+      "seconds": 4.427
+    },
+    {
+      "case_id": "best_product_without_measure",
+      "category": "ambiguous",
+      "question": "Sản phẩm nào tốt nhất năm 2025?",
+      "active": false,
+      "layers": {
+        "intent": {
+          "status": "not_scored",
+          "reason": "not yet scored: active from phase 8",
+          "recall": null
+        },
+        "extraction": {
+          "status": "not_scored",
+          "reason": "not yet scored: active from phase 8",
+          "recall": null
+        },
+        "retrieval": {
+          "status": "not_scored",
+          "reason": "not yet scored: active from phase 8",
+          "recall": null
+        },
+        "execution": {
+          "status": "not_scored",
+          "reason": "not yet scored: active from phase 8",
+          "recall": null
+        }
+      },
+      "error": null,
+      "seconds": 0.0
+    },
+    {
+      "case_id": "marketing_asks_for_refunds",
+      "category": "unauthorized",
+      "question": "Tổng tiền hoàn trả năm 2025 là bao nhiêu?",
+      "active": false,
+      "layers": {
+        "intent": {
+          "status": "not_scored",
+          "reason": "not yet scored: active from phase 6",
+          "recall": null
+        },
+        "extraction": {
+          "status": "not_scored",
+          "reason": "not yet scored: active from phase 6",
+          "recall": null
+        },
+        "retrieval": {
+          "status": "not_scored",
+          "reason": "not yet scored: active from phase 6",
+          "recall": null
+        },
+        "execution": {
+          "status": "not_scored",
+          "reason": "not yet scored: active from phase 6",
+          "recall": null
+        }
+      },
+      "error": null,
+      "seconds": 0.0
+    },
+    {
+      "case_id": "weather_question",
+      "category": "out_of_scope",
+      "question": "Thời tiết Hà Nội hôm nay thế nào?",
+      "active": false,
+      "layers": {
+        "intent": {
+          "status": "not_scored",
+          "reason": "not yet scored: active from phase 8",
+          "recall": null
+        },
+        "extraction": {
+          "status": "not_scored",
+          "reason": "not yet scored: active from phase 8",
+          "recall": null
+        },
+        "retrieval": {
+          "status": "not_scored",
+          "reason": "not yet scored: active from phase 8",
+          "recall": null
+        },
+        "execution": {
+          "status": "not_scored",
+          "reason": "not yet scored: active from phase 8",
+          "recall": null
+        }
+      },
+      "error": null,
+      "seconds": 0.0
+    },
+    {
+      "case_id": "net_sales_by_region_2024_vs_2025",
+      "category": "two_period_compare",
+      "question": "Net sales by region in 2024 compared with 2025",
+      "active": true,
+      "layers": {
+        "intent": {
+          "status": "not_scored",
+          "reason": "router not built",
+          "recall": null
+        },
+        "extraction": {
+          "status": "pass",
+          "reason": null,
+          "recall": null
+        },
+        "retrieval": {
+          "status": "pass",
+          "reason": null,
+          "recall": 1.0
+        },
+        "execution": {
+          "status": "pass",
+          "reason": null,
+          "recall": null
+        }
+      },
+      "error": null,
+      "seconds": 6.943
+    },
+    {
+      "case_id": "orders_q4_2025_vs_q4_2024",
+      "category": "two_period_compare",
+      "question": "Số đơn hàng quý 4 năm 2025 so với quý 4 năm 2024",
+      "active": true,
+      "layers": {
+        "intent": {
+          "status": "not_scored",
+          "reason": "router not built",
+          "recall": null
+        },
+        "extraction": {
+          "status": "pass",
+          "reason": null,
+          "recall": null
+        },
+        "retrieval": {
+          "status": "pass",
+          "reason": null,
+          "recall": 1.0
+        },
+        "execution": {
+          "status": "pass",
+          "reason": null,
+          "recall": null
+        }
+      },
+      "error": null,
+      "seconds": 5.944
+    },
+    {
+      "case_id": "conversion_rate_by_device_dec_2025_vs_dec_2024",
+      "category": "two_period_compare",
+      "question": "Conversion rate by device in December 2025 versus December 2024",
+      "active": true,
+      "layers": {
+        "intent": {
+          "status": "not_scored",
+          "reason": "router not built",
+          "recall": null
+        },
+        "extraction": {
+          "status": "pass",
+          "reason": null,
+          "recall": null
+        },
+        "retrieval": {
+          "status": "pass",
+          "reason": null,
+          "recall": 1.0
+        },
+        "execution": {
+          "status": "pass",
+          "reason": null,
+          "recall": null
+        }
+      },
+      "error": null,
+      "seconds": 10.272
+    },
+    {
+      "case_id": "refunds_last_quarter_vs_same_quarter_last_year",
+      "category": "two_period_compare",
+      "question": "Tiền hoàn trả quý trước so với cùng kỳ năm ngoái",
+      "active": true,
+      "layers": {
+        "intent": {
+          "status": "not_scored",
+          "reason": "router not built",
+          "recall": null
+        },
+        "extraction": {
+          "status": "fail",
+          "reason": "periods: expected [('2024-10-01', '2025-01-01'), ('2025-10-01', '2026-01-01')], got [('2025-01-01', '2025-04-01'), ('2025-10-01', '2026-01-01')]",
+          "recall": null
+        },
+        "retrieval": {
+          "status": "pass",
+          "reason": null,
+          "recall": 1.0
+        },
+        "execution": {
+          "status": "fail",
+          "reason": "no column matches measure refund_total_q4_2024",
+          "recall": null
+        }
+      },
+      "error": null,
+      "seconds": 5.821
+    },
+    {
+      "case_id": "top_categories_by_net_sales_2025",
+      "category": "top_n",
+      "question": "Top 3 ngành hàng có doanh thu cao nhất năm 2025",
+      "active": true,
+      "layers": {
+        "intent": {
+          "status": "not_scored",
+          "reason": "router not built",
+          "recall": null
+        },
+        "extraction": {
+          "status": "pass",
+          "reason": null,
+          "recall": null
+        },
+        "retrieval": {
+          "status": "pass",
+          "reason": null,
+          "recall": 1.0
+        },
+        "execution": {
+          "status": "pass",
+          "reason": null,
+          "recall": null
+        }
+      },
+      "error": null,
+      "seconds": 5.679
+    },
+    {
+      "case_id": "top_subcategories_by_units_last_month",
+      "category": "top_n",
+      "question": "Top 5 subcategories by units sold last month",
+      "active": true,
+      "layers": {
+        "intent": {
+          "status": "not_scored",
+          "reason": "router not built",
+          "recall": null
+        },
+        "extraction": {
+          "status": "pass",
+          "reason": null,
+          "recall": null
+        },
+        "retrieval": {
+          "status": "pass",
+          "reason": null,
+          "recall": 1.0
+        },
+        "execution": {
+          "status": "pass",
+          "reason": null,
+          "recall": null
+        }
+      },
+      "error": null,
+      "seconds": 4.869
+    },
+    {
+      "case_id": "top_channels_by_sessions_2025",
+      "category": "top_n",
+      "question": "Top 3 traffic channels by sessions in 2025",
+      "active": true,
+      "layers": {
+        "intent": {
+          "status": "not_scored",
+          "reason": "router not built",
+          "recall": null
+        },
+        "extraction": {
+          "status": "pass",
+          "reason": null,
+          "recall": null
+        },
+        "retrieval": {
+          "status": "pass",
+          "reason": null,
+          "recall": 1.0
+        },
+        "execution": {
+          "status": "pass",
+          "reason": null,
+          "recall": null
+        }
+      },
+      "error": null,
+      "seconds": 4.083
+    },
+    {
+      "case_id": "top_return_reasons_by_refunds_2025",
+      "category": "top_n",
+      "question": "Top 3 lý do trả hàng có tổng tiền hoàn trả lớn nhất năm 2025",
+      "active": true,
+      "layers": {
+        "intent": {
+          "status": "not_scored",
+          "reason": "router not built",
+          "recall": null
+        },
+        "extraction": {
+          "status": "pass",
+          "reason": null,
+          "recall": null
+        },
+        "retrieval": {
+          "status": "pass",
+          "reason": null,
+          "recall": 1.0
+        },
+        "execution": {
+          "status": "pass",
+          "reason": null,
+          "recall": null
+        }
+      },
+      "error": null,
+      "seconds": 4.884
+    },
+    {
+      "case_id": "top_customers_by_net_sales_q2_2025",
+      "category": "top_n",
+      "question": "Top 10 customers by net sales in Q2 2025",
+      "active": true,
+      "layers": {
+        "intent": {
+          "status": "not_scored",
+          "reason": "router not built",
+          "recall": null
+        },
+        "extraction": {
+          "status": "pass",
+          "reason": null,
+          "recall": null
+        },
+        "retrieval": {
+          "status": "pass",
+          "reason": null,
+          "recall": 1.0
+        },
+        "execution": {
+          "status": "fail",
+          "reason": "expected 10 rows, got 4",
+          "recall": null
+        }
+      },
+      "error": null,
+      "seconds": 4.704
+    },
+    {
+      "case_id": "vip_net_sales_2025",
+      "category": "string_filter",
+      "question": "Net sales from VIP customers in 2025",
+      "active": true,
+      "layers": {
+        "intent": {
+          "status": "not_scored",
+          "reason": "router not built",
+          "recall": null
+        },
+        "extraction": {
+          "status": "pass",
+          "reason": null,
+          "recall": null
+        },
+        "retrieval": {
+          "status": "pass",
+          "reason": null,
+          "recall": 1.0
+        },
+        "execution": {
+          "status": "pass",
+          "reason": null,
+          "recall": null
+        }
+      },
+      "error": null,
+      "seconds": 5.168
+    },
+    {
+      "case_id": "paypal_orders_q3_2025",
+      "category": "string_filter",
+      "question": "Số đơn hàng thanh toán bằng PayPal trong quý 3 năm 2025",
+      "active": true,
+      "layers": {
+        "intent": {
+          "status": "not_scored",
+          "reason": "router not built",
+          "recall": null
+        },
+        "extraction": {
+          "status": "pass",
+          "reason": null,
+          "recall": null
+        },
+        "retrieval": {
+          "status": "pass",
+          "reason": null,
+          "recall": 1.0
+        },
+        "execution": {
+          "status": "pass",
+          "reason": null,
+          "recall": null
+        }
+      },
+      "error": null,
+      "seconds": 4.677
+    },
+    {
+      "case_id": "mobile_sessions_last_month",
+      "category": "string_filter",
+      "question": "Sessions on mobile last month",
+      "active": true,
+      "layers": {
+        "intent": {
+          "status": "not_scored",
+          "reason": "router not built",
+          "recall": null
+        },
+        "extraction": {
+          "status": "pass",
+          "reason": null,
+          "recall": null
+        },
+        "retrieval": {
+          "status": "pass",
+          "reason": null,
+          "recall": 1.0
+        },
+        "execution": {
+          "status": "pass",
+          "reason": null,
+          "recall": null
+        }
+      },
+      "error": null,
+      "seconds": 4.225
+    },
+    {
+      "case_id": "defective_returns_2025",
+      "category": "string_filter",
+      "question": "Có bao nhiêu lượt trả hàng với lý do defective trong năm 2025?",
+      "active": true,
+      "layers": {
+        "intent": {
+          "status": "not_scored",
+          "reason": "router not built",
+          "recall": null
+        },
+        "extraction": {
+          "status": "pass",
+          "reason": null,
+          "recall": null
+        },
+        "retrieval": {
+          "status": "pass",
+          "reason": null,
+          "recall": 1.0
+        },
+        "execution": {
+          "status": "pass",
+          "reason": null,
+          "recall": null
+        }
+      },
+      "error": null,
+      "seconds": 4.502
+    },
+    {
+      "case_id": "apparel_average_order_value_northeast_2024",
+      "category": "string_filter",
+      "question": "Average order value for Apparel in the Northeast region in 2024",
+      "active": true,
+      "layers": {
+        "intent": {
+          "status": "not_scored",
+          "reason": "router not built",
+          "recall": null
+        },
+        "extraction": {
+          "status": "pass",
+          "reason": null,
+          "recall": null
+        },
+        "retrieval": {
+          "status": "pass",
+          "reason": null,
+          "recall": 1.0
+        },
+        "execution": {
+          "status": "pass",
+          "reason": null,
+          "recall": null
+        }
+      },
+      "error": null,
+      "seconds": 4.887
+    },
+    {
+      "case_id": "monthly_orders_2024",
+      "category": "monthly_trend",
+      "question": "Số đơn hàng theo tháng năm 2024",
+      "active": true,
+      "layers": {
+        "intent": {
+          "status": "not_scored",
+          "reason": "router not built",
+          "recall": null
+        },
+        "extraction": {
+          "status": "pass",
+          "reason": null,
+          "recall": null
+        },
+        "retrieval": {
+          "status": "pass",
+          "reason": null,
+          "recall": 1.0
+        },
+        "execution": {
+          "status": "pass",
+          "reason": null,
+          "recall": null
+        }
+      },
+      "error": null,
+      "seconds": 4.736
+    },
+    {
+      "case_id": "monthly_refunds_2025",
+      "category": "monthly_trend",
+      "question": "Monthly refunds in 2025",
+      "active": true,
+      "layers": {
+        "intent": {
+          "status": "not_scored",
+          "reason": "router not built",
+          "recall": null
+        },
+        "extraction": {
+          "status": "pass",
+          "reason": null,
+          "recall": null
+        },
+        "retrieval": {
+          "status": "pass",
+          "reason": null,
+          "recall": 1.0
+        },
+        "execution": {
+          "status": "pass",
+          "reason": null,
+          "recall": null
+        }
+      },
+      "error": null,
+      "seconds": 4.647
+    },
+    {
+      "case_id": "monthly_return_rate_jan_to_jun_2025",
+      "category": "monthly_trend",
+      "question": "Line return rate per month from January to June 2025",
+      "active": true,
+      "layers": {
+        "intent": {
+          "status": "not_scored",
+          "reason": "router not built",
+          "recall": null
+        },
+        "extraction": {
+          "status": "fail",
+          "reason": "periods: expected [('2025-01-01', '2025-07-01')], got [('2025-01-01', '2025-02-01'), ('2025-02-01', '2025-03-01'), ('2025-03-01', '2025-04-01'), ('2025-04-01', '2025-05-01'), ('2025-05-01', '2025-06-01'), ('2025-06-01', '2025-07-01')]",
+          "recall": null
+        },
+        "retrieval": {
+          "status": "pass",
+          "reason": null,
+          "recall": 1.0
+        },
+        "execution": {
+          "status": "pass",
+          "reason": null,
+          "recall": null
+        }
+      },
+      "error": null,
+      "seconds": 4.881
+    },
+    {
+      "case_id": "monthly_email_sessions_2025",
+      "category": "monthly_trend",
+      "question": "Số phiên truy cập theo tháng từ kênh email năm 2025",
+      "active": true,
+      "layers": {
+        "intent": {
+          "status": "not_scored",
+          "reason": "router not built",
+          "recall": null
+        },
+        "extraction": {
+          "status": "pass",
+          "reason": null,
+          "recall": null
+        },
+        "retrieval": {
+          "status": "pass",
+          "reason": null,
+          "recall": 1.0
+        },
+        "execution": {
+          "status": "pass",
+          "reason": null,
+          "recall": null
+        }
+      },
+      "error": null,
+      "seconds": 4.977
+    },
+    {
+      "case_id": "performance_last_quarter_without_measure",
+      "category": "ambiguous",
+      "question": "How did we do last quarter?",
+      "active": false,
+      "layers": {
+        "intent": {
+          "status": "not_scored",
+          "reason": "not yet scored: active from phase 8",
+          "recall": null
+        },
+        "extraction": {
+          "status": "not_scored",
+          "reason": "not yet scored: active from phase 8",
+          "recall": null
+        },
+        "retrieval": {
+          "status": "not_scored",
+          "reason": "not yet scored: active from phase 8",
+          "recall": null
+        },
+        "execution": {
+          "status": "not_scored",
+          "reason": "not yet scored: active from phase 8",
+          "recall": null
+        }
+      },
+      "error": null,
+      "seconds": 0.0
+    },
+    {
+      "case_id": "best_region_last_year_without_measure",
+      "category": "ambiguous",
+      "question": "Khu vực nào tốt nhất năm ngoái?",
+      "active": false,
+      "layers": {
+        "intent": {
+          "status": "not_scored",
+          "reason": "not yet scored: active from phase 8",
+          "recall": null
+        },
+        "extraction": {
+          "status": "not_scored",
+          "reason": "not yet scored: active from phase 8",
+          "recall": null
+        },
+        "retrieval": {
+          "status": "not_scored",
+          "reason": "not yet scored: active from phase 8",
+          "recall": null
+        },
+        "execution": {
+          "status": "not_scored",
+          "reason": "not yet scored: active from phase 8",
+          "recall": null
+        }
+      },
+      "error": null,
+      "seconds": 0.0
+    },
+    {
+      "case_id": "marketing_asks_for_net_sales_by_category",
+      "category": "unauthorized",
+      "question": "Net sales by category in 2025",
+      "active": false,
+      "layers": {
+        "intent": {
+          "status": "not_scored",
+          "reason": "not yet scored: active from phase 6",
+          "recall": null
+        },
+        "extraction": {
+          "status": "not_scored",
+          "reason": "not yet scored: active from phase 6",
+          "recall": null
+        },
+        "retrieval": {
+          "status": "not_scored",
+          "reason": "not yet scored: active from phase 6",
+          "recall": null
+        },
+        "execution": {
+          "status": "not_scored",
+          "reason": "not yet scored: active from phase 6",
+          "recall": null
+        }
+      },
+      "error": null,
+      "seconds": 0.0
+    },
+    {
+      "case_id": "marketing_asks_for_top_customers",
+      "category": "unauthorized",
+      "question": "Top 10 khách hàng mua nhiều nhất năm 2025",
+      "active": false,
+      "layers": {
+        "intent": {
+          "status": "not_scored",
+          "reason": "not yet scored: active from phase 6",
+          "recall": null
+        },
+        "extraction": {
+          "status": "not_scored",
+          "reason": "not yet scored: active from phase 6",
+          "recall": null
+        },
+        "retrieval": {
+          "status": "not_scored",
+          "reason": "not yet scored: active from phase 6",
+          "recall": null
+        },
+        "execution": {
+          "status": "not_scored",
+          "reason": "not yet scored: active from phase 6",
+          "recall": null
+        }
+      },
+      "error": null,
+      "seconds": 0.0
+    },
+    {
+      "case_id": "poem_request",
+      "category": "out_of_scope",
+      "question": "Write a short poem about our store",
+      "active": false,
+      "layers": {
+        "intent": {
+          "status": "not_scored",
+          "reason": "not yet scored: active from phase 8",
+          "recall": null
+        },
+        "extraction": {
+          "status": "not_scored",
+          "reason": "not yet scored: active from phase 8",
+          "recall": null
+        },
+        "retrieval": {
+          "status": "not_scored",
+          "reason": "not yet scored: active from phase 8",
+          "recall": null
+        },
+        "execution": {
+          "status": "not_scored",
+          "reason": "not yet scored: active from phase 8",
+          "recall": null
+        }
+      },
+      "error": null,
+      "seconds": 0.0
+    },
+    {
+      "case_id": "stock_price_question",
+      "category": "out_of_scope",
+      "question": "Giá cổ phiếu Apple hôm nay là bao nhiêu?",
+      "active": false,
+      "layers": {
+        "intent": {
+          "status": "not_scored",
+          "reason": "not yet scored: active from phase 8",
+          "recall": null
+        },
+        "extraction": {
+          "status": "not_scored",
+          "reason": "not yet scored: active from phase 8",
+          "recall": null
+        },
+        "retrieval": {
+          "status": "not_scored",
+          "reason": "not yet scored: active from phase 8",
+          "recall": null
+        },
+        "execution": {
+          "status": "not_scored",
+          "reason": "not yet scored: active from phase 8",
+          "recall": null
+        }
+      },
+      "error": null,
+      "seconds": 0.0
+    }
+  ],
+  "reference_errors": []
+}

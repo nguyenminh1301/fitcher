@@ -1,0 +1,122 @@
+version: 2
+
+models:
+  - name: sales_lines
+    description: >
+      One row per order line of the e-commerce lab dataset, with order, product
+      and customer attributes. Net sales is the sum of line_amount over lines
+      whose order_status is not 'cancelled'; returns are not netted (see
+      returns_fact). The source has no discounts and no order timestamps.
+    columns:
+      - name: order_item_id
+        description: Order line key.
+        data_tests:
+          - unique
+          - not_null
+          - relationships:
+              arguments: {to: ref('stg_ecommerce_twin__order_items'), field: order_item_id}
+      - {name: order_id, description: Order the line belongs to.}
+      - name: order_date
+        description: Date the order was placed.
+        data_tests:
+          - value_between:
+              arguments: {min_value: "toDate('2022-01-01')", max_value: "toDate('2027-01-01')"}
+      - {name: order_status, description: "Order status: delivered, shipped, returned or cancelled."}
+      - {name: payment_method, description: Payment method of the order.}
+      - name: customer_id
+        description: Customer who placed the order.
+        data_tests:
+          - relationships:
+              arguments: {to: ref('stg_ecommerce_twin__customers'), field: customer_id}
+      - {name: customer_region, description: Customer region.}
+      - {name: customer_segment, description: "Customer segment: new, casual, loyal or vip."}
+      - {name: customer_signup_date, description: Date the customer signed up.}
+      - name: product_id
+        description: Product sold on the line.
+        data_tests:
+          - relationships:
+              arguments: {to: ref('stg_ecommerce_twin__products'), field: product_id}
+      - {name: product_category, description: Product category.}
+      - {name: product_subcategory, description: Product subcategory.}
+      - {name: product_brand, description: Product brand.}
+      - {name: product_list_price, description: Current list price of the product.}
+      - {name: product_unit_cost, description: Unit cost of the product.}
+      - name: quantity
+        description: Units sold on the line.
+        data_tests:
+          - value_between:
+              arguments: {min_value: 0, max_value: 1000000000}
+      - name: unit_price
+        description: Price per unit on the line.
+        data_tests:
+          - value_between:
+              arguments: {min_value: 0, max_value: 1000000000}
+      - name: line_amount
+        description: quantity * unit_price for the line.
+        data_tests:
+          - value_between:
+              arguments: {min_value: 0, max_value: 1000000000}
+      - {name: is_returned, description: Whether the line was returned.}
+
+  - name: returns_fact
+    description: One row per returned order line, joined to the original sale in sales_lines.
+    columns:
+      - name: return_id
+        description: Return key.
+        data_tests:
+          - unique
+          - not_null
+          - relationships:
+              arguments: {to: ref('stg_ecommerce_twin__returns'), field: return_id}
+      - name: return_date
+        description: Date the return was recorded.
+        data_tests:
+          - value_between:
+              arguments: {min_value: "toDate('2022-01-01')", max_value: "toDate('2027-01-01')"}
+      - {name: return_reason, description: Reason given for the return.}
+      - name: refund_amount
+        description: Amount refunded.
+        data_tests:
+          - value_between:
+              arguments: {min_value: 0, max_value: 1000000000}
+      - name: order_item_id
+        description: Returned order line.
+        data_tests:
+          - relationships:
+              arguments: {to: ref('stg_ecommerce_twin__order_items'), field: order_item_id}
+      - {name: order_id, description: Order of the returned line.}
+      - {name: order_date, description: Date of the original order.}
+      - {name: order_status, description: Status of the original order.}
+      - {name: product_id, description: Returned product.}
+      - {name: product_category, description: Product category.}
+      - {name: product_subcategory, description: Product subcategory.}
+      - {name: product_brand, description: Product brand.}
+      - {name: customer_id, description: Customer of the original order.}
+      - {name: customer_region, description: Customer region.}
+      - {name: customer_segment, description: Customer segment.}
+      - {name: quantity, description: Units on the original line.}
+      - {name: line_amount, description: Amount of the original line.}
+      - {name: days_to_return, description: Days between the order date and the return date.}
+
+  - name: sessions_daily
+    description: One row per day, device, channel, customer region and customer segment with session and conversion counts.
+    data_tests:
+      - unique_combination:
+          arguments: {columns: [session_date, device, channel, customer_region, customer_segment]}
+    columns:
+      - name: session_date
+        description: Day the sessions started.
+        data_tests:
+          - value_between:
+              arguments: {min_value: "toDate('2022-01-01')", max_value: "toDate('2027-01-01')"}
+      - {name: device, description: "Device: desktop, mobile or tablet."}
+      - {name: channel, description: Traffic channel.}
+      - {name: customer_region, description: Region of the session's customer.}
+      - {name: customer_segment, description: Segment of the session's customer.}
+      - name: sessions
+        description: Number of sessions.
+        data_tests:
+          - value_between:
+              arguments: {min_value: 0, max_value: 1000000000}
+      - {name: converted_sessions, description: Sessions that converted into an order.}
+      - {name: pages_viewed, description: Total pages viewed in the sessions.}

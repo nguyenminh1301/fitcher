@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Shared Domain Pack definitions",
+  "$defs": {
+    "id": {
+      "description": "Identifier other pack items reference.",
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]*$"
+    },
+    "name": {
+      "description": "A ClickHouse table or column name.",
+      "type": "string",
+      "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+    },
+    "text": {"type": "string", "minLength": 1},
+    "language": {"type": "string", "pattern": "^[a-z]{2}$"},
+    "status": {
+      "description": "Only approved items are compiled.",
+      "type": "string",
+      "enum": ["draft", "approved"]
+    },
+    "confidence": {"type": "number", "minimum": 0, "maximum": 1},
+    "evidence": {
+      "description": "Where an item comes from: a manual entry, a profile, a document, an error or a trace.",
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["kind", "ref"],
+        "properties": {
+          "kind": {"type": "string", "enum": ["manual", "profile", "doc", "error", "trace"]},
+          "ref": {"$ref": "#/$defs/text"}
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,46 @@
+{
+  "additionalProperties": false,
+  "description": "The fields a request changes; ``group_id: null`` takes the conversation out of its group.",
+  "properties": {
+    "title": {
+      "anyOf": [
+        {
+          "maxLength": 80,
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Title"
+    },
+    "pinned": {
+      "anyOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Pinned"
+    },
+    "group_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Group Id"
+    }
+  },
+  "title": "ConversationPatch",
+  "type": "object"
+}

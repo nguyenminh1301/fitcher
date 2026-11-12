@@ -1,0 +1,15 @@
+# Domain Pack for the FreeEcommerceTwin14M lab dataset (CC BY-NC 4.0).
+name: ecommerce_twin
+display_name: E-commerce twin store
+industry: online retail
+currency: USD
+fiscal_year_start_month: 1
+conventions:
+  - id: best_selling
+    description: >-
+      "Best-selling" and "top products" rank by net sales unless the question
+      names another measure such as units sold.
+    metric: net_sales
+    status: approved
+    evidence: [{kind: manual, ref: docs/DECISIONS.md#14-open-decisions-with-defaults}]
+    confidence: 1.0

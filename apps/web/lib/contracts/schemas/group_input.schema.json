@@ -1,0 +1,16 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "name": {
+      "maxLength": 80,
+      "minLength": 1,
+      "title": "Name",
+      "type": "string"
+    }
+  },
+  "required": [
+    "name"
+  ],
+  "title": "GroupInput",
+  "type": "object"
+}

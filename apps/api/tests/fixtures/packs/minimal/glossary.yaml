@@ -1,0 +1,23 @@
+terms:
+  - id: revenue
+    term: revenue
+    definition: Money received from widget sales.
+    aliases:
+      vi: [doanh thu]
+      en: [revenue, sales]
+    targets:
+      - {kind: metric, metric: widget_revenue}
+    status: approved
+    evidence: [{kind: manual, ref: fixture}]
+    confidence: 1.0
+  - id: widget
+    term: widget
+    definition: A product sold by the shop.
+    aliases:
+      vi: [sản phẩm]
+      en: [widget, product]
+    targets:
+      - {kind: column, dataset: widget_sales, column: widget_name}
+    status: approved
+    evidence: [{kind: manual, ref: fixture}]
+    confidence: 1.0

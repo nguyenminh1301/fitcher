@@ -1,0 +1,459 @@
+name: fitcher
+
+# Every port binds to host loopback. Service configuration lives under infra/.
+
+services:
+  clickhouse:
+    image: clickhouse/clickhouse-server:26.8.36.3
+    environment:
+      CLICKHOUSE_USER: ${CLICKHOUSE_ADMIN_USER:?set CLICKHOUSE_ADMIN_USER in .env}
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_ADMIN_PASSWORD:?set CLICKHOUSE_ADMIN_PASSWORD in .env}
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: "1"
+      # Read by users.d/agent_logs.xml for the agent_logs users.
+      CLICKHOUSE_LOGS_WRITER_PASSWORD: ${CLICKHOUSE_LOGS_WRITER_PASSWORD:?set CLICKHOUSE_LOGS_WRITER_PASSWORD in .env}
+      CLICKHOUSE_TRACE_READER_PASSWORD: ${CLICKHOUSE_TRACE_READER_PASSWORD:?set CLICKHOUSE_TRACE_READER_PASSWORD in .env}
+      CLICKHOUSE_REVIEW_READER_PASSWORD: ${CLICKHOUSE_REVIEW_READER_PASSWORD:?set CLICKHOUSE_REVIEW_READER_PASSWORD in .env}
+      # Read by users.d/agent_query_stopper.xml.
+      CLICKHOUSE_QUERY_STOPPER_PASSWORD: ${CLICKHOUSE_QUERY_STOPPER_PASSWORD:?set CLICKHOUSE_QUERY_STOPPER_PASSWORD in .env}
+      # Read by users.d/agent_conversations.xml.
+      CLICKHOUSE_CONVERSATIONS_PASSWORD: ${CLICKHOUSE_CONVERSATIONS_PASSWORD:?set CLICKHOUSE_CONVERSATIONS_PASSWORD in .env}
+      # Read by users.d/model_tiers.xml.
+      CLICKHOUSE_MODEL_TIERS_PASSWORD: ${CLICKHOUSE_MODEL_TIERS_PASSWORD:?set CLICKHOUSE_MODEL_TIERS_PASSWORD in .env}
+      # Read by users.d/pack_review.xml.
+      CLICKHOUSE_PACK_REVIEW_PASSWORD: ${CLICKHOUSE_PACK_REVIEW_PASSWORD:?set CLICKHOUSE_PACK_REVIEW_PASSWORD in .env}
+      # Read by users.d/sources.xml for source_loader, the only user of the source named collections.
+      CLICKHOUSE_SOURCES_PASSWORD: ${CLICKHOUSE_SOURCES_PASSWORD:?set CLICKHOUSE_SOURCES_PASSWORD in .env}
+      # Read-only source credentials, read by config.d/sources.xml (DECISIONS §4 Data sources).
+      # They reach no other service; an unset source leaves its collection unusable.
+      FIXTURE_POSTGRES_HOST: ${FIXTURE_POSTGRES_HOST:-}
+      FIXTURE_POSTGRES_PORT: ${FIXTURE_POSTGRES_PORT:-}
+      FIXTURE_POSTGRES_DATABASE: ${FIXTURE_POSTGRES_DATABASE:-}
+      FIXTURE_POSTGRES_USER: ${FIXTURE_POSTGRES_USER:-}
+      FIXTURE_POSTGRES_PASSWORD: ${FIXTURE_POSTGRES_PASSWORD:-}
+      IOWA_LIQUOR_POSTGRES_HOST: ${IOWA_LIQUOR_POSTGRES_HOST:-}
+      IOWA_LIQUOR_POSTGRES_PORT: ${IOWA_LIQUOR_POSTGRES_PORT:-}
+      IOWA_LIQUOR_POSTGRES_DATABASE: ${IOWA_LIQUOR_POSTGRES_DATABASE:-}
+      IOWA_LIQUOR_POSTGRES_USER: ${IOWA_LIQUOR_POSTGRES_USER:-}
+      IOWA_LIQUOR_POSTGRES_PASSWORD: ${IOWA_LIQUOR_POSTGRES_PASSWORD:-}
+      FIXTURE_MYSQL_HOST: ${FIXTURE_MYSQL_HOST:-}
+      FIXTURE_MYSQL_PORT: ${FIXTURE_MYSQL_PORT:-}
+      FIXTURE_MYSQL_DATABASE: ${FIXTURE_MYSQL_DATABASE:-}
+      FIXTURE_MYSQL_USER: ${FIXTURE_MYSQL_USER:-}
+      FIXTURE_MYSQL_PASSWORD: ${FIXTURE_MYSQL_PASSWORD:-}
+      FIXTURE_MONGODB_HOST: ${FIXTURE_MONGODB_HOST:-}
+      FIXTURE_MONGODB_PORT: ${FIXTURE_MONGODB_PORT:-}
+      FIXTURE_MONGODB_DATABASE: ${FIXTURE_MONGODB_DATABASE:-}
+      FIXTURE_MONGODB_USER: ${FIXTURE_MONGODB_USER:-}
+      FIXTURE_MONGODB_PASSWORD: ${FIXTURE_MONGODB_PASSWORD:-}
+      # An S3 collection takes one URL: the store's address and the bucket.
+      FIXTURE_FILES_URL: http://${FIXTURE_FILES_HOST:-}:${FIXTURE_FILES_PORT:-}/${FIXTURE_FILES_DATABASE:-}/
+      FIXTURE_FILES_USER: ${FIXTURE_FILES_USER:-}
+      FIXTURE_FILES_PASSWORD: ${FIXTURE_FILES_PASSWORD:-}
+    ports:
+      - "127.0.0.1:8123:8123"
+      - "127.0.0.1:9000:9000"
+    volumes:
+      - clickhouse-data:/var/lib/clickhouse
+      - ./infra/clickhouse/config.d/listen.xml:/etc/clickhouse-server/config.d/listen.xml:ro
+      - ./infra/clickhouse/users.d/users.xml:/etc/clickhouse-server/users.d/users.xml:ro
+      - ./infra/clickhouse/users.d/agent_logs.xml:/etc/clickhouse-server/users.d/agent_logs.xml:ro
+      - ./infra/clickhouse/users.d/agent_query_stopper.xml:/etc/clickhouse-server/users.d/agent_query_stopper.xml:ro
+      - ./infra/clickhouse/users.d/agent_conversations.xml:/etc/clickhouse-server/users.d/agent_conversations.xml:ro
+      - ./infra/clickhouse/users.d/model_tiers.xml:/etc/clickhouse-server/users.d/model_tiers.xml:ro
+      - ./infra/clickhouse/users.d/pack_review.xml:/etc/clickhouse-server/users.d/pack_review.xml:ro
+      - ./infra/clickhouse/users.d/sources.xml:/etc/clickhouse-server/users.d/sources.xml:ro
+      - ./infra/clickhouse/config.d/sources.xml:/etc/clickhouse-server/config.d/sources.xml:ro
+      - ./infra/clickhouse/initdb:/docker-entrypoint-initdb.d:ro
+    ulimits:
+      nofile:
+        soft: 262144
+        hard: 262144
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://127.0.0.1:8123/ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 20s
+
+  # Search collections of every pack: dense and BM25 sparse vectors fused with RRF (DECISIONS §5).
+  qdrant:
+    # qdrant/qdrant:v1.20.0 with patched Debian packages (infra/qdrant/Dockerfile).
+    build:
+      context: ./infra/qdrant
+    environment:
+      QDRANT__TELEMETRY_DISABLED: "true"
+    ports:
+      - "127.0.0.1:6333:6333"
+    volumes:
+      - qdrant-data:/qdrant/storage
+    healthcheck:
+      # The image has no curl or wget, and its sh has no /dev/tcp; bash opens the readiness endpoint.
+      test:
+        - CMD
+        - bash
+        - -c
+        - >-
+          exec 3<>/dev/tcp/127.0.0.1/6333 &&
+          printf 'GET /readyz HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n' >&3 &&
+          grep -q 'HTTP/1.1 200' <&3
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 10s
+
+  litellm:
+    # ghcr.io/berriai/litellm:v1.106.7 with patched bundled packages (infra/litellm/Dockerfile).
+    build:
+      context: ./infra/litellm
+    # build_config.py adds each catalog block whose provider key is set, then starts the proxy.
+    entrypoint: ["python", "/app/build_config.py"]
+    command: ["--port", "4000"]
+    environment:
+      LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY:?set LITELLM_MASTER_KEY in .env}
+      # callbacks/clickhouse_logger.py writes agent_logs.llm_calls as the log writer.
+      CLICKHOUSE_HOST: clickhouse
+      CLICKHOUSE_LOGS_WRITER_PASSWORD: ${CLICKHOUSE_LOGS_WRITER_PASSWORD:?set CLICKHOUSE_LOGS_WRITER_PASSWORD in .env}
+      # Provider keys are passed to this service only.
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      OLLAMA_URL: ${OLLAMA_URL:-}
+    ports:
+      - "127.0.0.1:4000:4000"
+    volumes:
+      - ./infra/litellm/config.yaml:/app/config.yaml:ro
+      - ./infra/litellm/build_config.py:/app/build_config.py:ro
+      - ./infra/litellm/catalog:/app/catalog:ro
+      - ./infra/litellm/callbacks/clickhouse_logger.py:/app/clickhouse_logger.py:ro
+      # The screening guardrail and its copy of the api's rules (DECISIONS §9).
+      - ./infra/litellm/callbacks/screening_guard.py:/app/screening_guard.py:ro
+      - ./infra/litellm/callbacks/screening_rules.py:/app/screening_rules.py:ro
+    healthcheck:
+      # Liveliness only checks the proxy process; it never calls OpenAI.
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:4000/health/liveliness', timeout=2)"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 20s
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.8.1
+    command: ["start-dev", "--import-realm"]
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN:?set KEYCLOAK_ADMIN in .env}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:?set KEYCLOAK_ADMIN_PASSWORD in .env}
+      KC_HEALTH_ENABLED: "true"
+      # The realm import resolves the fitcher-admin-api client secret from it.
+      KEYCLOAK_ADMIN_API_SECRET: ${KEYCLOAK_ADMIN_API_SECRET:?set KEYCLOAK_ADMIN_API_SECRET in .env}
+      # Tokens name the address browsers use as issuer, whichever address requested them;
+      # containers still reach Keycloak at keycloak:8080.
+      KC_HOSTNAME: http://localhost:8080
+      KC_HOSTNAME_BACKCHANNEL_DYNAMIC: "true"
+    ports:
+      - "127.0.0.1:8080:8080"
+    volumes:
+      - ./infra/keycloak/realm-finch.json:/opt/keycloak/data/import/realm-finch.json:ro
+    healthcheck:
+      # The image has no curl or wget; bash opens the management port directly.
+      test:
+        - CMD-SHELL
+        - >-
+          exec 3<>/dev/tcp/127.0.0.1/9000 &&
+          printf 'GET /health/ready HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n' >&3 &&
+          grep -q 'HTTP/1.1 200' <&3
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 30s
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    environment:
+      LITELLM_BASE_URL: http://litellm:4000
+      LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY:?set LITELLM_MASTER_KEY in .env}
+      # Agent queries run as the asking role's ClickHouse user, whose password
+      # derives from CLICKHOUSE_AGENT_PASSWORD; run logs are written as the
+      # insert-only agent_logs_writer.
+      CLICKHOUSE_HOST: clickhouse
+      CLICKHOUSE_AGENT_PASSWORD: ${CLICKHOUSE_AGENT_PASSWORD:?set CLICKHOUSE_AGENT_PASSWORD in .env}
+      CLICKHOUSE_LOGS_WRITER_PASSWORD: ${CLICKHOUSE_LOGS_WRITER_PASSWORD:?set CLICKHOUSE_LOGS_WRITER_PASSWORD in .env}
+      # Stops the running query of an answer whose client disconnected.
+      CLICKHOUSE_QUERY_STOPPER_PASSWORD: ${CLICKHOUSE_QUERY_STOPPER_PASSWORD:?set CLICKHOUSE_QUERY_STOPPER_PASSWORD in .env}
+      # Reads and writes the asking user's conversations.
+      CLICKHOUSE_CONVERSATIONS_PASSWORD: ${CLICKHOUSE_CONVERSATIONS_PASSWORD:?set CLICKHOUSE_CONVERSATIONS_PASSWORD in .env}
+      # Reads and writes the model tier mapping of the Models page.
+      CLICKHOUSE_MODEL_TIERS_PASSWORD: ${CLICKHOUSE_MODEL_TIERS_PASSWORD:?set CLICKHOUSE_MODEL_TIERS_PASSWORD in .env}
+      # The console's admin sections read run logs, and reviewers' proposals read runs (users.d/agent_logs.xml).
+      CLICKHOUSE_TRACE_READER_PASSWORD: ${CLICKHOUSE_TRACE_READER_PASSWORD:?set CLICKHOUSE_TRACE_READER_PASSWORD in .env}
+      CLICKHOUSE_REVIEW_READER_PASSWORD: ${CLICKHOUSE_REVIEW_READER_PASSWORD:?set CLICKHOUSE_REVIEW_READER_PASSWORD in .env}
+      # The Users section manages realm roles as the fitcher-admin-api service account (app/auth/keycloak_admin.py).
+      KEYCLOAK_URL: http://keycloak:8080
+      KEYCLOAK_ADMIN_API_SECRET: ${KEYCLOAK_ADMIN_API_SECRET:?set KEYCLOAK_ADMIN_API_SECRET in .env}
+      # Writes the document registry and test-runs reviewed metrics (users.d/pack_review.xml).
+      CLICKHOUSE_PACK_REVIEW_PASSWORD: ${CLICKHOUSE_PACK_REVIEW_PASSWORD:?set CLICKHOUSE_PACK_REVIEW_PASSWORD in .env}
+      # Company documents (DECISIONS §5) and the pack working tree the Review UI writes (never committed by the app).
+      DOCUMENTS_DIR: /app/build/documents
+      DOCUMENT_MAX_BYTES: ${DOCUMENT_MAX_BYTES:-20971520}
+      PACKS_DIR: /app/packs
+      # Default catalog alias of each model tier (apps/api/app/llm/tiers.py).
+      MODEL_TIER_FAST: ${MODEL_TIER_FAST:-openai-small}
+      MODEL_TIER_SQL_SMALL: ${MODEL_TIER_SQL_SMALL:-openai-small}
+      MODEL_TIER_SQL_GEN: ${MODEL_TIER_SQL_GEN:-openai-medium}
+      MODEL_TIER_SQL_GEN_HARD: ${MODEL_TIER_SQL_GEN_HARD:-openai-large}
+      MODEL_TIER_EMBED: ${MODEL_TIER_EMBED:-openai-embed}
+      LOG_BATCH_SIZE: ${LOG_BATCH_SIZE:-100}
+      LOG_FLUSH_INTERVAL_MS: ${LOG_FLUSH_INTERVAL_MS:-1000}
+      LOG_QUEUE_MAX: ${LOG_QUEUE_MAX:-10000}
+      QUERY_MAX_EXECUTION_TIME: ${QUERY_MAX_EXECUTION_TIME:-30}
+      QUERY_MAX_RESULT_ROWS: ${QUERY_MAX_RESULT_ROWS:-10000}
+      QUERY_MAX_MEMORY_USAGE: ${QUERY_MAX_MEMORY_USAGE:-2000000000}
+      ACTIVE_PACK: ${ACTIVE_PACK:?set ACTIVE_PACK in .env}
+      QDRANT_URL: http://qdrant:6333
+      EMBEDDING_DIMENSIONS: ${EMBEDDING_DIMENSIONS:-1024}
+      # Access tokens /ask accepts (apps/api/app/auth/jwt.py).
+      KEYCLOAK_ISSUER: ${KEYCLOAK_ISSUER:-http://localhost:8080/realms/finch}
+      KEYCLOAK_AUDIENCE: ${KEYCLOAK_AUDIENCE:-finch-api}
+      KEYCLOAK_JWKS_URL: ${KEYCLOAK_JWKS_URL:-http://keycloak:8080/realms/finch/protocol/openid-connect/certs}
+      # Questions per user per minute on /ask; the single api worker keeps the counts.
+      RATE_LIMIT_PER_MINUTE: ${RATE_LIMIT_PER_MINUTE:-10}
+      # Input screening (DECISIONS §9); without the classifier every question gets the blocked reply.
+      SCREEN_MODE: ${SCREEN_MODE:-log}
+      SCREEN_FLAG_AT: ${SCREEN_FLAG_AT:-0.5}
+      SCREEN_BLOCK_AT: ${SCREEN_BLOCK_AT:-0.9}
+      GUARD_MODEL_DIR: /app/build/guard_model
+    ports:
+      - "127.0.0.1:8000:8000"
+    volumes:
+      - compiled-packs:/app/build/packs:ro
+      - guard-models:/app/build/guard_model:ro
+      - documents:/app/build/documents
+      - ./packs:/app/packs
+    depends_on:
+      clickhouse:
+        condition: service_healthy
+      qdrant:
+        condition: service_healthy
+      litellm:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=2)"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+
+  # One-off jobs on the api image. Only this service holds the ClickHouse
+  # admin credentials; start it with `docker compose run --rm jobs ...`.
+  jobs:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    profiles: ["jobs"]
+    environment:
+      CLICKHOUSE_HOST: clickhouse
+      CLICKHOUSE_ADMIN_USER: ${CLICKHOUSE_ADMIN_USER:?set CLICKHOUSE_ADMIN_USER in .env}
+      CLICKHOUSE_ADMIN_PASSWORD: ${CLICKHOUSE_ADMIN_PASSWORD:?set CLICKHOUSE_ADMIN_PASSWORD in .env}
+      # jobs.sync_sources connects as source_loader (infra/clickhouse/users.d/sources.xml).
+      CLICKHOUSE_SOURCES_PASSWORD: ${CLICKHOUSE_SOURCES_PASSWORD:?set CLICKHOUSE_SOURCES_PASSWORD in .env}
+      # compile_pack derives the pack's per-role ClickHouse user passwords from it.
+      CLICKHOUSE_AGENT_PASSWORD: ${CLICKHOUSE_AGENT_PASSWORD:?set CLICKHOUSE_AGENT_PASSWORD in .env}
+      HF_HUB_DISABLE_TELEMETRY: "1"
+      # /app/dbt in the image is read-only for the app user.
+      DBT_TARGET_PATH: /tmp/dbt/target
+      DBT_LOG_PATH: /tmp/dbt/logs
+      QDRANT_URL: http://qdrant:6333
+      LITELLM_BASE_URL: http://litellm:4000
+      LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY:?set LITELLM_MASTER_KEY in .env}
+      EMBEDDING_DIMENSIONS: ${EMBEDDING_DIMENSIONS:-1024}
+      COLUMN_VALUES_TOP_K: ${COLUMN_VALUES_TOP_K:-10000}
+      # Default catalog alias of each model tier (apps/api/app/llm/tiers.py).
+      MODEL_TIER_FAST: ${MODEL_TIER_FAST:-openai-small}
+      MODEL_TIER_SQL_SMALL: ${MODEL_TIER_SQL_SMALL:-openai-small}
+      MODEL_TIER_SQL_GEN: ${MODEL_TIER_SQL_GEN:-openai-medium}
+      MODEL_TIER_SQL_GEN_HARD: ${MODEL_TIER_SQL_GEN_HARD:-openai-large}
+      MODEL_TIER_EMBED: ${MODEL_TIER_EMBED:-openai-embed}
+      # set_lab_passwords signs in as the Keycloak bootstrap administrator.
+      KEYCLOAK_URL: http://keycloak:8080
+      KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN:?set KEYCLOAK_ADMIN in .env}
+      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:?set KEYCLOAK_ADMIN_PASSWORD in .env}
+      KEYCLOAK_LAB_USER_PASSWORD: ${KEYCLOAK_LAB_USER_PASSWORD:-}
+      # compile_pack, eval and ask screen like the api.
+      SCREEN_MODE: ${SCREEN_MODE:-log}
+      SCREEN_FLAG_AT: ${SCREEN_FLAG_AT:-0.5}
+      SCREEN_BLOCK_AT: ${SCREEN_BLOCK_AT:-0.9}
+      GUARD_MODEL_DIR: /app/build/guard_model
+      DOCUMENTS_DIR: /app/build/documents
+      DOCUMENT_MAX_BYTES: ${DOCUMENT_MAX_BYTES:-20971520}
+      PACKS_DIR: /app/packs
+    volumes:
+      - ./data:/app/data
+      - compiled-packs:/app/build/packs
+      - guard-models:/app/build/guard_model:ro
+      - documents:/app/build/documents
+      - ./packs:/app/packs
+    depends_on:
+      clickhouse:
+        condition: service_healthy
+      qdrant:
+        condition: service_healthy
+      litellm:
+        condition: service_healthy
+
+  # Downloads the gated classifier with HF_TOKEN, exports it to ONNX and writes
+  # it to guard-models; start it with `docker compose run --rm guard-model`.
+  # Only this service receives the token.
+  guard-model:
+    build:
+      context: .
+      dockerfile: jobs/fetch_guard_model.Dockerfile
+    profiles: ["jobs"]
+    environment:
+      HF_TOKEN: ${HF_TOKEN:-}
+    volumes:
+      - guard-models:/models/guard
+
+  # A local model for the local-small alias (DECISIONS §2); optional and off by default.
+  # Start it with `docker compose --profile local-models up -d ollama`, pull the
+  # model named in infra/litellm/catalog/ollama.yaml and set OLLAMA_URL.
+  ollama:
+    image: ollama/ollama:0.40.4
+    profiles: ["local-models"]
+    volumes:
+      - ollama-models:/root/.ollama
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  # Lab-only fixtures that play a company's source systems (DECISIONS §3 and §4);
+  # they are not fitcher services. Start them with
+  # `docker compose --profile sources up -d --wait`. Each seeds the synthetic
+  # widget dataset of infra/sources/fixtures and creates the read-only user
+  # whose credentials ClickHouse holds; FIXTURE_ADMIN_PASSWORD is each system's
+  # own administrator and never leaves its container. No port is published.
+  # Their variables are optional for the default stack, so an unset one makes
+  # only the fixture that needs it fail to start.
+  postgres-fixture:
+    image: postgres:18.4-alpine
+    profiles: ["sources"]
+    environment:
+      POSTGRES_PASSWORD: ${FIXTURE_ADMIN_PASSWORD:-}
+      POSTGRES_DB: ${FIXTURE_POSTGRES_DATABASE:-}
+      FIXTURE_POSTGRES_USER: ${FIXTURE_POSTGRES_USER:-}
+      FIXTURE_POSTGRES_PASSWORD: ${FIXTURE_POSTGRES_PASSWORD:-}
+      # Iowa Liquor Sales (infra/sources/iowa_liquor), seeded on demand by seed.sh.
+      IOWA_LIQUOR_POSTGRES_USER: ${IOWA_LIQUOR_POSTGRES_USER:-}
+      IOWA_LIQUOR_POSTGRES_PASSWORD: ${IOWA_LIQUOR_POSTGRES_PASSWORD:-}
+    volumes:
+      - ./infra/sources/fixtures/widgets:/fixtures:ro
+      - ./infra/sources/fixtures/postgres/init.sh:/docker-entrypoint-initdb.d/init.sh:ro
+      - ./infra/sources/iowa_liquor:/seed/iowa_liquor:ro
+      - ./data/sources/iowa_liquor:/sources/iowa_liquor:ro
+    healthcheck:
+      # Passes over TCP as the reader once seeding has finished and the server restarted.
+      test: ["CMD-SHELL", "PGPASSWORD=\"$$FIXTURE_POSTGRES_PASSWORD\" psql -h 127.0.0.1 -U \"$$FIXTURE_POSTGRES_USER\" -d \"$$POSTGRES_DB\" -tAc 'SELECT 1 FROM refunds LIMIT 1' | grep -q 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 10s
+
+  mysql-fixture:
+    image: mysql:8.4.10
+    profiles: ["sources"]
+    environment:
+      MYSQL_ROOT_PASSWORD: ${FIXTURE_ADMIN_PASSWORD:-}
+      MYSQL_DATABASE: ${FIXTURE_MYSQL_DATABASE:-}
+      FIXTURE_MYSQL_USER: ${FIXTURE_MYSQL_USER:-}
+      FIXTURE_MYSQL_PASSWORD: ${FIXTURE_MYSQL_PASSWORD:-}
+    volumes:
+      - ./infra/sources/fixtures/widgets:/fixtures:ro
+      - ./infra/sources/fixtures/mysql/init.sh:/docker-entrypoint-initdb.d/init.sh:ro
+    healthcheck:
+      test: ["CMD-SHELL", "mysql -h 127.0.0.1 -u\"$$FIXTURE_MYSQL_USER\" -p\"$$FIXTURE_MYSQL_PASSWORD\" \"$$MYSQL_DATABASE\" -NBe 'SELECT 1 FROM refunds LIMIT 1' | grep -q 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 40
+      start_period: 20s
+
+  mongodb-fixture:
+    image: mongo:8.0.20
+    profiles: ["sources"]
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: fixture_admin
+      MONGO_INITDB_ROOT_PASSWORD: ${FIXTURE_ADMIN_PASSWORD:-}
+      FIXTURE_MONGODB_DATABASE: ${FIXTURE_MONGODB_DATABASE:-}
+      FIXTURE_MONGODB_USER: ${FIXTURE_MONGODB_USER:-}
+      FIXTURE_MONGODB_PASSWORD: ${FIXTURE_MONGODB_PASSWORD:-}
+    volumes:
+      - ./infra/sources/fixtures/widgets:/fixtures:ro
+      - ./infra/sources/fixtures/mongodb/seed.js:/docker-entrypoint-initdb.d/seed.js:ro
+    healthcheck:
+      test: ["CMD-SHELL", "mongosh --quiet -u \"$$FIXTURE_MONGODB_USER\" -p \"$$FIXTURE_MONGODB_PASSWORD\" --authenticationDatabase \"$$FIXTURE_MONGODB_DATABASE\" \"mongodb://127.0.0.1:27017/$$FIXTURE_MONGODB_DATABASE\" --eval 'quit(db.refunds.countDocuments() > 0 ? 0 : 1)'"]
+      interval: 5s
+      timeout: 10s
+      retries: 30
+      start_period: 20s
+
+  files-fixture:
+    image: chrislusf/seaweedfs:4.05
+    profiles: ["sources"]
+    entrypoint: ["/bin/sh", "/start.sh"]
+    environment:
+      FIXTURE_FILES_DATABASE: ${FIXTURE_FILES_DATABASE:-}
+      FIXTURE_FILES_USER: ${FIXTURE_FILES_USER:-}
+      FIXTURE_FILES_PASSWORD: ${FIXTURE_FILES_PASSWORD:-}
+    volumes:
+      - ./infra/sources/fixtures/widgets:/fixtures:ro
+      - ./infra/sources/fixtures/files/start.sh:/start.sh:ro
+    healthcheck:
+      test: ["CMD-SHELL", "test -f /tmp/seeded"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 10s
+
+  web:
+    build:
+      context: ./apps/web
+    environment:
+      # Features still on sample data read packs/<ACTIVE_PACK>/sample_data (DECISIONS §15).
+      ACTIVE_PACK: ${ACTIVE_PACK:?set ACTIVE_PACK in .env}
+      PACKS_DIR: /packs
+      # Sign-in (apps/web/lib/server/auth.ts): browsers reach Keycloak and this app on localhost, the
+      # server exchanges codes at keycloak:8080 and calls the api at api:8000.
+      APP_URL: http://localhost:3000
+      KEYCLOAK_ISSUER: ${KEYCLOAK_ISSUER:-http://localhost:8080/realms/finch}
+      KEYCLOAK_BACKCHANNEL_URL: http://keycloak:8080/realms/finch
+      KEYCLOAK_CLIENT_ID: finch-web
+      API_URL: http://api:8000
+    ports:
+      - "127.0.0.1:3000:3000"
+    volumes:
+      - ./packs:/packs:ro
+    depends_on:
+      api:
+        condition: service_healthy
+      keycloak:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+
+volumes:
+  clickhouse-data:
+  qdrant-data:
+  # compiled.json of each pack, written by compile_pack in jobs and read by api.
+  compiled-packs:
+  # The screening classifier, written by guard-model and read by api and jobs.
+  guard-models:
+  # Original company documents, written by the api and ingest_docs and re-read by compile_pack.
+  documents:
+  # Models pulled into the optional ollama service.
+  ollama-models:

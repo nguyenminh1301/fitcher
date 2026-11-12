@@ -1,0 +1,60 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "trace_id": {
+      "title": "Trace Id",
+      "type": "string"
+    },
+    "ts": {
+      "format": "date-time",
+      "title": "Ts",
+      "type": "string"
+    },
+    "user_id": {
+      "title": "User Id",
+      "type": "string"
+    },
+    "role": {
+      "title": "Role",
+      "type": "string"
+    },
+    "question": {
+      "title": "Question",
+      "type": "string"
+    },
+    "intent": {
+      "title": "Intent",
+      "type": "string"
+    },
+    "status": {
+      "title": "Status",
+      "type": "string"
+    },
+    "latency_ms": {
+      "title": "Latency Ms",
+      "type": "integer"
+    },
+    "cost_usd": {
+      "title": "Cost Usd",
+      "type": "number"
+    },
+    "error": {
+      "default": "",
+      "title": "Error",
+      "type": "string"
+    }
+  },
+  "required": [
+    "trace_id",
+    "ts",
+    "user_id",
+    "role",
+    "question",
+    "intent",
+    "status",
+    "latency_ms",
+    "cost_usd"
+  ],
+  "title": "RunRow",
+  "type": "object"
+}

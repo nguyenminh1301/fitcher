@@ -1,0 +1,16 @@
+# Domain Pack for Iowa Liquor Sales 2025 (Iowa Data Hub dataset 1262, CC BY 4.0,
+# Iowa Department of Revenue, Alcohol Operations Bureau). See README.md.
+name: iowa_liquor
+display_name: Iowa liquor wholesale
+industry: state alcohol wholesale
+currency: USD
+fiscal_year_start_month: 1
+conventions:
+  - id: best_selling
+    metric: total_sales_dollars
+    description: '"Best-selling" and "top" rank by sales dollars unless the question names another measure such as bottles or liters.'
+    status: approved
+    evidence:
+      - kind: manual
+        ref: review of the drafted pack (docs/eval/iowa_liquor-report.md)
+    confidence: 1.0

@@ -1,0 +1,76 @@
+{
+  "$defs": {
+    "DatasetColumnView": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "type": {
+          "title": "Type",
+          "type": "string"
+        },
+        "role": {
+          "title": "Role",
+          "type": "string"
+        },
+        "description": {
+          "title": "Description",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "type",
+        "role",
+        "description"
+      ],
+      "title": "DatasetColumnView",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "title": "Id",
+      "type": "string"
+    },
+    "description": {
+      "title": "Description",
+      "type": "string"
+    },
+    "grain": {
+      "title": "Grain",
+      "type": "string"
+    },
+    "time_column": {
+      "title": "Time Column",
+      "type": "string"
+    },
+    "readable_roles": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Readable Roles",
+      "type": "array"
+    },
+    "columns": {
+      "items": {
+        "$ref": "#/$defs/DatasetColumnView"
+      },
+      "title": "Columns",
+      "type": "array"
+    }
+  },
+  "required": [
+    "id",
+    "description",
+    "grain",
+    "time_column",
+    "readable_roles",
+    "columns"
+  ],
+  "title": "DatasetView",
+  "type": "object"
+}
