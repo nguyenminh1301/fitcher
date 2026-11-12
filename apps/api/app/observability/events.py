@@ -1,7 +1,7 @@
 """Typed rows of the ``agent_logs`` tables the api writes.
 
 Field names and order equal the table columns in
-``infra/clickhouse/initdb/010-agent-logs.sql``; a test compares them. The
+``infra/clickhouse/changes/0002_agent_logs.sql``; a test compares them. The
 LiteLLM callback writes ``llm_calls`` itself, and later phases add records for
 the tables they start writing.
 """

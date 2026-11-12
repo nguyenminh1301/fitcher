@@ -15,7 +15,7 @@ from app.observability.events import (
 )
 from app.observability.log_writer import ClickHouseLogSink, FlushResult, LogWriter
 
-SCHEMA = Path(__file__).resolve().parents[3] / "infra" / "clickhouse" / "initdb" / "010-agent-logs.sql"
+SCHEMA = Path(__file__).resolve().parents[3] / "infra" / "clickhouse" / "changes" / "0002_agent_logs.sql"
 NOW = datetime(2026, 11, 2, 8, 0, tzinfo=UTC)
 
 
