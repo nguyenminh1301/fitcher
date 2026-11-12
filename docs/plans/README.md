@@ -23,12 +23,14 @@ Every phase plan has these sections:
 
 ## Cross-phase rules
 
-- LLM calls go through LiteLLM aliases (`fast`, `sql-gen`, `sql-gen-hard`, `embed`) only. Unit tests mock the LLM client; billable calls run only through explicit commands.
+- LLM calls go through the model tiers of DECISIONS §2 only, never a model name. Unit tests mock the LLM client; billable calls run only through explicit commands.
 - Engine code under `apps/` contains no pack table, column, metric or industry name. From Phase 3 onward a repository check enforces this.
 - From Phase 4 onward every phase reruns `eval.py --pack ecommerce_twin` and attaches the report to its PR; scores must not regress.
 - Each LangGraph node is a pure function of its input state plus injected clients, unit-tested in isolation.
-- Every service binds to loopback in Compose; credentials stay in `.env` and never reach the browser or an LLM prompt.
-- ClickHouse initialization scripts run only on a fresh volume; any schema change also ships an idempotent apply path for existing volumes. Volumes are never deleted to make a check pass.
+- Every service binds to loopback; credentials never reach the browser or an LLM prompt. From Phase 13 onward a secret a user enters is stored encrypted in the app state or in ClickHouse, never in a file the user edits.
+- ClickHouse initialization scripts run only on a fresh volume; any schema change also ships an idempotent apply path for existing volumes. From Phase 13 onward that path is a numbered schema change applied by `jobs.migrate`. Volumes are never deleted to make a check pass.
+- Phases 13 to 21 replace behaviour of Phases 0 to 12 one piece at a time ([DECISIONS §16](../DECISIONS.md#16-transition-from-v3)). A phase removes only what it replaces, and the application answers the acceptance question at the end of every phase.
+- A measurement a plan asks for is recorded under `docs/eval/` or in the document the plan names, with the command that produced it; a decision that depends on it is written into DECISIONS in the same change.
 - Each phase updates README.md (status and commands) and CHANGELOG.md.
 
 ## Phases
@@ -53,3 +55,12 @@ Every phase plan has these sections:
 | 10 | [Automated onboarding](phase-10-automated-onboarding.md) |
 | 11 | [Industry neutrality proof](phase-11-industry-neutrality.md) |
 | 12 | [Admin, audit and feedback loop](phase-12-admin-audit-feedback.md) |
+| 13 | [App state and first-run setup](phase-13-app-state-and-setup.md) |
+| 14 | [Model providers in the application](phase-14-model-providers.md) |
+| 15 | [Individual and team sign-in](phase-15-sign-in-modes.md) |
+| 16 | [One image, one container](phase-16-single-container-image.md) |
+| 17 | [Connect data sources in the application](phase-17-data-source-connections.md) |
+| 18 | [SQL Server sources](phase-18-sql-server-sources.md) |
+| 19 | [Instant pack from a connected source](phase-19-instant-pack.md) |
+| 20 | [Search in ClickHouse and optional documents](phase-20-search-in-clickhouse.md) |
+| 21 | [Hardening and first release](phase-21-hardening-and-release.md) |

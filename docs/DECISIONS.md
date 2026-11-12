@@ -1,11 +1,12 @@
-# Finch-Lab: Settled Decisions (v3)
+# fitcher: Settled Decisions (v4)
 
 This document is the source of truth for implementation.
 Every decision here is binding; to change one, edit this file first.
 
-The v3 architecture diagram is [finch-architecture.excalidraw](finch-architecture.excalidraw), with one SVG per section in [architecture/](architecture/); `scripts/build_architecture_diagram.py` rebuilds both. Where the diagram and this document disagree, this document wins.
-
-The repository and package names remain `fitcher`; Finch-Lab names the architecture.
+v4 turns fitcher from a six-service lab into a self-hosted product that starts with one Docker command.
+The reasoning, measurements and sources behind v4 are in [self-hosted-product-assessment.md](self-hosted-product-assessment.md).
+The architecture diagram in [finch-architecture.excalidraw](finch-architecture.excalidraw) and [architecture/](architecture/) still draws v3 and is redrawn in Phase 21; where it and this document disagree, this document wins.
+This document states the target. §16 lists each decision that differs from the code built in Phases 0 to 12 and the phase that implements it; until that phase is merged, the code keeps the earlier behaviour and nobody removes it ahead of its phase.
 
 ## 1. Goals and scope
 
@@ -13,14 +14,18 @@ The repository and package names remain `fitcher`; Finch-Lab names the architect
 - It plugs into a new company by loading a **Domain Pack** (YAML) and connecting the company's data through ClickHouse (§4): a source is read live through a ClickHouse database or table engine or copied into ClickHouse on a schedule. The engine contains no industry knowledge and queries only ClickHouse.
 - Acceptance question: "Top 10 best-selling products in Q1 2024 compared with Q1 2025".
 - Uber Finch is only a source of ideas. Uber/taxi data is not reproduced.
-- This is a **lab**, not production.
+- It is an **open-source, self-hosted product** for developers who run it on their own machine or server: one image, one container, one data volume and one published port (§3). The reference machine is a laptop with 8 GB of memory.
+- A first-run setup (§15) asks who uses the instance (one person or a team), which models to use, which data to connect and whether to add company documents. Nothing requires editing a file.
 
 ### Out of scope
 
 - Querying a source database from the engine in its own dialect or over its own driver. Every source is reached through ClickHouse (§4), so the agent writes one SQL dialect and RBAC stays in ClickHouse (§9).
 - Writing to a source database.
 - Caching (Redis, result cache, answer cache).
-- Production components: HA, autoscaling, multi-region, Kubernetes, secret manager.
+- Clustered operation: HA, autoscaling, multi-region, Kubernetes, an external secret manager.
+- A native desktop application. Docker is the only supported way to run fitcher.
+- Connecting to a source through an SSH tunnel, change data capture and streaming ingestion.
+- Telemetry: the application sends nothing about its use to anyone.
 - Multi-tenancy within one instance. Each run serves one active pack.
 - Model fine-tuning.
 
@@ -29,26 +34,30 @@ The repository and package names remain `fitcher`; Finch-Lab names the architect
 | Component | Choice | Notes |
 |---|---|---|
 | Frontend | Next.js | Chat app and workspace console (§15): chat, tables, charts, SQL view, Review, Documents and Admin pages; English/Vietnamese interface, light and dark themes |
-| Auth | Keycloak (OIDC) | JWT carries roles; realm imported from a file |
+| Auth | Built into `api` | Individual mode has no sign-in; team mode has local accounts and server-side sessions, with any OIDC provider as an optional sign-in (§9) |
+| App state | SQLite file in the data volume | settings, encrypted secrets, accounts, sessions, sources and the setup state; ClickHouse keeps data and logs |
 | API | FastAPI | sync/async, SSE |
 | Orchestration | LangGraph | one graph; nodes deterministic where possible |
-| LLM gateway | LiteLLM Proxy | change models without code changes |
-| Model | OpenAI by default; Anthropic, Gemini and a local model (Ollama) allowed | chat + embeddings, called through LiteLLM; a provider is enabled for a tier only after the pack eval passes with it (§2 Model tiers) |
-| Input screening | Llama Prompt Guard 2 86M, local ONNX in `api`, plus rules | a security classifier, not an answering model (§9) |
+| LLM gateway | LiteLLM Python SDK inside `api` | one client for every provider; no proxy service |
+| Model | OpenAI, Anthropic, Gemini, Ollama and any OpenAI-compatible endpoint (LM Studio, OpenRouter and similar) | providers and keys are entered in the application (§15); chat tiers are called through the gateway |
+| Embeddings | Local multilingual model through fastembed by default; a provider's embedding model as an option | no key is needed to index a pack; changing the model needs a full reindex (§14) |
+| Input screening | EN/VI rules always; Llama Prompt Guard 2 86M (local ONNX) as an option | a security classifier, not an answering model (§9) |
 | Data database | ClickHouse | databases `raw`, `marts`; sources attached through engines or copied (§4) |
 | Logs / audit | ClickHouse | database `agent_logs`, dedicated user, 90-day TTL |
-| Semantic search | Qdrant | hybrid dense + BM25 sparse vectors, fused with RRF on the server |
+| Semantic search | ClickHouse | hybrid dense + BM25 sparse scoring fused with RRF; Qdrant is used until Phase 20 proves no loss of recall (§16) |
 | Transform | dbt-clickhouse | raw -> wide marts |
 | SQL parsing | sqlglot (clickhouse dialect) | |
 | Charts | Own ChartSpec + adapter -> **Apache ECharts** (`echarts-for-react`) | changing library only requires rewriting the adapter |
 | Data tables | TanStack Table | |
-| Deploy | Docker Compose | 6 long-running services + jobs |
+| Deploy | One Docker image | one container supervised by s6-overlay; Compose is the development environment (§3) |
 
 **Dropped since v2:** ScyllaDB and the ClickHouse log syncer, replaced by ClickHouse `agent_logs`. Row-filter injection into SQL by sqlglot. Uber-specific marts.
 
+**Dropped in v4:** Keycloak, the LiteLLM Proxy service and the Qdrant service.
+
 ### Model tiers
 
-The engine calls a task tier; each tier maps to one model alias of the LiteLLM catalog (`infra/litellm/config.yaml`):
+The engine calls a task tier; each tier maps to one model of a configured provider:
 
 - `fast`: router, extractor, summarizer, chart tie-break
 - `sql-small`: SQL generation for a query spec the complexity rule scores as simple (§6)
@@ -56,32 +65,29 @@ The engine calls a task tier; each tier maps to one model alias of the LiteLLM c
 - `sql-gen-hard`: third retry
 - `embed`: embeddings
 
-Code may only call tiers and catalog aliases, never model names directly. The tier-to-alias mapping defaults come from `.env`; an `admin` changes the chat tiers on the console's Models page (§15), which offers only aliases whose provider passed the pack eval for that tier. `embed` is not changed from the console, because a new embedding model needs a full reindex (§14).
+Code may only call tiers, never model names directly. Providers, their keys or base URLs and the tier mapping are stored in the app state and edited in the setup and on the Models page (§15). Adding a provider proposes a default model for every chat tier. A model that has no passing pack eval for its tier is allowed and shown as not evaluated; the eval informs the choice and no longer gates it. Changing `embed` is a separate, confirmed action because it reindexes the pack (§14).
 
-## 3. Docker Compose
+## 3. Deployment
 
-Long-running services:
+fitcher ships as one image. The documented start is one command that publishes one port on loopback and mounts one volume:
 
-- `web` (:3000)
-- `keycloak` (:8080)
-- `api` (:8000, runs FastAPI + LangGraph + log writer)
-- `litellm` (:4000)
-- `qdrant` (:6333)
-- `clickhouse` (:8123 / :9000)
+```bash
+docker run -d --name fitcher -p 127.0.0.1:3000:3000 -v fitcher-data:/data ghcr.io/nguyenminh1301/fitcher
+```
 
-The optional Compose profile `sources` starts lab-only fixtures that play a company's source systems (PostgreSQL, MySQL, MongoDB and an S3-compatible object store); they are not fitcher services. The optional profile `local-models` starts Ollama for a local model tier (§2).
+- **Processes.** s6-overlay supervises `web` (the only published port), `api` and an embedded ClickHouse server. They talk over loopback inside the container. A process that cannot be restarted stops the container, and the image healthcheck covers all three.
+- **Embedded or external.** ClickHouse is embedded unless `CLICKHOUSE_URL` points to an external server; a sample Compose file shows that layout. No other service is required in any layout.
+- **Data.** Everything that must survive lives under `/data`: the ClickHouse data, the app state file, packs, documents, downloaded models and the generated secret key. Backing up the instance is copying that volume.
+- **Secrets.** The key that encrypts stored secrets is generated on first start in `/data`, or supplied as `FITCHER_SECRET_KEY`. ClickHouse users get generated passwords; the embedded server listens on loopback only.
+- **Memory.** The embedded ClickHouse runs a low-memory profile sized from the container's memory limit: a server memory cap, a small mark cache, no metric or trace system logs, and aggregation and sorting that spill to disk.
+- **Upgrades.** Every start applies the pending numbered schema changes to the app state and to ClickHouse, each recorded in a version table. A newer image therefore upgrades an older volume in place; a volume written by a newer image refuses to start on an older one.
+- **Local models.** A model server on the host is reached as `host.docker.internal`; on Linux the command adds `--add-host=host.docker.internal:host-gateway`.
+- **Jobs.** The job modules (`sync_sources`, `profile`, `draft_pack`, `compile_pack`, `eval`, `ingest_docs` and the others) are in the image and run with `docker exec`; the application starts the same code from the console.
+- **Development.** `compose.yaml` builds `api`, `web` and ClickHouse as separate services and keeps the `sources` fixtures and the `local-models` profile. dbt and the lab datasets are development tools and are not in the released image.
 
-Jobs share the `api` image and run manually or from CI; an admin can also start an eval run from the Evaluation page (§15), which runs the same code inside `api`:
+## 4. Development datasets and data sources
 
-- `load_data.py`
-- `dbt run`
-- `profile.py`
-- `ingest_docs.py`
-- `draft_pack.py`
-- `compile_pack.py`
-- `eval.py`
-
-## 4. Lab dataset
+The two datasets below exist to develop and evaluate the engine. Their packs, source manifests and dbt models stay in the repository and are never part of the released image; the public demo is the web app on hand-written sample data (§15).
 
 - **Primary:** `ziadatalabs/FreeEcommerceTwin14M` on Hugging Face.
   - 7 tables: customers, products, sessions, orders, order_items, returns, support_tickets
@@ -96,27 +102,31 @@ Jobs share the `api` image and run manually or from CI; an admin can also start 
   - License CC BY 4.0, published by the Iowa Department of Revenue, Alcohol Operations Bureau; the download stays in the Git-ignored `data/` directory
   - Served from the fixture PostgreSQL (`infra/sources/iowa_liquor`) and copied into ClickHouse through its source manifest like a company's own database; pack `iowa_liquor`
 
-Principle: the agent queries only **marts** (2-5 wide tables, few joins), never `raw`.
+Principle: the agent queries only **marts**, never `raw` or `src_*`. A mart is either a wide table built by a transform (the development datasets use dbt) or, for a source connected in the application, a view over one selected source table (§11).
 
 ### Data sources
 
-A company's data is declared in a source manifest (`jobs/sources/<pack>.yaml`) and always reached through ClickHouse:
+A company's data is always reached through ClickHouse. A source is created on the Sources page (§15) and stored in the app state; a source manifest (`jobs/sources/<pack>.yaml`) declares the same thing as a file for development and scripted setups:
 
 | Kind | Live mode | Copy mode |
 |---|---|---|
 | PostgreSQL | `PostgreSQL` database engine in database `src_<source>` | scheduled `INSERT INTO raw.* SELECT` from the source |
 | MySQL / MariaDB | `MySQL` database engine in database `src_<source>` | same |
 | MongoDB | `MongoDB` table engine with declared columns (flat collections only) | same |
-| CSV / Parquet / S3 | `S3` or `File` table engine | load into `raw` |
+| SQL Server | `ODBC` table engine through `clickhouse-odbc-bridge` and FreeTDS | same |
+| Uploaded CSV / Excel / Parquet file | none | load into `raw` |
+| S3 files (manifest only) | `S3` table engine | load into `raw` |
 
-- **Copy** is the default: queries never load the source and run at ClickHouse speed; data is as fresh as the last sync. **Live** suits small sources that must be fresh; dbt builds the marts as views over `src_<source>`.
+- The mode is chosen per table. **Live** is the default for a small table: nothing is stored twice and answers are always fresh. **Copy** is proposed for a table above the size threshold (§14), because ClickHouse pushes only simple `WHERE` filters to a source and runs joins, aggregation and sorting itself after reading the rows; a copied table is queried at ClickHouse speed and is as fresh as its last sync.
+- A copy is refreshed on a schedule kept in the app state and run inside `api`. A table with an increasing key or modification time is copied incrementally from the last value seen; any other table is reloaded and swapped atomically.
+- MongoDB and S3 sources are declared in a manifest only; the Sources page does not offer them.
 - The agent still queries only marts, writes ClickHouse SQL and runs under the ClickHouse RBAC of §9; `src_*` databases are granted to no agent role.
-- Each source has a read-only user on the source system. Its credentials come from `.env`, are held only by ClickHouse engine definitions and the sync job, and never reach the api's prompts or the LLM.
+- Each source has a read-only user on the source system. Its credentials are written once into a ClickHouse named collection created with SQL and stored encrypted by ClickHouse; the app state keeps only the source's name, kind, host and tables. Credentials are never read back, never shown again in the interface and never reach a prompt or the LLM.
 - Generating MongoDB queries (or any non-SQL query language) is out of scope: a document collection that is not flat is copied and flattened by dbt.
 
 ## 5. Domain Pack
 
-Path: `packs/<company>/`. Git is the source of truth. Packs live in Git and are validated with JSON Schema.
+Path: `<packs dir>/<company>/`, in the data volume of a running instance. Packs are YAML files validated with JSON Schema; an instance exports and imports a pack as an archive, and keeping it in Git is the owner's choice. The packs under `packs/` in the repository are development fixtures.
 
 | File | Contents |
 |---|---|
@@ -129,20 +139,20 @@ Path: `packs/<company>/`. Git is the source of truth. Packs live in Git and are 
 | `policies.yaml` | role -> dataset/columns, row filters, aggregate-only (granted through views) |
 | `eval.yaml` | question -> correct result (or correct SQL), labelled per layer |
 
-Every drafter-generated item has `status: draft|approved`, `evidence` and `confidence`. The compiler uses only `approved` items.
+Every drafter-generated item has `status: draft|approved`, `evidence` and `confidence`. The compiler uses only `approved` items. An instant pack (§11) approves its generated items automatically and marks them `reviewed: false`, which the interface shows as unreviewed until a person confirms them.
 
-### Search collections (Qdrant)
+### Search collections
 
-Each index below is a Qdrant collection with a dense vector (`embed`) and a BM25 sparse vector per point. Collection names carry a version `_v1` and are accessed through aliases so they can be reindexed when the embedding model changes:
+Each index below holds a dense vector (`embed`) and a BM25 sparse vector per item. Every pack generation writes a new versioned set and the live one is switched atomically, so a pack can be reindexed when the embedding model changes:
 
 - `glossary_terms`
 - `metrics`
 - `datasets` (including columns)
 - `column_values`: real values of low-cardinality string columns (top-K), with aliases
 - `examples`
-- `kb_docs`: company document chunks, with tags and allowed_roles
+- `kb_docs`: company document chunks, with tags and allowed_roles; absent when documents are turned off (§15)
 
-Every query filters by `allowed_roles` (a payload filter) and fuses the dense and sparse results with RRF on the server.
+Every query filters by `allowed_roles` and fuses the dense and sparse results with RRF.
 
 ### Company documents
 
@@ -164,7 +174,7 @@ Documents are runtime content managed in the application, not files in Git; the 
 
 Nodes in order:
 
-0. **screen** (deterministic rules + local classifier, §9): screens the new question before any LLM call. `block` ends the run with a `blocked` reply; `flag` continues and is logged.
+0. **screen** (deterministic rules, plus the local classifier when it is enabled, §9): screens the new question before any LLM call. `block` ends the run with a `blocked` reply; `flag` continues and is logged.
 1. **load_context**: load business_profile (always), the last N chat turns, and the previous turn's QuerySpec and result.
 2. **router** (`fast`, structured output). Classifies intent as one of four:
    - `data_query`
@@ -178,7 +188,7 @@ Nodes in order:
 4. **extract** (`fast`, JSON schema): metric, dimensions, `periods[]`, filters, `top_n`, `rank_by`, `compare`.
 5. **resolve_time** (deterministic): convert periods to half-open date ranges `[start, end)` using the pack's fiscal calendar and the user's time zone. Supports multiple periods and relative phrases ("last quarter").
    The browser sends its IANA time zone with every request; clients without one (CLI, eval) pass it explicitly, otherwise UTC is used.
-6. **retrieve**: Qdrant hybrid search over the 6 collections. Candidates for the question's own terms (metrics, dimensions, filter values) are searched across all of the pack's roles, so a term resolves to what it means and the gate can deny it rather than replace it with the nearest item the role may read; the context given to SQL generation (examples, dataset hits) is filtered by the asking role.
+6. **retrieve**: hybrid search over the search collections (§5). Candidates for the question's own terms (metrics, dimensions, filter values) are searched across all of the pack's roles, so a term resolves to what it means and the gate can deny it rather than replace it with the nearest item the role may read; the context given to SQL generation (examples, dataset hits) is filtered by the asking role.
 7. **build_spec** -> `QuerySpec`, with a coverage check (dataset min/max dates versus the requested periods).
    When an approved example readable by the asking role asks the same question (compared case-, diacritic- and punctuation-insensitively) and carries a reviewed spec, that spec's metrics, dataset, dimensions, filters, top N and ranking replace the term resolution; periods and time grain still come from the question, and the gate checks the result as usual. A reviewed spec names only pack items and pack values, never a value taken from a user's run.
 8. **gate**:
@@ -308,8 +318,11 @@ Principles:
 - **Layer 2, guard:** blocks early with an understandable message.
 - **Layer 3, ClickHouse:** the real security layer.
 - **Aggregate-only:** grant only on pre-aggregated views that also hide groups with fewer than k records. Never enforced by analysing SQL.
-- Keycloak roles map 1:1 to ClickHouse users/roles. The API never gives credentials to the LLM.
-- Users still sign in only through Keycloak. An `admin` may change another user's pack roles and disable or enable that user on the Users page (§15); the api does this through the Keycloak Admin API with a dedicated confidential client whose service account holds only `view-users` and `manage-users`. The api never creates or deletes users, sets credentials or changes the acting admin's own account, and writes every change to `agent_logs.admin_actions`. A changed role takes effect when the user's access token is next refreshed.
+- Application roles map 1:1 to ClickHouse users/roles. The API never gives credentials to the LLM.
+- **Individual mode.** There is no sign-in. Every request acts as one built-in owner who holds every pack role and every console role. The api accepts a request only when its `Host` is a loopback name or is listed in `FITCHER_ALLOWED_HOSTS`, and a state-changing request only from the same origin; with a non-loopback host allowed, the interface shows a standing warning that anyone who can reach the address controls the instance.
+- **Team mode.** Users sign in with a local account: passwords are hashed with Argon2id, sessions are random identifiers stored server-side in the app state and sent as an `HttpOnly`, `SameSite=Strict` cookie, and repeated failed sign-ins are slowed down. An `admin` creates, disables and enables accounts, resets passwords and assigns pack and console roles on the Users page (§15); every change is written to `agent_logs.admin_actions` and takes effect on the user's next request. An admin cannot disable or demote the last admin.
+- **OIDC (optional, team mode).** An admin may register one OpenID Connect provider. A user signing in through it gets an account on first sign-in with the roles named by a configured claim, or no role when the claim is absent. Local accounts keep working.
+- **Changing mode.** Switching from individual to team creates the first admin account and gives it the owner's conversations and history; switching back is refused while more than one account is enabled.
 - Every per-query limit in a ClickHouse settings profile has a minimum of 1 as well as a maximum, because 0 means unlimited.
 - Every ALLOW/DENY decision is written to `agent_logs.audit`.
 - Retrieved content (documents, column values) is **data, not instructions**. Prompts must state this explicitly to resist prompt injection, and the LLM client sends instructions in a `system` message and untrusted content in the `user` message.
@@ -317,11 +330,12 @@ Principles:
   - Screened: every new question (graph node `screen`), and document chunks and low-cardinality column values when they are indexed. History is not screened again: each turn was screened when asked, and a blocked turn is not stored. Reviewed pack content is trusted.
   - Screener: EN/VI rules on folded text (known attack phrases, fake prompt boundaries), then the local classifier score over 512-token windows. Verdicts `allow`, `flag` and `block` by thresholds in `.env`; a rule hit blocks.
   - `SCREEN_MODE=log` records verdicts without blocking; `enforce` blocks. Enforcement starts only after `screen_eval.py` shows no false positive on the benign set and at least 90% recall on the attack set, in English and in Vietnamese.
-  - **Fail closed:** without the classifier, no question reaches an LLM; the reply is the `blocked` notice that screening is unavailable.
+  - The classifier is optional. Individual mode starts with rules only; an admin can download and enable the classifier, and team mode proposes it during setup. **Fail closed:** when the classifier is enabled and cannot run, no question reaches an LLM; the reply is the `blocked` notice that screening is unavailable.
   - A blocked chunk is not indexed. A flagged column value is reported by the compiler and still indexed, because it is real data the filters need.
-  - The LiteLLM gateway rejects any request without the api's `screening` metadata and reruns the rules on the whole request. It closes code paths that forgot to screen; it is not an authentication boundary.
+  - The LLM client in `api` is the only code that calls a provider. It rejects any call without `screening` metadata and reruns the rules on the whole request, which closes code paths that forgot to screen; it is not an authentication boundary.
   - Out of scope: scanning model output, and fine-tuning the classifier.
-- Source database users are read-only; their credentials stay in `.env` and ClickHouse engine definitions (§4).
+- Source database users are read-only; their credentials stay in ClickHouse named collections (§4). In team mode only an `admin` creates, edits or deletes a source.
+- Provider keys and the OIDC client secret are encrypted in the app state with the instance's secret key (§3) and are never returned by any endpoint; the interface shows only whether a key is set and its last four characters.
 
 ## 10. Logging (ClickHouse `agent_logs`)
 
@@ -350,7 +364,8 @@ Tables (MergeTree, 90-day TTL, ordered by `(trace_id, ts)`, `(user_id, ts)` or, 
 
 ## 11. Onboarding a new company
 
-1. **Connect** the company's sources (§4): each one live through a ClickHouse engine or copied into `raw`; dbt builds the marts.
+0. **Instant pack** (the default path in the application): after a source is connected and its tables chosen, the application exposes each chosen table as a mart, reads the source's foreign keys and the profiler's join-key candidates into `relationships.yaml`, runs the profiler and the drafter, approves the generated items as unreviewed (§5) and compiles the pack. The first question can be asked without any manual step; the drafter is a billable call that the setup labels and confirms. The steps below are the same pipeline run by hand, and remain how a pack is refined.
+1. **Connect** the company's sources (§4): each one live through a ClickHouse engine or copied into `raw`; marts are views over the chosen tables, or tables built by a transform.
 2. **Profiler** (deterministic): reads `system.columns`, row counts, min/max dates, top-K values, join-key candidates, sample rows.
 3. **Documents**: a reviewer uploads PDF/DOCX/MD/TXT/XLSX files on the Documents page, or `ingest_docs.py` loads a folder; they are parsed, chunked, screened (§9) and indexed into `kb_docs`, can be deleted at any time (§5) and can be passed to the drafter.
 4. **Drafter** (`sql-gen`): drafts the whole pack; every item has `evidence` + `confidence`.
@@ -358,9 +373,9 @@ Tables (MergeTree, 90-day TTL, ordered by `(trace_id, ts)`, `(user_id, ts)` or, 
 6. **compile_pack**:
    - validate the schema
    - test-run every `sql_expr`
-   - index into Qdrant
+   - build the search collections (§5)
    - generate ClickHouse permissions
-7. **eval**: run `eval.yaml`, measured per layer (intent, dataset/columns, result). The pack is enabled only after reaching the threshold.
+7. **eval**: run `eval.yaml`, measured per layer (intent, dataset/columns, result). The result is shown on the Evaluation page and against each model on the Models page; it does not block using the pack.
 8. **Feedback loop:** dislikes or failed runs in `agent_logs` -> propose new examples (in bulk with `propose_examples.py`, or for one run from the Feedback page) -> back to Review.
 
 ## 12. Eval
@@ -388,9 +403,9 @@ Tables (MergeTree, 90-day TTL, ordered by `(trace_id, ts)`, `(user_id, ts)` or, 
   - `packs/`
   - `dbt/`
   - `jobs/`
-  - `infra/` (compose, Keycloak realm, LiteLLM config, ClickHouse init)
+  - `infra/` (image and process supervision, ClickHouse configuration and schema changes, development fixtures)
   - `docs/`
-- Configuration lives in `.env` + YAML. Never hard-code table names, metrics or industries in `apps/`.
+- Deployment configuration is a small set of environment variables (§3); everything a user chooses lives in the app state and is edited in the application. Never hard-code table names, metrics or industries in `apps/`.
 - The most important check: `grep` must not find any pack table or metric name in `apps/api`.
 - Each LangGraph node is a pure function, testable in isolation. LLMs are mocked in unit tests.
 - Prompts live in `apps/api/prompts/*.md` and are versioned.
@@ -399,8 +414,11 @@ Tables (MergeTree, 90-day TTL, ordered by `(trace_id, ts)`, `(user_id, ts)` or, 
 
 - Chart library: ECharts. Can switch to Plotly by rewriting the adapter.
 - Ambiguous "best-selling": use the default convention in `business_profile.yaml` if present; otherwise clarify.
-- Embedding model: the latest OpenAI embedding model available on LiteLLM. Changing the model requires a full reindex.
-- Pack eval threshold (§11): execution match >= 80% of the active eval cases; below it `eval.py` exits 1.
+- Embedding model: `sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2` (384 dimensions) through fastembed, downloaded into the data volume on first use. It is confirmed only if retrieval recall on the English and Vietnamese retrieval sets does not fall below the current provider model; otherwise the next multilingual fastembed model is measured. Changing the model requires a full reindex.
+- Pack eval threshold (§11): execution match >= 80% of the active eval cases; below it `eval.py` exits 1. The threshold is a report, not a gate on using a pack or a model.
+- Live or copy (§4): a table is proposed as live below 1 million rows or 1 GB at the source, whichever the source reports, and as copy above; the user can override either way.
+- Search engine (§2): search moves into ClickHouse only if `retrieval_eval.py` shows no loss of recall against Qdrant on both development packs; otherwise Qdrant stays as a supervised process inside the container.
+- Conversation retention: conversations and their messages are kept until deleted; run logs keep the 90-day TTL (§10). Settled when Phase 21 separates the two.
 - Screening thresholds (§9): `flag` from 0.5 and `block` from 0.9, tuned from the `screen_eval.py` report before enforcement.
 - SQL complexity rule (§6): simple means one metric, at most one dimension, one period, no comparison, no top N and one dataset; it can be widened only if the pack eval does not regress.
 - A provider passes for a tier when the pack eval run with that tier's alias on the provider meets the threshold and does not regress against the baseline.
@@ -409,6 +427,8 @@ Tables (MergeTree, 90-day TTL, ordered by `(trace_id, ts)`, `(user_id, ts)` or, 
 
 The interface follows the Fitcher web app design, summarized in [design/web-app.md](design/web-app.md); its component names are the names used in `apps/web`.
 
+- **Setup.** A new instance opens on a setup of four steps, each of which can be changed later in the console: who uses the instance (individual or team, creating the first admin for a team), models (pick a provider, enter a key or a base URL, test it, accept the proposed tier mapping), data (connect a source and choose tables, or skip) and documents (on by default, or off). The setup can be left after the models step; the chat then explains what is still missing.
+- **Sources page** (`admin`, or the owner in individual mode). Lists the sources with their kind, host, tables, mode and last sync. Adding a source asks for the kind and its connection fields (host, port, database, schema, user, password, TLS mode and certificate; a file upload for the file kind), tests the connection, lists the tables with their size and proposed mode, and saves. A saved password is never shown again.
 - **Two surfaces, one sign-in.** The Chat app is for every role. The workspace console is for console roles: `pack_reviewer` sees Review, Documents, Datasets, Feedback and Evaluation; `admin` sees Runs and trace, Audit, Costs, Evaluation, Models and Users. Navigation lists only the sections the user's roles allow, and the api enforces the same rule on every endpoint. A console role reaches the console from the account menu.
 - **Conversations.** A user can start, list, search, pin, rename and delete their own conversations and sort them into personal groups. The sidebar shows Pinned, Groups and Recent (today, past week, past month). A group is a folder only: conversations never share context, and there is no sharing or collaboration. A conversation's title is its first question cut to 80 characters; no LLM call names it. Search matches titles and the user's own questions, inside the user's conversations only. Delete only hides the conversation from its owner, at once: nothing is removed, and an `admin` can still read every conversation, deleted or not, with its messages and runs in the console's Runs and trace section. The rows expire with the 90-day log TTL, after which history is gone for everyone.
 - **Messages.** Under an answer: copy, like, dislike with an optional note, and retry. Under the user's own message: copy and edit. Edit and retry write a new revision of that turn and answer it again; the turns after it in the older revision leave the conversation and its context.
@@ -418,8 +438,24 @@ The interface follows the Fitcher web app design, summarized in [design/web-app.
 - **Datasets page.** A read-only view of the compiled pack's datasets: columns, types, roles and which pack roles may read each dataset.
 - **Feedback page.** Likes and dislikes with their notes, question and trace; a reviewer can propose an example from one disliked or failed run, which runs the same proposal code as `propose_examples.py` (§11 step 8).
 - **Evaluation page.** Reads `eval_reports`: per-layer rates, the threshold result, the required question categories and failed cases. An `admin` can start a run of the active pack's eval set: it is labelled as using paid AI, asks for confirmation, runs one at a time per pack inside `api`, and stores its report like `eval.py`.
-- **Users page.** Lists realm users with their pack roles and status; an `admin` changes roles and disables or enables users as set in §9.
+- **Users page** (team mode only). Lists accounts with their roles and status; an `admin` creates accounts, resets passwords, changes roles and disables or enables users as set in §9.
 - **Costs page.** LLM cost by day, alias, model, tier and provider from `llm_calls`, always labelled as an estimate.
-- **Models page** (`admin`). Lists the model tiers with their current alias, provider and the eval result that enabled it; an `admin` maps a chat tier to another alias that passed the pack eval for it (§2). Each change is written to `agent_logs.admin_actions`.
+- **Models page** (`admin`). Lists the providers with whether a key is set, and the model tiers with their current model and its latest eval result for the pack, or "not evaluated". An `admin` adds, tests and removes providers and maps a tier to any model of a configured provider (§2). Each change is written to `agent_logs.admin_actions`.
 - **Audit page.** Shows the access decisions of `audit` and the input-screening verdicts of `input_screening`.
-- **Sample-data mode.** Each web feature reads either the real api or the active pack's `sample_data/`, chosen per feature in one place. A feature on sample data shows a Sample data badge, so a demo is never mistaken for a real answer. Sample data belongs to the pack, is hand-written and is never copied or derived from a licensed dataset; the engine code in `apps/web` stays free of pack names. Each phase plan's Web wiring section names the features it moves to the real api.
+- **Sample-data mode.** Each web feature reads either the real api or the active pack's `sample_data/`, chosen per feature in one place. A feature on sample data shows a Sample data badge, so a demo is never mistaken for a real answer. The public demo is the web app built with every feature on sample data and no backend. Sample data belongs to the pack, is hand-written and is never copied or derived from a licensed dataset; the engine code in `apps/web` stays free of pack names. Each phase plan's Web wiring section names the features it moves to the real api.
+
+## 16. Transition from v3
+
+The code built in Phases 0 to 12 follows v3. Each row is replaced by the phase named; until then the v3 behaviour stays in place and working.
+
+| v3 behaviour still in the code | v4 decision | Phase |
+|---|---|---|
+| Settings and secrets in `.env` | App state in SQLite with encrypted secrets, setup state, numbered schema changes (§2, §3) | 13 |
+| LiteLLM Proxy service, catalog aliases, OpenAI embeddings, eval-gated providers, classifier always on | LiteLLM SDK in `api`, providers in the app state, local embeddings, optional classifier (§2, §9) | 14 |
+| Keycloak sign-in, sessions in the web process, roles from the JWT | Individual and team modes with local accounts and optional OIDC (§9) | 15 |
+| Six Compose services | One image and one container; Qdrant runs as an internal process until Phase 20 (§3) | 16 |
+| Sources declared only in manifests, credentials from `.env`, manual full reloads | Sources page, named collections created with SQL, scheduled and incremental copies (§4, §15) | 17 |
+| No SQL Server source | SQL Server through ODBC (§4) | 18 |
+| Marts hand-written in dbt, pack usable only after review and eval | Instant pack (§11) | 19 |
+| Qdrant | Search in ClickHouse, documents optional (§2, §5) | 20 |
+| 90-day expiry of conversations, one worker, development datasets in the image | Retention split, hardening, release and demo (§3, §14) | 21 |
