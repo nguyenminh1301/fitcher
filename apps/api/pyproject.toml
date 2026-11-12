@@ -11,6 +11,8 @@ dependencies = [
     "httpx==0.28.1",
     "jsonschema==4.26.0",
     "langgraph==1.2.16",
+    # The model gateway (app/llm/gateway.py) calls every provider through the LiteLLM SDK; no proxy extras.
+    "litellm==1.103.10",
     # The screening classifier (app/screening/classifier.py) runs on CPU with ONNX Runtime.
     "numpy==2.5.4",
     "onnxruntime==1.31.1",

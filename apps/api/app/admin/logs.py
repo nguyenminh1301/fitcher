@@ -110,14 +110,15 @@ class AdminLogs:
             items.append((_aware(ts), TraceItem(
                 name=node, kind="node", status="ok" if status == "ok" else "err", ms=int(duration_ms or 0),
             )))
-        for ts, node, alias, model, tokens, cost, latency_ms, status, error in self.query(
-            "SELECT ts, node, alias, model, total_tokens, cost_usd, latency_ms, status, error "
+        for ts, node, alias, provider, model, tokens, cost, latency_ms, status, error in self.query(
+            "SELECT ts, node, alias, provider, model, total_tokens, cost_usd, latency_ms, status, error "
             "FROM agent_logs.llm_calls WHERE trace_id = {trace_id:String} ORDER BY ts",
             parameters,
         ):
             items.append((_aware(ts), TraceItem(
                 name=f"LLM {node}", kind="llm", status="ok" if status in ("ok", "success") else "err",
-                ms=int(latency_ms or 0), meta=[alias, model, f"{int(tokens or 0)} tokens", f"${float(cost or 0):.6f}"],
+                ms=int(latency_ms or 0),
+                meta=[alias or provider, model, f"{int(tokens or 0)} tokens", "no price" if cost is None else f"${float(cost):.6f}"],
                 error=_short(error) or None,
             )))
         for ts, attempt, sql, rows_read, error in self.query(
@@ -175,15 +176,16 @@ class AdminLogs:
 
     def costs(self, *, start: date, end: date) -> list[CostRow]:
         rows = self.query(
-            "SELECT toString(toDate(ts)) AS day, alias, model, tier, count() AS calls, sum(cost_usd) AS cost "
+            "SELECT toString(toDate(ts)) AS day, alias, provider, model, tier, count() AS calls, sum(cost_usd) AS cost "
             "FROM agent_logs.llm_calls WHERE ts >= {start:Date} AND ts < {end:Date} "
-            "GROUP BY day, alias, model, tier ORDER BY day, alias, model, tier",
+            "GROUP BY day, alias, provider, model, tier ORDER BY day, alias, provider, model, tier",
             {"start": start, "end": end},
         )
         return [
-            CostRow(day=day, alias=alias, model=model, tier=tier, provider=provider_of(alias), calls=int(calls),
+            # Rows written through the LiteLLM Proxy have no provider column value; their alias names it.
+            CostRow(day=day, alias=alias, model=model, tier=tier, provider=provider or provider_of(alias), calls=int(calls),
                     cost_usd=round(float(cost or 0.0), 6))
-            for day, alias, model, tier, calls, cost in rows
+            for day, alias, provider, model, tier, calls, cost in rows
         ]
 
     @staticmethod

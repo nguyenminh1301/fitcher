@@ -11,24 +11,32 @@ import pytest
 from app.config import SettingsError, load_settings
 from app.observability.events import (
     AdminActionRecord, AuditRecord, ChatMessageRecord, ConversationGroupRecord, ConversationRecord, EvalReportRecord, EventRecord, RunRecord,
-    InputScreeningRecord, SqlRunRecord,
+    InputScreeningRecord, LlmCallRecord, SqlRunRecord,
 )
 from app.observability.log_writer import ClickHouseLogSink, FlushResult, LogWriter
 
-SCHEMA = Path(__file__).resolve().parents[3] / "infra" / "clickhouse" / "changes" / "0002_agent_logs.sql"
+CHANGES = Path(__file__).resolve().parents[3] / "infra" / "clickhouse" / "changes"
+SCHEMA = CHANGES / "0002_agent_logs.sql"
 NOW = datetime(2026, 11, 2, 8, 0, tzinfo=UTC)
 
 
 def table_columns(table: str) -> list[str]:
     sql = SCHEMA.read_text(encoding="utf-8")
     body = re.search(rf"CREATE TABLE IF NOT EXISTS agent_logs\.{table}\s*\((.*?)\n\)", sql, re.S).group(1)
-    return [line.split()[0] for line in body.strip().splitlines()]
+    columns = [line.split()[0] for line in body.strip().splitlines()]
+    # Later numbered changes add columns in place with ADD COLUMN ... AFTER.
+    for change in sorted(CHANGES.glob("*.sql")):
+        added = rf"ALTER TABLE agent_logs\.{table} ADD COLUMN IF NOT EXISTS (\w+) .*? AFTER (\w+);"
+        for column, after in re.findall(added, change.read_text(encoding="utf-8")):
+            if column not in columns:
+                columns.insert(columns.index(after) + 1, column)
+    return columns
 
 
 @pytest.mark.parametrize(
     "record", [
         RunRecord, EventRecord, SqlRunRecord, EvalReportRecord, AuditRecord, ChatMessageRecord, ConversationRecord,
-        ConversationGroupRecord, InputScreeningRecord, AdminActionRecord,
+        ConversationGroupRecord, InputScreeningRecord, AdminActionRecord, LlmCallRecord,
     ],
 )
 def test_records_match_their_table_columns(record):

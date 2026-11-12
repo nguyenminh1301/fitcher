@@ -42,10 +42,10 @@ FROM
     SELECT
         toDateTime64(ts, 6, 'UTC'),
         'llm',
-        concat(toString(node), ' ', toString(alias)),
+        concat(toString(node), ' ', if(alias = '', toString(provider), toString(alias))),
         toString(status),
         concat(
-            toString(model), ' tokens=', toString(total_tokens), ' cost_usd=', toString(cost_usd),
+            toString(model), ' tokens=', toString(total_tokens), ' cost_usd=', ifNull(toString(cost_usd), 'unknown'),
             ' latency_ms=', toString(latency_ms), if(error = '', '', concat(' error=', error))
         )
     FROM agent_logs.llm_calls

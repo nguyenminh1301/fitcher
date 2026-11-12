@@ -5,6 +5,7 @@ directory and edit one YAML file at a time to produce each failure.
 """
 
 from collections.abc import Callable
+import os
 from pathlib import Path
 import shutil
 from typing import Any
@@ -13,6 +14,9 @@ import pytest
 import yaml
 
 from app.packs.loader import read_yaml
+
+# Tests that import litellm read its bundled price table instead of downloading one.
+os.environ.setdefault("LITELLM_LOCAL_MODEL_COST_MAP", "True")
 
 FIXTURE_PACK = Path(__file__).parent / "fixtures" / "packs" / "minimal"
 SCHEMA_DIR = Path(__file__).resolve().parents[3] / "packs" / "_schema"
