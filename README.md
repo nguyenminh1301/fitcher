@@ -53,6 +53,10 @@ Each company's access rules live in one policy file. Publishing the pack turns i
 | Data modelling | dbt |
 | Domain Packs | YAML checked against JSON Schema |
 
+## Where fitcher is going
+
+Today fitcher runs as six services from this repository. The next phases turn it into one image that starts with a single `docker run`, with models, data sources and sign-in set up in the application instead of in files: see the [assessment](docs/self-hosted-product-assessment.md) (in Vietnamese), the [decisions](docs/DECISIONS.md) and the [master plan](docs/MASTER_PLAN.md), Phases 13 to 21. The Quick start below describes the current six-service setup.
+
 ## Quick start
 
 You need Docker with Compose v2 and about 8 GB of memory for Docker. Run the commands from the repository root, in Bash or PowerShell.

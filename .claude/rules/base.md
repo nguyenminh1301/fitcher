@@ -10,8 +10,8 @@ description: Always active. Sets communication, scope, repository boundaries and
 
 - Chat with the owner in Vietnamese.
 - Write code identifiers, comments, documentation and GitHub content in English.
-- fitcher implements the domain-neutral Finch-Lab architecture; `docs/DECISIONS.md` is the binding source of truth and `docs/MASTER_PLAN.md` orders the phases.
-- The repository is a monorepo whose Compose stack runs the six lab services: `apps/api` (FastAPI `GET /health`), `apps/web` (placeholder page), ClickHouse, Qdrant, LiteLLM and Keycloak configured under `infra/`, plus `packs/`, `dbt/` and `jobs/`. Read README.md for current status and available commands.
+- fitcher is a domain-neutral, self-hosted data question-answering product; `docs/DECISIONS.md` is the binding source of truth and `docs/MASTER_PLAN.md` orders the phases.
+- The repository is a monorepo. Phases 0 to 12 built a Compose stack of six services: `apps/api` (FastAPI), `apps/web` (Next.js), ClickHouse, Qdrant, LiteLLM and Keycloak configured under `infra/`, plus `packs/`, `dbt/` and `jobs/`. Phases 13 to 21 turn it into one self-hosted image without Keycloak, the LiteLLM Proxy and Qdrant (DECISIONS §16); a phase removes only the service it replaces. Read README.md for current status and available commands.
 - Before working on a phase, read DECISIONS.md and that phase's plan in `docs/plans/`. Stop and ask before going against a decision; never add an out-of-scope component from DECISIONS §1.
 - Engine code under `apps/` never hard-codes pack table, column, metric or industry names; LLM calls use LiteLLM aliases only.
 - Implement only the requested scope; do not add speculative application code, dependencies or abstractions.
