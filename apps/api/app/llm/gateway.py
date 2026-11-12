@@ -179,7 +179,10 @@ class Gateway:
     def _complete(self, tier: str, prompt: Prompt, response_format: dict | None) -> tuple[str, str]:
         """The model ``tier`` resolved to, and its reply text."""
         check_chat_tier(tier)
-        route = self._resolver.route(tier)
+        try:
+            route = self._resolver.route(tier)
+        except LookupError as error:  # no model mapped to the tier, or its provider is gone
+            raise LLMError(str(error)) from None
         request: dict = {
             "messages": [{"role": "system", "content": prompt.system}, {"role": "user", "content": prompt.user}],
         }
@@ -227,7 +230,10 @@ class GatewayEmbeddings:
         return vectors
 
     def _embed_batch(self, texts: list[str]) -> list[list[float]]:
-        route = self._resolver.route(EMBED_TIER)
+        try:
+            route = self._resolver.route(EMBED_TIER)
+        except LookupError as error:  # no embedding model set, or its provider is gone
+            raise EmbeddingError(str(error)) from None
         try:
             response = self._sender.send(EMBED_TIER, route, texts, {"input": texts, "dimensions": self.dimensions})
         except _ProviderFailure as failure:

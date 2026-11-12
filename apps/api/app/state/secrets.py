@@ -116,3 +116,17 @@ class SecretVault:
 
     def reader(self) -> SecretReader:
         return SecretReader(self._db, self._key)
+
+
+_shared_vault: SecretVault | None = None
+
+
+def shared_vault() -> SecretVault:
+    """The vault of the process's app state, under the instance key of ``FITCHER_DATA_DIR``."""
+    global _shared_vault
+    from app.state.db import data_dir, shared_state  # noqa: PLC0415 - shared_state opens and migrates the file
+
+    db = shared_state()
+    if _shared_vault is None or _shared_vault._db is not db:
+        _shared_vault = SecretVault(db, load_key(data_dir(), db=db))
+    return _shared_vault

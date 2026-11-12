@@ -355,3 +355,15 @@ def test_an_embedding_call_writes_a_row_of_the_embed_tier(screened):
     [row] = rows.records
     assert (row.trace_id, row.tier, row.model, row.status) == ("", "embed", "openai/text-embedding-3-small", "success")
     assert row.prompt_tokens == 4 and row.total_tokens == 4
+
+
+class Unmapped:
+    def route(self, tier: str) -> Route:
+        raise LookupError(f"no model is mapped to the {tier} tier; add a provider on the Models page")
+
+
+def test_a_tier_without_a_model_raises_the_callers_error_type(screened):
+    with pytest.raises(LLMError, match="no model is mapped to the fast tier"):
+        Gateway(Unmapped(), completion=FakeSdk()).text("fast", PROMPT)
+    with pytest.raises(EmbeddingError, match="no model is mapped to the embed tier"):
+        GatewayEmbeddings(Unmapped(), dimensions=2, embedding=FakeSdk()).embed(["a"])
