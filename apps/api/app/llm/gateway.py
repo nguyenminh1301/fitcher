@@ -26,8 +26,9 @@ retries and drops a parameter the model does not accept (such as a fixed
 temperature) instead of failing.
 
 LiteLLM is imported on the first call, not with this module: the import is
-slow, and its price table is read from the copy inside the package instead of
-being downloaded. Unit tests pass a fake in place of the SDK call.
+slow, its price table is read from the copy inside the package instead of
+being downloaded, and it runs in production mode so it never loads a ``.env``
+file into the environment. Unit tests pass a fake in place of the SDK call.
 """
 
 from collections.abc import Callable, Sequence
@@ -87,6 +88,9 @@ def screening_rejection(screening: str | None, texts: Sequence[str]) -> str | No
 
 def litellm_module():
     os.environ.setdefault("LITELLM_LOCAL_MODEL_COST_MAP", "True")
+    # Outside production mode LiteLLM loads a .env file from the working directory into the environment
+    # on import, which would hand the process every key and password that file holds.
+    os.environ.setdefault("LITELLM_MODE", "PRODUCTION")
     import litellm  # noqa: PLC0415 - slow import, deferred to the first call
 
     litellm.suppress_debug_info = True

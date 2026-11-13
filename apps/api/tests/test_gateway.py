@@ -1,7 +1,11 @@
 """The in-process model gateway with a fake SDK call in place of a provider; no test sends a request."""
 
 from collections.abc import Iterator
+import os
+from pathlib import Path
 import string
+import subprocess
+import sys
 
 import litellm
 from pydantic import BaseModel
@@ -367,3 +371,15 @@ def test_a_tier_without_a_model_raises_the_callers_error_type(screened):
         Gateway(Unmapped(), completion=FakeSdk()).text("fast", PROMPT)
     with pytest.raises(EmbeddingError, match="no model is mapped to the embed tier"):
         GatewayEmbeddings(Unmapped(), dimensions=2, embedding=FakeSdk()).embed(["a"])
+
+
+def test_loading_the_sdk_never_reads_a_dotenv_file(tmp_path):
+    # LiteLLM loads .env from the working directory on import unless told it runs in production.
+    (tmp_path / ".env").write_text("OPENAI_API_KEY=sk-from-a-dotenv-file\n", encoding="utf-8")
+    env = {key: value for key, value in os.environ.items() if key not in ("OPENAI_API_KEY", "LITELLM_MODE")}
+    env["PYTHONPATH"] = os.pathsep.join([str(Path(__file__).resolve().parents[1]), env.get("PYTHONPATH", "")])
+    code = "import os; from app.llm.gateway import litellm_module; litellm_module(); print(os.environ.get('OPENAI_API_KEY', 'unset'))"
+
+    out = subprocess.run([sys.executable, "-c", code], cwd=tmp_path, env=env, capture_output=True, text=True, check=True)
+
+    assert out.stdout.strip() == "unset"

@@ -17,6 +17,8 @@ from app.packs.loader import read_yaml
 
 # Tests that import litellm read its bundled price table instead of downloading one.
 os.environ.setdefault("LITELLM_LOCAL_MODEL_COST_MAP", "True")
+# Tests that import litellm directly must not load the repository's .env into the test process.
+os.environ.setdefault("LITELLM_MODE", "PRODUCTION")
 
 FIXTURE_PACK = Path(__file__).parent / "fixtures" / "packs" / "minimal"
 SCHEMA_DIR = Path(__file__).resolve().parents[3] / "packs" / "_schema"
