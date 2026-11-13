@@ -108,7 +108,7 @@ def fill_defaults(mapping: TierMapping, provider: Provider, *, dimensions: int =
             mapping.set_tier(tier, provider.id, model)
     embedding_model = defaults.embedding_model(provider.kind)
     if mapping.embedding() is None and embedding_model:
-        mapping.set_embedding(provider.id, embedding_model, dimensions)
+        mapping.set_embedding(provider.id, embedding_model, defaults.fixed_dimensions(embedding_model) or dimensions)
 
 
 class SettingsRoutes:
@@ -124,13 +124,14 @@ class SettingsRoutes:
             embedding = self._mapping.embedding()
             if embedding is None:
                 raise RouteError("no embedding model is set; add a provider on the Models page")
-            mapped = embedding[0]
+            mapped, embedding_call = embedding[0], True
         else:
+            embedding_call = False
             mapped = self._mapping.tier(tier)
             if mapped is None:
                 raise RouteError(f"no model is mapped to the {tier} tier; add a provider on the Models page")
         try:
-            return self._store.route(mapped.provider_id, mapped.model, self._reader)
+            return self._store.route(mapped.provider_id, mapped.model, self._reader, embedding=embedding_call)
         except SecretError:
             raise RouteError(
                 f"the key of provider {mapped.provider_id} cannot be read; enter it again on the Models page"

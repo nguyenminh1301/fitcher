@@ -25,11 +25,13 @@ DISPLAY_NAMES = {
     "openai": "OpenAI", "anthropic": "Anthropic", "gemini": "Gemini", "ollama": "Ollama",
     "openai_compatible": "OpenAI-compatible",
 }
-# The LiteLLM model prefix of each kind; a model server's base URL goes with the route.
+# The LiteLLM model prefix of each kind; a model server's base URL goes with the route. The SDK
+# serves Ollama chat as ``ollama_chat`` and Ollama embeddings only as ``ollama``.
 SDK_PREFIX = {
     "openai": "openai", "anthropic": "anthropic", "gemini": "gemini", "ollama": "ollama_chat",
     "openai_compatible": "openai",
 }
+EMBEDDING_PREFIX = {**SDK_PREFIX, "ollama": "ollama"}
 
 
 class ProviderError(ValueError):
@@ -159,9 +161,9 @@ class ProviderStore:
             conn.execute("DELETE FROM providers WHERE id = ?", (provider_id,))
             self._vault.delete_in(conn, key_name(provider_id))
 
-    def route(self, provider_id: str, model: str, reader: SecretReader) -> Route:
-        """Where a call to ``model`` of the provider goes, with its decrypted key."""
+    def route(self, provider_id: str, model: str, reader: SecretReader, *, embedding: bool = False) -> Route:
+        """Where a chat call, or an ``embedding`` call, to ``model`` of the provider goes, with its decrypted key."""
         provider = self.get(provider_id)
         api_key = reader.get(key_name(provider_id)) if provider.key_set else None
-        return Route(provider=provider.id, model=f"{SDK_PREFIX[provider.kind]}/{model}", api_key=api_key,
-                     api_base=provider.base_url)
+        prefix = (EMBEDDING_PREFIX if embedding else SDK_PREFIX)[provider.kind]
+        return Route(provider=provider.id, model=f"{prefix}/{model}", api_key=api_key, api_base=provider.base_url)

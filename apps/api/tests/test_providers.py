@@ -196,3 +196,11 @@ def test_a_provider_and_its_key_are_removed_together_or_not_at_all(state):
         ProviderStore(db, FailingVault(vault)).delete("gemini")
 
     assert ProviderStore(db, vault).get("gemini").key_set
+
+
+def test_an_ollama_embedding_route_uses_the_sdks_embedding_prefix(state, store):
+    store.create("ollama", base_url="http://host.docker.internal:11434")
+    reader = state[1].reader()
+
+    assert store.route("ollama", "nomic-embed-text", reader, embedding=True).model == "ollama/nomic-embed-text"
+    assert store.route("ollama", "qwen2.5-coder:7b", reader).model == "ollama_chat/qwen2.5-coder:7b"

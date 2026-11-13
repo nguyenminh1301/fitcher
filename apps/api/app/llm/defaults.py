@@ -3,7 +3,9 @@
 A proposal is only a starting point: the admin maps any tier to any model of a
 configured provider afterwards. An OpenAI-compatible endpoint serves models
 nobody can know in advance, so it proposes none and its tiers are chosen from
-the models it lists. Anthropic has no embedding model.
+the models it lists. Anthropic has no embedding model. The OpenAI and Gemini
+embedding models return the vector size they are asked for; Ollama's
+``nomic-embed-text`` always returns 768 floats.
 """
 
 _CHAT = {
@@ -20,6 +22,8 @@ _CHAT = {
     "openai_compatible": {},
 }
 _EMBEDDING = {"openai": "text-embedding-3-large", "gemini": "gemini-embedding-001", "ollama": "nomic-embed-text"}
+# The vector size of an embedding model that cannot return another size.
+_FIXED_DIMENSIONS = {"nomic-embed-text": 768}
 
 
 def chat_models(kind: str) -> dict[str, str]:
@@ -29,3 +33,8 @@ def chat_models(kind: str) -> dict[str, str]:
 
 def embedding_model(kind: str) -> str | None:
     return _EMBEDDING.get(kind)
+
+
+def fixed_dimensions(model: str) -> int | None:
+    """The only vector size ``model`` returns, or None when it returns the size it is asked for."""
+    return _FIXED_DIMENSIONS.get(model)

@@ -149,3 +149,16 @@ def test_the_shared_vault_follows_the_shared_state(monkeypatch, tmp_path):
 
     assert not shared_vault().has("probe")
     assert shared_vault()._db is shared_state()
+
+
+def test_a_model_with_a_fixed_vector_size_records_that_size(store, mapping):
+    # nomic-embed-text always returns 768 floats; OpenAI's model returns the size it is asked for.
+    fill_defaults(mapping, store.create("ollama", base_url="http://host.docker.internal:11434"), dimensions=1024)
+
+    assert mapping.embedding() == (TierModel("ollama", "nomic-embed-text"), 768)
+
+
+def test_the_embedding_route_of_ollama_uses_the_embedding_prefix(state, store, mapping):
+    fill_defaults(mapping, store.create("ollama", base_url="http://host.docker.internal:11434"), dimensions=1024)
+
+    assert SettingsRoutes(mapping, store, state[1].reader()).route("embed").model == "ollama/nomic-embed-text"
