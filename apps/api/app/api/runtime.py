@@ -11,6 +11,7 @@ import logging
 from pathlib import Path
 import threading
 
+import httpx
 import yaml
 
 from typing import Annotated
@@ -37,6 +38,7 @@ from app.packs.compiler import CompileError, CompiledPack, load_compiled
 from app.screening.screen import Screener
 from app.search.client import QdrantSearch
 from app.state.db import StateDb, shared_state
+from app.state.secrets import SecretVault, shared_vault
 
 
 logger = logging.getLogger(__name__)
@@ -58,6 +60,16 @@ def get_verifier() -> TokenVerifier | None:
 
 def get_state_db() -> StateDb:
     return shared_state()
+
+
+def get_vault() -> SecretVault:
+    return shared_vault()
+
+
+@cache
+def get_oidc_http() -> httpx.Client:
+    """The HTTP client of OIDC discovery, JWKS and code exchanges."""
+    return httpx.Client(follow_redirects=False)
 
 
 @cache

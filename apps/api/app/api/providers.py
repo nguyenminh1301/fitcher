@@ -28,7 +28,7 @@ from fastapi import APIRouter, Depends, HTTPException, Response, status
 from pydantic import BaseModel
 
 from app.api.console import require_admin
-from app.api.runtime import get_admin_action_log, get_compiled_or_none, get_model_store, pack_identity
+from app.api.runtime import get_admin_action_log, get_compiled_or_none, get_model_store, get_vault, pack_identity
 from app.api.setup import get_state_db
 from app.auth.principal import Principal
 from app.contracts.providers import (
@@ -48,7 +48,7 @@ from app.observability.events import AdminActionRecord, utc_now
 from app.observability.tracing import trusted_pack_calls
 from app.state import setup
 from app.state.db import StateDb
-from app.state.secrets import SecretError, SecretVault, shared_vault
+from app.state.secrets import SecretError, SecretVault
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -62,10 +62,6 @@ class ProbeReply(BaseModel):
 
 class ActionLog(Protocol):
     def record_action(self, record: AdminActionRecord) -> None: ...
-
-
-def get_vault() -> SecretVault:
-    return shared_vault()
 
 
 def get_compiled_embedding() -> tuple[str, int] | None:
