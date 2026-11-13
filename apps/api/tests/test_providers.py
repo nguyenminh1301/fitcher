@@ -152,3 +152,47 @@ def test_a_base_url_never_carries_credentials(store):
     store.create("ollama", base_url="http://host.docker.internal:11434")
     with pytest.raises(ProviderError, match="user information"):
         store.update("ollama", base_url="http://admin@host.docker.internal:11434")
+
+
+class FailingVault:
+    """Wraps a vault so that writing or deleting a secret fails inside the caller's transaction."""
+
+    def __init__(self, vault):
+        self._vault = vault
+
+    def __getattr__(self, name):
+        return getattr(self._vault, name)
+
+    def set_in(self, conn, name, value):
+        raise OSError("disk full")
+
+    def delete_in(self, conn, name):
+        raise OSError("disk full")
+
+
+def test_a_provider_whose_key_is_not_stored_is_not_created(state):
+    db, vault = state
+    with pytest.raises(OSError):
+        ProviderStore(db, FailingVault(vault)).create("openai", api_key=KEY)
+    assert ProviderStore(db, vault).list() == []
+
+
+def test_a_new_base_url_and_its_key_are_stored_together_or_not_at_all(state):
+    db, vault = state
+    ProviderStore(db, vault).create("openai_compatible", name="Lab", base_url="http://old:1/v1", api_key=KEY)
+
+    with pytest.raises(OSError):
+        ProviderStore(db, FailingVault(vault)).update("openai-compatible", base_url="http://new:1/v1", api_key="sk-new-0000")
+
+    kept = ProviderStore(db, vault).get("openai-compatible")
+    assert (kept.base_url, kept.key_last4) == ("http://old:1/v1", "9876")
+
+
+def test_a_provider_and_its_key_are_removed_together_or_not_at_all(state):
+    db, vault = state
+    ProviderStore(db, vault).create("gemini", api_key=KEY)
+
+    with pytest.raises(OSError):
+        ProviderStore(db, FailingVault(vault)).delete("gemini")
+
+    assert ProviderStore(db, vault).get("gemini").key_set

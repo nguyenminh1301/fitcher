@@ -91,17 +91,21 @@ class SecretVault:
         self._aead = AESGCM(key)
 
     def set(self, name: str, value: str) -> None:
+        with self._db.write() as conn:
+            self.set_in(conn, name, value)
+
+    def set_in(self, conn, name: str, value: str) -> None:
+        """Store the secret inside the caller's ``StateDb.write`` transaction."""
         if not value:
             raise SecretError("a secret cannot be empty")
         nonce = random.token_bytes(12)
         ciphertext = self._aead.encrypt(nonce, value.encode("utf-8"), name.encode("utf-8"))
-        with self._db.write() as conn:
-            conn.execute(
-                "INSERT INTO secrets (name, nonce, ciphertext, last_four, updated_at) VALUES (?, ?, ?, ?, ?) "
-                "ON CONFLICT(name) DO UPDATE SET nonce = excluded.nonce, ciphertext = excluded.ciphertext, "
-                "last_four = excluded.last_four, updated_at = excluded.updated_at",
-                (name, nonce, ciphertext, value[-4:], datetime.now(UTC).isoformat()),
-            )
+        conn.execute(
+            "INSERT INTO secrets (name, nonce, ciphertext, last_four, updated_at) VALUES (?, ?, ?, ?, ?) "
+            "ON CONFLICT(name) DO UPDATE SET nonce = excluded.nonce, ciphertext = excluded.ciphertext, "
+            "last_four = excluded.last_four, updated_at = excluded.updated_at",
+            (name, nonce, ciphertext, value[-4:], datetime.now(UTC).isoformat()),
+        )
 
     def has(self, name: str) -> bool:
         return self._db.connection().execute("SELECT 1 FROM secrets WHERE name = ?", (name,)).fetchone() is not None
@@ -112,7 +116,11 @@ class SecretVault:
 
     def delete(self, name: str) -> None:
         with self._db.write() as conn:
-            conn.execute("DELETE FROM secrets WHERE name = ?", (name,))
+            self.delete_in(conn, name)
+
+    def delete_in(self, conn, name: str) -> None:
+        """Delete the secret inside the caller's ``StateDb.write`` transaction."""
+        conn.execute("DELETE FROM secrets WHERE name = ?", (name,))
 
     def reader(self) -> SecretReader:
         return SecretReader(self._db, self._key)

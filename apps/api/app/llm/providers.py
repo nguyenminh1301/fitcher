@@ -122,13 +122,14 @@ class ProviderStore:
         while provider_id in taken:
             number += 1
             provider_id = f"{kind.replace('_', '-')}-{number}"
+        # The row and its key are written in one transaction: a hosted provider never exists without its key.
         with self._db.write() as conn:
             conn.execute(
                 "INSERT INTO providers (id, name, kind, base_url, created_at) VALUES (?, ?, ?, ?, ?)",
                 (provider_id, name, kind, url, datetime.now(UTC).isoformat()),
             )
-        if api_key:
-            self._vault.set(key_name(provider_id), api_key)
+            if api_key:
+                self._vault.set_in(conn, key_name(provider_id), api_key)
         return self.get(provider_id)
 
     def update(self, provider_id: str, *, name: str | None = None, api_key: str | None = None,
@@ -141,20 +142,22 @@ class ProviderStore:
         url = _base_url(current.kind, base_url) if base_url is not None else current.base_url
         if api_key and current.kind == "ollama":
             raise ProviderError("an ollama provider takes no API key")
+        # A new base URL and its new key change together, so no call sends the old key to the new address.
         with self._db.write() as conn:
             conn.execute(
                 "UPDATE providers SET name = ?, base_url = ? WHERE id = ?",
                 (name if name is not None else current.name, url, provider_id),
             )
-        if api_key:
-            self._vault.set(key_name(provider_id), api_key)
+            if api_key:
+                self._vault.set_in(conn, key_name(provider_id), api_key)
         return self.get(provider_id)
 
     def delete(self, provider_id: str) -> None:
         self.get(provider_id)
+        # Removed together, so a provider created later with the same id never finds the old key.
         with self._db.write() as conn:
             conn.execute("DELETE FROM providers WHERE id = ?", (provider_id,))
-        self._vault.delete(key_name(provider_id))
+            self._vault.delete_in(conn, key_name(provider_id))
 
     def route(self, provider_id: str, model: str, reader: SecretReader) -> Route:
         """Where a call to ``model`` of the provider goes, with its decrypted key."""
