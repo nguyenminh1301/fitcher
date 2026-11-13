@@ -135,16 +135,28 @@ def test_an_address_gets_more_failures_than_one_email(db):
     assert throttle.reserve(["email:new2@example.com", "address:10.0.0.1"])[0] > 0
 
 
-def test_a_successful_sign_in_releases_its_places_and_clears_the_email_failures(db):
+def test_a_successful_sign_in_releases_only_its_own_places(db):
     throttle = account_sessions.SignInThrottle(db, clock=Clock())
     keys = ["email:ana@example.com", "address:10.0.0.1"]
     for _ in range(4):
         throttle.reserve(keys)
 
     _, reservation = throttle.reserve(keys)
-    throttle.succeeded(reservation, "email:ana@example.com")
+    throttle.succeeded(reservation)
 
-    for _ in range(5):
-        assert throttle.reserve(keys)[0] == 0
-    assert db.connection().execute(
-        "SELECT count(*) FROM sign_in_failures WHERE key = 'address:10.0.0.1'").fetchone()[0] == 9
+    assert throttle.reserve(keys)[0] == 0
+    assert throttle.reserve(keys)[0] > 0
+
+
+def test_a_success_does_not_free_the_places_of_attempts_still_being_checked(db):
+    throttle = account_sessions.SignInThrottle(db, clock=Clock())
+    keys = ["email:ana@example.com", "address:10.0.0.1"]
+    in_progress = [throttle.reserve(keys) for _ in range(4)]
+    assert all(wait == 0 for wait, _ in in_progress)
+
+    _, reservation = throttle.reserve(keys)
+    throttle.succeeded(reservation)
+
+    # The four attempts still being checked keep their places; one more fits, then the limit holds.
+    assert throttle.reserve(keys)[0] == 0
+    assert throttle.reserve(keys)[0] > 0
