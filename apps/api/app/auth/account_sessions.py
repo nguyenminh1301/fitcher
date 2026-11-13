@@ -7,10 +7,11 @@ it started, on sign-out, on a password change and when the account is
 disabled. The principal is read from the account on every request, so a role
 change or a disable reaches the user's next request.
 
-Failed sign-ins are counted per e-mail and per client address over a
-15-minute window. Once a key reaches its limit, further attempts are refused
-until its oldest counted failure leaves the window, whether or not the
-account exists.
+Sign-in attempts are counted per e-mail and per client address over a
+15-minute window; an attempt is counted before its password is checked and
+released when it succeeds. Once a key reaches its limit, further attempts are
+refused until the counted failure that reached it leaves the window, whether
+or not the account exists.
 """
 
 from collections.abc import Callable, Iterable
@@ -88,32 +89,39 @@ def address_key(address: str) -> str:
 
 
 class SignInThrottle:
+    """Counts each sign-in attempt before its password is checked, so parallel attempts cannot pass the limit."""
+
     def __init__(self, db: StateDb, clock: Clock = time.time):
         self._db = db
         self._clock = clock
 
-    def retry_after(self, keys: Iterable[str]) -> int:
-        """Seconds until a sign-in for these keys is accepted again; 0 when it is accepted now."""
-        now = self._clock()
-        conn = self._db.connection()
-        wait = 0.0
-        for key in keys:
-            limit = LIMITS[key.partition(":")[0]]
-            times = [row[0] for row in conn.execute(
-                "SELECT failed_at FROM sign_in_failures WHERE key = ? AND failed_at > ? ORDER BY failed_at DESC",
-                (key, now - WINDOW_SECONDS),
-            )]
-            if len(times) >= limit:
-                # Accepted again when the failure that reached the limit leaves the window.
-                wait = max(wait, times[limit - 1] + WINDOW_SECONDS - now)
-        return math.ceil(wait) if wait > 0 else 0
+    def reserve(self, keys: Iterable[str]) -> tuple[int, list[int]]:
+        """Count one attempt for each key, or refuse it.
 
-    def failed(self, keys: Iterable[str]) -> None:
+        Returns ``(0, rows)`` when the attempt may go ahead, its rows counted as failures until
+        ``succeeded`` releases them, or ``(seconds, [])`` until an attempt is accepted again.
+        """
+        keys = list(keys)
         now = self._clock()
         with self._db.write() as conn:
             conn.execute("DELETE FROM sign_in_failures WHERE failed_at <= ?", (now - WINDOW_SECONDS,))
-            conn.executemany("INSERT INTO sign_in_failures (key, failed_at) VALUES (?, ?)", [(key, now) for key in keys])
+            wait = 0.0
+            for key in keys:
+                limit = LIMITS[key.partition(":")[0]]
+                times = [row[0] for row in conn.execute(
+                    "SELECT failed_at FROM sign_in_failures WHERE key = ? ORDER BY failed_at DESC", (key,),
+                )]
+                if len(times) >= limit:
+                    # Accepted again when the failure that reached the limit leaves the window.
+                    wait = max(wait, times[limit - 1] + WINDOW_SECONDS - now)
+            if wait > 0:
+                return math.ceil(wait), []
+            rows = [conn.execute("INSERT INTO sign_in_failures (key, failed_at) VALUES (?, ?)", (key, now)).lastrowid
+                    for key in keys]
+        return 0, rows
 
-    def succeeded(self, key: str) -> None:
+    def succeeded(self, rows: list[int], email: str) -> None:
+        """Release a successful attempt's rows and forget the e-mail's earlier failures."""
         with self._db.write() as conn:
-            conn.execute("DELETE FROM sign_in_failures WHERE key = ?", (key,))
+            conn.executemany("DELETE FROM sign_in_failures WHERE rowid = ?", [(row,) for row in rows])
+            conn.execute("DELETE FROM sign_in_failures WHERE key = ?", (email,))

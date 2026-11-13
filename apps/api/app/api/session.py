@@ -37,15 +37,14 @@ def sign_in(body: SignIn, request: Request, response: Response, db: State) -> No
     throttle = account_sessions.SignInThrottle(db)
     address = request.client.host if request.client else "unknown"
     keys = [account_sessions.email_key(body.email), account_sessions.address_key(address)]
-    wait = throttle.retry_after(keys)
+    wait, attempt = throttle.reserve(keys)
     if wait:
         raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, detail="too many failed sign-ins; try again later",
                             headers={"Retry-After": str(wait)})
     account = accounts.authenticate(db, body.email, body.password)
     if account is None:
-        throttle.failed(keys)
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail="invalid email or password")
-    throttle.succeeded(keys[0])
+    throttle.succeeded(attempt, keys[0])
     sign_in_response(request, response, db, account.id)
 
 

@@ -108,38 +108,43 @@ def test_a_role_change_reaches_the_next_request(db, account):
     assert account_sessions.principal_for(db, token).roles == ("admin", "pack_reviewer")
 
 
-def test_the_throttle_refuses_a_key_after_five_failures_in_fifteen_minutes(db):
+def test_each_attempt_is_counted_before_the_password_is_checked(db):
     clock = Clock()
     throttle = account_sessions.SignInThrottle(db, clock=clock)
     keys = ["email:ana@example.com", "address:10.0.0.1"]
 
+    # Five attempts still being checked hold the five places, so a sixth parallel one is refused.
     for _ in range(5):
-        assert throttle.retry_after(keys) == 0
-        throttle.failed(keys)
-    wait = throttle.retry_after(keys)
+        wait, _ = throttle.reserve(keys)
+        assert wait == 0
+    wait, reservation = throttle.reserve(keys)
     assert 0 < wait <= 15 * 60
+    assert reservation == []
 
     clock.now += wait
-    assert throttle.retry_after(keys) == 0
+    assert throttle.reserve(keys)[0] == 0
 
 
 def test_an_address_gets_more_failures_than_one_email(db):
     throttle = account_sessions.SignInThrottle(db, clock=Clock())
 
     for index in range(19):
-        throttle.failed([f"email:user{index}@example.com", "address:10.0.0.1"])
+        throttle.reserve([f"email:user{index}@example.com", "address:10.0.0.1"])
 
-    assert throttle.retry_after(["email:new@example.com", "address:10.0.0.1"]) == 0
-    throttle.failed(["address:10.0.0.1"])
-    assert throttle.retry_after(["email:new@example.com", "address:10.0.0.1"]) > 0
+    assert throttle.reserve(["email:new@example.com", "address:10.0.0.1"])[0] == 0
+    assert throttle.reserve(["email:new2@example.com", "address:10.0.0.1"])[0] > 0
 
 
-def test_a_successful_sign_in_clears_the_email_failures(db):
+def test_a_successful_sign_in_releases_its_places_and_clears_the_email_failures(db):
     throttle = account_sessions.SignInThrottle(db, clock=Clock())
+    keys = ["email:ana@example.com", "address:10.0.0.1"]
     for _ in range(4):
-        throttle.failed(["email:ana@example.com"])
+        throttle.reserve(keys)
 
-    throttle.succeeded("email:ana@example.com")
-    throttle.failed(["email:ana@example.com"])
+    _, reservation = throttle.reserve(keys)
+    throttle.succeeded(reservation, "email:ana@example.com")
 
-    assert throttle.retry_after(["email:ana@example.com"]) == 0
+    for _ in range(5):
+        assert throttle.reserve(keys)[0] == 0
+    assert db.connection().execute(
+        "SELECT count(*) FROM sign_in_failures WHERE key = 'address:10.0.0.1'").fetchone()[0] == 9
