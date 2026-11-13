@@ -1,0 +1,30 @@
+# Development accounts of the two development packs, created in team mode by
+# `docker compose run --rm jobs python -m jobs.seed_dev_accounts` with the
+# password DEV_ACCOUNT_PASSWORD from .env. The ids keep the usernames these
+# users had before, so their conversations and run logs stay theirs. Never used
+# in the released image.
+accounts:
+  - id: lab.analyst
+    email: lab.analyst@fitcher.test
+    display_name: Lab Analyst
+    roles: [analyst]
+  - id: lab.marketing
+    email: lab.marketing@fitcher.test
+    display_name: Lab Marketing
+    roles: [marketing]
+  - id: lab.northwest
+    email: lab.northwest@fitcher.test
+    display_name: Lab Northwest
+    roles: [northwest_sales]
+  - id: lab.partner
+    email: lab.partner@fitcher.test
+    display_name: Lab Partner
+    roles: [category_partner]
+  - id: lab.reviewer
+    email: lab.reviewer@fitcher.test
+    display_name: Lab Reviewer
+    roles: [pack_reviewer, analyst]
+  - id: lab.admin
+    email: lab.admin@fitcher.test
+    display_name: Lab Admin
+    roles: [admin, analyst]

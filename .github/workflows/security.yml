@@ -58,7 +58,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        service: [api, web, clickhouse, qdrant, keycloak]
+        service: [api, web, clickhouse, qdrant]
     env:
       SERVICE: ${{ matrix.service }}
       TRIVY_VERSION: "0.76.1"
