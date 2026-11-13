@@ -41,6 +41,10 @@ SPECS: dict[tuple[str, str], SettingSpec] = {
     ("llm.embedding", "provider_id"): SettingSpec(str),
     ("llm.embedding", "model"): SettingSpec(str),
     ("llm.embedding", "dimensions"): SettingSpec(int),
+    # The one OpenID Connect provider of team mode (DECISIONS §9); its client secret is the secret oidc:client_secret.
+    ("oidc", "issuer"): SettingSpec(str),
+    ("oidc", "client_id"): SettingSpec(str),
+    ("oidc", "roles_claim"): SettingSpec(str, "roles"),
 }
 
 
@@ -74,3 +78,9 @@ class Settings:
                 "ON CONFLICT(group_name, key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at",
                 (group, key, json.dumps(value), datetime.now(UTC).isoformat()),
             )
+
+    def unset(self, group: str, key: str) -> None:
+        """Forget the stored value, so reading it returns its default again."""
+        self._spec(group, key)
+        with self._db.write() as conn:
+            conn.execute("DELETE FROM settings WHERE group_name = ? AND key = ?", (group, key))

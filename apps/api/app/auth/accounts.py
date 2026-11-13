@@ -93,6 +93,16 @@ def get(db: StateDb, account_id: str) -> Account | None:
     return None if row is None else _account(conn, row)
 
 
+def by_oidc_subject(db: StateDb, subject: str) -> Account | None:
+    conn = db.connection()
+    row = conn.execute(f"SELECT {_COLUMNS} FROM accounts WHERE oidc_subject = ?", (subject,)).fetchone()
+    return None if row is None else _account(conn, row)
+
+
+def email_taken(db: StateDb, email: str) -> bool:
+    return db.connection().execute("SELECT 1 FROM accounts WHERE email = ?", (normalize_email(email),)).fetchone() is not None
+
+
 def list_all(db: StateDb) -> list[Account]:
     conn = db.connection()
     return [_account(conn, row) for row in conn.execute(f"SELECT {_COLUMNS} FROM accounts ORDER BY email").fetchall()]
@@ -106,7 +116,7 @@ def _set_roles(conn: sqlite3.Connection, account_id: str, roles: Iterable[str]) 
 
 def create(
     db: StateDb, email: str, display_name: str, password: str | None, roles: Iterable[str],
-    account_id: str | None = None,
+    account_id: str | None = None, oidc_subject: str | None = None,
 ) -> Account:
     """A new enabled account; ``password`` is None for an account that signs in only through OIDC."""
     email = normalize_email(email)
@@ -118,9 +128,9 @@ def create(
     try:
         with db.write() as conn:
             conn.execute(
-                "INSERT INTO accounts (id, email, display_name, password_hash, status, created_at, updated_at) "
-                "VALUES (?, ?, ?, ?, 'enabled', ?, ?)",
-                (account_id, email, display_name.strip() or email, password_hash, now, now),
+                "INSERT INTO accounts (id, email, display_name, password_hash, status, created_at, updated_at, "
+                "oidc_subject) VALUES (?, ?, ?, ?, 'enabled', ?, ?, ?)",
+                (account_id, email, display_name.strip() or email, password_hash, now, now, oidc_subject),
             )
             _set_roles(conn, account_id, roles)
     except sqlite3.IntegrityError:
