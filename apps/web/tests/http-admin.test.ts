@@ -50,8 +50,10 @@ describe("http admin sections", () => {
     await users.setEnabled("u1", false);
     await users.setEnabled("u1", true);
     expect(calls(fetch)).toEqual([
-      ["/api/admin/users/u1/roles", "PUT"], ["/api/admin/users/u1/disable", "POST"], ["/api/admin/users/u1/enable", "POST"],
+      ["/api/admin/users/u1", "PATCH"], ["/api/admin/users/u1", "PATCH"], ["/api/admin/users/u1", "PATCH"],
     ]);
-    expect(JSON.parse(fetch.mock.calls[0][1]?.body as string)).toEqual({ roles: ["analyst"] });
+    expect(fetch.mock.calls.map(([, init]) => JSON.parse(init?.body as string))).toEqual([
+      { roles: ["analyst"] }, { enabled: false }, { enabled: true },
+    ]);
   });
 });

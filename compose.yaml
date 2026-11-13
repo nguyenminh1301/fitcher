@@ -157,9 +157,6 @@ services:
       # The console's admin sections read run logs, and reviewers' proposals read runs (users.d/agent_logs.xml).
       CLICKHOUSE_TRACE_READER_PASSWORD: ${CLICKHOUSE_TRACE_READER_PASSWORD:?set CLICKHOUSE_TRACE_READER_PASSWORD in .env}
       CLICKHOUSE_REVIEW_READER_PASSWORD: ${CLICKHOUSE_REVIEW_READER_PASSWORD:?set CLICKHOUSE_REVIEW_READER_PASSWORD in .env}
-      # The Users section manages realm roles as the fitcher-admin-api service account (app/auth/keycloak_admin.py).
-      KEYCLOAK_URL: http://keycloak:8080
-      KEYCLOAK_ADMIN_API_SECRET: ${KEYCLOAK_ADMIN_API_SECRET:?set KEYCLOAK_ADMIN_API_SECRET in .env}
       # Writes the document registry and test-runs reviewed metrics (users.d/pack_review.xml).
       CLICKHOUSE_PACK_REVIEW_PASSWORD: ${CLICKHOUSE_PACK_REVIEW_PASSWORD:?set CLICKHOUSE_PACK_REVIEW_PASSWORD in .env}
       # Company documents (DECISIONS §5) and the pack working tree the Review UI writes (never committed by the app).

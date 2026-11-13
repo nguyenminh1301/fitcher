@@ -369,7 +369,7 @@
     "disable": "Disable",
     "enable": "Enable",
     "roles": "Roles",
-    "usersNote": "People appear here after their first sign-in with the company account. Their role decides which sections and data they can open. A role change takes effect at their next sign-in or token refresh, within a few minutes.",
+    "usersNote": "Each person signs in with their own account of this instance. Their roles decide which sections and data they can open. A role change or a disable takes effect on their next request.",
     "disableTitle": "Disable {name}?",
     "disableText": "They can no longer sign in to fitcher. Their past runs stay in the audit log.",
     "members": "{n} members",

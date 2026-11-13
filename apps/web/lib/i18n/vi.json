@@ -369,7 +369,7 @@
     "disable": "Vô hiệu hóa",
     "enable": "Kích hoạt",
     "roles": "Vai trò",
-    "usersNote": "Người dùng xuất hiện ở đây sau lần đầu đăng nhập bằng tài khoản công ty. Vai trò quyết định họ được mở mục và dữ liệu nào. Đổi vai trò có hiệu lực ở lần đăng nhập hoặc làm mới phiên kế tiếp, trong vài phút.",
+    "usersNote": "Mỗi người đăng nhập bằng tài khoản riêng của instance này. Vai trò quyết định họ được mở mục và dữ liệu nào. Đổi vai trò hoặc vô hiệu hóa có hiệu lực ngay ở yêu cầu kế tiếp của họ.",
     "disableTitle": "Vô hiệu hóa {name}?",
     "disableText": "Người này sẽ không đăng nhập fitcher được nữa. Các lượt chạy cũ vẫn còn trong nhật ký kiểm toán.",
     "members": "{n} thành viên",

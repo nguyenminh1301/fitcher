@@ -28,7 +28,6 @@ from app.llm.clients import chat_client, embedding_client, index_embeddings
 from app.llm.model_store import ClickHouseModelStore, model_tiers_client
 from app.onboarding.documents import ClickHouseDocumentRegistry, DocumentService, pack_review_client
 from app.admin.logs import AdminLogs, trace_reader_client
-from app.auth.keycloak_admin import KeycloakAdmin, KeycloakAdminError
 from app.eval.console import EvalReports, EvalRuns
 from app.feedback.store import ClickHouseProposalStore, review_reader_client
 from app.observability.log_writer import start_log_writer, writer_client
@@ -277,14 +276,6 @@ def get_eval_reports() -> EvalReports:
         raise unavailable(f"the eval reports are unavailable: {error}") from None
     return EvalReports(lambda sql, parameters: client.query(sql, parameters=parameters).result_rows,
                        pack_identity(get_compiled_or_none()).name)
-
-
-@cache
-def get_keycloak_admin() -> KeycloakAdmin:
-    try:
-        return KeycloakAdmin.from_env()
-    except KeycloakAdminError as error:
-        raise unavailable(str(error)) from None
 
 
 def get_admin_action_log() -> ClickHouseModelStore:

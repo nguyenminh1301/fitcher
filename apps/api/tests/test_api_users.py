@@ -1,59 +1,17 @@
-"""The Users section over a fake Keycloak Admin REST API (httpx MockTransport)."""
-
-import json
+"""The Users section on local accounts (DECISIONS §9, §15)."""
 
 from fastapi.testclient import TestClient
-import httpx
 import pytest
 
 from agent_fixtures import compiled_fixture
-from auth_fixtures import token, verifier
+from session_fixtures import PASSWORD, sign_in
 
 from app.api import runtime
-from app.auth.keycloak_admin import KeycloakAdmin
+from app.auth import accounts, sessions
 from app.main import app
+from app.state.db import shared_state
 
-ADMIN = {"Authorization": f"Bearer {token(preferred_username='lab.admin', realm_access={'roles': ['admin']})}"}
-VIEWER = {"Authorization": f"Bearer {token()}"}
-
-
-class FakeKeycloak:
-    def __init__(self):
-        self.users = {
-            "u1": {"id": "u1", "username": "lab.analyst", "firstName": "Lab", "lastName": "Analyst", "enabled": True},
-            "u2": {"id": "u2", "username": "lab.admin", "firstName": "Lab", "lastName": "Admin", "enabled": True},
-            "s1": {"id": "s1", "username": "service-account-fitcher-admin-api", "enabled": True},
-        }
-        self.roles = {"u1": {"viewer", "pack_reviewer"}, "u2": {"admin"}, "s1": set()}
-        self.realm_roles = {"viewer", "pack_reviewer", "admin"}
-        self.tokens = 0
-
-    def __call__(self, request: httpx.Request) -> httpx.Response:
-        path, method = request.url.path, request.method
-        if path.endswith("/protocol/openid-connect/token"):
-            self.tokens += 1
-            return httpx.Response(200, json={"access_token": "t", "expires_in": 300})
-        assert request.headers["Authorization"] == "Bearer t"
-        parts = path.split("/admin/realms/finch")[1].strip("/").split("/")
-        if parts == ["users"]:
-            return httpx.Response(200, json=list(self.users.values()))
-        user_id = parts[1]
-        if user_id not in self.users:
-            return httpx.Response(404, json={})
-        if len(parts) == 2:
-            if method == "PUT":
-                self.users[user_id].update(json.loads(request.content))
-                return httpx.Response(204)
-            return httpx.Response(200, json=self.users[user_id])
-        if parts[2:] == ["role-mappings", "realm"]:
-            if method == "GET":
-                return httpx.Response(200, json=[{"id": r, "name": r} for r in sorted(self.roles[user_id])])
-            names = {role["name"] for role in json.loads(request.content)}
-            self.roles[user_id] = self.roles[user_id] | names if method == "POST" else self.roles[user_id] - names
-            return httpx.Response(204)
-        if parts[2:] == ["role-mappings", "realm", "available"]:
-            return httpx.Response(200, json=[{"id": r, "name": r} for r in sorted(self.realm_roles - self.roles[user_id])])
-        raise AssertionError(f"unexpected {method} {path}")
+NEW = {"email": "Bea@Example.com", "display_name": "Bea", "password": "battery staple", "roles": ["viewer"]}
 
 
 class ActionLog:
@@ -63,64 +21,149 @@ class ActionLog:
     def record_action(self, record):
         self.records.append(record)
 
+    def summary(self):
+        return [(r.actor, r.action, r.target, r.old_value, r.new_value) for r in self.records]
+
 
 @pytest.fixture
 def setup():
-    fake, log = FakeKeycloak(), ActionLog()
-    admin = KeycloakAdmin("http://keycloak:8080", "finch", "fitcher-admin-api", "secret",
-                          http=httpx.Client(transport=httpx.MockTransport(fake)))
-    app.dependency_overrides[runtime.get_verifier] = lambda: verifier()
-    app.dependency_overrides[runtime.get_compiled_or_none] = lambda: compiled_fixture()
-    app.dependency_overrides[runtime.get_keycloak_admin] = lambda: admin
+    log = ActionLog()
+    app.dependency_overrides[runtime.get_compiled_or_none] = compiled_fixture
     app.dependency_overrides[runtime.get_admin_action_log] = lambda: log
     with TestClient(app) as client:
-        yield client, fake, log
+        sign_in(client, "root", ["admin"])
+        yield client, log
     app.dependency_overrides.clear()
 
 
-def test_users_list_their_pack_roles_and_hide_service_accounts(setup):
-    client, fake, _ = setup
-    users = client.get("/admin/users", headers=ADMIN).json()
-    assert users == [
-        {"id": "u1", "username": "lab.analyst", "display_name": "Lab Analyst", "roles": ["viewer"], "enabled": True},
-        {"id": "u2", "username": "lab.admin", "display_name": "Lab Admin", "roles": [], "enabled": True},
+def create(client, **overrides):
+    response = client.post("/admin/users", json={**NEW, **overrides})
+    assert response.status_code == 201, response.text
+    return response.json()
+
+
+def test_an_admin_creates_an_account_that_can_sign_in(setup):
+    client, log = setup
+
+    user = create(client)
+
+    assert user == {"id": user["id"], "email": "bea@example.com", "display_name": "Bea", "roles": ["viewer"],
+                    "enabled": True}
+    assert accounts.authenticate(shared_state(), "bea@example.com", "battery staple").id == user["id"]
+    assert log.summary() == [("root", "user_created", user["id"], "null", '{"email": "bea@example.com", "roles": ["viewer"]}')]
+
+
+def test_the_list_shows_every_account_with_its_pack_and_console_roles(setup):
+    client, _ = setup
+    create(client, roles=["pack_reviewer", "viewer"])
+
+    users = client.get("/admin/users").json()
+
+    assert [(user["email"], user["roles"]) for user in users] == [
+        ("bea@example.com", ["viewer", "pack_reviewer"]), ("root@example.com", ["admin"]),
     ]
-    assert fake.tokens == 1
 
 
-def test_setting_roles_changes_only_pack_roles_and_is_recorded(setup):
-    client, fake, log = setup
-    assert client.put("/admin/users/u1/roles", headers=ADMIN, json={"roles": []}).json()["roles"] == []
-    assert fake.roles["u1"] == {"pack_reviewer"}
-    assert client.put("/admin/users/u1/roles", headers=ADMIN, json={"roles": ["viewer"]}).json()["roles"] == ["viewer"]
-    assert fake.roles["u1"] == {"viewer", "pack_reviewer"}
-    assert [(r.actor, r.action, r.target, r.old_value, r.new_value) for r in log.records] == [
-        ("lab.admin", "user_roles", "u1", '["viewer"]', "[]"), ("lab.admin", "user_roles", "u1", "[]", '["viewer"]'),
-    ]
-
-
-@pytest.mark.parametrize(("method", "path", "body", "code"), [
-    ("PUT", "/admin/users/u1/roles", {"roles": ["admin"]}, 422),
-    ("PUT", "/admin/users/u2/roles", {"roles": ["viewer"]}, 409),
-    ("POST", "/admin/users/u2/disable", None, 409),
-    ("PUT", "/admin/users/nope/roles", {"roles": []}, 404),
+@pytest.mark.parametrize(("body", "code"), [
+    ({"roles": ["no_such_role"]}, 422),
+    ({"password": "short"}, 422),
+    ({"email": "not-an-email"}, 422),
+    ({"email": "ROOT@example.com"}, 409),
 ])
-def test_refusals(setup, method, path, body, code):
-    client, _, log = setup
-    assert client.request(method, path, headers=ADMIN, json=body).status_code == code
+def test_create_refusals(setup, body, code):
+    client, log = setup
+
+    assert client.post("/admin/users", json={**NEW, **body}).status_code == code
     assert log.records == []
 
 
-def test_disable_and_enable_are_recorded(setup):
-    client, fake, log = setup
-    assert client.post("/admin/users/u1/disable", headers=ADMIN).status_code == 204
-    assert fake.users["u1"]["enabled"] is False
-    assert client.post("/admin/users/u1/enable", headers=ADMIN).status_code == 204
-    assert [(r.action, r.old_value, r.new_value) for r in log.records] == [
-        ("user_enabled", "true", "false"), ("user_enabled", "false", "true"),
+def test_patch_changes_roles_name_and_status_and_records_each_change(setup):
+    client, log = setup
+    user = create(client)
+    log.records.clear()
+
+    response = client.patch(f"/admin/users/{user['id']}", json={"display_name": "Bea B", "roles": ["pack_reviewer"], "enabled": False})
+
+    assert response.status_code == 200
+    assert response.json() == {**user, "display_name": "Bea B", "roles": ["pack_reviewer"], "enabled": False}
+    assert log.summary() == [
+        ("root", "user_display_name", user["id"], '"Bea"', '"Bea B"'),
+        ("root", "user_roles", user["id"], '["viewer"]', '["pack_reviewer"]'),
+        ("root", "user_enabled", user["id"], "true", "false"),
     ]
 
 
+def test_disabling_signs_the_user_out_at_once(setup):
+    client, _ = setup
+    user = create(client)
+    token = sessions.start(shared_state(), user["id"])
+
+    client.patch(f"/admin/users/{user['id']}", json={"enabled": False})
+
+    assert sessions.principal_for(shared_state(), token) is None
+
+
+@pytest.mark.parametrize("body", [{"enabled": False}, {"roles": ["viewer"]}])
+def test_the_last_admin_cannot_be_disabled_or_demoted(setup, body):
+    client, log = setup
+
+    response = client.patch("/admin/users/root", json=body)
+
+    assert response.status_code == 409
+    assert log.records == []
+    assert accounts.get(shared_state(), "root").roles == ("admin",)
+
+
+@pytest.mark.parametrize(("method", "path", "body"), [
+    ("PATCH", "/admin/users/nope", {"enabled": False}),
+    ("POST", "/admin/users/nope/password", {"password": "battery staple"}),
+])
+def test_an_unknown_user_is_not_found(setup, method, path, body):
+    client, _ = setup
+
+    assert client.request(method, path, json=body).status_code == 404
+
+
+def test_patch_refuses_a_role_the_instance_does_not_have(setup):
+    client, _ = setup
+    user = create(client)
+
+    assert client.patch(f"/admin/users/{user['id']}", json={"roles": ["no_such_role"]}).status_code == 422
+
+
+def test_a_password_reset_replaces_the_password_and_ends_the_sessions(setup):
+    client, log = setup
+    user = create(client)
+    token = sessions.start(shared_state(), user["id"])
+    log.records.clear()
+
+    response = client.post(f"/admin/users/{user['id']}/password", json={"password": "new password"})
+
+    assert response.status_code == 204
+    assert sessions.principal_for(shared_state(), token) is None
+    assert accounts.authenticate(shared_state(), "bea@example.com", "new password") is not None
+    assert log.summary() == [("root", "user_password", user["id"], "null", "null")]
+
+
+def test_a_reset_to_a_short_password_is_refused(setup):
+    client, _ = setup
+    user = create(client)
+
+    assert client.post(f"/admin/users/{user['id']}/password", json={"password": "short"}).status_code == 422
+
+
 def test_only_an_admin_manages_users(setup):
-    client, _, _ = setup
-    assert client.get("/admin/users", headers=VIEWER).status_code == 403
+    client, _ = setup
+    sign_in(client, "lab.viewer", ["viewer"])
+
+    assert client.get("/admin/users").status_code == 403
+    assert client.post("/admin/users", json=NEW).status_code == 403
+    assert client.patch("/admin/users/root", json={"enabled": False}).status_code == 403
+
+
+def test_the_password_is_never_returned(setup):
+    client, _ = setup
+    create(client)
+
+    assert PASSWORD not in client.get("/admin/users").text
+    assert "battery staple" not in client.get("/admin/users").text

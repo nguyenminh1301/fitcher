@@ -39,8 +39,8 @@ export function UsersSection() {
   const users = data?.users ?? [];
   const needle = query.trim().toLowerCase();
   const rows = users.filter((user) => (role === "all" || user.roles.includes(role))
-    && (!needle || `${user.display_name} ${user.username}`.toLowerCase().includes(needle)));
-  const isSelf = (user: UserRow) => user.username === identity?.user_id;
+    && (!needle || `${user.display_name} ${user.email}`.toLowerCase().includes(needle)));
+  const isSelf = (user: UserRow) => user.id === identity?.user_id;
 
   async function setRoles(user: UserRow, next: string[]) {
     await api.users.setRoles(user.id, next);
@@ -77,7 +77,7 @@ export function UsersSection() {
               { key: "name", label: t("ui.name"), render: (user) => (
                 <span className="fc-person">
                   <span className="fc-avatar" aria-hidden>{initials(user.display_name)}</span>
-                  <span><b>{user.display_name}</b><small>{isSelf(user) ? `${user.username} · ${t("ui.you")}` : user.username}</small></span>
+                  <span><b>{user.display_name}</b><small>{isSelf(user) ? `${user.email} · ${t("ui.you")}` : user.email}</small></span>
                 </span>
               ) },
               { key: "roles", label: t("ui.roles"), render: (user) => (

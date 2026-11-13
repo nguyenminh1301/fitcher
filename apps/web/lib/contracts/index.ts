@@ -36,7 +36,7 @@ export type { ProposalResult } from "./proposal_result";
 export type { EvalLayer, EvalReportView as EvalReport, FailedCase } from "./eval_report_view";
 export type { EvalRunStarted } from "./eval_run_started";
 export type { UserView as UserRow } from "./user_view";
-export type { UserRoles } from "./user_roles";
+export type { UserChange } from "./user_change";
 export type { SetupStatus, SetupStep } from "./setup_status";
 export type { SetupModeChange } from "./setup_mode_change";
 export type {

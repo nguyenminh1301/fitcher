@@ -1,4 +1,4 @@
-// Realm users with their pack roles, from the api's GET /admin/users (admin).
+// Accounts with their pack and console roles, from the api's GET /admin/users (admin).
 
 import { forwardJson } from "@/lib/server/api";
 

@@ -32,7 +32,7 @@ from app.contracts.result import Result  # noqa: E402
 from app.contracts.review import DatasetView, ReviewItem, ReviewItemPatch  # noqa: E402
 from app.contracts.screening import ClassifierStatus  # noqa: E402
 from app.contracts.setup import SetupModeChange, SetupStatus  # noqa: E402
-from app.contracts.users import UserRoles, UserView  # noqa: E402
+from app.contracts.users import UserChange, UserView  # noqa: E402
 
 # Each contract with the JSON Schema mode of its direction: what the api accepts ("validation") or
 # what it sends ("serialization", where every field is present).
@@ -76,7 +76,7 @@ CONTRACTS = {
     "eval_report_view": (EvalReportView, "serialization"),
     "eval_run_started": (EvalRunStarted, "serialization"),
     "user_view": (UserView, "serialization"),
-    "user_roles": (UserRoles, "validation"),
+    "user_change": (UserChange, "validation"),
     "setup_status": (SetupStatus, "serialization"),
     "setup_mode_change": (SetupModeChange, "validation"),
 }
