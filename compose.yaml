@@ -171,6 +171,12 @@ services:
       context: .
       dockerfile: apps/api/Dockerfile
     environment:
+      # Providers created in the app state on the first start that finds none (apps/api/app/llm/routes.py);
+      # afterwards providers and keys are managed on the Models page.
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      OLLAMA_URL: ${OLLAMA_URL:-}
       LITELLM_BASE_URL: http://litellm:4000
       LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY:?set LITELLM_MASTER_KEY in .env}
       # Agent queries run as the asking role's ClickHouse user, whose password
@@ -253,6 +259,12 @@ services:
       dockerfile: apps/api/Dockerfile
     profiles: ["jobs"]
     environment:
+      # Providers created in the app state on the first start that finds none (apps/api/app/llm/routes.py);
+      # afterwards providers and keys are managed on the Models page.
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      OLLAMA_URL: ${OLLAMA_URL:-}
       CLICKHOUSE_HOST: clickhouse
       CLICKHOUSE_ADMIN_USER: ${CLICKHOUSE_ADMIN_USER:?set CLICKHOUSE_ADMIN_USER in .env}
       CLICKHOUSE_ADMIN_PASSWORD: ${CLICKHOUSE_ADMIN_PASSWORD:?set CLICKHOUSE_ADMIN_PASSWORD in .env}

@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from app.api import admin, ask, auth, conversations, datasets, documents, evaluation, feedback, feedback_review, models, providers, review, runtime, setup, users
-from app.llm.routes import bootstrap_providers
+from app.llm.clients import bootstrap
 from app.state.db import shared_state
 
 
@@ -12,7 +12,7 @@ from app.state.db import shared_state
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     # Loading the screening classifier takes seconds; questions wait for it, /health does not.
     shared_state()
-    bootstrap_providers()
+    bootstrap()
     runtime.build_screener_in_background()
     yield
     runtime.close()

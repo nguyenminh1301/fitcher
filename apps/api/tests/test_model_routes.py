@@ -183,3 +183,40 @@ def test_an_invalid_environment_creates_nothing_so_a_corrected_one_still_bootstr
 
     assert [p.id for p in bootstrap_from_env(store, mapping, {"OPENAI_API_KEY": KEY})] == ["openai"]
     assert mapping.tier("fast") == TierModel("openai", "gpt-5.4-mini")
+
+
+def test_an_override_replaces_a_tiers_model_for_one_resolver_only(state, store, mapping):
+    fill_defaults(mapping, store.create("openai", api_key=KEY), dimensions=1024)
+
+    trial = SettingsRoutes(mapping, store, state[1].reader(), overrides={"sql-gen": TierModel("openai", "gpt-5.5")})
+
+    assert trial.route("sql-gen").model == "openai/gpt-5.5"
+    assert SettingsRoutes(mapping, store, state[1].reader()).route("sql-gen").model == "openai/gpt-5.4"
+
+
+def test_the_resolver_names_each_tiers_provider_and_model(state, store, mapping):
+    fill_defaults(mapping, store.create("openai", api_key=KEY), dimensions=1024)
+
+    labels = SettingsRoutes(mapping, store, state[1].reader(), overrides={"fast": TierModel("openai", "gpt-5.5")}).labels()
+
+    assert labels == {"fast": "openai/gpt-5.5", "sql-small": "openai/gpt-5.4-mini", "sql-gen": "openai/gpt-5.4",
+                      "sql-gen-hard": "openai/gpt-5.5", "embed": "openai/text-embedding-3-large"}
+
+
+def test_the_aliases_mapped_before_the_app_state_are_copied_once(store, mapping):
+    env = {"OPENAI_API_KEY": KEY, "ANTHROPIC_API_KEY": KEY, "MODEL_TIER_FAST": "anthropic-small",
+           "MODEL_TIER_SQL_GEN": "openai-large"}
+    # The admin's change on the old Models page wins over the environment default.
+    stored = {"sql-gen": "anthropic-medium", "sql-small": "an-alias-nobody-knows"}
+
+    bootstrap_from_env(store, mapping, env, legacy_aliases=lambda: stored)
+
+    assert mapping.tier("fast") == TierModel("anthropic", "claude-haiku-5-5")
+    assert mapping.tier("sql-gen") == TierModel("anthropic", "claude-sonnet-5-5")
+    assert mapping.tier("sql-small") == TierModel("openai", "gpt-5.4-mini")
+
+
+def test_an_alias_of_a_provider_the_environment_does_not_set_keeps_the_default(store, mapping):
+    bootstrap_from_env(store, mapping, {"OPENAI_API_KEY": KEY, "MODEL_TIER_FAST": "gemini-small"})
+
+    assert mapping.tier("fast") == TierModel("openai", "gpt-5.4-mini")

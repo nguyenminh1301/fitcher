@@ -18,7 +18,7 @@ scripted start or CI needs no setup step. The embedding keeps
 match their vectors.
 """
 
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 import logging
 import os
@@ -26,7 +26,7 @@ import os
 from app.llm import defaults
 from app.llm.gateway import Route
 from app.llm.providers import check_fields, Provider, ProviderStore
-from app.llm.tiers import check_chat_tier, CHAT_TIERS, EMBED_TIER
+from app.llm.tiers import check_chat_tier, CHAT_TIERS, EMBED_TIER, setting_name
 from app.state.db import shared_state, StateDb
 from app.state.secrets import SecretError, SecretReader, shared_vault
 from app.state.settings import Settings
@@ -44,6 +44,16 @@ ENV_PROVIDERS = (
 
 
 _log = logging.getLogger(__name__)
+
+
+# The catalog aliases of the LiteLLM Proxy era and the model each one named, so a mapping made
+# before the app state (MODEL_TIER_<TIER> or the old Models page) is copied once by bootstrap.
+LEGACY_ALIASES = {
+    "openai-small": ("openai", "gpt-5.4-mini"), "openai-medium": ("openai", "gpt-5.4"),
+    "openai-large": ("openai", "gpt-5.5"), "anthropic-small": ("anthropic", "claude-haiku-5-5"),
+    "anthropic-medium": ("anthropic", "claude-sonnet-5-5"), "gemini-small": ("gemini", "gemini-2.5-flash"),
+    "gemini-medium": ("gemini", "gemini-2.5-pro"), "local-small": ("ollama", "qwen2.5-coder:7b"),
+}
 
 
 class RouteError(LookupError):
@@ -116,10 +126,24 @@ def fill_defaults(mapping: TierMapping, provider: Provider, *, dimensions: int =
 class SettingsRoutes:
     """The gateway's ``RouteResolver`` over the app state."""
 
-    def __init__(self, mapping: TierMapping, store: ProviderStore, reader: SecretReader):
+    def __init__(self, mapping: TierMapping, store: ProviderStore, reader: SecretReader,
+                 overrides: Mapping[str, TierModel] | None = None):
+        """``overrides`` maps chat tiers to other models for this resolver only, as an eval run of one model does."""
         self._mapping = mapping
         self._store = store
         self._reader = reader
+        self._overrides = dict(overrides or {})
+
+    def _chat(self, tier: str) -> TierModel | None:
+        return self._overrides.get(tier) or self._mapping.tier(tier)
+
+    def labels(self) -> dict[str, str]:
+        """``provider/model`` of every mapped tier, as eval reports record them."""
+        labels = {tier: f"{model.provider_id}/{model.model}" for tier in CHAT_TIERS if (model := self._chat(tier))}
+        embedding = self._mapping.embedding()
+        if embedding is not None:
+            labels[EMBED_TIER] = f"{embedding[0].provider_id}/{embedding[0].model}"
+        return labels
 
     def route(self, tier: str) -> Route:
         if tier == EMBED_TIER:
@@ -129,7 +153,7 @@ class SettingsRoutes:
             mapped, embedding_call = embedding[0], True
         else:
             embedding_call = False
-            mapped = self._mapping.tier(tier)
+            mapped = self._chat(tier)
             if mapped is None:
                 raise RouteError(f"no model is mapped to the {tier} tier; add a provider on the Models page")
         try:
@@ -151,11 +175,24 @@ def _dimensions(env: Mapping[str, str]) -> int:
     return dimensions
 
 
-def bootstrap_from_env(store: ProviderStore, mapping: TierMapping, env: Mapping[str, str]) -> list[Provider]:
+def _copy_legacy(mapping: TierMapping, created: list[Provider], aliases: Mapping[str, str]) -> None:
+    by_kind = {provider.kind: provider.id for provider in created}
+    for tier, alias in aliases.items():
+        kind, model = LEGACY_ALIASES.get(alias, (None, None))
+        if tier in CHAT_TIERS and kind in by_kind:
+            mapping.set_tier(tier, by_kind[kind], model)
+
+
+def bootstrap_from_env(
+    store: ProviderStore, mapping: TierMapping, env: Mapping[str, str],
+    legacy_aliases: Callable[[], Mapping[str, str]] | None = None,
+) -> list[Provider]:
     """Create the environment's providers when none exists; returns the providers created.
 
     Every setting is checked before the first write, so an invalid environment creates nothing and a
-    corrected one bootstraps on the next start.
+    corrected one bootstraps on the next start. A tier mapped before the app state existed keeps its
+    model: the ``MODEL_TIER_<TIER>`` aliases, then the old Models page's ``legacy_aliases``, are
+    copied when their provider was created.
     """
     if store.list():
         return []
@@ -167,16 +204,20 @@ def bootstrap_from_env(store: ProviderStore, mapping: TierMapping, env: Mapping[
     for kind, fields in wanted:
         check_fields(kind, **fields)
     created = [store.create(kind, **fields) for kind, fields in wanted]
+    aliases = {tier: env[setting_name(tier)] for tier in CHAT_TIERS if env.get(setting_name(tier))}
+    if legacy_aliases is not None:
+        aliases.update(legacy_aliases())
+    _copy_legacy(mapping, created, aliases)
     for provider in created:
         fill_defaults(mapping, provider, dimensions=dimensions)
     return created
 
 
-def bootstrap_providers() -> None:
+def bootstrap_providers(legacy_aliases: Callable[[], Mapping[str, str]] | None = None) -> None:
     """At startup: create the environment's providers in the shared app state; logged, never fatal."""
     try:
         store = ProviderStore(shared_state(), shared_vault())
-        created = bootstrap_from_env(store, TierMapping(shared_state(), store), os.environ)
+        created = bootstrap_from_env(store, TierMapping(shared_state(), store), os.environ, legacy_aliases)
     except Exception:  # noqa: BLE001 - the setup's Models step can still add a provider
         _log.exception("the providers of the environment were not created")
         return

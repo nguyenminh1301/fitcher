@@ -33,10 +33,7 @@ from app.agent.nodes.resolve_time import TimeResolutionError, reference_date
 from app.agent.state import AgentDeps, AgentState
 from app.config import SettingsError, load_settings
 from app.data.clickhouse import ClickHouseRunner, QueryLimits, agent_client
-from app.llm.client import LiteLLMClient
-from app.llm.embeddings import LiteLLMEmbeddings
-from app.llm.model_store import ClickHouseModelStore, model_tiers_client
-from app.llm.tiers import EMBED_TIER, TierMap
+from app.llm import clients
 from app.observability.log_writer import start_log_writer
 from app.packs.compiler import CompileError, load_compiled
 from app.packs.models import Pack
@@ -150,30 +147,19 @@ def report(state: AgentState) -> int:
     return 0
 
 
-def stored_tiers() -> ClickHouseModelStore | None:
-    """The admin's tier mapping, as the api reads it; without its password the defaults apply."""
-    try:
-        return ClickHouseModelStore(model_tiers_client())
-    except Exception:  # noqa: BLE001 - a missing password or unreachable ClickHouse
-        print("Model tiers use their MODEL_TIER_<TIER> defaults: the model store is unavailable.", file=sys.stderr)
-        return None
-
-
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
     try:
         settings = load_settings()
         if not settings.active_pack:
             raise SettingsError("ACTIVE_PACK must be set")
-        tiers = TierMap(settings.model_tiers, stored_tiers())
-        llm = LiteLLMClient(settings.litellm_base_url, settings.litellm_master_key, tiers=tiers)
+        clients.bootstrap()
+        logs = start_log_writer(settings)
+        llm = clients.chat_client(call_log=logs.enqueue)
         compiled = load_compiled(Path(settings.compiled_pack_dir), settings.active_pack)
         role = choose_role(compiled.pack, args.role)
-        # Query vectors must match the indexed ones, so the compiled size wins over the environment.
-        embeddings = LiteLLMEmbeddings(
-            settings.litellm_base_url, settings.litellm_master_key, compiled.embedding_dimensions,
-            alias=tiers.alias(EMBED_TIER),
-        )
+        # Query vectors must match the indexed ones, so the compiled size wins over the setting.
+        embeddings = clients.embedding_client(compiled.embedding_dimensions, call_log=logs.enqueue)
         deps = AgentDeps(
             llm=FaultInjectingLLM(llm) if args.inject_sql_fault else llm,
             search=QdrantSearch(settings.qdrant_url),
@@ -181,7 +167,7 @@ def main(argv: list[str] | None = None) -> int:
             runner=ClickHouseRunner(agent_client(compiled.pack.name, role), QueryLimits.from_env()),
             compiled=compiled,
             today=args.reference_date or reference_date(args.timezone),
-            logs=start_log_writer(settings),
+            logs=logs,
             user_id="cli",
             role=role,
             screener=Screener.from_settings(settings),

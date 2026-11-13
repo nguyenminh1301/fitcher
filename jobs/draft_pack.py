@@ -21,8 +21,8 @@ from clickhouse_connect.driver.exceptions import Error as ClickHouseError
 
 from app.config import SettingsError, load_settings
 from app.data.clickhouse import ClientWarehouse
-from app.llm.client import LiteLLMClient, LLMError
-from app.llm.tiers import TierMap
+from app.llm import clients
+from app.llm.client import LLMError
 from app.observability.tracing import trusted_pack_calls
 from app.onboarding.documents import live_chunks
 from app.onboarding.drafter import DRAFT_FILES, Drafter, DraftError, draft_files
@@ -63,8 +63,8 @@ def main(argv: list[str] | None = None) -> int:
         profile = read_profile(compiled_dir, args.pack)
         chunks = read_chunks(QdrantSearch(settings.qdrant_url), args.pack, args.document)
         files = PackFiles(args.packs_dir / args.pack)
-        llm = LiteLLMClient(settings.litellm_base_url, settings.litellm_master_key, tiers=TierMap(settings.model_tiers))
-        drafter = Drafter(llm, ClientWarehouse(admin_client()))
+        clients.bootstrap()
+        drafter = Drafter(clients.chat_client(), ClientWarehouse(admin_client()))
         print(f"Pack {args.pack}: profile {'found' if profile else 'missing'}, {len(chunks)} document chunks")
         if not args.allow_billable:
             for file, characters in drafter.estimate(files, profile, chunks).items():

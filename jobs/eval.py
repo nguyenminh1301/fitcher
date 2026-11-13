@@ -2,21 +2,22 @@
 
 Run with ``docker compose run --rm -v ./build/eval:/app/build/eval api python -m
 jobs.eval --pack <name> --output-dir build/eval``. Each run sends billable
-requests to the LiteLLM aliases at temperature 0 and runs every reference query
+requests through the model gateway at temperature 0 and runs every reference query
 as the ClickHouse user of its case's role. The cases come from ``packs/<name>/eval.yaml``,
 so editing them needs no recompile; the agent answers from the compiled pack
 named by ``--pack``, whatever ``ACTIVE_PACK`` says. Every case's agent run is
 written to ClickHouse ``agent_logs`` under the trace id kept in its JSON score,
 and the JSON report itself to ``agent_logs.eval_reports``.
 
-Each tier calls its ``MODEL_TIER_<TIER>`` default; ``--tier <tier>=<alias>``
-overrides a chat tier for this run, for example ``--tier sql-small=openai-medium``.
-The mapping is stored with the report together with whether the run regressed
-against ``--baseline``: an alias becomes eligible for a tier on the Models page
-once its latest report passes without regression (DECISIONS §2 Model tiers).
-Only the tiers the run called count as evidence, and only for a run of the whole
-eval set at no less than the default threshold without reference errors; any
-other run is stored with no tier evidence.
+Each tier calls the model the app state maps it to; ``--tier
+<tier>=<provider>/<model>`` runs a chat tier on another model of a configured
+provider for this run, for example ``--tier sql-small=openai/gpt-5.4``. The
+``provider/model`` of each tier is stored with the report together with whether
+the run regressed against ``--baseline``; the Models page shows a model's latest
+result next to it (DECISIONS §2 Model tiers). Only the tiers the run called
+count as evidence, and only for a run of the whole eval set at no less than the
+default threshold without reference errors; any other run is stored with no
+tier evidence.
 
 Exit codes: 0 when no layer regressed against ``--baseline`` and the execution
 match rate meets ``--threshold``; 1 on a regression or below the threshold; 2
@@ -38,9 +39,10 @@ from app.data.clickhouse import ClickHouseRunner, QueryLimits, agent_client
 from app.eval.cases import EvalSetError, load_eval_set
 from app.eval.report import BaselineDiff, diff_baseline, layer_totals, meets_threshold, render_markdown
 from app.eval.runner import EvalRun, run_eval
-from app.llm.client import LiteLLMClient
-from app.llm.embeddings import LiteLLMEmbeddings
-from app.llm.tiers import CHAT_TIERS, EMBED_TIER, TierMap
+from app.llm import clients
+from app.llm.gateway import Gateway
+from app.llm.routes import SettingsRoutes, TierModel
+from app.llm.tiers import CHAT_TIERS, EMBED_TIER
 from app.observability.events import EvalReportRecord, utc_now
 from app.observability.log_writer import start_log_writer
 from app.packs.compiler import CompileError, load_compiled
@@ -52,13 +54,14 @@ from app.search.client import QdrantSearch
 DEFAULT_THRESHOLD = 0.8
 
 
-def tier_override(value: str) -> tuple[str, str]:
-    tier, separator, alias = value.partition("=")
-    if not separator or not alias:
-        raise argparse.ArgumentTypeError(f"expected <tier>=<alias>, got {value!r}")
+def tier_override(value: str) -> tuple[str, TierModel]:
+    tier, separator, target = value.partition("=")
+    provider_id, slash, model = target.partition("/")
+    if not separator or not slash or not provider_id or not model:
+        raise argparse.ArgumentTypeError(f"expected <tier>=<provider>/<model>, got {value!r}")
     if tier not in CHAT_TIERS:
         raise argparse.ArgumentTypeError(f"--tier takes a chat tier ({', '.join(CHAT_TIERS)}), got {tier!r}")
-    return tier, alias
+    return tier, TierModel(provider_id, model)
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -71,28 +74,26 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--threshold", type=float, default=DEFAULT_THRESHOLD, help="execution match rate the pack must reach; default 0.8")
     parser.add_argument("--packs-dir", type=Path, default=Path("packs"), help="directory of the source packs; default packs")
     parser.add_argument(
-        "--tier", type=tier_override, action="append", default=[], metavar="TIER=ALIAS",
-        help="run a chat tier on another catalog alias; repeat for several tiers",
+        "--tier", type=tier_override, action="append", default=[], metavar="TIER=PROVIDER/MODEL",
+        help="run a chat tier on another model of a configured provider; repeat for several tiers",
     )
     return parser.parse_args(argv)
 
 
-def build_deps(pack: str, reference: date, tiers: TierMap) -> AgentDeps:
+def build_deps(pack: str, reference: date, routes: SettingsRoutes) -> AgentDeps:
     settings = load_settings()
     compiled = load_compiled(Path(settings.compiled_pack_dir), pack)
+    logs = start_log_writer(settings)
     return AgentDeps(
-        llm=LiteLLMClient(settings.litellm_base_url, settings.litellm_master_key, temperature=0, tiers=tiers),
+        llm=Gateway(routes, call_log=logs.enqueue, temperature=0),
         search=QdrantSearch(settings.qdrant_url),
-        # Query vectors must match the indexed ones, so the compiled size wins over the environment.
-        embeddings=LiteLLMEmbeddings(
-            settings.litellm_base_url, settings.litellm_master_key, compiled.embedding_dimensions,
-            alias=tiers.alias(EMBED_TIER),
-        ),
+        # Query vectors must match the indexed ones, so the compiled size wins over the setting.
+        embeddings=clients.embedding_client(compiled.embedding_dimensions, call_log=logs.enqueue),
         # Each case replaces it with its role's runner (role_runners).
         runner=ClickHouseRunner(agent_client(pack, compiled.pack.policies.roles[0].id), QueryLimits.from_env()),
         compiled=compiled,
         today=reference,
-        logs=start_log_writer(settings),
+        logs=logs,
         user_id="eval",
         screener=Screener.from_settings(settings),
         screen_mode=settings.screen_mode,
@@ -170,15 +171,16 @@ def store_report(
 
 def main(
     argv: list[str] | None = None,
-    deps_factory: Callable[[str, date, TierMap], AgentDeps] = build_deps,
+    deps_factory: Callable[[str, date, SettingsRoutes], AgentDeps] = build_deps,
     runners_factory: Callable[[str], Callable[[str], QueryRunner]] | None = None,
 ) -> int:
     args = parse_args(argv)
     try:
         eval_set = load_eval_set(load_pack(args.packs_dir / args.pack), args.only)
         baseline = load_baseline(args.baseline, args.pack) if args.baseline else None
-        tiers = TierMap({**load_settings().model_tiers, **dict(args.tier)})
-        deps = deps_factory(args.pack, eval_set.reference_date, tiers)
+        clients.bootstrap()
+        routes = clients.shared_routes(dict(args.tier))
+        deps = deps_factory(args.pack, eval_set.reference_date, routes)
     except (SettingsError, CompileError, PackValidationError, EvalSetError, RuntimeError) as error:
         print(error, file=sys.stderr)
         return 2
@@ -186,7 +188,7 @@ def main(
         runner_for = runners_factory(args.pack) if runners_factory is not None else None
         run = run_eval(
             args.pack, eval_set, deps, timeout=args.timeout, threshold=args.threshold, runner_for=runner_for,
-            tiers=tiers.current(),
+            tiers=routes.labels(),
         )
     finally:
         if deps.logs is not None:
@@ -203,7 +205,7 @@ def main(
     code = exit_code(run, diff)
     proven, not_qualified = evidence(run, args)
     if not_qualified:
-        print(f"The report makes no alias eligible: {not_qualified}.", file=sys.stderr)
+        print(f"The report is no evidence for any model: {not_qualified}.", file=sys.stderr)
     store_report(deps, run, diff, proven)
     return code
 
