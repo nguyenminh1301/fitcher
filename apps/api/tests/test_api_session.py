@@ -57,7 +57,8 @@ def test_the_session_cookie_identifies_the_account_on_later_requests(client, acc
     response = client.get("/me")
 
     assert response.status_code == 200
-    assert response.json() == {"user_id": account.id, "display_name": "Ana", "roles": ["viewer"], "active_role": "viewer"}
+    assert response.json() == {"user_id": account.id, "display_name": "Ana", "roles": ["viewer"], "active_role": "viewer",
+                               "mode": "team", "exposed": False}
 
 
 @pytest.mark.parametrize("body", [
@@ -107,3 +108,13 @@ def test_a_disabled_account_is_signed_out_on_its_next_request(client, account):
     accounts.update(shared_state(), account.id, enabled=False)
 
     assert client.get("/me").status_code == 401
+
+
+def test_a_proxy_https_header_is_trusted_only_when_the_public_hosts_are_listed(client, account, monkeypatch):
+    forwarded = {"X-Forwarded-Proto": "https"}
+
+    monkeypatch.delenv("FITCHER_ALLOWED_HOSTS", raising=False)
+    assert "Secure" not in client.post("/session", json=SIGN_IN, headers=forwarded).headers["set-cookie"]
+
+    monkeypatch.setenv("FITCHER_ALLOWED_HOSTS", "fitcher.example.com")
+    assert "Secure" in client.post("/session", json=SIGN_IN, headers=forwarded).headers["set-cookie"]

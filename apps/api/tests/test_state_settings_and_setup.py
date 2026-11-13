@@ -45,10 +45,23 @@ def test_a_new_instance_has_every_step_pending_and_is_incomplete(db):
 
 
 def test_choosing_a_mode_marks_its_step_done_and_is_kept(db):
-    setup.set_mode(db, "team")
+    setup.set_mode(db, "team", setup.FirstAdmin("ana@example.com", "Ana", "correct horse"), ["viewer"])
     status = setup.status(db)
     assert status.mode == "team"
     assert {s.id: s.state for s in status.steps}["mode"] == "done"
+
+
+def test_team_mode_without_an_admin_needs_the_first_admin(db):
+    with pytest.raises(setup.FirstAdminNeeded):
+        setup.set_mode(db, "team")
+    assert setup.status(db).mode is None
+
+
+def test_the_first_admin_takes_the_owner_id_and_the_owner_roles(db):
+    created = setup.set_mode(db, "team", setup.FirstAdmin("ana@example.com", "Ana", "correct horse"), ["viewer"])
+
+    assert (created.id, created.roles) == ("owner", ("admin", "viewer"))
+    assert setup.set_mode(db, "team") is None
 
 
 def test_unknown_mode_and_step_are_rejected(db):

@@ -28,7 +28,7 @@ def test_me_returns_the_verified_user_and_active_role(client):
 
     assert response.status_code == 200
     assert response.json() == {
-        "user_id": "lab.viewer", "display_name": "Lab Viewer", "roles": ["viewer"], "active_role": "viewer",
+        "user_id": "lab.viewer", "display_name": "Lab Viewer", "roles": ["viewer"], "active_role": "viewer", "mode": "team", "exposed": False,
     }
 
 

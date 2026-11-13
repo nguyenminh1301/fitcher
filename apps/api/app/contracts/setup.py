@@ -2,6 +2,8 @@
 
 from typing import Literal
 
+from pydantic import Field
+
 from app.contracts.query_spec import ContractModel
 
 
@@ -17,5 +19,13 @@ class SetupStatus(ContractModel):
     complete: bool
 
 
+class FirstAdminInput(ContractModel):
+    email: str = Field(max_length=320)
+    display_name: str = Field(max_length=200)
+    password: str = Field(max_length=1024)
+
+
 class SetupModeChange(ContractModel):
     mode: Literal["individual", "team"]
+    # Required when moving to team mode while no admin account is enabled.
+    admin: FirstAdminInput | None = None

@@ -2,7 +2,8 @@
 
 ``POST /session`` checks the e-mail and password and answers with the session
 cookie: ``HttpOnly``, ``SameSite=Strict``, sent on every path, and ``Secure``
-when the request arrived over HTTPS. A failure answers the same 401 whether
+when the request arrived over HTTPS (behind a proxy, ``X-Forwarded-Proto`` is
+trusted only when ``FITCHER_ALLOWED_HOSTS`` names the instance's public hosts). A failure answers the same 401 whether
 the account exists or not; repeated failures for one e-mail or one client
 address answer 429 with ``Retry-After`` until the throttling window passes.
 ``DELETE /session`` ends the session and clears the cookie.
@@ -13,7 +14,7 @@ from typing import Annotated
 from fastapi import APIRouter, Cookie, Depends, HTTPException, Request, Response, status
 
 from app.api.runtime import get_state_db
-from app.auth import accounts, account_sessions
+from app.auth import account_sessions, accounts, origin
 from app.auth.principal import SESSION_COOKIE
 from app.contracts.session import SignIn
 from app.state.db import StateDb
@@ -23,7 +24,7 @@ State = Annotated[StateDb, Depends(get_state_db)]
 
 
 def _cookie_options(request: Request) -> dict:
-    return {"path": "/", "httponly": True, "samesite": "strict", "secure": request.url.scheme == "https"}
+    return {"path": "/", "httponly": True, "samesite": "strict", "secure": request.url.scheme == "https" or origin.https_forwarded(request.headers)}
 
 
 def sign_in_response(request: Request, response: Response, db: StateDb, account_id: str) -> None:

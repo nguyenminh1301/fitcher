@@ -10,6 +10,7 @@ from state_fixtures import new_state
 
 from app.api import runtime, screening as screening_api, setup as setup_api
 from app.main import app
+from app.state.settings import Settings
 from app.screening.screen import Screener
 from fakes import FakeClassifier
 
@@ -38,6 +39,7 @@ def actions():
 @pytest.fixture
 def client(tmp_path, model_dir, actions):
     db, _ = new_state(tmp_path)
+    Settings(db).set("instance", "mode", "team")
     loaded = []
     screener = Screener(None, loader=lambda: loaded.append(1) or FakeClassifier(), enabled=lambda: False)
     app.dependency_overrides[runtime.get_verifier] = lambda: verifier()

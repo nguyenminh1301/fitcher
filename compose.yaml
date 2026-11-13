@@ -136,6 +136,10 @@ services:
       context: .
       dockerfile: apps/api/Dockerfile
     environment:
+      # Individual mode accepts only loopback hosts, these internal names (how the web service reaches the
+      # api) and FITCHER_ALLOWED_HOSTS, which exposes the instance to anyone reaching that name (app/auth/origin.py).
+      FITCHER_INTERNAL_HOSTS: api
+      FITCHER_ALLOWED_HOSTS: ${FITCHER_ALLOWED_HOSTS:-}
       # Providers created in the app state on the first start that finds none (apps/api/app/llm/routes.py);
       # afterwards providers and keys are managed on the Models page.
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}

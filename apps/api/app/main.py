@@ -4,6 +4,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from app.api import admin, ask, auth, conversations, datasets, documents, evaluation, feedback, feedback_review, providers, review, runtime, screening, session, setup, users
+from app.auth.origin import HostOriginGuard
 from app.llm.clients import bootstrap
 from app.state.db import shared_state
 
@@ -19,6 +20,7 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
 
 
 app = FastAPI(title="fitcher API", version="0.1.0", lifespan=lifespan)
+app.add_middleware(HostOriginGuard)
 app.include_router(auth.router)
 app.include_router(session.router)
 app.include_router(ask.router)

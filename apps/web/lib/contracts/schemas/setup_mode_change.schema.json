@@ -1,4 +1,33 @@
 {
+  "$defs": {
+    "FirstAdminInput": {
+      "additionalProperties": false,
+      "properties": {
+        "email": {
+          "maxLength": 320,
+          "title": "Email",
+          "type": "string"
+        },
+        "display_name": {
+          "maxLength": 200,
+          "title": "Display Name",
+          "type": "string"
+        },
+        "password": {
+          "maxLength": 1024,
+          "title": "Password",
+          "type": "string"
+        }
+      },
+      "required": [
+        "email",
+        "display_name",
+        "password"
+      ],
+      "title": "FirstAdminInput",
+      "type": "object"
+    }
+  },
   "additionalProperties": false,
   "properties": {
     "mode": {
@@ -8,6 +37,17 @@
       ],
       "title": "Mode",
       "type": "string"
+    },
+    "admin": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/FirstAdminInput"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
     }
   },
   "required": [
