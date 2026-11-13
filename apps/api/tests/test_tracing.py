@@ -1,19 +1,18 @@
 """Run tracing: OpenTelemetry trace ids, run rows and LLM request metadata."""
 
 from dataclasses import replace
-import json
 import re
 
 from agent_fixtures import GOOD_SQL, deps, extraction_reply, routing_reply
 from fakes import FakeLogWriter, FakeRunner
-import httpx
+import litellm
 import pytest
 
 from app.agent.graph import run_question
 from app.agent.state import RunCancelled
 from app.data.clickhouse import QueryError
-from app.llm.client import LiteLLMClient, Prompt
-from app.llm.embeddings import LiteLLMEmbeddings
+from app.llm.client import GatewayBlocked, Prompt
+from app.llm.gateway import Gateway, GatewayEmbeddings, Route
 from app.observability.tracing import current_run, node_span, run_span, trusted_pack_calls
 
 QUESTION = "Top 10 best-selling widgets in Q1 2024 compared with Q1 2025"
@@ -115,24 +114,26 @@ def test_a_cancelled_run_stops_before_its_next_node_and_records_it():
 
 
 def test_llm_calls_carry_the_trace_and_node_and_are_counted():
-    sent: list[dict] = []
+    rows = []
 
-    def handler(request: httpx.Request) -> httpx.Response:
-        body = json.loads(request.content)
-        sent.append(body)
-        if request.url.path.endswith("/embeddings"):
-            return httpx.Response(200, json={"data": [{"index": 0, "embedding": [0.0, 0.0]}]})
-        return httpx.Response(200, json={"choices": [{"message": {"content": "ok"}}]})
+    def completion(**kwargs):
+        return litellm.ModelResponse(choices=[{"message": {"role": "assistant", "content": "ok"}, "index": 0}])
 
-    transport = httpx.MockTransport(handler)
-    llm = LiteLLMClient("http://litellm:4000", "sk-test", http=httpx.Client(transport=transport))
-    embeddings = LiteLLMEmbeddings("http://litellm:4000", "sk-test", 2, http=httpx.Client(transport=transport))
+    def embedding(**kwargs):
+        return litellm.EmbeddingResponse(data=[{"object": "embedding", "index": 0, "embedding": [0.0, 0.0]}])
+
+    route = Route(provider="openai", model="openai/gpt-5.4-mini", api_key="sk-test")
+    routes = type("Routes", (), {"route": lambda self, tier: route})()
+    llm = Gateway(routes, completion=completion, call_log=rows.append)
+    embeddings = GatewayEmbeddings(routes, 2, embedding=embedding, call_log=rows.append)
 
     prompt = Prompt(system="rules", user="question")
-    llm.text("fast", prompt)
+    with pytest.raises(GatewayBlocked):
+        llm.text("fast", prompt)
     with trusted_pack_calls():
         embeddings.embed(["pack text"])
     with run_span() as run:
+        run.screening = "allow"
         llm.text("fast", prompt)
         run.screening = "flag"
         with node_span("extract"):
@@ -142,10 +143,9 @@ def test_llm_calls_carry_the_trace_and_node_and_are_counted():
         assert run.llm_calls == 4
     assert current_run() is None
 
-    # Outside a run and outside trusted pack calls nothing marks the request as screened; the gateway rejects it.
-    assert sent[0]["metadata"] == {"tier": "fast"}
-    assert sent[1]["metadata"] == {"screening": "trusted_pack", "tier": "embed"}
-    assert sent[2]["metadata"] == {"trace_id": run.trace_id, "node": "", "tier": "fast"}
-    assert sent[3]["metadata"] == {"trace_id": run.trace_id, "node": "extract", "screening": "flag", "tier": "fast"}
-    assert sent[4]["metadata"] == {"trace_id": run.trace_id, "node": "extract", "screening": "flag", "tier": "embed"}
-    assert sent[5]["metadata"] == {"trace_id": run.trace_id, "node": "", "screening": "flag", "tier": "fast"}
+    # Outside a run and outside trusted pack calls nothing marks the call as screened, so the gateway refuses it.
+    assert [(row.trace_id, row.node, row.tier, row.status) for row in rows] == [
+        ("", "", "fast", "blocked"), ("", "", "embed", "success"),
+        (run.trace_id, "", "fast", "success"), (run.trace_id, "extract", "fast", "success"),
+        (run.trace_id, "extract", "embed", "success"), (run.trace_id, "", "fast", "success"),
+    ]

@@ -35,8 +35,8 @@ import time
 from clickhouse_connect.driver.exceptions import Error as ClickHouseError
 
 from app.config import SettingsError, load_settings
-from app.llm.embeddings import EmbeddingError, LiteLLMEmbeddings
-from app.llm.tiers import EMBED_TIER
+from app.llm import clients
+from app.llm.embeddings import EmbeddingError
 from app.packs.compiler import CompileError, CompileSummary, compile_pack, load_compiled
 from app.observability.tracing import trusted_pack_calls
 from app.onboarding.documents import ClickHouseDocumentRegistry, DocumentRegistry, compile_lock_path, processing
@@ -140,32 +140,27 @@ def wait_for_uploads(registry: DocumentRegistry, pack: str) -> None:
 
 def main(argv: list[str] | None = None) -> int:
     # Every gateway request of a compile embeds reviewed pack content or screened chunks (DECISIONS §9).
-    with trusted_pack_calls():
-        return _main(argv)
+    clients.bootstrap()
+    with trusted_pack_calls(), clients.job_call_log() as call_log:
+        return _main(argv, call_log)
 
 
-def _main(argv: list[str] | None) -> int:
+def _main(argv: list[str] | None, call_log=None) -> int:
     args = parse_args(argv)
     try:
         settings = load_settings()
         search = QdrantSearch(settings.qdrant_url)
         if args.check_search is not None:
-            embeddings = LiteLLMEmbeddings(
-                settings.litellm_base_url, settings.litellm_master_key, settings.embedding_dimensions,
-                alias=settings.model_tiers[EMBED_TIER],
-            )
+            embeddings, _ = clients.index_embeddings(call_log=call_log)
             return check_search(args, settings, search, embeddings)
 
-        embeddings = None
+        embeddings, label = None, ""
         if not args.skip_index:
-            embeddings = LiteLLMEmbeddings(
-                settings.litellm_base_url, settings.litellm_master_key, settings.embedding_dimensions,
-                alias=settings.model_tiers[EMBED_TIER],
-            )
+            embeddings, label = clients.index_embeddings(call_log=call_log)
         warehouse = ClickHouseWarehouse(admin_client())
         compiled_dir = Path(settings.compiled_pack_dir)
         with compile_lock(compiled_dir, args.pack):
-            summary = _compile(args, settings, warehouse, search, embeddings)
+            summary = _compile(args, settings, warehouse, search, embeddings, label)
     except (PackValidationError, CompileError, SettingsError, SearchError, EmbeddingError, ClickHouseError) as error:
         print(error, file=sys.stderr)
         return 1
@@ -173,7 +168,9 @@ def _main(argv: list[str] | None) -> int:
     return 0
 
 
-def _compile(args: argparse.Namespace, settings, warehouse: ClickHouseWarehouse, search, embeddings) -> CompileSummary:
+def _compile(
+    args: argparse.Namespace, settings, warehouse: ClickHouseWarehouse, search, embeddings, embedding_label: str,
+) -> CompileSummary:
     registry = None
     if not args.skip_index:
         registry = ClickHouseDocumentRegistry(admin_client())
@@ -191,7 +188,8 @@ def _compile(args: argparse.Namespace, settings, warehouse: ClickHouseWarehouse,
         screener=Screener.from_settings(settings),
         registry=registry,
         documents_dir=Path(settings.documents_dir),
-        embedding_alias=settings.model_tiers[EMBED_TIER],
+        # The embedding model's provider/model label: a later compile copies document chunks only with the same one.
+        embedding_alias=embedding_label,
     )
 
 

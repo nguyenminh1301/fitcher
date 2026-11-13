@@ -6,7 +6,7 @@ import { ModelsSection } from "@/components/console/sections/ModelsSection";
 import { createMockApi, type MockApi } from "@/lib/api/mock";
 import type { ConsoleFile } from "@/lib/api/provisional";
 import { ChatProvider } from "@/lib/chat/ChatContext";
-import type { ModelTier, ModelTiers } from "@/lib/contracts";
+import type { ClassifierStatus, ModelTiersView, ProviderView } from "@/lib/contracts";
 import { I18nProvider } from "@/lib/i18n/react";
 import { ThemeProvider } from "@/lib/theme";
 
@@ -19,27 +19,19 @@ const CONSOLE: Partial<ConsoleFile> = {
   conversations: [],
 };
 
-function tier(name: string, alias: string, extra: Partial<ModelTier> = {}): ModelTier {
-  return {
-    tier: name, alias, provider: alias.split("-")[0], default_alias: alias, editable: name !== "embed", eligible: true,
-    reason: "the latest eval report with it passed without regression", report_id: "r1", report_ts: "2026-11-04T08:00:00Z",
-    options: [], ...extra,
-  };
-}
-
-const TIERS: ModelTiers = {
-  pack: "shop",
-  tiers: [
-    tier("sql-small", "openai-small", {
-      options: [
-        { alias: "openai-small", provider: "openai", eligible: true, reason: "passed", report_id: "r1" },
-        { alias: "anthropic-small", provider: "anthropic", eligible: true, reason: "passed", report_id: "r2" },
-        { alias: "gemini-small", provider: "gemini", eligible: false, reason: "no eval report ran sql-small with gemini-small" },
-      ],
-    }),
-    tier("embed", "openai-embed"),
-  ],
+const OPENAI: ProviderView = {
+  id: "openai", name: "OpenAI", kind: "openai", base_url: null, key_set: true, key_last4: "7777", hosted: true, in_use: true,
 };
+const GEMINI: ProviderView = { ...OPENAI, id: "gemini", name: "Gemini", kind: "gemini", key_last4: "1234", in_use: false };
+
+const TIERS: ModelTiersView = {
+  tiers: [
+    { tier: "fast", provider_id: "openai", model: "gpt-5.4-mini", eval: { evaluated: false, passed: false, reason: "no eval report ran fast with openai/gpt-5.4-mini" } },
+    { tier: "sql-gen", provider_id: "openai", model: "gpt-5.4", eval: { evaluated: true, passed: true, reason: "passed", report_id: "r1", report_ts: "2026-11-10T08:00:00Z" } },
+  ],
+  embedding: { backend: "local", provider_id: null, model: "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2", dimensions: 384, needs_reindex: false },
+};
+const CLASSIFIER: ClassifierStatus = { enabled: false, model_present: false, version: null };
 
 let api: MockApi;
 
@@ -61,8 +53,16 @@ beforeEach(() => {
   vi.stubGlobal("fetch", vi.fn(async (url: string) =>
     url.endsWith("/console") ? new Response(JSON.stringify(CONSOLE)) : new Response(JSON.stringify({ suggestions: [], scenarios: [] }))));
   api = createMockApi();
-  api.models.list = vi.fn(async () => TIERS);
-  api.models.set = vi.fn(async (name: string, alias: string) => tier(name, alias));
+  Object.assign(api.models, {
+    providers: vi.fn(async () => [OPENAI, GEMINI]),
+    tiers: vi.fn(async () => TIERS),
+    classifier: vi.fn(async () => CLASSIFIER),
+    providerModels: vi.fn(async () => ({ provider_id: "openai", models: ["gpt-5.4", "gpt-5.5"] })),
+    setTier: vi.fn(async (tier: string, change: { provider_id: string; model: string }) => ({ tier, ...change, eval: null })),
+    setEmbedding: vi.fn(async () => TIERS.embedding),
+    removeProvider: vi.fn(async () => undefined),
+    setClassifier: vi.fn(async () => CLASSIFIER),
+  });
 });
 afterEach(() => {
   cleanup();
@@ -70,53 +70,62 @@ afterEach(() => {
 });
 
 describe("models", () => {
-  it("shows each tier's model and eligibility without a Sample data badge", async () => {
+  it("lists providers with only the end of their key and no Sample data badge", async () => {
     show();
-    const small = await screen.findByRole("region", { name: "Tier sql-small" });
+    const providers = await screen.findByRole("region", { name: "Providers" });
 
-    expect(within(small).getAllByText("openai-small").length).toBeGreaterThan(0);
-    expect(within(small).getByText("Eligible")).toBeTruthy();
+    expect(within(providers).getByText(/Key ending in 7777/)).toBeTruthy();
+    expect(within(providers).getByText(/Key ending in 1234/)).toBeTruthy();
     expect(screen.queryByText("Sample data")).toBeNull();
   });
 
-  it("disables an ineligible model and says why", async () => {
+  it("does not offer to remove a provider in use and asks before removing another", async () => {
     show();
-    const small = await screen.findByRole("region", { name: "Tier sql-small" });
+    const openai = await screen.findByRole("listitem", { name: "OpenAI" });
+    expect((within(openai).getByRole("button", { name: "Remove" }) as HTMLButtonElement).disabled).toBe(true);
 
-    expect((within(small).getByRole("button", { name: "gemini-small" }) as HTMLButtonElement).disabled).toBe(true);
-    expect(within(small).getByText(/no eval report ran sql-small with gemini-small/)).toBeTruthy();
+    fireEvent.click(within(screen.getByRole("listitem", { name: "Gemini" })).getByRole("button", { name: "Remove" }));
+    expect(api.models.removeProvider).not.toHaveBeenCalled();
+    await act(async () => fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Remove" })));
+
+    await waitFor(() => expect(api.models.removeProvider).toHaveBeenCalledWith("gemini"));
   });
 
-  it("asks before mapping a tier to an eligible model", async () => {
+  it("shows each tier's model with its eval result, which never blocks a change", async () => {
     show();
-    const small = await screen.findByRole("region", { name: "Tier sql-small" });
+    const fast = await screen.findByRole("region", { name: "fast" });
+    const sqlGen = screen.getByRole("region", { name: "sql-gen" });
 
-    fireEvent.click(within(small).getByRole("button", { name: "anthropic-small" }));
-    expect(api.models.set).not.toHaveBeenCalled();
-    await act(async () => fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Change model" })));
+    expect(within(fast).getByText("Not evaluated")).toBeTruthy();
+    expect(within(sqlGen).getByText("Passed the pack eval")).toBeTruthy();
+    fireEvent.change(within(fast).getByLabelText("Model"), { target: { value: "gpt-5.5" } });
+    await act(async () => fireEvent.click(within(fast).getByRole("button", { name: "Use this model" })));
 
-    await waitFor(() => expect(api.models.set).toHaveBeenCalledWith("sql-small", "anthropic-small"));
+    await waitFor(() => expect(api.models.setTier).toHaveBeenCalledWith("fast", { provider_id: "openai", model: "gpt-5.5" }));
   });
 
-  it("disables every choice while a change saves", async () => {
-    let finish: (tier: ModelTier) => void = () => undefined;
-    api.models.set = vi.fn(() => new Promise<ModelTier>((resolve) => { finish = resolve; }));
+  it("asks to confirm the reindex before changing the embedding", async () => {
     show();
-    const small = await screen.findByRole("region", { name: "Tier sql-small" });
+    const embedding = await screen.findByRole("region", { name: "Embedding" });
+    expect(within(embedding).getByText(/Runs inside fitcher/)).toBeTruthy();
 
-    fireEvent.click(within(small).getByRole("button", { name: "anthropic-small" }));
-    await act(async () => fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Change model" })));
+    fireEvent.change(within(embedding).getByLabelText("Embedding model"), {
+      target: { value: "sentence-transformers/paraphrase-multilingual-mpnet-base-v2" },
+    });
+    fireEvent.click(within(embedding).getByRole("button", { name: "Change the embedding model" }));
+    expect(api.models.setEmbedding).not.toHaveBeenCalled();
+    await act(async () => fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Change the embedding model" })));
 
-    expect((within(small).getByRole("button", { name: "anthropic-small" }) as HTMLButtonElement).disabled).toBe(true);
-    await act(async () => finish(tier("sql-small", "anthropic-small")));
-    await waitFor(() => expect((within(small).getByRole("button", { name: "anthropic-small" }) as HTMLButtonElement).disabled).toBe(false));
+    await waitFor(() => expect(api.models.setEmbedding).toHaveBeenCalledWith({
+      backend: "local", model: "sentence-transformers/paraphrase-multilingual-mpnet-base-v2", confirm_reindex: true,
+    }));
   });
 
-  it("offers no change for the embedding tier", async () => {
+  it("says how to fetch the classifier before it can be turned on", async () => {
     show();
-    const embed = await screen.findByRole("region", { name: "Tier embed" });
+    const classifier = await screen.findByRole("region", { name: "Prompt-injection classifier" });
 
-    expect(within(embed).queryAllByRole("button")).toEqual([]);
-    expect(within(embed).getByText(/full reindex/)).toBeTruthy();
+    expect(within(classifier).getByText(/docker compose run --rm guard-model/)).toBeTruthy();
+    expect((within(classifier).getByRole("button", { name: "Turn on" }) as HTMLButtonElement).disabled).toBe(true);
   });
 });

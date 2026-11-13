@@ -1,0 +1,31 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "enabled": {
+      "title": "Enabled",
+      "type": "boolean"
+    },
+    "model_present": {
+      "title": "Model Present",
+      "type": "boolean"
+    },
+    "version": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Version"
+    }
+  },
+  "required": [
+    "enabled",
+    "model_present",
+    "version"
+  ],
+  "title": "ClassifierStatus",
+  "type": "object"
+}

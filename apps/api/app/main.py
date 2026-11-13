@@ -3,8 +3,8 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
-from app.api import admin, ask, auth, conversations, datasets, documents, evaluation, feedback, feedback_review, models, review, runtime, setup, users
-from app.llm.routes import bootstrap_providers
+from app.api import admin, ask, auth, conversations, datasets, documents, evaluation, feedback, feedback_review, providers, review, runtime, screening, setup, users
+from app.llm.clients import bootstrap
 from app.state.db import shared_state
 
 
@@ -12,7 +12,7 @@ from app.state.db import shared_state
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     # Loading the screening classifier takes seconds; questions wait for it, /health does not.
     shared_state()
-    bootstrap_providers()
+    bootstrap()
     runtime.build_screener_in_background()
     yield
     runtime.close()
@@ -23,7 +23,6 @@ app.include_router(auth.router)
 app.include_router(ask.router)
 app.include_router(conversations.router)
 app.include_router(feedback.router)
-app.include_router(models.router)
 app.include_router(documents.router)
 app.include_router(review.router)
 app.include_router(datasets.router)
@@ -32,16 +31,20 @@ app.include_router(feedback_review.router)
 app.include_router(evaluation.router)
 app.include_router(users.router)
 app.include_router(setup.router)
+app.include_router(providers.router)
+app.include_router(screening.router)
 
 
 @app.get("/health")
 def health() -> dict[str, str | None]:
-    """Liveness, with whether questions can be screened (DECISIONS §9).
+    """Liveness, with whether questions can be screened (DECISIONS §9): ``rules_only`` while the classifier is off.
 
     It never loads the classifier: until the screener is built, and whenever the model is missing, it
     reports ``screening: unavailable`` and stays healthy, so Compose and CI never depend on the gated model.
     """
     screener = runtime.loaded_screener()
+    if screener is not None and screener.disabled:
+        return {"status": "ok", "screening": "rules_only", "classifier": None}
     classifier = screener.loaded if screener else None
     return {
         "status": "ok", "screening": "ready" if classifier else "unavailable",

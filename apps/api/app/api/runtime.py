@@ -23,16 +23,15 @@ from app.auth.jwt import JwksCache, TokenSettings, TokenVerifier
 from app.config import load_settings
 from app.conversation.store import ConversationStore, conversations_client
 from app.data.clickhouse import ClientWarehouse, QueryLimits
-from app.llm.client import LiteLLMClient, LLMError
-from app.llm.embeddings import LiteLLMEmbeddings
-from app.llm.model_store import CatalogClient, ClickHouseModelStore, model_tiers_client
-from app.llm.tiers import EMBED_TIER, TierMap, TierStoreError
+from app.llm.client import LLMError
+from app.llm.clients import chat_client, embedding_client, index_embeddings
+from app.llm.model_store import ClickHouseModelStore, model_tiers_client
 from app.onboarding.documents import ClickHouseDocumentRegistry, DocumentService, pack_review_client
 from app.admin.logs import AdminLogs, trace_reader_client
 from app.auth.keycloak_admin import KeycloakAdmin, KeycloakAdminError
 from app.eval.console import EvalReports, EvalRuns
 from app.feedback.store import ClickHouseProposalStore, review_reader_client
-from app.observability.log_writer import writer_client
+from app.observability.log_writer import start_log_writer, writer_client
 from app.onboarding.drafter import Drafter
 from app.onboarding.review import ReviewService
 from app.packs.compiler import CompileError, CompiledPack, load_compiled
@@ -156,36 +155,27 @@ def get_model_store() -> ClickHouseModelStore:
         raise unavailable(f"the model store is unavailable: {error}") from None
 
 
-class LazyTierStore:
-    """The model store, looked up on every read: a store unavailable at startup is used once it is back."""
-
-    def read(self) -> dict[str, str]:
-        try:
-            store = get_model_store()
-        except HTTPException as error:
-            raise TierStoreError(str(error.detail)) from None
-        return store.read()
-
-    def write(self, tier, alias, changed_by, changed_at) -> None:
-        get_model_store().write(tier, alias, changed_by, changed_at)
+_call_log_writer = None
+_call_log_lock = threading.Lock()
 
 
-@cache
-def get_tier_map() -> TierMap:
-    """The process's tier lookup; while the model store is unavailable, every tier keeps its default."""
-    return TierMap(load_settings().model_tiers, LazyTierStore())
-
-
-@cache
-def get_catalog() -> CatalogClient:
-    settings = load_settings()
-    return CatalogClient(settings.litellm_base_url, settings.litellm_master_key)
+def _call_log():
+    """The ``llm_calls`` writer of the api's calls outside a question: drafts and document embeddings."""
+    global _call_log_writer
+    with _call_log_lock:
+        if _call_log_writer is None:
+            try:
+                _call_log_writer = start_log_writer(load_settings())
+            except Exception:  # noqa: BLE001 - logging never blocks the call
+                logger.exception("the llm_calls writer did not start")
+                return None
+        return _call_log_writer.enqueue
 
 
 @cache
 def get_agent() -> Agent:
     try:
-        return Agent(load_settings(), get_compiled(), get_screener(), get_tier_map())
+        return Agent(load_settings(), get_compiled(), get_screener())
     except LLMError as error:
         raise unavailable(str(error)) from None
 
@@ -205,11 +195,8 @@ def get_document_service() -> DocumentService:
     identity = pack_identity(get_compiled_or_none())
     try:
         registry = ClickHouseDocumentRegistry(pack_review_client())
-        embeddings = LiteLLMEmbeddings(
-            settings.litellm_base_url, settings.litellm_master_key, settings.embedding_dimensions,
-            alias=settings.model_tiers[EMBED_TIER],
-        )
-    except Exception as error:  # noqa: BLE001 - a missing password or gateway key, or ClickHouse unreachable
+        embeddings, _ = index_embeddings(call_log=_call_log())
+    except Exception as error:  # noqa: BLE001 - a missing password, no embedding model, or ClickHouse unreachable
         raise unavailable(f"the document store is unavailable: {error}") from None
     return DocumentService(
         pack=identity.name, pack_roles=identity.roles, registry=registry,
@@ -235,12 +222,7 @@ def get_review_warehouse() -> ClientWarehouse:
 
 @cache
 def get_drafter() -> Drafter:
-    settings = load_settings()
-    try:
-        llm = LiteLLMClient(settings.litellm_base_url, settings.litellm_master_key, tiers=get_tier_map())
-    except LLMError as error:
-        raise unavailable(str(error)) from None
-    return Drafter(llm, get_review_warehouse())
+    return Drafter(chat_client(call_log=_call_log()), get_review_warehouse())
 
 
 def get_review_service() -> ReviewService:
@@ -319,6 +301,11 @@ def get_rate_limiter() -> RateLimiter:
 
 
 def close() -> None:
-    """Flush and stop the agent's log writer if a question ever built the agent."""
+    """Flush and stop the agent's log writer if a question ever built the agent, and the api's call log."""
+    global _call_log_writer
     if get_agent.cache_info().currsize:
         get_agent().close()
+    with _call_log_lock:
+        if _call_log_writer is not None:
+            _call_log_writer.close()
+            _call_log_writer = None

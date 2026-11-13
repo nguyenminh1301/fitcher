@@ -25,8 +25,8 @@ import sys
 
 from app.config import SettingsError, load_settings
 from app.eval.cases import EvalSetError, load_eval_set
-from app.llm.embeddings import EmbeddingError, LiteLLMEmbeddings
-from app.llm.tiers import EMBED_TIER
+from app.llm import clients
+from app.llm.embeddings import EmbeddingError
 from app.observability.tracing import trusted_pack_calls
 from app.packs.compiler import CompileError, approved_pack, load_compiled
 from app.packs.loader import PackValidationError, load_pack
@@ -177,10 +177,9 @@ def main(argv: list[str] | None = None) -> int:
         cases = load_eval_set(approved_pack(load_pack(args.packs_dir / args.pack))).cases
         backend = "qdrant"
         search = QdrantSearch(settings.qdrant_url)
-        embeddings = LiteLLMEmbeddings(
-            settings.litellm_base_url, settings.litellm_master_key, compiled.embedding_dimensions,
-            alias=settings.model_tiers[EMBED_TIER],
-        )
+        clients.bootstrap()
+        # Query vectors must match the indexed ones, so the compiled size wins over the setting.
+        embeddings = clients.embedding_client(compiled.embedding_dimensions)
         with trusted_pack_calls():
             scores = measure(search, embeddings, args.pack, labelled_queries(cases))
     except (SettingsError, CompileError, PackValidationError, EvalSetError, EmbeddingError, SearchError) as error:

@@ -5,10 +5,8 @@ documents them. Nothing here names a pack, table or model.
 """
 
 from collections.abc import Mapping
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 import os
-
-from app.llm.tiers import BUILT_IN_DEFAULTS, tier_defaults
 
 
 SCREEN_MODES = ("log", "enforce")
@@ -22,9 +20,6 @@ class SettingsError(RuntimeError):
 class Settings:
     active_pack: str
     qdrant_url: str
-    litellm_base_url: str
-    litellm_master_key: str
-    embedding_dimensions: int
     column_values_top_k: int
     compiled_pack_dir: str
     # agent_logs writer: records per batch, flush interval and queue bound.
@@ -43,8 +38,6 @@ class Settings:
     screen_block_at: float = 0.9
     # Where jobs.fetch_guard_model wrote the classifier; without it every question is refused.
     guard_model_dir: str = "build/guard_model"
-    # Default catalog alias of every model tier, from MODEL_TIER_<TIER> (DECISIONS §2 Model tiers).
-    model_tiers: Mapping[str, str] = field(default_factory=lambda: dict(BUILT_IN_DEFAULTS))
     # Company documents (DECISIONS §5): stored originals, upload size cap and the pack working tree reviews write.
     documents_dir: str = "build/documents"
     document_max_bytes: int = 20 * 1024 * 1024
@@ -89,9 +82,6 @@ def load_settings(env: Mapping[str, str] | None = None) -> Settings:
     return Settings(
         active_pack=env.get("ACTIVE_PACK", ""),
         qdrant_url=env.get("QDRANT_URL", "http://qdrant:6333").rstrip("/"),
-        litellm_base_url=env.get("LITELLM_BASE_URL", "http://litellm:4000").rstrip("/"),
-        litellm_master_key=env.get("LITELLM_MASTER_KEY", ""),
-        embedding_dimensions=positive_int(env, "EMBEDDING_DIMENSIONS", 1024),
         column_values_top_k=positive_int(env, "COLUMN_VALUES_TOP_K", 10_000),
         compiled_pack_dir=env.get("COMPILED_PACK_DIR", "build/packs"),
         log_batch_size=positive_int(env, "LOG_BATCH_SIZE", 100),
@@ -105,7 +95,6 @@ def load_settings(env: Mapping[str, str] | None = None) -> Settings:
         screen_flag_at=screen_flag_at,
         screen_block_at=screen_block_at,
         guard_model_dir=env.get("GUARD_MODEL_DIR", "build/guard_model"),
-        model_tiers=tier_defaults(env),
         documents_dir=env.get("DOCUMENTS_DIR", "build/documents"),
         document_max_bytes=positive_int(env, "DOCUMENT_MAX_BYTES", 20 * 1024 * 1024),
         packs_dir=env.get("PACKS_DIR", "packs"),

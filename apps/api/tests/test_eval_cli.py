@@ -39,7 +39,7 @@ def _answers(cases: int) -> list:
 
 
 def _factory(runner: FakeRunner, cases: int = 1, seen: list | None = None, logs=None):
-    def build(pack: str, reference: date, tiers=None):
+    def build(pack: str, reference: date, routes=None):
         if seen is not None:
             seen.append((pack, reference))
         return replace(deps(_answers(cases), runner=runner), logs=logs)
@@ -143,24 +143,34 @@ def test_run_report_is_stored_in_agent_logs(packs_dir):
 
 @pytest.fixture(autouse=True)
 def default_tiers(monkeypatch):
+    """An OpenAI and an Anthropic provider in the app state, with the tiers on OpenAI's proposed models."""
+    from app.llm.providers import ProviderStore
+    from app.llm.routes import fill_defaults, TierMapping
+    from app.state.db import shared_state
+    from app.state.secrets import shared_vault
+
     for name in ("FAST", "SQL_SMALL", "SQL_GEN", "SQL_GEN_HARD", "EMBED"):
         monkeypatch.delenv(f"MODEL_TIER_{name}", raising=False)
+    store = ProviderStore(shared_state(), shared_vault())
+    fill_defaults(TierMapping(shared_state(), store), store.create("openai", api_key="sk-test-eval-0001"))
+    store.create("anthropic", api_key="sk-test-eval-0002")
 
 
 def test_the_report_records_the_tier_mapping_and_its_overrides(packs_dir, tmp_path):
     logs = FakeLogWriter()
     output = tmp_path / "out"
 
-    code = _main(packs_dir, "--tier", "sql-small=anthropic-small", "--output-dir", str(output),
+    code = _main(packs_dir, "--tier", "sql-small=anthropic/claude-haiku-5-5", "--output-dir", str(output),
                  factory=_factory(_matching(), logs=logs))
 
     assert code == 0
     (stored,) = [record for record in logs.written if record.TABLE == "eval_reports"]
     # Only the tiers the run called are evidence; the case generated its SQL on sql-gen, never sql-small.
-    assert stored.tiers == {"fast": "openai-small", "sql-gen": "openai-medium", "embed": "openai-embed"}
+    assert stored.tiers == {"fast": "openai/gpt-5.4-mini", "sql-gen": "openai/gpt-5.4",
+                            "embed": "openai/text-embedding-3-large"}
     assert stored.regressed is None
     report = EvalRun.model_validate_json((output / "minimal-eval.json").read_text(encoding="utf-8"))
-    assert report.tiers["sql-small"] == "anthropic-small" and report.tiers["sql-gen-hard"] == "openai-large"
+    assert report.tiers["sql-small"] == "anthropic/claude-haiku-5-5" and report.tiers["sql-gen-hard"] == "openai/gpt-5.5"
     assert report.cases[0].sql_tiers == ["sql-gen"]
     assert "## Model routing" in (output / "minimal-eval.md").read_text(encoding="utf-8")
 
@@ -184,10 +194,11 @@ def test_a_partial_or_lenient_run_is_no_eligibility_evidence(packs_dir, args, ca
 
     (stored,) = [record for record in logs.written if record.TABLE == "eval_reports"]
     assert stored.tiers == {}
-    assert "makes no alias eligible" in capsys.readouterr().err
+    assert "no evidence for any model" in capsys.readouterr().err
 
 
-@pytest.mark.parametrize("value", ["embed=openai-embed", "sql-small", "sql-small=", "gpt=openai-small"])
+@pytest.mark.parametrize("value", ["embed=openai/text-embedding-3-large", "sql-small", "sql-small=", "sql-small=gpt-5.4",
+                                   "gpt=openai/gpt-5.4"])
 def test_only_a_chat_tier_can_be_overridden(packs_dir, value):
     with pytest.raises(SystemExit):
         _main(packs_dir, "--tier", value, factory=_factory(_matching()))

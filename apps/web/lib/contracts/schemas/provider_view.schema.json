@@ -1,0 +1,70 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "title": "Id",
+      "type": "string"
+    },
+    "name": {
+      "title": "Name",
+      "type": "string"
+    },
+    "kind": {
+      "enum": [
+        "openai",
+        "anthropic",
+        "gemini",
+        "ollama",
+        "openai_compatible"
+      ],
+      "title": "Kind",
+      "type": "string"
+    },
+    "base_url": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Base Url"
+    },
+    "key_set": {
+      "title": "Key Set",
+      "type": "boolean"
+    },
+    "key_last4": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Key Last4"
+    },
+    "hosted": {
+      "title": "Hosted",
+      "type": "boolean"
+    },
+    "in_use": {
+      "title": "In Use",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "id",
+    "name",
+    "kind",
+    "base_url",
+    "key_set",
+    "key_last4",
+    "hosted",
+    "in_use"
+  ],
+  "title": "ProviderView",
+  "type": "object"
+}

@@ -67,5 +67,8 @@ def test_complete_needs_every_step_decided(db):
     with pytest.raises(setup.SetupError, match="mode"):
         setup.complete(db)
     setup.set_mode(db, "individual")
+    with pytest.raises(setup.SetupError, match="models"):
+        setup.complete(db)
+    setup.mark_done(db, "models")
     setup.complete(db)
     assert setup.status(db).complete

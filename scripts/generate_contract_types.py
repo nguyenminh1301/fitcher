@@ -23,10 +23,14 @@ from app.contracts.documents import DocumentList, DocumentRolesChange, DocumentV
 from app.contracts.evaluation import EvalReportView, EvalRunStarted  # noqa: E402
 from app.contracts.events import AskEvent, AskRequest  # noqa: E402
 from app.contracts.feedback import FeedbackInput  # noqa: E402
-from app.contracts.model_tiers import ModelTierChange, ModelTiers  # noqa: E402
+from app.contracts.providers import (  # noqa: E402
+    EmbeddingChange, EmbeddingView, ModelTiersView, ProviderCreate, ProviderModels, ProviderTestRequest,
+    ProviderTestResult, ProviderUpdate, ProviderView, TierChange, TierView,
+)
 from app.contracts.query_spec import QuerySpec  # noqa: E402
 from app.contracts.result import Result  # noqa: E402
 from app.contracts.review import DatasetView, ReviewItem, ReviewItemPatch  # noqa: E402
+from app.contracts.screening import ClassifierStatus  # noqa: E402
 from app.contracts.setup import SetupModeChange, SetupStatus  # noqa: E402
 from app.contracts.users import UserRoles, UserView  # noqa: E402
 
@@ -44,8 +48,18 @@ CONTRACTS = {
     "conversation_patch": (ConversationPatch, "validation"),
     "group_input": (GroupInput, "validation"),
     "feedback_input": (FeedbackInput, "validation"),
-    "model_tiers": (ModelTiers, "serialization"),
-    "model_tier_change": (ModelTierChange, "validation"),
+    "provider_view": (ProviderView, "serialization"),
+    "provider_create": (ProviderCreate, "validation"),
+    "provider_update": (ProviderUpdate, "validation"),
+    "provider_models": (ProviderModels, "serialization"),
+    "provider_test_request": (ProviderTestRequest, "validation"),
+    "provider_test_result": (ProviderTestResult, "serialization"),
+    "model_tiers_view": (ModelTiersView, "serialization"),
+    "tier_view": (TierView, "serialization"),
+    "tier_change": (TierChange, "validation"),
+    "embedding_view": (EmbeddingView, "serialization"),
+    "embedding_change": (EmbeddingChange, "validation"),
+    "classifier_status": (ClassifierStatus, "serialization"),
     "dataset_view": (DatasetView, "serialization"),
     "review_item": (ReviewItem, "serialization"),
     "review_item_patch": (ReviewItemPatch, "validation"),

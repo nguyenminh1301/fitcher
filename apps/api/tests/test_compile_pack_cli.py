@@ -32,12 +32,11 @@ def services(monkeypatch, tmp_path):
         fixture_catalog().tables, coverage={"widget_sales": (5, date(2024, 1, 1), date(2024, 12, 31))}
     )
     monkeypatch.setenv("COMPILED_PACK_DIR", str(tmp_path / "build"))
-    monkeypatch.setenv("LITELLM_MASTER_KEY", "sk-test")
     monkeypatch.setenv("CLICKHOUSE_AGENT_PASSWORD", "lab-secret")
     monkeypatch.setattr(cli, "admin_client", lambda: object())
     monkeypatch.setattr(cli, "ClickHouseWarehouse", lambda client: fake_warehouse)
     monkeypatch.setattr(cli, "QdrantSearch", lambda url: search)
-    monkeypatch.setattr(cli, "LiteLLMEmbeddings", lambda *args, **kwargs: FakeEmbeddings())
+    monkeypatch.setattr(cli.clients, "index_embeddings", lambda **kwargs: (FakeEmbeddings(), "fake/embedding-model"))
     monkeypatch.setattr(cli, "ClickHouseDocumentRegistry", lambda client: registry)
     return search
 

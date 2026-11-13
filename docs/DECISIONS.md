@@ -40,7 +40,7 @@ This document states the target. §16 lists each decision that differs from the 
 | Orchestration | LangGraph | one graph; nodes deterministic where possible |
 | LLM gateway | LiteLLM Python SDK inside `api` | one client for every provider; no proxy service |
 | Model | OpenAI, Anthropic, Gemini, Ollama and any OpenAI-compatible endpoint (LM Studio, OpenRouter and similar) | providers and keys are entered in the application (§15); chat tiers are called through the gateway |
-| Embeddings | Local multilingual model through fastembed by default; a provider's embedding model as an option | no key is needed to index a pack; changing the model needs a full reindex (§14) |
+| Embeddings | A connected provider's embedding model by default; a local multilingual model through fastembed when no connected provider offers one, or by choice | the local models lost retrieval recall against the provider model ([local-embedding-report.md](eval/local-embedding-report.md)), so indexing a pack needs a key unless the provider is a local model server or the local model is chosen; changing the model needs a full reindex (§14) |
 | Input screening | EN/VI rules always; Llama Prompt Guard 2 86M (local ONNX) as an option | a security classifier, not an answering model (§9) |
 | Data database | ClickHouse | databases `raw`, `marts`; sources attached through engines or copied (§4) |
 | Logs / audit | ClickHouse | database `agent_logs`, dedicated user, 90-day TTL |
@@ -414,7 +414,7 @@ Tables (MergeTree, 90-day TTL, ordered by `(trace_id, ts)`, `(user_id, ts)` or, 
 
 - Chart library: ECharts. Can switch to Plotly by rewriting the adapter.
 - Ambiguous "best-selling": use the default convention in `business_profile.yaml` if present; otherwise clarify.
-- Embedding model: `sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2` (384 dimensions) through fastembed, downloaded into the data volume on first use. It is confirmed only if retrieval recall on the English and Vietnamese retrieval sets does not fall below the current provider model; otherwise the next multilingual fastembed model is measured. Changing the model requires a full reindex.
+- Embedding model: the first connected provider that offers one proposes its embedding model: OpenAI `text-embedding-3-large` at 1024 dimensions, Gemini `gemini-embedding-001` at 768, or Ollama `nomic-embed-text` at 768. Measured in [local-embedding-report.md](eval/local-embedding-report.md): the local candidates `paraphrase-multilingual-MiniLM-L12-v2` and `paraphrase-multilingual-mpnet-base-v2` both lost recall on the English and Vietnamese retrieval sets against the provider model, so neither is the default. MiniLM (384 dimensions, through fastembed, downloaded into the data volume on first use) is used when no connected provider offers an embedding model, and an admin can choose either local model. Changing the model requires a full reindex.
 - Pack eval threshold (§11): execution match >= 80% of the active eval cases; below it `eval.py` exits 1. The threshold is a report, not a gate on using a pack or a model.
 - Live or copy (§4): a table is proposed as live below 1 million rows or 1 GB at the source, whichever the source reports, and as copy above; the user can override either way.
 - Search engine (§2): search moves into ClickHouse only if `retrieval_eval.py` shows no loss of recall against Qdrant on both development packs; otherwise Qdrant stays as a supervised process inside the container.
@@ -451,7 +451,7 @@ The code built in Phases 0 to 12 follows v3. Each row is replaced by the phase n
 | v3 behaviour still in the code | v4 decision | Phase |
 |---|---|---|
 | Settings and secrets in `.env` | App state in SQLite with encrypted secrets, setup state, numbered schema changes (§2, §3) | 13 |
-| LiteLLM Proxy service, catalog aliases, OpenAI embeddings, eval-gated providers, classifier always on | LiteLLM SDK in `api`, providers in the app state, local embeddings, optional classifier (§2, §9) | 14 |
+| LiteLLM Proxy service, catalog aliases, OpenAI embeddings, eval-gated providers, classifier always on | LiteLLM SDK in `api`, providers in the app state, a provider's embedding model or a local one, optional classifier (§2, §9) | 14 |
 | Keycloak sign-in, sessions in the web process, roles from the JWT | Individual and team modes with local accounts and optional OIDC (§9) | 15 |
 | Six Compose services | One image and one container; Qdrant runs as an internal process until Phase 20 (§3) | 16 |
 | Sources declared only in manifests, credentials from `.env`, manual full reloads | Sources page, named collections created with SQL, scheduled and incremental copies (§4, §15) | 17 |

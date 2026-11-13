@@ -1,9 +1,11 @@
-"""Whether a catalog alias may serve a model tier (DECISIONS §2 Model tiers, §14).
+"""The latest eval result of a model for a tier, shown next to it on the Models page (DECISIONS §2, §14).
 
-An alias is eligible for a tier when the latest eval report of the pack that
-ran the tier with that alias meets the threshold and did not regress against
-the baseline it was compared with. A report without a baseline comparison
-proves nothing about regressions, so it does not make an alias eligible.
+A model passed for a tier when the latest eval report of the pack that ran
+the tier on it (recorded as ``provider/model``) meets the threshold and did
+not regress against the baseline it was compared with; a report without a
+baseline comparison proves nothing about regressions. The result informs the
+choice and never gates it: any model of a configured provider may serve any
+tier.
 """
 
 from collections.abc import Sequence
@@ -33,7 +35,7 @@ class Eligibility:
 
 
 def eligibility(reports: Sequence[ReportSummary], tier: str, alias: str) -> Eligibility:
-    """The eligibility of ``alias`` for ``tier`` from the pack's ``reports``, in any order."""
+    """The latest result of model ``alias`` (``provider/model``) for ``tier`` from the pack's ``reports``, in any order."""
     runs = [report for report in reports if report.tiers.get(tier) == alias]
     if not runs:
         return Eligibility(False, f"no eval report ran {tier} with {alias}")

@@ -18,8 +18,17 @@ import type {
   TraceItem,
   UserRow,
   FeedbackInput,
-  ModelTier,
-  ModelTiers,
+  ClassifierStatus,
+  EmbeddingChange,
+  EmbeddingView,
+  ModelTiersView,
+  ProviderCreate,
+  ProviderModels,
+  ProviderTestResult,
+  ProviderUpdate,
+  ProviderView,
+  TierChange,
+  TierView,
   ReviewItem,
   ReviewItemPatch,
   SetupModeChange,
@@ -100,10 +109,22 @@ export interface FitcherApi {
     setRoles(id: string, roles: string[]): Promise<void>;
     setEnabled(id: string, enabled: boolean): Promise<void>;
   };
+  /** Model providers, the tier mapping, the embedding and the optional screening classifier (admin only). */
   models: {
-    list(): Promise<ModelTiers>;
-    /** Map a chat tier to an eligible alias; the api refuses embed and any ineligible alias. */
-    set(tier: string, alias: string): Promise<ModelTier>;
+    providers(): Promise<ProviderView[]>;
+    addProvider(body: ProviderCreate): Promise<ProviderView>;
+    changeProvider(id: string, body: ProviderUpdate): Promise<ProviderView>;
+    removeProvider(id: string): Promise<void>;
+    providerModels(id: string): Promise<ProviderModels>;
+    /** Lists the provider's models, then asks one of them for a small structured reply (billed by a hosted provider). */
+    testProvider(id: string, model?: string): Promise<ProviderTestResult>;
+    tiers(): Promise<ModelTiersView>;
+    /** Map a chat tier to any model of a configured provider. */
+    setTier(tier: string, change: TierChange): Promise<TierView>;
+    /** Change the embedding model; the api refuses it unless ``confirm_reindex`` is set. */
+    setEmbedding(change: EmbeddingChange): Promise<EmbeddingView>;
+    classifier(): Promise<ClassifierStatus>;
+    setClassifier(enabled: boolean): Promise<ClassifierStatus>;
   };
   /** First-run setup (DECISIONS §15); the changes need the admin role. */
   setup: {

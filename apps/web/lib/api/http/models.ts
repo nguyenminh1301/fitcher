@@ -1,23 +1,42 @@
-// The Models page from the api (Phase 9D), through the web server's /api/admin/models routes, which add
-// the session's access token; the api answers only an admin and accepts only an eligible alias.
+// Model providers, tiers, the embedding and the screening classifier from the api (Phase 14), through the web
+// server's /api/providers, /api/models and /api/screening routes, which add the session's access token. The
+// api answers only an admin; no response carries a provider key, only whether one is set and its last four
+// characters.
 
 import type { FitcherApi } from "../client";
 import { refused } from "./conversations";
 
-export function createHttpModels(fetcher: typeof fetch = (...args) => fetch(...args)): FitcherApi["models"] {
+type Fetcher = typeof fetch;
+
+async function json<T>(fetcher: Fetcher, url: string, init?: RequestInit): Promise<T> {
+  const response = await fetcher(url, init);
+  if (!response.ok) throw await refused(response);
+  return response.json();
+}
+
+function send(method: string, body?: unknown): RequestInit {
+  return body === undefined
+    ? { method }
+    : { method, headers: { "content-type": "application/json" }, body: JSON.stringify(body) };
+}
+
+export function createHttpModels(fetcher: Fetcher = (...args) => fetch(...args)): FitcherApi["models"] {
+  const provider = (id: string) => `/api/providers/${encodeURIComponent(id)}`;
   return {
-    list: async () => {
-      const response = await fetcher("/api/admin/models");
+    providers: () => json(fetcher, "/api/providers"),
+    addProvider: (body) => json(fetcher, "/api/providers", send("POST", body)),
+    changeProvider: (id, body) => json(fetcher, provider(id), send("PATCH", body)),
+    removeProvider: async (id) => {
+      const response = await fetcher(provider(id), { method: "DELETE" });
       if (!response.ok) throw await refused(response);
-      return response.json();
     },
-    set: async (tier, alias) => {
-      const response = await fetcher(`/api/admin/models/${encodeURIComponent(tier)}`, {
-        method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ alias }),
-      });
-      if (!response.ok) throw await refused(response);
-      return response.json();
-    },
+    providerModels: (id) => json(fetcher, `${provider(id)}/models`),
+    testProvider: (id, model) => json(fetcher, `${provider(id)}/test`, send("POST", model ? { model } : {})),
+    tiers: () => json(fetcher, "/api/models/tiers"),
+    setTier: (tier, change) => json(fetcher, `/api/models/tiers/${encodeURIComponent(tier)}`, send("PUT", change)),
+    setEmbedding: (change) => json(fetcher, "/api/models/embedding", send("PUT", change)),
+    classifier: () => json(fetcher, "/api/screening/classifier"),
+    setClassifier: (enabled) => json(fetcher, "/api/screening/classifier", send(enabled ? "POST" : "DELETE")),
   };
 }
 

@@ -28,7 +28,7 @@ The web app has a chat for everyone and a workspace console for reviewers and ad
 
 ![How the pieces fit together](docs/architecture/system.svg)
 
-The user talks to the web app, which signs them in through Keycloak and streams answers from the API. The API runs the agent: it looks up the company's terms in the search index, sends language tasks to AI models through the LiteLLM gateway, and runs SQL in ClickHouse as the user's role. Models are called by task (fast replies, simple SQL, harder SQL, embeddings), and an admin can switch a task to another model once that model passes the pack's test questions. All of these services run together with Docker Compose on one machine.
+The user talks to the web app, which signs them in through Keycloak and streams answers from the API. The API runs the agent: it looks up the company's terms in the search index, sends language tasks to the AI models an admin connected in the app, and runs SQL in ClickHouse as the user's role. Models are called by task (fast replies, simple SQL, harder SQL), any task can use any model of a connected provider, and the pack's test results are shown next to each model. Search uses the provider's embedding model, or a local one when the provider has none. All of these services run together with Docker Compose on one machine.
 
 ![How a question is answered](docs/architecture/question-flow.svg)
 
@@ -47,7 +47,7 @@ Each company's access rules live in one policy file. Publishing the pack turns i
 | Web app | Next.js, ECharts, TanStack Table |
 | Sign-in | Keycloak (OpenID Connect) |
 | API and agent | FastAPI with streamed responses, LangGraph, sqlglot |
-| AI model gateway | LiteLLM, with OpenAI, Anthropic, Gemini or a local Ollama model |
+| AI models | OpenAI, Anthropic, Gemini, a local Ollama model or any OpenAI-compatible endpoint, called in process through the LiteLLM SDK; the provider's embedding model, or a local multilingual one with fastembed |
 | Data and run logs | ClickHouse |
 | Search index | Qdrant, combining meaning-based and keyword search |
 | Data modelling | dbt |
@@ -55,45 +55,47 @@ Each company's access rules live in one policy file. Publishing the pack turns i
 
 ## Where fitcher is going
 
-Today fitcher runs as six services from this repository. The next phases turn it into one image that starts with a single `docker run`, with models, data sources and sign-in set up in the application instead of in files: see the [assessment](docs/self-hosted-product-assessment.md) (in Vietnamese), the [decisions](docs/DECISIONS.md) and the [master plan](docs/MASTER_PLAN.md), Phases 13 to 21. The Quick start below describes the current six-service setup.
+Today fitcher runs as five services from this repository; models are already connected in the application (Phase 14). The next phases turn it into one image that starts with a single `docker run`, with data sources and sign-in set up in the application instead of in files: see the [assessment](docs/self-hosted-product-assessment.md) (in Vietnamese), the [decisions](docs/DECISIONS.md) and the [master plan](docs/MASTER_PLAN.md), Phases 13 to 21. The Quick start below describes the current five-service setup.
 
 ## Quick start
 
 You need Docker with Compose v2 and about 8 GB of memory for Docker. Run the commands from the repository root, in Bash or PowerShell.
 
-1. Copy [.env.example](.env.example) to `.env`, replace every `change-me` value and add a key for at least one model provider (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GEMINI_API_KEY`, or `OLLAMA_URL` with the `local-models` profile). Never commit `.env`.
+1. Copy [.env.example](.env.example) to `.env` and replace every `change-me` value. Never commit `.env`. You add a model provider in the app's setup (step 4); to script it instead, set `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GEMINI_API_KEY` or `OLLAMA_URL` in `.env`, which creates that provider on the first start.
 
-2. Start the services. They all report healthy even before a model key is set.
+2. Start the services. They all report healthy before any model provider is connected.
 
    ```bash
    docker compose up --build --wait
    ```
 
-3. Load the sample e-commerce data and build the tables the agent reads. This downloads [FreeEcommerceTwin14M](https://huggingface.co/datasets/ziadatalabs/FreeEcommerceTwin14M), 14.3 million rows licensed for non-commercial use only. On Linux, `./data` must be writable by user ID 10001.
-
-   ```bash
-   docker compose run --rm jobs python -m jobs.refresh_data --source ecommerce_twin
-   ```
-
-4. Publish the e-commerce Domain Pack. This checks it, test-runs its metrics, writes the database permissions and builds the search index, which costs a little in embedding calls.
-
-   ```bash
-   docker compose run --rm jobs python -m jobs.compile_pack --pack ecommerce_twin
-   ```
-
-5. Install the prompt-injection classifier. Accept the licence of `meta-llama/Llama-Prompt-Guard-2-86M` on Hugging Face and put your token in `.env` as `HF_TOKEN`. Until the classifier is installed, every question is blocked.
-
-   ```bash
-   docker compose run --rm guard-model
-   ```
-
-6. Give the demo users the password set as `KEYCLOAK_LAB_USER_PASSWORD` in `.env`.
+3. Give the demo users the password set as `KEYCLOAK_LAB_USER_PASSWORD` in `.env`.
 
    ```bash
    docker compose run --rm jobs python -m jobs.set_lab_passwords
    ```
 
-7. Open [localhost:3000](http://localhost:3000), choose Continue with company account, sign in as `lab.analyst` and pick one of the suggested questions. Every question is billed by your model provider.
+4. Open [localhost:3000](http://localhost:3000), choose Continue with company account and sign in as `lab.admin`. The setup asks who uses the instance and which models to use: a provider and its key, or a model server on this computer (Ollama, LM Studio or any OpenAI-compatible endpoint, reached as `host.docker.internal`). Its test call shows the model each task will use.
+
+5. Load the sample e-commerce data and build the tables the agent reads. This downloads [FreeEcommerceTwin14M](https://huggingface.co/datasets/ziadatalabs/FreeEcommerceTwin14M), 14.3 million rows licensed for non-commercial use only. On Linux, `./data` must be writable by user ID 10001.
+
+   ```bash
+   docker compose run --rm jobs python -m jobs.refresh_data --source ecommerce_twin
+   ```
+
+6. Publish the e-commerce Domain Pack. This checks it, test-runs its metrics, writes the database permissions and builds the search index with the embedding model of the provider from step 4, which costs a little with a hosted provider. With a provider that has no embedding model, such as Anthropic alone, a local model is downloaded once (about 0.2 GB) instead; it finds fewer matches ([measurement](docs/eval/local-embedding-report.md)).
+
+   ```bash
+   docker compose run --rm jobs python -m jobs.compile_pack --pack ecommerce_twin
+   ```
+
+7. Optionally, install the prompt-injection classifier. Questions are always screened by English and Vietnamese rules; the classifier adds a model score. Accept the licence of `meta-llama/Llama-Prompt-Guard-2-86M` on Hugging Face, put your token in `.env` as `HF_TOKEN`, run the command below and turn the classifier on on the Models page.
+
+   ```bash
+   docker compose run --rm guard-model
+   ```
+
+8. Sign in as `lab.analyst` and pick one of the suggested questions. A hosted provider bills every question.
 
 You can also ask from the command line:
 
@@ -121,7 +123,6 @@ docker compose run --rm api python -m jobs.ask "Top 10 best-selling products in 
 | Web app | [localhost:3000](http://localhost:3000) |
 | API | [localhost:8000](http://localhost:8000/health), with interactive [API docs](http://localhost:8000/docs) |
 | Keycloak | [localhost:8080](http://localhost:8080), realm `finch` |
-| LiteLLM | localhost:4000 |
 | Qdrant | localhost:6333 |
 | ClickHouse | localhost:8123 (HTTP) and localhost:9000 (native) |
 

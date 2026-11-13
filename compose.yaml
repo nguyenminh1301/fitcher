@@ -101,41 +101,6 @@ services:
       retries: 20
       start_period: 10s
 
-  litellm:
-    # ghcr.io/berriai/litellm:v1.106.7 with patched bundled packages (infra/litellm/Dockerfile).
-    build:
-      context: ./infra/litellm
-    # build_config.py adds each catalog block whose provider key is set, then starts the proxy.
-    entrypoint: ["python", "/app/build_config.py"]
-    command: ["--port", "4000"]
-    environment:
-      LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY:?set LITELLM_MASTER_KEY in .env}
-      # callbacks/clickhouse_logger.py writes agent_logs.llm_calls as the log writer.
-      CLICKHOUSE_HOST: clickhouse
-      CLICKHOUSE_LOGS_WRITER_PASSWORD: ${CLICKHOUSE_LOGS_WRITER_PASSWORD:?set CLICKHOUSE_LOGS_WRITER_PASSWORD in .env}
-      # Provider keys are passed to this service only.
-      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
-      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
-      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
-      OLLAMA_URL: ${OLLAMA_URL:-}
-    ports:
-      - "127.0.0.1:4000:4000"
-    volumes:
-      - ./infra/litellm/config.yaml:/app/config.yaml:ro
-      - ./infra/litellm/build_config.py:/app/build_config.py:ro
-      - ./infra/litellm/catalog:/app/catalog:ro
-      - ./infra/litellm/callbacks/clickhouse_logger.py:/app/clickhouse_logger.py:ro
-      # The screening guardrail and its copy of the api's rules (DECISIONS §9).
-      - ./infra/litellm/callbacks/screening_guard.py:/app/screening_guard.py:ro
-      - ./infra/litellm/callbacks/screening_rules.py:/app/screening_rules.py:ro
-    healthcheck:
-      # Liveliness only checks the proxy process; it never calls OpenAI.
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:4000/health/liveliness', timeout=2)"]
-      interval: 5s
-      timeout: 3s
-      retries: 20
-      start_period: 20s
-
   keycloak:
     image: quay.io/keycloak/keycloak:26.8.1
     command: ["start-dev", "--import-realm"]
@@ -171,8 +136,12 @@ services:
       context: .
       dockerfile: apps/api/Dockerfile
     environment:
-      LITELLM_BASE_URL: http://litellm:4000
-      LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY:?set LITELLM_MASTER_KEY in .env}
+      # Providers created in the app state on the first start that finds none (apps/api/app/llm/routes.py);
+      # afterwards providers and keys are managed on the Models page.
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      OLLAMA_URL: ${OLLAMA_URL:-}
       # Agent queries run as the asking role's ClickHouse user, whose password
       # derives from CLICKHOUSE_AGENT_PASSWORD; run logs are written as the
       # insert-only agent_logs_writer.
@@ -197,12 +166,6 @@ services:
       DOCUMENTS_DIR: /app/build/documents
       DOCUMENT_MAX_BYTES: ${DOCUMENT_MAX_BYTES:-20971520}
       PACKS_DIR: /app/packs
-      # Default catalog alias of each model tier (apps/api/app/llm/tiers.py).
-      MODEL_TIER_FAST: ${MODEL_TIER_FAST:-openai-small}
-      MODEL_TIER_SQL_SMALL: ${MODEL_TIER_SQL_SMALL:-openai-small}
-      MODEL_TIER_SQL_GEN: ${MODEL_TIER_SQL_GEN:-openai-medium}
-      MODEL_TIER_SQL_GEN_HARD: ${MODEL_TIER_SQL_GEN_HARD:-openai-large}
-      MODEL_TIER_EMBED: ${MODEL_TIER_EMBED:-openai-embed}
       LOG_BATCH_SIZE: ${LOG_BATCH_SIZE:-100}
       LOG_FLUSH_INTERVAL_MS: ${LOG_FLUSH_INTERVAL_MS:-1000}
       LOG_QUEUE_MAX: ${LOG_QUEUE_MAX:-10000}
@@ -211,7 +174,6 @@ services:
       QUERY_MAX_MEMORY_USAGE: ${QUERY_MAX_MEMORY_USAGE:-2000000000}
       ACTIVE_PACK: ${ACTIVE_PACK:?set ACTIVE_PACK in .env}
       QDRANT_URL: http://qdrant:6333
-      EMBEDDING_DIMENSIONS: ${EMBEDDING_DIMENSIONS:-1024}
       # Access tokens /ask accepts (apps/api/app/auth/jwt.py).
       KEYCLOAK_ISSUER: ${KEYCLOAK_ISSUER:-http://localhost:8080/realms/finch}
       KEYCLOAK_AUDIENCE: ${KEYCLOAK_AUDIENCE:-finch-api}
@@ -236,8 +198,6 @@ services:
         condition: service_healthy
       qdrant:
         condition: service_healthy
-      litellm:
-        condition: service_healthy
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=2)"]
       interval: 5s
@@ -253,6 +213,12 @@ services:
       dockerfile: apps/api/Dockerfile
     profiles: ["jobs"]
     environment:
+      # Providers created in the app state on the first start that finds none (apps/api/app/llm/routes.py);
+      # afterwards providers and keys are managed on the Models page.
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      OLLAMA_URL: ${OLLAMA_URL:-}
       CLICKHOUSE_HOST: clickhouse
       CLICKHOUSE_ADMIN_USER: ${CLICKHOUSE_ADMIN_USER:?set CLICKHOUSE_ADMIN_USER in .env}
       CLICKHOUSE_ADMIN_PASSWORD: ${CLICKHOUSE_ADMIN_PASSWORD:?set CLICKHOUSE_ADMIN_PASSWORD in .env}
@@ -265,16 +231,7 @@ services:
       DBT_TARGET_PATH: /tmp/dbt/target
       DBT_LOG_PATH: /tmp/dbt/logs
       QDRANT_URL: http://qdrant:6333
-      LITELLM_BASE_URL: http://litellm:4000
-      LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY:?set LITELLM_MASTER_KEY in .env}
-      EMBEDDING_DIMENSIONS: ${EMBEDDING_DIMENSIONS:-1024}
       COLUMN_VALUES_TOP_K: ${COLUMN_VALUES_TOP_K:-10000}
-      # Default catalog alias of each model tier (apps/api/app/llm/tiers.py).
-      MODEL_TIER_FAST: ${MODEL_TIER_FAST:-openai-small}
-      MODEL_TIER_SQL_SMALL: ${MODEL_TIER_SQL_SMALL:-openai-small}
-      MODEL_TIER_SQL_GEN: ${MODEL_TIER_SQL_GEN:-openai-medium}
-      MODEL_TIER_SQL_GEN_HARD: ${MODEL_TIER_SQL_GEN_HARD:-openai-large}
-      MODEL_TIER_EMBED: ${MODEL_TIER_EMBED:-openai-embed}
       # set_lab_passwords signs in as the Keycloak bootstrap administrator.
       KEYCLOAK_URL: http://keycloak:8080
       KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN:?set KEYCLOAK_ADMIN in .env}
@@ -300,8 +257,6 @@ services:
         condition: service_healthy
       qdrant:
         condition: service_healthy
-      litellm:
-        condition: service_healthy
 
   # Downloads the gated classifier with HF_TOKEN, exports it to ONNX and writes
   # it to guard-models; start it with `docker compose run --rm guard-model`.
@@ -316,9 +271,9 @@ services:
     volumes:
       - guard-models:/models/guard
 
-  # A local model for the local-small alias (DECISIONS §2); optional and off by default.
+  # A local chat model server (DECISIONS §2); optional and off by default.
   # Start it with `docker compose --profile local-models up -d ollama`, pull the
-  # model named in infra/litellm/catalog/ollama.yaml and set OLLAMA_URL.
+  # model and add an Ollama provider with the base URL http://ollama:11434 on the Models page.
   ollama:
     image: ollama/ollama:0.40.4
     profiles: ["local-models"]

@@ -2,15 +2,18 @@
 
 // First-run setup (DECISIONS §15): the steps as a list with the current one open. A step that has no
 // implementation yet is not listed (the api lists the steps it knows). Only an admin can answer a step.
+// The Models step adds a provider, tests it and shows the models proposed for each tier; adding the
+// provider answers the step, and the setup can be left after it.
 
 import { useCallback, useEffect, useState } from "react";
 
 import { Logo } from "@/components/brand/Logo";
+import { ProviderForm, ProviderTestButton, TestOutcome } from "@/components/models/ProviderForm";
 import { Button } from "@/components/ui/controls";
 import { WarningBanner } from "@/components/ui/feedback";
 import { Preferences } from "@/components/ui/Preferences";
 import type { FitcherApi } from "@/lib/api/client";
-import type { SetupStatus } from "@/lib/contracts";
+import type { ModelTiersView, ProviderTestResult, ProviderView, SetupStatus } from "@/lib/contracts";
 import { useI18n } from "@/lib/i18n/react";
 
 type Mode = NonNullable<SetupStatus["mode"]>;
@@ -18,13 +21,63 @@ const MODES: Mode[] = ["individual", "team"];
 
 export type SetupScreenProps = {
   setup: FitcherApi["setup"];
+  models: FitcherApi["models"];
   /** Whether the signed-in user may answer the steps. */
   isAdmin: boolean;
   onSignedOut: () => void;
   onOpenChat: () => void;
 };
 
-export function SetupScreen({ setup, isAdmin, onSignedOut, onOpenChat }: SetupScreenProps) {
+function ModelsStep({ models, disabled, onDone, onSkip }: {
+  models: FitcherApi["models"];
+  disabled: boolean;
+  onDone: () => void;
+  onSkip: () => void;
+}) {
+  const { t } = useI18n();
+  const [provider, setProvider] = useState<ProviderView | null>(null);
+  const [tiers, setTiers] = useState<ModelTiersView | null>(null);
+  const [test, setTest] = useState<{ result: ProviderTestResult | null; error?: string } | null>(null);
+
+  const added = async (next: ProviderView) => {
+    setProvider(next);
+    setTiers(await models.tiers().catch(() => null));
+  };
+  return (
+    <section className="fc-card" aria-label={t("setup.step_models")}>
+      <div className="fc-card-head"><h2 className="fc-card-title">{t("setup.modelsQuestion")}</h2></div>
+      <div className="fc-card-body fc-stack">
+        <p className="fc-muted" style={{ margin: 0 }}>{t("setup.modelsHint")}</p>
+        {provider ? (
+          <>
+            <p style={{ margin: 0 }}>{t("models.added", { name: provider.name })}</p>
+            <ProviderTestButton models={models} provider={provider} onResult={(result, error) => setTest({ result, error })} />
+            {test?.result ? <TestOutcome result={test.result} /> : null}
+            {test?.error ? <WarningBanner tone="danger">{t("models.testFailed", { reason: test.error })}</WarningBanner> : null}
+            {tiers ? (
+              <dl className="fc-kv" aria-label={t("models.proposed")}>
+                {tiers.tiers.map((tier) => (
+                  <div key={tier.tier} style={{ display: "contents" }}>
+                    <dt className="fc-mono">{tier.tier}</dt>
+                    <dd>{tier.model ?? t("models.notMapped")}</dd>
+                  </div>
+                ))}
+              </dl>
+            ) : null}
+            <div><Button variant="primary" onClick={onDone}>{t("setup.continue")}</Button></div>
+          </>
+        ) : disabled ? null : (
+          <>
+            <ProviderForm models={models} onAdded={(next) => void added(next)} />
+            <div><Button onClick={onSkip}>{t("setup.skip")}</Button></div>
+          </>
+        )}
+      </div>
+    </section>
+  );
+}
+
+export function SetupScreen({ setup, models, isAdmin, onSignedOut, onOpenChat }: SetupScreenProps) {
   const { t } = useI18n();
   const [status, setStatus] = useState<SetupStatus | null>(null);
   const [error, setError] = useState<"load" | "save" | null>(null);
@@ -55,7 +108,13 @@ export function SetupScreen({ setup, isAdmin, onSignedOut, onOpenChat }: SetupSc
     }
   };
 
-  const current = status?.steps.find((step) => step.state === "pending");
+  const [modelsOpen, setModelsOpen] = useState(false);
+  const pending = status?.steps.find((step) => step.state === "pending");
+  // The Models step stays open after a provider is added, until the admin has seen the test and the tiers.
+  const current = modelsOpen ? { id: "models", state: "pending" as const } : pending;
+  useEffect(() => {
+    if (pending?.id === "models") setModelsOpen(true);
+  }, [pending?.id]);
   return (
     <div className="fc-app" style={{ flexDirection: "column", minHeight: "100vh" }}>
       <header style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "var(--base-size-16)", padding: "var(--base-size-24) var(--base-size-24) 0" }}>
@@ -89,6 +148,10 @@ export function SetupScreen({ setup, isAdmin, onSignedOut, onOpenChat }: SetupSc
                     <div><Button variant="primary" onClick={onOpenChat}>{t("setup.openChat")}</Button></div>
                   </div>
                 </section>
+              ) : current?.id === "models" ? (
+                <ModelsStep models={models} disabled={!isAdmin || busy}
+                  onDone={() => { setModelsOpen(false); void run(() => setup.status()); }}
+                  onSkip={() => { setModelsOpen(false); void run(() => setup.skip("models")); }} />
               ) : current?.id === "mode" ? (
                 <section className="fc-card" aria-label={t("setup.step_mode")}>
                   <div className="fc-card-head"><h2 className="fc-card-title">{t("setup.modeQuestion")}</h2></div>

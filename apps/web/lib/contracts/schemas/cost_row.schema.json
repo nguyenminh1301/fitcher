@@ -1,6 +1,6 @@
 {
   "additionalProperties": false,
-  "description": "Estimated LLM cost of one day, alias and model, from LiteLLM's cost table.",
+  "description": "Estimated LLM cost of one day, provider, model and tier, from the LiteLLM SDK's price table.",
   "properties": {
     "day": {
       "title": "Day",

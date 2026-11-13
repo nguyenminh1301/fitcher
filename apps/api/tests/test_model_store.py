@@ -1,12 +1,10 @@
-"""The ClickHouse model store and the gateway catalog client, over fakes."""
+"""The ClickHouse side of the Models page, over a fake client."""
 
 from datetime import datetime, UTC
 
-import httpx
 import pytest
 
-from app.llm.model_store import CatalogClient, CatalogError, ClickHouseModelStore, model_tiers_client
-from app.llm.tiers import TierStoreError
+from app.llm.model_store import ClickHouseModelStore, model_tiers_client
 from app.observability.events import AdminActionRecord
 
 NOW = datetime(2026, 11, 4, 8, 0, tzinfo=UTC)
@@ -41,28 +39,6 @@ def test_read_takes_the_latest_alias_of_each_tier():
     assert "argMax(alias, changed_at)" in client.queries[0][0] and "data_meta.model_tiers" in client.queries[0][0]
 
 
-def test_a_failed_read_is_a_tier_store_error():
-    with pytest.raises(TierStoreError, match="ConnectionError"):
-        ClickHouseModelStore(FakeClient(fail=True)).read()
-
-
-def test_write_and_record_action_insert_one_row_each():
-    client = FakeClient()
-    store = ClickHouseModelStore(client)
-
-    store.write("sql-gen", "openai-large", "lab.admin", NOW)
-    store.record_action(AdminActionRecord(
-        ts=NOW, actor="lab.admin", action="model_tier", target="sql-gen", old_value="openai-medium", new_value="openai-large",
-    ))
-
-    assert client.inserts[0] == (
-        "data_meta.model_tiers", [["sql-gen", "openai-large", "lab.admin", NOW]], ["tier", "alias", "changed_by", "changed_at"],
-    )
-    table, rows, columns = client.inserts[1]
-    assert (table, columns) == ("agent_logs.admin_actions", ["ts", "actor", "action", "target", "old_value", "new_value"])
-    assert rows == [[NOW, "lab.admin", "model_tier", "sql-gen", "openai-medium", "openai-large"]]
-
-
 def test_reports_are_the_latest_per_tier_and_alias_of_one_pack():
     client = FakeClient([("sql-gen", "openai-medium", "r1", NOW, 1, None)])
 
@@ -73,38 +49,18 @@ def test_reports_are_the_latest_per_tier_and_alias_of_one_pack():
     assert "GROUP BY tier, alias" in sql and "LIMIT" not in sql and parameters["pack"] == "shop"
 
 
-def test_two_changes_in_one_millisecond_keep_their_order():
-    client = FakeClient()
-    store = ClickHouseModelStore(client)
-
-    store.write("sql-gen", "openai-large", "lab.admin", NOW)
-    store.write("sql-gen", "openai-medium", "lab.admin", NOW)
-
-    first, second = (rows[0][3] for _, rows, _ in client.inserts)
-    assert second > first
-
-
 def test_the_client_needs_its_password():
     with pytest.raises(RuntimeError, match="CLICKHOUSE_MODEL_TIERS_PASSWORD must be set"):
         model_tiers_client({})
 
 
-def catalog(handler) -> CatalogClient:
-    return CatalogClient("http://litellm:4000/", "sk-test", http=httpx.Client(transport=httpx.MockTransport(handler)))
+def test_record_action_inserts_one_row():
+    client = FakeClient()
 
+    ClickHouseModelStore(client).record_action(AdminActionRecord(
+        ts=NOW, actor="lab.admin", action="model_tier", target="fast", old_value="openai/gpt-5.4-mini",
+        new_value="openai/gpt-5.5",
+    ))
 
-def test_the_catalog_lists_the_loaded_aliases():
-    seen = []
-
-    def handler(request: httpx.Request) -> httpx.Response:
-        seen.append((str(request.url), request.headers["Authorization"]))
-        return httpx.Response(200, json={"data": [{"id": "openai-small"}, {"id": "anthropic-small"}]})
-
-    assert catalog(handler).aliases() == ["anthropic-small", "openai-small"]
-    assert seen == [("http://litellm:4000/v1/models", "Bearer sk-test")]
-
-
-@pytest.mark.parametrize("response", [httpx.Response(500), httpx.Response(200, json={"data": [{"name": "x"}]})])
-def test_a_failed_listing_is_a_catalog_error(response):
-    with pytest.raises(CatalogError):
-        catalog(lambda request: response).aliases()
+    [(table, rows, columns)] = client.inserts
+    assert table == "agent_logs.admin_actions" and rows[0][1] == "lab.admin" and columns[0] == "ts"

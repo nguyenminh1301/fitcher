@@ -23,9 +23,7 @@ from app.agent.state import AgentDeps, AgentState, Progress
 from app.config import Settings
 from app.conversation.store import Turn
 from app.data.clickhouse import ClickHouseRunner, QueryLimits, QueryStopper, agent_client, stopper_client
-from app.llm.client import LiteLLMClient
-from app.llm.embeddings import LiteLLMEmbeddings
-from app.llm.tiers import EMBED_TIER, TierMap
+from app.llm.clients import chat_client, embedding_client
 from app.observability.log_writer import start_log_writer
 from app.packs.compiler import CompiledPack
 from app.packs.policy_compiler import Names
@@ -74,19 +72,17 @@ class GraphRun:
 
 
 class Agent:
-    def __init__(self, settings: Settings, compiled: CompiledPack, screener: Screener, tiers: TierMap):
+    def __init__(self, settings: Settings, compiled: CompiledPack, screener: Screener):
         self.compiled = compiled
         self._screener = screener
         self._screen_mode = settings.screen_mode
-        self._llm = LiteLLMClient(settings.litellm_base_url, settings.litellm_master_key, tiers=tiers)
-        self._search = QdrantSearch(settings.qdrant_url)
-        # Query vectors must match the indexed ones, so the compiled size wins over the environment.
-        self._embeddings = LiteLLMEmbeddings(
-            settings.litellm_base_url, settings.litellm_master_key, compiled.embedding_dimensions,
-            alias=tiers.alias(EMBED_TIER),
-        )
-        self._limits = QueryLimits.from_env()
         self._logs = start_log_writer(settings)
+        # Each provider call writes its llm_calls row through the run's log writer.
+        self._llm = chat_client(call_log=self._logs.enqueue)
+        self._search = QdrantSearch(settings.qdrant_url)
+        # Query vectors must match the indexed ones, so the compiled size wins over the setting.
+        self._embeddings = embedding_client(compiled.embedding_dimensions, call_log=self._logs.enqueue)
+        self._limits = QueryLimits.from_env()
         self._clients: dict[str, object] = {}
         self._stopper: QueryStopper | None = None
         self._lock = threading.Lock()
