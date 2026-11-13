@@ -2,10 +2,12 @@
 
 The mapping lives in the app state: setting group ``llm.tiers`` holds
 ``{"provider_id", "model"}`` per chat tier, and ``llm.embedding`` the embed
-tier's provider, model and vector size. Any model of a configured provider may
+tier's backend, model and vector size. Any model of a configured provider may
 serve a chat tier; an eval result informs the choice and no longer gates it.
-Adding the first provider fills every unmapped chat tier, and the embedding
-when it is unset, from ``defaults``.
+Adding the first provider fills every unmapped chat tier from ``defaults``.
+The embedding runs locally (``app/llm/local_embeddings.py``) unless an admin
+chooses a provider's embedding model, so no key is needed to index a pack
+(DECISIONS §14).
 
 ``SettingsRoutes`` reads the mapping on every call, so a change applies to the
 next call in every process that shares the app state.
@@ -13,9 +15,10 @@ next call in every process that shares the app state.
 When no provider exists yet, ``bootstrap_from_env`` creates one per provider
 setting of the environment (``OPENAI_API_KEY``, ``ANTHROPIC_API_KEY``,
 ``GEMINI_API_KEY``, ``OLLAMA_URL``) and maps the tiers to the first, so a
-scripted start or CI needs no setup step. The embedding keeps
-``EMBEDDING_DIMENSIONS`` so packs indexed before the app state existed still
-match their vectors.
+scripted start or CI needs no setup step. When the active pack was compiled
+with a provider's embedding model before the app state existed, that model and
+vector size are kept, so the pack's vectors still match until an admin changes
+the embedding and recompiles.
 """
 
 from collections.abc import Callable, Mapping
@@ -25,6 +28,7 @@ import os
 
 from app.llm import defaults
 from app.llm.gateway import Route
+from app.llm.local_embeddings import LOCAL_MODELS
 from app.llm.providers import check_fields, Provider, ProviderStore
 from app.llm.tiers import check_chat_tier, CHAT_TIERS, EMBED_TIER, setting_name
 from app.state.db import shared_state, StateDb
@@ -56,6 +60,10 @@ LEGACY_ALIASES = {
 }
 
 
+# The embedding model of the proxy era's openai-embed alias.
+LEGACY_EMBEDDING_ALIASES = {"openai-embed": ("openai", "text-embedding-3-large")}
+
+
 class RouteError(LookupError):
     """No model is mapped to the tier."""
 
@@ -64,6 +72,24 @@ class RouteError(LookupError):
 class TierModel:
     provider_id: str
     model: str
+
+
+@dataclass(frozen=True)
+class EmbeddingChoice:
+    """The embed tier: a local model, or a provider's model, and the vector size it returns."""
+
+    backend: str
+    model: str
+    dimensions: int
+    provider_id: str | None = None
+
+    @property
+    def label(self) -> str:
+        """``local/<model>`` or ``<provider>/<model>``, as ``compiled.json`` and eval reports record it."""
+        return f"{self.provider_id if self.backend == 'provider' else 'local'}/{self.model}"
+
+
+LOCAL_DEFAULT = EmbeddingChoice("local", defaults.LOCAL_EMBEDDING_MODEL, LOCAL_MODELS[defaults.LOCAL_EMBEDDING_MODEL])
 
 
 class TierMapping:
@@ -89,38 +115,50 @@ class TierMapping:
         self._settings.set(TIERS_GROUP, tier, {"provider_id": mapped.provider_id, "model": mapped.model})
         return mapped
 
-    def embedding(self) -> tuple[TierModel, int] | None:
-        provider_id = self._settings.get(EMBEDDING_GROUP, "provider_id")
-        model = self._settings.get(EMBEDDING_GROUP, "model")
-        if not provider_id or not model:
-            return None
-        return TierModel(provider_id, model), self._settings.get(EMBEDDING_GROUP, "dimensions") or DEFAULT_DIMENSIONS
+    def embedding(self) -> EmbeddingChoice:
+        if self._settings.get(EMBEDDING_GROUP, "backend") != "provider":
+            model = self._settings.get(EMBEDDING_GROUP, "model")
+            return EmbeddingChoice("local", model, LOCAL_MODELS[model]) if model in LOCAL_MODELS else LOCAL_DEFAULT
+        return EmbeddingChoice("provider", self._settings.get(EMBEDDING_GROUP, "model"),
+                               self._settings.get(EMBEDDING_GROUP, "dimensions") or DEFAULT_DIMENSIONS,
+                               provider_id=self._settings.get(EMBEDDING_GROUP, "provider_id"))
 
-    def set_embedding(self, provider_id: str, model: str, dimensions: int) -> None:
+    def set_embedding(self, provider_id: str, model: str, dimensions: int) -> EmbeddingChoice:
+        """Embed with a provider's model; a model that returns only one size records that size."""
+        dimensions = defaults.fixed_dimensions(model) or dimensions
         if dimensions < 1:
             raise ValueError("the embedding needs at least one dimension")
+        if not model or not model.strip():
+            raise ValueError("an embedding needs a model name")
         self._store.get(provider_id)
         self._settings.set(EMBEDDING_GROUP, "provider_id", provider_id)
-        self._settings.set(EMBEDDING_GROUP, "model", model)
+        self._settings.set(EMBEDDING_GROUP, "model", model.strip())
         self._settings.set(EMBEDDING_GROUP, "dimensions", dimensions)
+        self._settings.set(EMBEDDING_GROUP, "backend", "provider")
+        return self.embedding()
+
+    def set_local_embedding(self, model: str) -> EmbeddingChoice:
+        if model not in LOCAL_MODELS:
+            raise ValueError(f"{model!r} is not an offered local embedding model; use one of {', '.join(LOCAL_MODELS)}")
+        self._settings.set(EMBEDDING_GROUP, "model", model)
+        self._settings.set(EMBEDDING_GROUP, "dimensions", LOCAL_MODELS[model])
+        self._settings.set(EMBEDDING_GROUP, "backend", "local")
+        return self.embedding()
 
     def providers_in_use(self) -> set[str]:
         used = {model.provider_id for model in self.tiers().values()}
         embedding = self.embedding()
-        if embedding is not None:
-            used.add(embedding[0].provider_id)
+        if embedding.provider_id:
+            used.add(embedding.provider_id)
         return used
 
 
 def fill_defaults(mapping: TierMapping, provider: Provider, *, dimensions: int = DEFAULT_DIMENSIONS) -> None:
-    """Map every unmapped chat tier, and an unset embedding, to the provider's proposed models."""
+    """Map every unmapped chat tier to the provider's proposed models; the embedding stays as it is."""
     current = mapping.tiers()
     for tier, model in defaults.chat_models(provider.kind).items():
         if tier not in current:
             mapping.set_tier(tier, provider.id, model)
-    embedding_model = defaults.embedding_model(provider.kind)
-    if mapping.embedding() is None and embedding_model:
-        mapping.set_embedding(provider.id, embedding_model, defaults.fixed_dimensions(embedding_model) or dimensions)
 
 
 class SettingsRoutes:
@@ -140,17 +178,15 @@ class SettingsRoutes:
     def labels(self) -> dict[str, str]:
         """``provider/model`` of every mapped tier, as eval reports record them."""
         labels = {tier: f"{model.provider_id}/{model.model}" for tier in CHAT_TIERS if (model := self._chat(tier))}
-        embedding = self._mapping.embedding()
-        if embedding is not None:
-            labels[EMBED_TIER] = f"{embedding[0].provider_id}/{embedding[0].model}"
+        labels[EMBED_TIER] = self._mapping.embedding().label
         return labels
 
     def route(self, tier: str) -> Route:
         if tier == EMBED_TIER:
             embedding = self._mapping.embedding()
-            if embedding is None:
-                raise RouteError("no embedding model is set; add a provider on the Models page")
-            mapped, embedding_call = embedding[0], True
+            if embedding.backend != "provider":
+                raise RouteError("the embedding runs locally; no provider serves it")
+            mapped, embedding_call = TierModel(embedding.provider_id, embedding.model), True
         else:
             embedding_call = False
             mapped = self._chat(tier)
@@ -183,9 +219,25 @@ def _copy_legacy(mapping: TierMapping, created: list[Provider], aliases: Mapping
             mapping.set_tier(tier, by_kind[kind], model)
 
 
+def _keep_compiled_embedding(mapping: TierMapping, created: list[Provider], compiled: tuple[str, int] | None) -> None:
+    """Keep the provider embedding a pack was compiled with, so its vectors still match."""
+    if compiled is None:
+        return
+    label, dimensions = compiled
+    kind, model = LEGACY_EMBEDDING_ALIASES.get(label, (None, None))
+    if kind is None and "/" in label and not label.startswith("local/"):
+        kind, model = label.split("/", 1)
+    by_kind = {provider.kind: provider.id for provider in created}
+    by_id = {provider.id for provider in created}
+    provider_id = by_kind.get(kind) or (kind if kind in by_id else None)
+    if provider_id and model:
+        mapping.set_embedding(provider_id, model, dimensions)
+
+
 def bootstrap_from_env(
     store: ProviderStore, mapping: TierMapping, env: Mapping[str, str],
     legacy_aliases: Callable[[], Mapping[str, str]] | None = None,
+    compiled_embedding: Callable[[], tuple[str, int] | None] | None = None,
 ) -> list[Provider]:
     """Create the environment's providers when none exists; returns the providers created.
 
@@ -210,14 +262,20 @@ def bootstrap_from_env(
     _copy_legacy(mapping, created, aliases)
     for provider in created:
         fill_defaults(mapping, provider, dimensions=dimensions)
+    if compiled_embedding is not None:
+        _keep_compiled_embedding(mapping, created, compiled_embedding())
     return created
 
 
-def bootstrap_providers(legacy_aliases: Callable[[], Mapping[str, str]] | None = None) -> None:
+def bootstrap_providers(
+    legacy_aliases: Callable[[], Mapping[str, str]] | None = None,
+    compiled_embedding: Callable[[], tuple[str, int] | None] | None = None,
+) -> None:
     """At startup: create the environment's providers in the shared app state; logged, never fatal."""
     try:
         store = ProviderStore(shared_state(), shared_vault())
-        created = bootstrap_from_env(store, TierMapping(shared_state(), store), os.environ, legacy_aliases)
+        created = bootstrap_from_env(store, TierMapping(shared_state(), store), os.environ, legacy_aliases,
+                                     compiled_embedding)
     except Exception:  # noqa: BLE001 - the setup's Models step can still add a provider
         _log.exception("the providers of the environment were not created")
         return

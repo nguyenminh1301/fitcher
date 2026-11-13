@@ -5,8 +5,10 @@ role. A key goes into the vault and never comes back: responses carry only
 whether it is set and its last four characters, and admin actions record the
 same. Adding the first provider maps every chat tier and the embedding to its
 proposed models; any tier can then be mapped to any model of a configured
-provider. The embedding is not changed here, because a new embedding model
-needs a full reindex.
+provider. The embedding runs locally until an admin chooses another model on
+``PUT /models/embedding``, a separate action that must confirm the full
+reindex it needs; ``needs_reindex`` then tells that the active pack was
+indexed with another model and must be recompiled.
 
 ``POST /providers/{id}/test`` lists the provider's models, then asks one model
 for a small structured reply through the gateway. For a hosted provider that
@@ -30,7 +32,7 @@ from app.api.runtime import get_admin_action_log
 from app.api.setup import get_state_db
 from app.auth.jwt import Principal
 from app.contracts.providers import (
-    EmbeddingView, ModelTiersView, ProviderCreate, ProviderModels, ProviderTestRequest, ProviderTestResult,
+    EmbeddingChange, EmbeddingView, ModelTiersView, ProviderCreate, ProviderModels, ProviderTestRequest, ProviderTestResult,
     ProviderUpdate, ProviderView, TierChange, TierView,
 )
 from app.llm import defaults
@@ -38,7 +40,8 @@ from app.llm.client import LLMError, Prompt
 from app.llm.gateway import Gateway, Route
 from app.llm.provider_models import list_models, ModelListError
 from app.llm.providers import key_name, Provider, ProviderError, ProviderNotFound, ProviderStore
-from app.llm.routes import fill_defaults, TierMapping
+from app.llm.clients import compiled_embedding
+from app.llm.routes import EmbeddingChoice, fill_defaults, TierMapping
 from app.llm.tiers import CHAT_TIERS, EMBED_TIER
 from app.observability.events import AdminActionRecord, utc_now
 from app.observability.tracing import trusted_pack_calls
@@ -61,6 +64,14 @@ class ActionLog(Protocol):
 
 def get_vault() -> SecretVault:
     return shared_vault()
+
+
+def get_compiled_embedding() -> tuple[str, int] | None:
+    """The embedding label and size the active pack was compiled with."""
+    return compiled_embedding()
+
+
+Compiled = Annotated[tuple[str, int] | None, Depends(get_compiled_embedding)]
 
 
 def get_model_lister() -> Callable[[Provider, str | None], list[str]]:
@@ -230,20 +241,43 @@ def test_provider(
     return ProviderTestResult(**result | {"model": model, "structured_output": True})
 
 
-def _tiers(mapping: TierMapping) -> ModelTiersView:
+def _embedding(choice: EmbeddingChoice, compiled: tuple[str, int] | None) -> EmbeddingView:
+    stale = compiled is not None and compiled != (choice.label, choice.dimensions)
+    return EmbeddingView(backend=choice.backend, provider_id=choice.provider_id, model=choice.model,
+                         dimensions=choice.dimensions, needs_reindex=stale)
+
+
+def _tiers(mapping: TierMapping, compiled: tuple[str, int] | None) -> ModelTiersView:
     mapped = mapping.tiers()
-    embedding = mapping.embedding()
     return ModelTiersView(
         tiers=[TierView(tier=tier, provider_id=mapped[tier].provider_id if tier in mapped else None,
                         model=mapped[tier].model if tier in mapped else None) for tier in CHAT_TIERS],
-        embedding=EmbeddingView(provider_id=embedding[0].provider_id, model=embedding[0].model,
-                                dimensions=embedding[1]) if embedding else None,
+        embedding=_embedding(mapping.embedding(), compiled),
     )
 
 
 @router.get("/models/tiers")
-def model_tiers(_: Admin, mapping: Mapping) -> ModelTiersView:
-    return _tiers(mapping)
+def model_tiers(_: Admin, mapping: Mapping, compiled: Compiled) -> ModelTiersView:
+    return _tiers(mapping, compiled)
+
+
+@router.put("/models/embedding")
+def change_embedding(body: EmbeddingChange, admin: Admin, mapping: Mapping, compiled: Compiled, log: Log) -> EmbeddingView:
+    if not body.confirm_reindex:
+        raise HTTPException(status.HTTP_409_CONFLICT,
+                            detail="changing the embedding model needs a full reindex of the pack; confirm it")
+    before = mapping.embedding()
+    try:
+        if body.backend == "local":
+            choice = mapping.set_local_embedding(body.model)
+        else:
+            if not body.provider_id:
+                raise ValueError("a provider embedding needs a provider")
+            choice = mapping.set_embedding(body.provider_id, body.model, body.dimensions or 0)
+    except (ProviderNotFound, ValueError) as error:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(error)) from None
+    _record(log, admin, "embedding", EMBED_TIER, before.label, choice.label)
+    return _embedding(choice, compiled)
 
 
 @router.put("/models/tiers/{tier}")

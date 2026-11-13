@@ -31,6 +31,7 @@ class Fakes:
         self.list_error: ModelListError | None = None
         self.probed: list = []
         self.probe_error: LLMError | None = None
+        self.compiled: tuple[str, int] | None = ("local/sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2", 384)
 
     def lister(self, provider, api_key):
         self.listed_with.append(api_key)
@@ -63,6 +64,7 @@ def client(tmp_path, fakes, actions):
     app.dependency_overrides[providers_api.get_model_lister] = lambda: fakes.lister
     app.dependency_overrides[providers_api.get_probe] = lambda: fakes.probe
     app.dependency_overrides[runtime.get_admin_action_log] = lambda: actions
+    app.dependency_overrides[providers_api.get_compiled_embedding] = lambda: fakes.compiled
     yield TestClient(app)
     app.dependency_overrides.clear()
 
@@ -76,7 +78,7 @@ def add_openai(client):
 @pytest.mark.parametrize(("method", "path"), [
     ("get", "/providers"), ("post", "/providers"), ("patch", "/providers/openai"), ("delete", "/providers/openai"),
     ("get", "/providers/openai/models"), ("post", "/providers/openai/test"), ("get", "/models/tiers"),
-    ("put", "/models/tiers/fast"),
+    ("put", "/models/tiers/fast"), ("put", "/models/embedding"),
 ])
 def test_every_endpoint_needs_the_admin_role(client, method, path):
     assert getattr(client, method)(path, headers=VIEWER).status_code == 403
@@ -89,7 +91,8 @@ def test_adding_the_first_provider_shows_only_the_key_ending_and_fills_the_tiers
                     "key_last4": "7777", "hosted": True, "in_use": True}
     tiers = client.get("/models/tiers", headers=ADMIN).json()
     assert tiers["tiers"][0] == {"tier": "fast", "provider_id": "openai", "model": "gpt-5.4-mini"}
-    assert tiers["embedding"]["model"] == "text-embedding-3-large"
+    assert tiers["embedding"] == {"backend": "local", "provider_id": None, "dimensions": 384, "needs_reindex": False,
+                                  "model": "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"}
     [action] = actions.records
     assert (action.action, action.target) == ("provider_add", "openai")
     assert KEY not in action.new_value and "7777" in action.new_value
@@ -215,3 +218,48 @@ def test_a_key_the_instance_key_cannot_read_asks_for_the_key_again(client, fakes
         assert response.status_code == 409
         assert "enter it again" in response.json()["detail"]
     assert fakes.listed_with == [] and fakes.probed == []
+
+
+
+def test_changing_the_embedding_needs_a_confirmed_reindex(client):
+    add_openai(client)
+    change = {"backend": "provider", "provider_id": "openai", "model": "text-embedding-3-large", "dimensions": 1024}
+
+    refused = client.put("/models/embedding", headers=ADMIN, json=change)
+
+    assert refused.status_code == 409 and "full reindex" in refused.json()["detail"]
+    assert client.get("/models/tiers", headers=ADMIN).json()["embedding"]["backend"] == "local"
+
+
+def test_a_confirmed_embedding_change_marks_the_pack_as_needing_a_recompile(client, actions):
+    add_openai(client)
+    change = {"backend": "provider", "provider_id": "openai", "model": "text-embedding-3-large", "dimensions": 1024,
+              "confirm_reindex": True}
+
+    body = client.put("/models/embedding", headers=ADMIN, json=change).json()
+
+    assert body == {"backend": "provider", "provider_id": "openai", "model": "text-embedding-3-large",
+                    "dimensions": 1024, "needs_reindex": True}
+    record = actions.records[-1]
+    assert (record.action, record.old_value, record.new_value) == (
+        "embedding", "local/sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2", "openai/text-embedding-3-large",
+    )
+
+
+def test_the_embedding_can_move_back_to_a_local_model(client):
+    body = client.put("/models/embedding", headers=ADMIN, json={
+        "backend": "local", "model": "sentence-transformers/paraphrase-multilingual-mpnet-base-v2", "confirm_reindex": True,
+    }).json()
+
+    assert (body["backend"], body["dimensions"], body["needs_reindex"]) == ("local", 768, True)
+
+
+@pytest.mark.parametrize("change", [
+    {"backend": "local", "model": "someone/unknown-model"},
+    {"backend": "provider", "provider_id": "nope", "model": "text-embedding-3-large", "dimensions": 1024},
+    {"backend": "provider", "model": "text-embedding-3-large", "dimensions": 1024},
+    {"backend": "provider", "provider_id": "openai", "model": "text-embedding-3-large", "dimensions": 0},
+])
+def test_an_embedding_change_that_does_not_fit_is_refused(client, change):
+    add_openai(client)
+    assert client.put("/models/embedding", headers=ADMIN, json={**change, "confirm_reindex": True}).status_code == 422

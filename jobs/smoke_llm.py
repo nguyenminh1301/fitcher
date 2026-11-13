@@ -5,7 +5,8 @@ Run it explicitly with ``make smoke`` or
 to the named tiers. It never runs from tests or health checks. Each chat model
 mapped to a tier must answer a request for JSON matching a small schema, the
 structured output every engine node relies on; the embedding model must return
-one vector. A model that serves several tiers is called once. The reply is not
+one vector; a local embedding model is loaded and run instead of called. A
+model that serves several tiers is called once. The reply is not
 printed, only whether it passed (DECISIONS §2 Model tiers). The fixed prompt is
 engine text, so it runs as reviewed pack content for the gateway's screening
 (DECISIONS §9).
@@ -50,18 +51,21 @@ def main(argv: list[str] | None = None, *, completion: Callable | None = None, e
     args = parser.parse_args(argv)
     clients.bootstrap()
     routes = clients.shared_routes()
-    groups = _groups(routes.labels(), args.tier)
-    if not groups:
-        print("No model is mapped to these tiers; add a provider on the Models page or in the setup", file=sys.stderr)
+    labels = routes.labels()
+    if not any(tier in labels for tier in CHAT_TIERS):
+        print("No chat model is mapped; add a provider on the Models page or in the setup", file=sys.stderr)
         return 1
-    setting = clients.embedding_setting()
+    groups = _groups(labels, args.tier)
+    embedding_choice = clients.embedding_choice()
     chat = Gateway(routes, completion=completion, retries=0)
     failed = 0
     with trusted_pack_calls():
         for label, tiers in groups.items():
             try:
-                if tiers == [EMBED_TIER]:
-                    GatewayEmbeddings(routes, setting[1], embedding=embedding, retries=0).embed(["ready"])
+                if tiers == [EMBED_TIER] and embedding_choice.backend == "local":
+                    clients.embedding_client(embedding_choice.dimensions).embed(["ready"])
+                elif tiers == [EMBED_TIER]:
+                    GatewayEmbeddings(routes, embedding_choice.dimensions, embedding=embedding, retries=0).embed(["ready"])
                 else:
                     chat.structured(next(tier for tier in tiers if tier in CHAT_TIERS), PROMPT, Smoke)
             except (LLMError, EmbeddingError, RouteError) as error:

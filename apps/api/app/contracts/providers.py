@@ -62,14 +62,27 @@ class TierView(ContractModel):
 
 
 class EmbeddingView(ContractModel):
-    provider_id: str
+    # A local model runs inside the api; a provider's model is called through the gateway.
+    backend: Literal["local", "provider"]
+    provider_id: str | None
     model: str
     dimensions: int
+    # The active pack was indexed with another model or size and must be recompiled.
+    needs_reindex: bool
+
+
+class EmbeddingChange(ContractModel):
+    backend: Literal["local", "provider"]
+    model: str
+    provider_id: str | None = None
+    dimensions: int | None = None
+    # Changing the embedding needs a full reindex of the pack, so the change is refused unless confirmed.
+    confirm_reindex: bool = False
 
 
 class ModelTiersView(ContractModel):
     tiers: list[TierView]
-    embedding: EmbeddingView | None
+    embedding: EmbeddingView
 
 
 class TierChange(ContractModel):

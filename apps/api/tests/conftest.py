@@ -61,6 +61,17 @@ def edit_pack(pack_dir: Path) -> Callable[[str, Callable[[Any], None]], None]:
 
 
 @pytest.fixture(autouse=True)
+def no_local_model_download(monkeypatch):
+    """No test downloads or loads a real local embedding model; a test that needs one passes a fake loader."""
+    from app.llm import local_embeddings
+
+    def refuse(name, cache_dir):
+        raise AssertionError(f"a test tried to load the local embedding model {name}")
+
+    monkeypatch.setattr(local_embeddings, "_fastembed", refuse)
+
+
+@pytest.fixture(autouse=True)
 def isolated_data_dir(tmp_path, monkeypatch):
     """Keep the app state of any test that starts the app out of the real data directory."""
     from app.state.db import reset_shared_state

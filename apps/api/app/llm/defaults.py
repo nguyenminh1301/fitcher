@@ -21,6 +21,8 @@ _CHAT = {
     "ollama": dict.fromkeys(("fast", "sql-small", "sql-gen", "sql-gen-hard"), "qwen2.5-coder:7b"),
     "openai_compatible": {},
 }
+# The local embedding model used until an admin chooses another (DECISIONS §14).
+LOCAL_EMBEDDING_MODEL = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
 _EMBEDDING = {"openai": "text-embedding-3-large", "gemini": "gemini-embedding-001", "ollama": "nomic-embed-text"}
 # The vector size of an embedding model that cannot return another size.
 _FIXED_DIMENSIONS = {"nomic-embed-text": 768}

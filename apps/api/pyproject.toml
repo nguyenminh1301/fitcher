@@ -8,7 +8,11 @@ dependencies = [
     # Encrypts stored secrets with AES-256-GCM (app/state/secrets.py).
     "cryptography==50.0.2",
     "fastapi==0.162.0",
+    # Local embeddings (app/llm/local_embeddings.py): ONNX models on CPU, downloaded into the data volume.
+    "fastembed==0.9.1",
     "httpx==0.28.1",
+    # Downloads the local embedding model and the optional screening classifier; fastembed requires below 2.0.
+    "huggingface-hub==1.33.0",
     "jsonschema==4.26.0",
     "langgraph==1.2.16",
     # The model gateway (app/llm/gateway.py) calls every provider through the LiteLLM SDK; no proxy extras.
@@ -41,7 +45,6 @@ dev = [
 jobs = [
     "dbt-clickhouse==1.10.3",
     "dbt-core==1.12.6",
-    "huggingface-hub==2.4.0",
     "pyarrow==26.0.0",
 ]
 

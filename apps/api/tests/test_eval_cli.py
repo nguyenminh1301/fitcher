@@ -167,7 +167,7 @@ def test_the_report_records_the_tier_mapping_and_its_overrides(packs_dir, tmp_pa
     (stored,) = [record for record in logs.written if record.TABLE == "eval_reports"]
     # Only the tiers the run called are evidence; the case generated its SQL on sql-gen, never sql-small.
     assert stored.tiers == {"fast": "openai/gpt-5.4-mini", "sql-gen": "openai/gpt-5.4",
-                            "embed": "openai/text-embedding-3-large"}
+                            "embed": "local/sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"}
     assert stored.regressed is None
     report = EvalRun.model_validate_json((output / "minimal-eval.json").read_text(encoding="utf-8"))
     assert report.tiers["sql-small"] == "anthropic/claude-haiku-5-5" and report.tiers["sql-gen-hard"] == "openai/gpt-5.5"
