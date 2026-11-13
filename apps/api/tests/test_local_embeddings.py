@@ -55,7 +55,7 @@ def test_a_model_of_another_size_is_refused(tmp_path):
 
 def test_a_model_that_cannot_load_raises_embedding_error(tmp_path):
     def broken(name, cache_dir):
-        raise OSError("no space left on device")
+        raise OSError("disk full")
 
     with pytest.raises(EmbeddingError, match="cannot load the local embedding model m: OSError"):
         LocalEmbeddings("m", 4, tmp_path, loader=broken).embed(["a"])
