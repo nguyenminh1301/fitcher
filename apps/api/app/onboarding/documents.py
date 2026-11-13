@@ -202,7 +202,7 @@ def chunk_payloads(record: DocumentRecord, chunks: Sequence[Chunk]) -> list[dict
 
 
 def screen_chunks(screener, chunks: Sequence[Chunk]) -> tuple[list[Chunk], int]:
-    """Chunks screening lets through, and how many it blocked (``block`` or, without the classifier, ``unavailable``)."""
+    """Chunks screening lets through, and how many it blocked (``block``, or ``unavailable`` while the classifier is on but cannot run)."""
     verdicts = screener.screen_many([chunk.text for chunk in chunks], "document")
     kept = [chunk for chunk, verdict in zip(chunks, verdicts, strict=True) if verdict.verdict not in ("block", "unavailable")]
     return kept, len(chunks) - len(kept)

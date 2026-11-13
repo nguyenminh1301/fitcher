@@ -255,7 +255,11 @@ def screen_documents(documents: dict[str, list[dict]], screener: Screener, summa
         if verdict.verdict in ("flag", "block") or verdict.rule_hits:
             shown = value["payload"]["value"][:SHOWN_VALUE]
             summary.flagged_values.append(f"{value['dataset']}.{value['column']}={shown!r} ({_screen_note(verdict)})")
-    if screener.classifier is None:
+    if screener.state == "disabled":
+        summary.warnings.append(
+            "the screening classifier is off: documents and column values were checked by the rules only"
+        )
+    elif screener.state == "unavailable":
         summary.warnings.append(
             "the screening classifier is unavailable: column values were checked by the rules only "
             "and no document chunk was indexed"
