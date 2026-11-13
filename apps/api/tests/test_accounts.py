@@ -1,5 +1,6 @@
 """Local accounts in the app state: unique e-mail, Argon2id hashes, roles and the last-admin rule."""
 
+from argon2 import PasswordHasher
 import pytest
 
 from state_fixtures import new_state
@@ -120,3 +121,19 @@ def test_accounts_are_listed_by_email(db):
     accounts.create(db, "ana@example.com", "Ana", "correct horse", [])
 
     assert [account.email for account in accounts.list_all(db)] == ["ana@example.com", "zed@example.com"]
+
+
+def test_a_rehash_never_overwrites_a_password_reset_made_meanwhile(db, monkeypatch):
+    created = accounts.create(db, "ana@example.com", "Ana", "correct horse", [])
+
+    class ResetThenAskForRehash(PasswordHasher):
+        def check_needs_rehash(self, hash):
+            accounts.set_password(db, created.id, "battery staple")
+            return True
+
+    monkeypatch.setattr(accounts, "_hasher", ResetThenAskForRehash())
+    assert accounts.authenticate(db, "ana@example.com", "correct horse") is None
+    monkeypatch.undo()
+
+    assert accounts.authenticate(db, "ana@example.com", "battery staple") is not None
+    assert accounts.authenticate(db, "ana@example.com", "correct horse") is None

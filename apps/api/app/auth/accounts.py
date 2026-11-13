@@ -146,7 +146,11 @@ def authenticate(db: StateDb, email: str, password: str) -> Account | None:
         return None
     if _hasher.check_needs_rehash(stored):
         with db.write() as conn:
-            conn.execute("UPDATE accounts SET password_hash = ? WHERE id = ?", (_hasher.hash(password), row[0]))
+            # A password reset committed since the read wins; this sign-in used the old password.
+            updated = conn.execute("UPDATE accounts SET password_hash = ? WHERE id = ? AND password_hash = ?",
+                                   (_hasher.hash(password), row[0], stored))
+        if updated.rowcount == 0:
+            return None
     return get(db, row[0])
 
 
