@@ -269,6 +269,7 @@
     "resetPasswordNote": "They are signed out everywhere and sign in again with this password.",
     "accountCreated": "{name} can now sign in.",
     "passwordReset": "The password of {name} was changed.",
+    "signOutFailed": "Sign-out did not complete, so you may still be signed in. Try again.",
     "welcomeBack": "Welcome back",
     "signInSub": "Sign in to ask questions about {pack} data.",
     "signInFailed": "Sign-in did not complete. Try again.",

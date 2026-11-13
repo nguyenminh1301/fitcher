@@ -269,6 +269,7 @@
     "resetPasswordNote": "Họ bị đăng xuất khỏi mọi nơi và đăng nhập lại bằng mật khẩu này.",
     "accountCreated": "{name} đã có thể đăng nhập.",
     "passwordReset": "Đã đổi mật khẩu của {name}.",
+    "signOutFailed": "Đăng xuất chưa hoàn tất, có thể bạn vẫn đang đăng nhập. Hãy thử lại.",
     "welcomeBack": "Chào mừng trở lại",
     "signInSub": "Đăng nhập để hỏi về dữ liệu của {pack}.",
     "signInFailed": "Đăng nhập chưa hoàn tất. Hãy thử lại.",
