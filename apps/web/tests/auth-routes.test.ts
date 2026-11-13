@@ -5,7 +5,7 @@ import { NextRequest } from "next/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const jar = new Map<string, string>();
-vi.mock("next/headers", () => ({ cookies: async () => ({ get: (name: string) => (jar.has(name) ? { name, value: jar.get(name) } : undefined) }) }));
+vi.mock("next/headers", () => ({ headers: async () => new Headers({ host: "app.test" }), cookies: async () => ({ get: (name: string) => (jar.has(name) ? { name, value: jar.get(name) } : undefined) }) }));
 
 import { GET as callback } from "@/app/auth/callback/route";
 import { GET as signIn } from "@/app/auth/sign-in/route";
@@ -149,6 +149,7 @@ describe("session route", () => {
     expect(await response.json()).toEqual({ user_id: "lab.viewer", display_name: "Lab Viewer", roles: ["viewer"] });
     expect(calls.at(-1)?.url).toBe("http://api:8000/me");
     expect(calls.at(-1)?.headers.get("authorization")).toBe("Bearer access-1");
+    expect(calls.at(-1)?.headers.get("x-forwarded-host")).toBe("app.test");
   });
 
   it("is a 401 without a session, and signs out when the api refuses the token", async () => {

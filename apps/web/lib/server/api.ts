@@ -1,6 +1,6 @@
 // Calls from the web server to the fitcher api, with the signed-in user's access token.
 
-import { cookies } from "next/headers";
+import { cookies, headers as requestHeaders } from "next/headers";
 
 import { SESSION_COOKIE, accessToken, authConfig, dropSession } from "./auth";
 
@@ -40,6 +40,20 @@ export async function forwardBody(request: Request, path: string): Promise<Respo
 }
 
 /**
+ * The browser's own host and origin for the api's address checks (individual mode): the api sees this
+ * server as its client, so the browser's Host travels as X-Forwarded-Host. A forwarded host the client
+ * sent is ignored, because a page can set that header on its own requests.
+ */
+export function browserHeaders(incoming: Headers): Headers {
+  const forwarded = new Headers();
+  const host = incoming.get("host");
+  const origin = incoming.get("origin");
+  if (host) forwarded.set("x-forwarded-host", host);
+  if (origin) forwarded.set("origin", origin);
+  return forwarded;
+}
+
+/**
  * Send a request to the api as the signed-in user. Without a session, or when the api refuses the
  * token, the user is signed out and the answer is a 401.
  */
@@ -48,6 +62,7 @@ export async function callApi(path: string, init: RequestInit = {}): Promise<Res
   const token = await accessToken(authConfig(), session);
   if (!token) return jsonError("signed_out", 401);
   const headers = new Headers(init.headers);
+  for (const [name, value] of browserHeaders(await requestHeaders())) headers.set(name, value);
   headers.set("authorization", `Bearer ${token}`);
   let response: Response;
   try {

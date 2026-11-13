@@ -80,3 +80,12 @@ def isolated_data_dir(tmp_path, monkeypatch):
     reset_shared_state()
     yield
     reset_shared_state()
+
+
+@pytest.fixture(autouse=True)
+def team_mode(isolated_data_dir):
+    """Tests sign users in, so the test app state is in team mode; individual-mode tests set their own mode."""
+    from app.state.db import shared_state
+    from app.state.settings import Settings
+
+    Settings(shared_state()).set("instance", "mode", "team")

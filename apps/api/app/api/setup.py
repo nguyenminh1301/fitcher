@@ -1,25 +1,30 @@
 """The first-run setup (DECISIONS §15): who uses the instance, and when setup is complete.
 
-Until sign-in moves into the app (Phase 15) the changes need the ``admin``
-role of the existing sign-in. The status is readable by any signed-in user so
-that the web app can tell a user who is not an admin that the instance is
-still being set up.
+The changes need the ``admin`` role: the owner holds it in individual mode.
+The status is readable by any user so that the web app can tell a user who is
+not an admin that the instance is still being set up. Moving from individual
+to team mode creates the first admin from the request and signs the caller in
+as that admin; moving back is refused while more than one account is enabled.
 """
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 
 from app.api.auth import current_principal
 from app.api.console import require_admin
-from app.api.runtime import get_state_db
+from app.api.runtime import get_compiled_or_none, get_state_db, pack_identity
+from app.api.session import sign_in_response
+from app.auth import accounts
 from app.auth.principal import Principal
 from app.contracts.setup import SetupModeChange, SetupStatus, SetupStep
+from app.packs.compiler import CompiledPack
 from app.state import setup
 from app.state.db import StateDb
 
 router = APIRouter(prefix="/setup")
 Admin = Annotated[Principal, Depends(require_admin)]
+Compiled = Annotated[CompiledPack | None, Depends(get_compiled_or_none)]
 
 
 State = Annotated[StateDb, Depends(get_state_db)]
@@ -38,9 +43,26 @@ def get_status(_: Annotated[Principal, Depends(current_principal)], db: State) -
 
 
 @router.put("/mode")
-def put_mode(change: SetupModeChange, _: Admin, db: State) -> SetupStatus:
-    setup.set_mode(db, change.mode)
+def put_mode(
+    change: SetupModeChange, _: Admin, db: State, compiled: Compiled, request: Request, response: Response,
+) -> SetupStatus:
+    first_admin = None if change.admin is None else setup.FirstAdmin(**change.admin.model_dump())
+    try:
+        created = setup.set_mode(db, change.mode, first_admin, pack_identity_roles(compiled))
+    except (setup.TooManyAccounts, accounts.DuplicateEmail) as error:
+        raise HTTPException(status.HTTP_409_CONFLICT, detail=str(error)) from None
+    except (setup.SetupError, accounts.AccountError) as error:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(error)) from None
+    if created is not None:
+        sign_in_response(request, response, db, created.id)
     return _view(db)
+
+
+def pack_identity_roles(compiled: CompiledPack | None) -> list[str]:
+    try:
+        return pack_identity(compiled).roles
+    except HTTPException:
+        return []
 
 
 @router.post("/steps/{step_id}/skip")
