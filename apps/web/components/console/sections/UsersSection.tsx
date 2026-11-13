@@ -1,8 +1,8 @@
 "use client";
 
-// Users (DECISIONS §9, §15): the realm's users with their pack roles and status. An admin changes a
-// user's pack roles (the only roles the api reads or changes) and disables or enables users, never their
-// own account; a second tab shows what each pack and console role can open and read.
+// Users (DECISIONS §9, §15): the accounts of the instance with their pack roles and status. An admin
+// creates accounts, resets passwords, changes a user's pack roles and disables or enables users, never
+// their own account; a second tab shows what each pack and console role can open and read.
 
 import { useCallback, useState } from "react";
 
@@ -12,7 +12,7 @@ import { ListPage, RecordTable } from "@/components/console/ListPage";
 import { Button, Chip, Segmented, Tabs, TextField } from "@/components/ui/controls";
 import { StatusPill, WarningBanner } from "@/components/ui/feedback";
 import { Dialog } from "@/components/ui/overlay";
-import type { UserRow } from "@/lib/contracts";
+import type { NewUser, UserRow } from "@/lib/contracts";
 import { useChat } from "@/lib/chat/ChatContext";
 import { allowedSections } from "@/lib/console/sections";
 import { useLoad } from "@/lib/console/useLoad";
@@ -34,6 +34,11 @@ export function UsersSection() {
   const [query, setQuery] = useState("");
   const [role, setRole] = useState("all");
   const [disabling, setDisabling] = useState<UserRow | null>(null);
+  const [creating, setCreating] = useState(false);
+  const [draft, setDraft] = useState<NewUser>({ email: "", display_name: "", password: "", roles: [] });
+  const [resetting, setResetting] = useState<UserRow | null>(null);
+  const [newPassword, setNewPassword] = useState("");
+  const [refusal, setRefusal] = useState<string | null>(null);
   const packRoles = pack?.roles ?? [];
   const roles = [...packRoles, ...CONSOLE_ROLES];
   const users = data?.users ?? [];
@@ -46,6 +51,33 @@ export function UsersSection() {
     await api.users.setRoles(user.id, next);
     toast(t("ui.roleChanged", { name: user.display_name, role: next.join(", ") || "—" }));
     await reload();
+  }
+
+  async function create() {
+    setRefusal(null);
+    try {
+      const user = await api.users.create(draft);
+      setCreating(false);
+      setDraft({ email: "", display_name: "", password: "", roles: [] });
+      toast(t("ui.accountCreated", { name: user.display_name }));
+      await reload();
+    } catch (error) {
+      setRefusal(error instanceof Error ? error.message : String(error));
+    }
+  }
+
+  async function resetPassword() {
+    const user = resetting;
+    if (!user) return;
+    setRefusal(null);
+    try {
+      await api.users.resetPassword(user.id, newPassword);
+      setResetting(null);
+      setNewPassword("");
+      toast(t("ui.passwordReset", { name: user.display_name }));
+    } catch (error) {
+      setRefusal(error instanceof Error ? error.message : String(error));
+    }
   }
 
   async function setEnabled(user: UserRow, enabled: boolean) {
@@ -64,6 +96,7 @@ export function UsersSection() {
           <div className="fc-toolbar">
             <TextField icon="search" type="search" aria-label={t("ui.searchUsers")} placeholder={t("ui.searchUsers")} value={query}
               onChange={(event) => setQuery(event.target.value)} className="fc-tool-field fc-tool-wide" />
+            <Button variant="primary" icon="user" onClick={() => { setRefusal(null); setCreating(true); }}>{t("ui.newAccount")}</Button>
             <div className="fc-scroll-x">
               <Segmented label={t("ui.role")} value={role} onChange={setRole} options={[["all", t("ui.allRoles")], ...packRoles.map((item): [string, string] => [item, item])]} />
             </div>
@@ -96,9 +129,14 @@ export function UsersSection() {
               { key: "status", label: t("ui.status"), render: (user) => <StatusPill status={user.enabled ? "active" : "disabled"} /> },
               { key: "actions", label: t("ui.actions"), render: (user) => {
                 if (isSelf(user)) return <span className="fc-muted">—</span>;
-                return user.enabled
-                  ? <Button size="sm" variant="ghost" icon="userX" onClick={() => setDisabling(user)}>{t("ui.disable")}</Button>
-                  : <Button size="sm" icon="userCheck" onClick={() => void setEnabled(user, true)}>{t("ui.enable")}</Button>;
+                return (
+                  <span className="fc-row" style={{ gap: "var(--base-size-4)" }}>
+                    <Button size="sm" variant="ghost" icon="lock" onClick={() => { setRefusal(null); setResetting(user); }}>{t("ui.resetPassword")}</Button>
+                    {user.enabled
+                      ? <Button size="sm" variant="ghost" icon="userX" onClick={() => setDisabling(user)}>{t("ui.disable")}</Button>
+                      : <Button size="sm" icon="userCheck" onClick={() => void setEnabled(user, true)}>{t("ui.enable")}</Button>}
+                  </span>
+                );
               } },
             ]}
           />
@@ -152,6 +190,46 @@ export function UsersSection() {
           </>
         }>
         {t("ui.disableText")}
+      </Dialog>
+      <Dialog open={creating} title={t("ui.newAccount")} onClose={() => setCreating(false)}
+        actions={
+          <>
+            <Button onClick={() => setCreating(false)}>{t("ui.cancel")}</Button>
+            <Button variant="primary" icon="user" onClick={() => void create()}>{t("ui.create")}</Button>
+          </>
+        }>
+        <div className="fc-stack" style={{ gap: "var(--base-size-12)" }}>
+          {refusal ? <WarningBanner tone="danger">{refusal}</WarningBanner> : null}
+          <TextField label={t("ui.email")} type="email" autoComplete="off" value={draft.email}
+            onChange={(event) => setDraft({ ...draft, email: event.target.value })} />
+          <TextField label={t("ui.name")} value={draft.display_name} onChange={(event) => setDraft({ ...draft, display_name: event.target.value })} />
+          <TextField label={t("ui.password")} type="password" autoComplete="new-password" help={t("ui.passwordRule")} value={draft.password}
+            onChange={(event) => setDraft({ ...draft, password: event.target.value })} />
+          <span className="fc-row" role="group" aria-label={t("ui.roles")} style={{ gap: "var(--base-size-4)" }}>
+            {roles.map((item) => {
+              const on = draft.roles.includes(item);
+              return (
+                <Chip key={item} size="sm" selected={on}
+                  onClick={() => setDraft({ ...draft, roles: on ? draft.roles.filter((value) => value !== item) : [...draft.roles, item] })}>
+                  {item}
+                </Chip>
+              );
+            })}
+          </span>
+        </div>
+      </Dialog>
+      <Dialog open={!!resetting} title={t("ui.resetPasswordTitle", { name: resetting?.display_name ?? "" })} onClose={() => setResetting(null)}
+        actions={
+          <>
+            <Button onClick={() => setResetting(null)}>{t("ui.cancel")}</Button>
+            <Button variant="primary" onClick={() => void resetPassword()}>{t("ui.save")}</Button>
+          </>
+        }>
+        <div className="fc-stack" style={{ gap: "var(--base-size-12)" }}>
+          {refusal ? <WarningBanner tone="danger">{refusal}</WarningBanner> : null}
+          <TextField label={t("ui.newPassword")} type="password" autoComplete="new-password" help={t("ui.resetPasswordNote")} value={newPassword}
+            onChange={(event) => setNewPassword(event.target.value)} />
+        </div>
       </Dialog>
     </ListPage>
   );

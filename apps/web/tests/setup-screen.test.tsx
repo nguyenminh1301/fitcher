@@ -61,11 +61,27 @@ describe("setup screen", () => {
     const setup = fakeSetup();
     wrap(<SetupScreen models={fakeModels()} setup={setup} isAdmin onSignedOut={() => {}} onOpenChat={() => {}} />);
     await userEvent.click(await screen.findByRole("radio", { name: /A team/ }));
+    await userEvent.type(screen.getByLabelText("Your e-mail"), "ana@example.com");
+    await userEvent.type(screen.getByLabelText("Your name"), "Ana");
+    await userEvent.type(screen.getByLabelText("Your password"), "correct horse");
     await userEvent.click(screen.getByRole("button", { name: "Save and continue" }));
-    expect(setup.setMode).toHaveBeenCalledWith("team");
+    expect(setup.setMode).toHaveBeenCalledWith("team", { email: "ana@example.com", display_name: "Ana", password: "correct horse" });
     await userEvent.click(await screen.findByRole("button", { name: "Finish setup" }));
     expect(setup.complete).toHaveBeenCalled();
     expect(await screen.findByRole("button", { name: "Open the chat" })).toBeTruthy();
+  });
+
+  it("asks for the first admin only when the instance is not in team mode yet", async () => {
+    wrap(<SetupScreen models={fakeModels()} setup={fakeSetup()} isAdmin onSignedOut={() => {}} onOpenChat={() => {}} />);
+    await screen.findByRole("radio", { name: /One person/ });
+    expect(screen.queryByLabelText("Your e-mail")).toBeNull();
+    cleanup();
+
+    const stored: SetupStatus = { mode: "team", steps: [{ id: "mode", state: "pending" }], complete: false };
+    const setup = fakeSetup(stored);
+    wrap(<SetupScreen models={fakeModels()} setup={setup} isAdmin onSignedOut={() => {}} onOpenChat={() => {}} />);
+    await screen.findByRole("radio", { name: /A team/ });
+    expect(screen.queryByLabelText("Your e-mail")).toBeNull();
   });
 
   it("shows the stored mode again after a reload", async () => {

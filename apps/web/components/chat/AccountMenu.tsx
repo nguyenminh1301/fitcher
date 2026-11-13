@@ -38,7 +38,8 @@ export function AccountMenu({ onConsole, onChat, onSignOut, compact }: { onConso
   items.push({ separator: true });
   if (onChat) items.push({ icon: "message", label: t("ui.chatApp"), onSelect: onChat });
   else if (hasConsole(roles) && onConsole) items.push({ icon: "layout", label: t("ui.console"), onSelect: onConsole });
-  items.push({ icon: "logout", label: t("ui.signOut"), onSelect: onSignOut });
+  // Individual mode has no sign-in, so there is nothing to sign out of.
+  if (identity.mode !== "individual") items.push({ icon: "logout", label: t("ui.signOut"), onSelect: onSignOut });
 
   const header = (
     <>

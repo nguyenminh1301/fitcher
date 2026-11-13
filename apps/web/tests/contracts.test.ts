@@ -17,7 +17,7 @@ describe("generated contract types", () => {
       "document_view.schema.json", "draft_result.schema.json", "embedding_change.schema.json",
       "embedding_view.schema.json", "eval_report_view.schema.json", "eval_run_started.schema.json",
       "feedback_input.schema.json", "feedback_row.schema.json", "group_input.schema.json",
-      "model_tiers_view.schema.json", "proposal_result.schema.json", "provider_create.schema.json",
+      "model_tiers_view.schema.json", "new_user.schema.json", "password_reset.schema.json", "proposal_result.schema.json", "provider_create.schema.json",
       "provider_models.schema.json", "provider_test_request.schema.json", "provider_test_result.schema.json",
       "provider_update.schema.json", "provider_view.schema.json", "query_spec.schema.json", "result.schema.json",
       "review_item.schema.json", "review_item_patch.schema.json", "run_row.schema.json", "run_trace.schema.json",

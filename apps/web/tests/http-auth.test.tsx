@@ -5,10 +5,13 @@ import { createMockApi } from "@/lib/api/mock";
 import { createHttpAuth } from "@/lib/api/http/auth";
 import { ChatProvider } from "@/lib/chat/ChatContext";
 
-const IDENTITY = { user_id: "lab.viewer", display_name: "Lab Viewer", roles: ["viewer", "admin"] };
+const IDENTITY = { user_id: "lab.viewer", display_name: "Lab Viewer", roles: ["viewer", "admin"], mode: "team" as const, exposed: false };
 
-function fetcher(replies: Record<string, () => Response>) {
-  return vi.fn(async (url: RequestInfo | URL) => replies[String(url)]?.() ?? new Response("{}", { status: 404 }));
+function fetcher(replies: Record<string, (init?: RequestInit) => Response>) {
+  return vi.fn(async (url: RequestInfo | URL, init?: RequestInit) => {
+    const key = `${init?.method ?? "GET"} ${String(url)}`;
+    return (replies[key] ?? replies[String(url)])?.(init) ?? new Response("{}", { status: 404 });
+  });
 }
 
 afterEach(cleanup);
@@ -31,17 +34,38 @@ describe("http auth", () => {
     expect(await auth.identities()).toEqual([]);
   });
 
-  it("signs out through the web server and forgets the user", async () => {
+  it("signs out through the api and forgets the user", async () => {
     const fetch = fetcher({
-      "/api/session": () => Response.json(IDENTITY),
-      "/auth/sign-out": () => Response.json({ url: "http://sso.test/logout" }),
+      "GET /api/session": () => Response.json(IDENTITY),
+      "DELETE /api/session": () => new Response(null, { status: 204 }),
     });
     const auth = createHttpAuth(fetch);
     await auth.current();
 
-    expect(await auth.signOut()).toBe("http://sso.test/logout");
+    expect(await auth.signOut()).toBe("/sign-in");
     await auth.current();
-    expect(fetch.mock.calls.filter(([url]) => url === "/api/session")).toHaveLength(2);
+    expect(fetch.mock.calls.filter(([url, init]) => url === "/api/session" && !init?.method)).toHaveLength(2);
+  });
+
+  it("signs in with an e-mail and password", async () => {
+    const fetch = fetcher({ "POST /api/session": () => new Response(null, { status: 204 }) });
+
+    await createHttpAuth(fetch).signIn("ana@example.com", "correct horse");
+
+    expect(JSON.parse(fetch.mock.calls[0][1]?.body as string)).toEqual({ email: "ana@example.com", password: "correct horse" });
+  });
+
+  it.each([[401, "invalid"], [429, "throttled"]] as const)("tells a refused sign-in (%s) apart", async (status, reason) => {
+    const auth = createHttpAuth(fetcher({ "POST /api/session": () => Response.json({}, { status }) }));
+
+    await expect(auth.signIn("ana@example.com", "wrong")).rejects.toMatchObject({ reason });
+  });
+
+  it("learns whether sign-in through a provider is offered", async () => {
+    const auth = createHttpAuth(fetcher({ "/api/session/oidc": () => Response.json({ enabled: true }) }));
+
+    expect(await auth.oidcEnabled()).toBe(true);
+    expect(await createHttpAuth(fetcher({})).oidcEnabled()).toBe(false);
   });
 
   it("reads the pack from the web server", async () => {
