@@ -9,9 +9,9 @@ change or a disable reaches the user's next request.
 
 Sign-in attempts are counted per e-mail and per client address over a
 15-minute window; an attempt is counted before its password is checked and
-released when it succeeds. Once a key reaches its limit, further attempts are
-refused until the counted failure that reached it leaves the window, whether
-or not the account exists.
+only its own count is released when it succeeds. Once a key reaches its
+limit, further attempts are refused until the counted failure that reached it
+leaves the window, whether or not the account exists.
 """
 
 from collections.abc import Callable, Iterable
@@ -120,8 +120,11 @@ class SignInThrottle:
                     for key in keys]
         return 0, rows
 
-    def succeeded(self, rows: list[int], email: str) -> None:
-        """Release a successful attempt's rows and forget the e-mail's earlier failures."""
+    def succeeded(self, rows: list[int]) -> None:
+        """Release a successful attempt's own rows.
+
+        Earlier rows of the same e-mail stay until they leave the window: some may belong to attempts still
+        being checked, which must keep counting.
+        """
         with self._db.write() as conn:
             conn.executemany("DELETE FROM sign_in_failures WHERE rowid = ?", [(row,) for row in rows])
-            conn.execute("DELETE FROM sign_in_failures WHERE key = ?", (email,))

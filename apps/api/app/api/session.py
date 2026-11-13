@@ -44,7 +44,7 @@ def sign_in(body: SignIn, request: Request, response: Response, db: State) -> No
     account = accounts.authenticate(db, body.email, body.password)
     if account is None:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail="invalid email or password")
-    throttle.succeeded(attempt, keys[0])
+    throttle.succeeded(attempt)
     sign_in_response(request, response, db, account.id)
 
 
