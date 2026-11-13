@@ -68,6 +68,9 @@ def _base_url(kind: str, base_url: str | None) -> str | None:
     parts = urlsplit(base_url.strip())
     if parts.scheme not in ("http", "https") or not parts.netloc:
         raise ProviderError("the base URL must be an http or https address")
+    # The base URL is stored and shown in plain text; a key goes through api_key and the vault.
+    if parts.username is not None or parts.password is not None:
+        raise ProviderError("the base URL must not include user information; enter the key as the API key")
     return base_url.strip().rstrip("/")
 
 

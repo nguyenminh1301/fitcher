@@ -143,3 +143,12 @@ def test_every_kind_has_a_proposed_model_for_each_chat_tier_or_none():
     assert defaults.chat_models("openai_compatible") == {}
     assert defaults.embedding_model("openai") == "text-embedding-3-large"
     assert defaults.embedding_model("anthropic") is None
+
+
+def test_a_base_url_never_carries_credentials(store):
+    # A key goes through api_key and the vault; the base URL is stored and shown in plain text.
+    with pytest.raises(ProviderError, match="user information"):
+        store.create("openai_compatible", base_url="https://user:sk-secret@openrouter.ai/api/v1")
+    store.create("ollama", base_url="http://host.docker.internal:11434")
+    with pytest.raises(ProviderError, match="user information"):
+        store.update("ollama", base_url="http://admin@host.docker.internal:11434")
