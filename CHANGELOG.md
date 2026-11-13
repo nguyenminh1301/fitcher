@@ -256,6 +256,7 @@
 
 ### Removed
 
+- Remove the LiteLLM Proxy service: the `litellm` Compose service, `infra/litellm/` (image, catalog, configuration, the `llm_calls` callback and the screening guardrail with its copy of the rules, so `apps/api/app/screening/rules.py` is the only copy), its image audit job and trivy ignore list, and the `LITELLM_MASTER_KEY`, `LITELLM_BASE_URL`, `MODEL_TIER_<TIER>` and `EMBEDDING_DIMENSIONS` settings. README, `infra/README.md`, `jobs/README.md`, `packs/README.md`, `docs/tracing.md`, `SECURITY.md` and `.env.example` describe providers connected in the application instead.
 - Remove the alias-based Models page: `GET` and `PUT /admin/models`, its `model_tiers` contracts, the cached `TierMap` over `data_meta.model_tiers` (now read only once by bootstrap), the gateway catalog client and the api's HTTP clients of the LiteLLM Proxy (`LiteLLMClient`, `LiteLLMEmbeddings`).
 - Remove OpenSearch: the `opensearch` service and volume, `OPENSEARCH_JAVA_OPTS`, its image scan and exceptions (the Security workflow scans `qdrant/qdrant:v1.20.0` instead, with six bundled web-UI advisories recorded as expiring exceptions) and its documentation, after `docs/eval/ecommerce_twin-retrieval.md` showed Qdrant retrieval recall no lower than OpenSearch and the pack eval showed no regression.
 - Remove the TLC HVFHV download, DuckDB views, sample queries, PostgreSQL/pgvector service and OpenAI smoke check, which the domain-neutral ClickHouse architecture replaces.

@@ -9,7 +9,7 @@ export type Calls = number;
 export type CostUsd = number;
 
 /**
- * Estimated LLM cost of one day, alias and model, from LiteLLM's cost table.
+ * Estimated LLM cost of one day, provider, model and tier, from the LiteLLM SDK's price table.
  */
 export interface CostRow {
   day: Day;

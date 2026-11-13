@@ -10,19 +10,12 @@ See [DECISIONS §3](../docs/DECISIONS.md#3-docker-compose) and the [Phase 0 plan
 | `clickhouse/users.d/users.xml` | Removes the passwordless `default` user |
 | `clickhouse/users.d/agent_logs.xml` | Insert-only `agent_logs_writer`, trace reader and review reader users for `agent_logs` |
 | `clickhouse/users.d/agent_query_stopper.xml` | `agent_query_stopper`, which may only list and stop running queries; the api stops the query of an answer whose client disconnected |
-| `clickhouse/users.d/model_tiers.xml` | `model_tiers_admin`, which reads and writes the model tier mapping, reads eval reports and records admin actions for the Models page |
+| `clickhouse/users.d/model_tiers.xml` | `model_tiers_admin`, which reads the eval reports and records the admin actions of the Models page, and reads the tier mapping of the LiteLLM Proxy era once |
 | `clickhouse/users.d/sources.xml` | `source_loader`, the only user that may use the source named collections; copies sources into `raw` and defines the live `src_<source>` databases |
 | `clickhouse/changes/0001_databases.sql` | Creates `raw`, `marts` and `data_meta` |
 | `clickhouse/changes/0002_agent_logs.sql` | Creates the `agent_logs` database and its run log tables |
-| `clickhouse/changes/0003_model_tiers.sql` | Creates `data_meta.model_tiers`, the model tier mapping of the Models page |
+| `clickhouse/changes/0003_model_tiers.sql` | Creates `data_meta.model_tiers`, the tier mapping of the LiteLLM Proxy era, which the api copies into its app state once |
 | `clickhouse/changes/0004_documents.sql` | Creates `data_meta.documents`, the registry of company documents |
-| `litellm/Dockerfile` | The pinned upstream LiteLLM image with patched bundled packages the upstream still ships at a vulnerable version (see SECURITY.md) |
-| `litellm/config.yaml` | Gateway settings shared by every model: callbacks, guardrail and master key |
-| `litellm/catalog/*.yaml` | One file per provider (OpenAI, Anthropic, Gemini, Ollama) with its aliases, named `<provider>-<size>`, and the variables it needs |
-| `litellm/build_config.py` | Container entrypoint: adds each catalog file whose variables are set to the settings and starts the proxy |
-| `litellm/callbacks/clickhouse_logger.py` | Proxy callback writing one `agent_logs.llm_calls` row per call as `agent_logs_writer` |
-| `litellm/callbacks/screening_guard.py` | `pre_call` guardrail rejecting requests without the api's `screening` metadata and rerunning the EN/VI rules |
-| `litellm/callbacks/screening_rules.py` | Byte-identical copy of `apps/api/app/screening/rules.py` for the guardrail |
 | `sources/fixtures/` | Lab-only fixture source systems of the `sources` Compose profile: the synthetic widget dataset (`widgets/`, written by `generate.py`) and one seed script per PostgreSQL, MySQL, MongoDB and the S3-compatible store |
 | `keycloak/realm-finch.json` | Realm `finch`: the active pack's policy roles and the console roles `pack_reviewer` and `admin`, one lab user per role without credentials, the public `finch-web` client whose access tokens carry the realm roles and the api audience, and the lab-only `finch-cli` password-grant client |
 
@@ -63,7 +56,7 @@ Six configuration users reach it and the registries in `data_meta`, each with it
 | `agent_logs_trace_reader` | `CLICKHOUSE_TRACE_READER_PASSWORD` | `SELECT` on `runs`, `events`, `llm_calls`, `sql_runs`, `audit`, `eval_reports`, `input_screening`, `conversations`, `chat_messages` and `system.query_log` for the `admin` paths |
 | `agent_logs_review_reader` | `CLICKHOUSE_REVIEW_READER_PASSWORD` | `SELECT` on `example_proposals`, `feedback`, `chat_messages`, `runs`, `events` and `sql_runs` for the `pack_reviewer` paths and the proposals built from runs |
 | `agent_conversations` | `CLICKHOUSE_CONVERSATIONS_PASSWORD` | `SELECT` and `INSERT` on `chat_messages`, `conversations` and `conversation_groups`; the api's conversation store, which filters every query by the requesting user |
-| `model_tiers_admin` | `CLICKHOUSE_MODEL_TIERS_PASSWORD` | `SELECT` and `INSERT` on `data_meta.model_tiers`, `SELECT` on `eval_reports` and `INSERT` on `admin_actions`; the api's tier lookup and Models page |
+| `model_tiers_admin` | `CLICKHOUSE_MODEL_TIERS_PASSWORD` | `SELECT` and `INSERT` on `data_meta.model_tiers`, `SELECT` on `eval_reports` and `INSERT` on `admin_actions`; the Models page's eval results and admin actions, and the one-time copy of the old tier mapping |
 | `pack_review` | `CLICKHOUSE_PACK_REVIEW_PASSWORD` | `SELECT` and `INSERT` on the document registry `data_meta.documents` and `SELECT` on `marts`; the api's Documents and Review paths, whose test-runs send `readonly=2` and the `QUERY_MAX_*` limits |
 
 The agent's role users have no access to `agent_logs`.
@@ -80,14 +73,13 @@ Adding a source and choosing its mode are described in [jobs/](../jobs/README.md
 The `sources` Compose profile starts the fixture systems `postgres-fixture`, `mysql-fixture`, `mongodb-fixture` and `files-fixture` (SeaweedFS), which publish no port.
 PostgreSQL, MySQL and MongoDB seed on a fresh volume, so recreate one with `docker compose --profile sources rm -sfv <service>` to seed it again; the file store empties its volume and copies the files on every start.
 
-## LiteLLM
+## Models
 
-The engine calls a model tier; the api maps it to a catalog alias (DECISIONS §2 Model tiers). The proxy starts through `build_config.py`, which loads a provider's aliases only when its variables are set (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GEMINI_API_KEY`, `OLLAMA_URL`); with none it starts with an empty catalog and stays healthy. Add or change a model in its `catalog/` file and run `docker compose up -d --wait litellm`; a new alias serves a tier only after `make smoke` and a passing eval with `--tier`.
-The proxy requires `LITELLM_MASTER_KEY`; the provider keys reach only this container.
-For a local model, start `docker compose --profile local-models up -d --wait ollama`, pull the model named in `catalog/ollama.yaml` with `docker compose exec ollama ollama pull <model>`, set `OLLAMA_URL=http://ollama:11434` and restart litellm. The profile is off by default; the model needs several GB of RAM and disk.
-Every call, successful or failed, is written to `agent_logs.llm_calls` with its alias, tier, resolved model, tokens, cost, latency and error; the api's `trace_id`, graph node and tier arrive as request `metadata`, and calls outside a traced run have an empty trace id. A failed write is printed to the proxy log and never affects the reply.
-
-The `screening-guard` guardrail runs before every call (DECISIONS §9). A request whose metadata has no `screening` value of `allow`, `flag` or `trusted_pack` is rejected with HTTP 400 `screening_guard: ...`, and so is one whose messages or embedding inputs trip the EN/VI rules; the api turns that rejection into the `blocked` reply. It closes code paths that forgot to screen and is not an authentication boundary. Change a rule in `apps/api/app/screening/rules.py`, copy the file over `callbacks/screening_rules.py` and restart litellm; a test fails while the copies differ.
+There is no model gateway service: the api and the jobs call every provider in process through the LiteLLM SDK (`apps/api/app/llm/gateway.py`, DECISIONS §2). Providers, their keys and the model of each tier are kept in the app state of the `fitcher-data` volume and managed in the setup and on the Models page; `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GEMINI_API_KEY` and `OLLAMA_URL` only create the first providers on a start that finds none.
+The embed tier uses the first connected provider's embedding model; with none, or when an admin chooses it, a local fastembed model downloaded on first use into `/data/models`.
+For a local chat model, start `docker compose --profile local-models up -d --wait ollama`, pull a model with `docker compose exec ollama ollama pull <model>` and add an Ollama provider with the base URL `http://ollama:11434` (or `http://host.docker.internal:11434` for a model server on the host).
+Every call, answered, failed or refused, is written to `agent_logs.llm_calls` with its tier, provider, model, tokens, estimated cost, latency and error; inside a traced run it carries the run's `trace_id` and graph node.
+The gateway refuses a call without `screening` metadata and reruns the EN/VI rules of `apps/api/app/screening/rules.py` on every message and embedding input before any provider call (DECISIONS §9); it closes code paths that forgot to screen and is not an authentication boundary.
 
 ## Keycloak
 

@@ -57,7 +57,7 @@ reviews:
       instructions: >-
         Preserve Windows and Linux support. Keep credentials server-side and avoid
         logging keys or private data. Verify GET /health remains a local liveness
-        probe. LLM calls must use LiteLLM aliases, never model names, and unit tests
+        probe. LLM calls must name model tiers, never model names, and unit tests
         must mock LLM, search and embedding clients. Engine code under apps/ must not
         hard-code pack table, column, metric or industry names. When present, check
         SELECT-only SQL guarding, role-scoped execution, query resource limits,

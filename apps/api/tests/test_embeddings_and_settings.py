@@ -9,7 +9,6 @@ def test_settings_defaults():
     settings = load_settings({})
 
     assert settings.qdrant_url == "http://qdrant:6333"
-    assert settings.embedding_dimensions == 1024
     assert settings.column_values_top_k == 10_000
     assert settings.compiled_pack_dir == "build/packs"
     assert settings.documents_dir == "build/documents"
@@ -25,8 +24,8 @@ def test_invalid_document_size_cap_is_rejected(value):
 
 @pytest.mark.parametrize("value", ["abc", "0", "-5"])
 def test_invalid_numeric_setting_is_rejected(value):
-    with pytest.raises(SettingsError, match="EMBEDDING_DIMENSIONS"):
-        load_settings({"EMBEDDING_DIMENSIONS": value})
+    with pytest.raises(SettingsError, match="COLUMN_VALUES_TOP_K"):
+        load_settings({"COLUMN_VALUES_TOP_K": value})
 
 
 def test_screening_settings_default_to_log_mode_and_the_plan_thresholds():

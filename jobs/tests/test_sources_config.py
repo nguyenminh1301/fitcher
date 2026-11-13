@@ -77,6 +77,6 @@ def test_only_clickhouse_and_the_fixture_itself_receive_a_source_password():
 
 def test_the_api_and_jobs_never_receive_a_source_credential():
     compose = yaml.safe_load((ROOT / "compose.yaml").read_text(encoding="utf-8"))
-    for service in ("api", "jobs", "web", "litellm"):
+    for service in ("api", "jobs", "web"):
         environment = compose["services"][service].get("environment") or {}
         assert not any(key.startswith("FIXTURE_") for key in environment), service

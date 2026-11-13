@@ -60,7 +60,7 @@ class ScreeningRow(ContractModel):
 
 
 class CostRow(ContractModel):
-    """Estimated LLM cost of one day, alias and model, from LiteLLM's cost table."""
+    """Estimated LLM cost of one day, provider, model and tier, from the LiteLLM SDK's price table."""
 
     day: str
     alias: str
