@@ -4,8 +4,8 @@ Only an ``admin`` reaches these endpoints. An account holds roles of the
 active pack and console roles; any other role is refused. Every change is
 recorded in ``agent_logs.admin_actions`` (a password change records no value)
 and reaches the user's next request: the principal is read from the account
-on each request, and disabling the account or resetting its password ends its
-sessions. The last enabled admin cannot be disabled or demoted.
+on each request, and disabling the account or resetting its password signs the user out
+everywhere. The last enabled admin cannot be disabled or demoted.
 """
 
 import json

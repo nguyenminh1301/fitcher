@@ -27,7 +27,7 @@ Remove Keycloak. An instance runs in individual mode with no sign-in, or in team
 ```text
 apps/api/app/auth/principal.py       # Principal and the dependency every router uses
 apps/api/app/auth/accounts.py        # accounts and roles in the app state, Argon2id
-apps/api/app/auth/sessions.py        # random session ids, expiry, revocation
+apps/api/app/auth/account_sessions.py # random session ids, expiry, revocation
 apps/api/app/auth/origin.py          # Host and Origin middleware
 apps/api/app/auth/oidc.py            # authorization-code flow with PKCE, reusing the JWKS cache of auth/jwt.py
 apps/api/app/api/session.py          # sign-in, sign-out, current user
@@ -54,7 +54,7 @@ jobs/seed_dev_accounts.py            # development accounts from a fixture file
 - `GET /session/oidc/start`, `GET /session/oidc/callback`; `GET/PUT/DELETE /settings/oidc` (admin).
 - `GET /admin/users`, `POST /admin/users`, `PATCH /admin/users/{id}`, `POST /admin/users/{id}/password`.
 - Environment: `FITCHER_ALLOWED_HOSTS` (comma-separated).
-- App state tables `accounts`, `account_roles`, `sessions`, `sign_in_failures`.
+- App state tables `accounts`, `account_roles`, `account_sessions`, `sign_in_failures` (not `sessions`: a development pack has a column of that name, which engine code may not use).
 
 ## Verification
 

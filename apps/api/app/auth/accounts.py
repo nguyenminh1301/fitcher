@@ -5,7 +5,7 @@ password hash, a status and the pack and console roles it holds. Passwords are
 hashed with argon2-cffi's default parameters, which follow the library's
 current recommendation; a stored hash made with older parameters is replaced
 on the next successful sign-in. Changing the password or disabling the
-account ends its sessions in the same transaction. The last enabled ``admin``
+account signs it out everywhere in the same transaction. The last enabled ``admin``
 cannot be disabled or lose the role, so an instance always keeps an admin.
 """
 
@@ -163,7 +163,7 @@ def set_password(db: StateDb, account_id: str, password: str) -> None:
         _require(conn, account_id)
         conn.execute("UPDATE accounts SET password_hash = ?, updated_at = ? WHERE id = ?",
                      (password_hash, _now(), account_id))
-        conn.execute("DELETE FROM sessions WHERE account_id = ?", (account_id,))
+        conn.execute("DELETE FROM account_sessions WHERE account_id = ?", (account_id,))
 
 
 def _enabled_admins(conn: sqlite3.Connection) -> int:
@@ -177,7 +177,7 @@ def update(
     db: StateDb, account_id: str, *, display_name: str | None = None, roles: Iterable[str] | None = None,
     enabled: bool | None = None,
 ) -> Account:
-    """Change the name, roles or status; disabling ends the account's sessions."""
+    """Change the name, roles or status; disabling signs the account out."""
     roles = None if roles is None else list(roles)
     with db.write() as conn:
         _require(conn, account_id)
@@ -189,7 +189,7 @@ def update(
         if enabled is not None:
             conn.execute("UPDATE accounts SET status = ? WHERE id = ?", ("enabled" if enabled else "disabled", account_id))
             if not enabled:
-                conn.execute("DELETE FROM sessions WHERE account_id = ?", (account_id,))
+                conn.execute("DELETE FROM account_sessions WHERE account_id = ?", (account_id,))
         if admins_before and not _enabled_admins(conn):
             # Raising inside the transaction rolls back every change above.
             raise LastAdmin("the last enabled admin cannot be disabled or lose the admin role")

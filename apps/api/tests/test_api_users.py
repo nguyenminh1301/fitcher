@@ -7,7 +7,7 @@ from agent_fixtures import compiled_fixture
 from session_fixtures import PASSWORD, sign_in
 
 from app.api import runtime
-from app.auth import accounts, sessions
+from app.auth import accounts, account_sessions
 from app.main import app
 from app.state.db import shared_state
 
@@ -96,11 +96,11 @@ def test_patch_changes_roles_name_and_status_and_records_each_change(setup):
 def test_disabling_signs_the_user_out_at_once(setup):
     client, _ = setup
     user = create(client)
-    token = sessions.start(shared_state(), user["id"])
+    token = account_sessions.start(shared_state(), user["id"])
 
     client.patch(f"/admin/users/{user['id']}", json={"enabled": False})
 
-    assert sessions.principal_for(shared_state(), token) is None
+    assert account_sessions.principal_for(shared_state(), token) is None
 
 
 @pytest.mark.parametrize("body", [{"enabled": False}, {"roles": ["viewer"]}])
@@ -134,13 +134,13 @@ def test_patch_refuses_a_role_the_instance_does_not_have(setup):
 def test_a_password_reset_replaces_the_password_and_ends_the_sessions(setup):
     client, log = setup
     user = create(client)
-    token = sessions.start(shared_state(), user["id"])
+    token = account_sessions.start(shared_state(), user["id"])
     log.records.clear()
 
     response = client.post(f"/admin/users/{user['id']}/password", json={"password": "new password"})
 
     assert response.status_code == 204
-    assert sessions.principal_for(shared_state(), token) is None
+    assert account_sessions.principal_for(shared_state(), token) is None
     assert accounts.authenticate(shared_state(), "bea@example.com", "new password") is not None
     assert log.summary() == [("root", "user_password", user["id"], "null", "null")]
 

@@ -15,7 +15,7 @@ from fastapi import APIRouter, Cookie, Depends, Header, HTTPException, status
 from pydantic import BaseModel
 
 from app.api.runtime import PackIdentity, get_compiled, get_pack_identity, get_state_db, get_verifier, unavailable
-from app.auth import sessions
+from app.auth import account_sessions
 from app.auth.jwt import AuthError, AuthUnavailable, TokenVerifier
 from app.auth.principal import SESSION_COOKIE, Principal
 from app.auth.roles import RoleError, active_role, known_roles
@@ -40,7 +40,7 @@ def current_principal(
     authorization: Annotated[str | None, Header()] = None,
 ) -> Principal:
     if session is not None:
-        principal = sessions.principal_for(db, session)
+        principal = account_sessions.principal_for(db, session)
         if principal is None:
             raise UNAUTHORIZED
         return principal

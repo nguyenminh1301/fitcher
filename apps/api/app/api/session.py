@@ -13,7 +13,7 @@ from typing import Annotated
 from fastapi import APIRouter, Cookie, Depends, HTTPException, Request, Response, status
 
 from app.api.runtime import get_state_db
-from app.auth import accounts, sessions
+from app.auth import accounts, account_sessions
 from app.auth.principal import SESSION_COOKIE
 from app.contracts.session import SignIn
 from app.state.db import StateDb
@@ -28,15 +28,15 @@ def _cookie_options(request: Request) -> dict:
 
 def sign_in_response(request: Request, response: Response, db: StateDb, account_id: str) -> None:
     """Start a session for the account and set its cookie on ``response``."""
-    token = sessions.start(db, account_id)
-    response.set_cookie(SESSION_COOKIE, token, max_age=sessions.LIFETIME_SECONDS, **_cookie_options(request))
+    token = account_sessions.start(db, account_id)
+    response.set_cookie(SESSION_COOKIE, token, max_age=account_sessions.LIFETIME_SECONDS, **_cookie_options(request))
 
 
 @router.post("", status_code=status.HTTP_204_NO_CONTENT)
 def sign_in(body: SignIn, request: Request, response: Response, db: State) -> None:
-    throttle = sessions.SignInThrottle(db)
+    throttle = account_sessions.SignInThrottle(db)
     address = request.client.host if request.client else "unknown"
-    keys = [sessions.email_key(body.email), sessions.address_key(address)]
+    keys = [account_sessions.email_key(body.email), account_sessions.address_key(address)]
     wait = throttle.retry_after(keys)
     if wait:
         raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, detail="too many failed sign-ins; try again later",
@@ -55,5 +55,5 @@ def sign_out(
     session: Annotated[str | None, Cookie(alias=SESSION_COOKIE)] = None,
 ) -> None:
     if session:
-        sessions.end(db, session)
+        account_sessions.end(db, session)
     response.delete_cookie(SESSION_COOKIE, **_cookie_options(request))

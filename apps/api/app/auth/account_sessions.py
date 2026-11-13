@@ -1,4 +1,4 @@
-"""Server-side sessions and the sign-in throttle (DECISIONS §9).
+"""Server-side session of each signed-in account, and the sign-in throttle (DECISIONS §9).
 
 A session id is 32 random bytes sent to the browser in the session cookie;
 the app state keeps only its SHA-256 with the account and its creation and
@@ -40,14 +40,14 @@ def start(db: StateDb, account_id: str, clock: Clock = time.time) -> str:
     token = secrets.token_urlsafe(32)
     now = clock()
     with db.write() as conn:
-        conn.execute("INSERT INTO sessions (id_hash, account_id, created_at, last_used_at) VALUES (?, ?, ?, ?)",
+        conn.execute("INSERT INTO account_sessions (id_hash, account_id, created_at, last_used_at) VALUES (?, ?, ?, ?)",
                      (_hash(token), account_id, now, now))
     return token
 
 
 def end(db: StateDb, token: str) -> None:
     with db.write() as conn:
-        conn.execute("DELETE FROM sessions WHERE id_hash = ?", (_hash(token),))
+        conn.execute("DELETE FROM account_sessions WHERE id_hash = ?", (_hash(token),))
 
 
 def principal_for(db: StateDb, token: str, clock: Clock = time.time) -> Principal | None:
@@ -56,7 +56,7 @@ def principal_for(db: StateDb, token: str, clock: Clock = time.time) -> Principa
         return None
     id_hash = _hash(token)
     row = db.connection().execute(
-        "SELECT account_id, created_at, last_used_at FROM sessions WHERE id_hash = ?", (id_hash,)
+        "SELECT account_id, created_at, last_used_at FROM account_sessions WHERE id_hash = ?", (id_hash,)
     ).fetchone()
     if row is None:
         return None
@@ -70,7 +70,7 @@ def principal_for(db: StateDb, token: str, clock: Clock = time.time) -> Principa
         return None
     if now - last_used_at >= TOUCH_SECONDS:
         with db.write() as conn:
-            conn.execute("UPDATE sessions SET last_used_at = ? WHERE id_hash = ?", (now, id_hash))
+            conn.execute("UPDATE account_sessions SET last_used_at = ? WHERE id_hash = ?", (now, id_hash))
     return Principal(user_id=account.id, subject=account.id, display_name=account.display_name, roles=account.roles)
 
 

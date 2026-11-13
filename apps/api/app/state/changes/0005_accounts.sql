@@ -20,9 +20,9 @@ CREATE TABLE account_roles
     PRIMARY KEY (account_id, role)
 );
 
--- Signed-in sessions. Only the SHA-256 of the random session id is stored.
+-- A signed-in session per row. Only the SHA-256 of the random session id is stored.
 -- Times are seconds since the epoch.
-CREATE TABLE sessions
+CREATE TABLE account_sessions
 (
     id_hash TEXT PRIMARY KEY,
     account_id TEXT NOT NULL REFERENCES accounts (id) ON DELETE CASCADE,
@@ -30,7 +30,7 @@ CREATE TABLE sessions
     last_used_at REAL NOT NULL
 );
 
-CREATE INDEX sessions_by_account ON sessions (account_id);
+CREATE INDEX account_sessions_by_account ON account_sessions (account_id);
 
 -- Failed sign-ins by key (an e-mail or a client address), kept for the
 -- throttling window only.
