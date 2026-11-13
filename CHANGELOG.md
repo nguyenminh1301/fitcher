@@ -236,6 +236,7 @@
 
 ### Security
 
+- Upgrade the LiteLLM gateway image's nodejs-26 from 26.13.0-r0 to at least 26.13.1-r0 (`infra/litellm/Dockerfile`), which fixes the HTTP/2 denial of service CVE-2026-123863 that upstream v1.106.7 still ships.
 - Build the Qdrant service from `infra/qdrant/Dockerfile`, which upgrades the upstream v1.20.0 image's zlib1g to the Debian fix for CVE-2026-76844 and CVE-2026-85091 until a Qdrant release ships it.
 - Build the LiteLLM gateway from `infra/litellm/Dockerfile`: the pinned `ghcr.io/berriai/litellm:v1.106.7` with its bundled oauthlib 4.0.0 replaced by 4.0.1, which fixes CVE-2026-49272 that failed the image audit; the newest upstream release, v1.108.1, still bundles 4.0.0.
 - Pin `pypdf` 6.21.4, which fixes the denial-of-service advisories (CVE-2026-115572 and nine others) reported against 6.21.1 for crafted PDF uploads.
