@@ -22,7 +22,7 @@ const CONSOLE = {
   traces: {},
   audit: [],
   costs: [],
-  users: [{ id: "u2", username: "lab.marketing", display_name: "Lab Marketing", roles: ["marketing"], enabled: true }],
+  users: [{ id: "u2", email: "marketing@example.com", display_name: "Lab Marketing", roles: ["marketing"], enabled: true }],
 };
 
 function fakeFetch(files: Record<string, unknown>) {

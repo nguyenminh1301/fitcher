@@ -5,8 +5,8 @@
       "title": "Id",
       "type": "string"
     },
-    "username": {
-      "title": "Username",
+    "email": {
+      "title": "Email",
       "type": "string"
     },
     "display_name": {
@@ -27,7 +27,7 @@
   },
   "required": [
     "id",
-    "username",
+    "email",
     "display_name",
     "roles",
     "enabled"

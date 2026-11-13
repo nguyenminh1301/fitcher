@@ -13,7 +13,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from app.api.auth import current_principal
 from app.api.console import ADMIN, PACK_REVIEWER, require_admin
 from app.api.runtime import get_eval_reports, get_eval_runs, unavailable
-from app.auth.jwt import Principal
+from app.auth.principal import Principal
 from app.contracts.evaluation import EvalReportView, EvalRunStarted
 from app.eval.console import EvalReports, EvalRuns, RunInProgress
 

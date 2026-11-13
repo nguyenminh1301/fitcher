@@ -99,7 +99,7 @@
     "costs": {"type": "array", "items": {"type": "object", "required": ["day", "alias", "model", "calls", "cost_usd"]}},
     "users": {
       "type": "array",
-      "items": {"type": "object", "required": ["id", "username", "display_name", "roles", "enabled"]}
+      "items": {"type": "object", "required": ["id", "email", "display_name", "roles", "enabled"]}
     }
   }
 }

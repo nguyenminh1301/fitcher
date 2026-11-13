@@ -17,7 +17,7 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, Response, Upl
 
 from app.api.console import require_reviewer
 from app.api.runtime import get_document_service, get_drafter, get_pack_dir, unavailable
-from app.auth.jwt import Principal
+from app.auth.principal import Principal
 from app.contracts.documents import DocumentList, DocumentRolesChange, DocumentView, DraftResult
 from app.llm.client import LLMError
 from app.observability.tracing import trusted_pack_calls

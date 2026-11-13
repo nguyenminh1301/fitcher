@@ -12,7 +12,7 @@ from fastapi import APIRouter, Depends, HTTPException, Response, status
 
 from app.api.auth import current_principal
 from app.api.runtime import get_conversation_store, unavailable
-from app.auth.jwt import Principal
+from app.auth.principal import Principal
 from app.contracts.feedback import FeedbackInput
 from app.conversation.store import AnswerNotFound, ConversationStore
 

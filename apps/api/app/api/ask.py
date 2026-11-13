@@ -35,7 +35,7 @@ from app.api.agent import Agent, AgentRun
 from app.api.auth import current_principal, current_role
 from app.api.rate_limit import RateLimiter
 from app.api.runtime import get_agent, get_conversation_store, get_rate_limiter, unavailable
-from app.auth.jwt import Principal
+from app.auth.principal import Principal
 from app.contracts.events import (
     AskRequest, BlockedEvent, ChartSpecEvent, ClarifyEvent, DenyEvent, DoneEvent, ErrorEvent, EventModel, ResultEvent,
     SqlEvent, StatusEvent, SummaryEvent,

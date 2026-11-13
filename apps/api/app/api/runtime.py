@@ -28,7 +28,6 @@ from app.llm.clients import chat_client, embedding_client, index_embeddings
 from app.llm.model_store import ClickHouseModelStore, model_tiers_client
 from app.onboarding.documents import ClickHouseDocumentRegistry, DocumentService, pack_review_client
 from app.admin.logs import AdminLogs, trace_reader_client
-from app.auth.keycloak_admin import KeycloakAdmin, KeycloakAdminError
 from app.eval.console import EvalReports, EvalRuns
 from app.feedback.store import ClickHouseProposalStore, review_reader_client
 from app.observability.log_writer import start_log_writer, writer_client
@@ -37,6 +36,7 @@ from app.onboarding.review import ReviewService
 from app.packs.compiler import CompileError, CompiledPack, load_compiled
 from app.screening.screen import Screener
 from app.search.client import QdrantSearch
+from app.state.db import StateDb, shared_state
 
 
 logger = logging.getLogger(__name__)
@@ -47,12 +47,17 @@ def unavailable(detail: str) -> HTTPException:
 
 
 @cache
-def get_verifier() -> TokenVerifier:
+def get_verifier() -> TokenVerifier | None:
+    """The Keycloak access-token verifier, or None when its settings are not set."""
     settings = load_settings()
     token = TokenSettings(settings.keycloak_issuer, settings.keycloak_audience, settings.keycloak_jwks_url)
     if not all((token.issuer, token.audience, token.jwks_url)):
-        raise unavailable("KEYCLOAK_ISSUER, KEYCLOAK_AUDIENCE and KEYCLOAK_JWKS_URL must be set")
+        return None
     return TokenVerifier(token, JwksCache(token.jwks_url))
+
+
+def get_state_db() -> StateDb:
+    return shared_state()
 
 
 @cache
@@ -271,14 +276,6 @@ def get_eval_reports() -> EvalReports:
         raise unavailable(f"the eval reports are unavailable: {error}") from None
     return EvalReports(lambda sql, parameters: client.query(sql, parameters=parameters).result_rows,
                        pack_identity(get_compiled_or_none()).name)
-
-
-@cache
-def get_keycloak_admin() -> KeycloakAdmin:
-    try:
-        return KeycloakAdmin.from_env()
-    except KeycloakAdminError as error:
-        raise unavailable(str(error)) from None
 
 
 def get_admin_action_log() -> ClickHouseModelStore:

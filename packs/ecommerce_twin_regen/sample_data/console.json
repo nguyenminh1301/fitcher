@@ -1720,7 +1720,7 @@
   "users": [
     {
       "id": "lab.analyst",
-      "username": "lab.analyst",
+      "email": "analyst@example.com",
       "display_name": "Lab Analyst",
       "roles": [
         "analyst"
@@ -1729,7 +1729,7 @@
     },
     {
       "id": "lab.marketing",
-      "username": "lab.marketing",
+      "email": "marketing@example.com",
       "display_name": "Lab Marketing",
       "roles": [
         "marketing"
@@ -1738,7 +1738,7 @@
     },
     {
       "id": "lab.northwest",
-      "username": "lab.northwest",
+      "email": "northwest@example.com",
       "display_name": "Lab Northwest",
       "roles": [
         "northwest_sales"
@@ -1747,7 +1747,7 @@
     },
     {
       "id": "lab.partner",
-      "username": "lab.partner",
+      "email": "partner@example.com",
       "display_name": "Lab Partner",
       "roles": [
         "category_partner"
@@ -1756,7 +1756,7 @@
     },
     {
       "id": "lab.reviewer",
-      "username": "lab.reviewer",
+      "email": "reviewer@example.com",
       "display_name": "Lab Reviewer",
       "roles": [
         "pack_reviewer",
@@ -1766,7 +1766,7 @@
     },
     {
       "id": "lab.admin",
-      "username": "lab.admin",
+      "email": "admin@example.com",
       "display_name": "Lab Admin",
       "roles": [
         "admin",

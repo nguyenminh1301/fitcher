@@ -13,7 +13,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 from app.api.console import require_reviewer
 from app.api.runtime import get_compiled_or_none, get_proposal_store, pack_identity, unavailable
-from app.auth.jwt import Principal
+from app.auth.principal import Principal
 from app.contracts.admin_feedback import FeedbackRow, ProposalResult
 from app.feedback.proposals import build_proposal, ineligible_reason, normalize
 from app.feedback.store import ClickHouseProposalStore

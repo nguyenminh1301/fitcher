@@ -2,6 +2,8 @@
 // which add the session's access token. The api answers runs, audit, costs and users only to an admin,
 // feedback to a pack_reviewer, and eval reports to either.
 
+import type { UserChange } from "@/lib/contracts";
+
 import type { FitcherApi } from "../client";
 import { refused } from "./conversations";
 
@@ -13,8 +15,8 @@ async function call(fetcher: Fetcher, url: string, init?: RequestInit): Promise<
   return response;
 }
 
-const json = (body: unknown): RequestInit => ({
-  method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify(body),
+const patch = (body: UserChange): RequestInit => ({
+  method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify(body),
 });
 const id = (value: string) => encodeURIComponent(value);
 
@@ -62,10 +64,10 @@ export function createHttpUsers(fetcher: Fetcher = (...args) => fetch(...args)):
   return {
     list: async () => (await call(fetcher, "/api/admin/users")).json(),
     setRoles: async (userId, roles) => {
-      await call(fetcher, `/api/admin/users/${id(userId)}/roles`, json({ roles }));
+      await call(fetcher, `/api/admin/users/${id(userId)}`, patch({ roles }));
     },
     setEnabled: async (userId, enabled) => {
-      await call(fetcher, `/api/admin/users/${id(userId)}/${enabled ? "enable" : "disable"}`, { method: "POST" });
+      await call(fetcher, `/api/admin/users/${id(userId)}`, patch({ enabled }));
     },
   };
 }

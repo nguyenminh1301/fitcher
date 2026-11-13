@@ -64,8 +64,8 @@ const CONSOLE: Partial<ConsoleFile> = {
     { day: "2026-11-02", alias: "sql-gen", model: "model-large", tier: "sql-gen", provider: "openai", calls: 4, cost_usd: 1.5 },
   ],
   users: [
-    { id: "adm", username: "adm", display_name: "Ada Admin", roles: ["admin", "analyst"], enabled: true },
-    { id: "ana", username: "ana", display_name: "Ana Analyst", roles: ["analyst"], enabled: true },
+    { id: "adm", email: "adm@example.com", display_name: "Ada Admin", roles: ["admin", "analyst"], enabled: true },
+    { id: "ana", email: "ana@example.com", display_name: "Ana Analyst", roles: ["analyst"], enabled: true },
   ],
 };
 

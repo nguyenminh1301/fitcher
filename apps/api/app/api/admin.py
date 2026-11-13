@@ -13,7 +13,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 from app.api.console import require_admin
 from app.api.runtime import get_admin_logs, unavailable
-from app.auth.jwt import Principal
+from app.auth.principal import Principal
 from app.contracts.admin import (
     AdminConversation, AdminConversationThread, AuditRow, CostRow, RunRow, RunTrace, ScreeningRow,
 )

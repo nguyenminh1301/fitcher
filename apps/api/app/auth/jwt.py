@@ -15,6 +15,8 @@ import time
 import httpx
 import jwt
 
+from app.auth.principal import Principal
+
 ALGORITHMS = ["RS256"]
 FETCH_TIMEOUT_SECONDS = 5.0
 REQUIRED_CLAIMS = ["exp", "iat", "iss", "aud", "sub"]
@@ -33,16 +35,6 @@ class TokenSettings:
     issuer: str
     audience: str
     jwks_url: str
-
-
-@dataclass(frozen=True)
-class Principal:
-    """The verified user: ``user_id`` is the username, which agent_logs record, else the subject."""
-
-    user_id: str
-    subject: str
-    display_name: str
-    roles: tuple[str, ...]
 
 
 def fetch_json(url: str) -> dict:
