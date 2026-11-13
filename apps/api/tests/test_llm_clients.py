@@ -19,7 +19,7 @@ def configure():
     mapping = TierMapping(shared_state(), store)
     from app.llm.routes import fill_defaults
 
-    fill_defaults(mapping, store.create("openai", api_key=KEY), dimensions=1024)
+    fill_defaults(mapping, store.create("openai", api_key=KEY))
     return mapping
 
 

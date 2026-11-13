@@ -92,8 +92,9 @@ def test_adding_the_first_provider_shows_only_the_key_ending_and_fills_the_tiers
     tiers = client.get("/models/tiers", headers=ADMIN).json()
     fast = tiers["tiers"][0]
     assert (fast["tier"], fast["provider_id"], fast["model"], fast["eval"]["evaluated"]) == ("fast", "openai", "gpt-5.4-mini", False)
-    assert tiers["embedding"] == {"backend": "local", "provider_id": None, "dimensions": 384, "needs_reindex": False,
-                                  "model": "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"}
+    # The pack was indexed locally, so the provider's embedding model now needs a recompile.
+    assert tiers["embedding"] == {"backend": "provider", "provider_id": "openai", "model": "text-embedding-3-large",
+                                  "dimensions": 1024, "needs_reindex": True}
     [action] = actions.records
     assert (action.action, action.target) == ("provider_add", "openai")
     assert KEY not in action.new_value and "7777" in action.new_value
@@ -224,26 +225,27 @@ def test_a_key_the_instance_key_cannot_read_asks_for_the_key_again(client, fakes
 
 def test_changing_the_embedding_needs_a_confirmed_reindex(client):
     add_openai(client)
-    change = {"backend": "provider", "provider_id": "openai", "model": "text-embedding-3-large", "dimensions": 1024}
+    change = {"backend": "local", "model": "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"}
 
     refused = client.put("/models/embedding", headers=ADMIN, json=change)
 
     assert refused.status_code == 409 and "full reindex" in refused.json()["detail"]
-    assert client.get("/models/tiers", headers=ADMIN).json()["embedding"]["backend"] == "local"
+    assert client.get("/models/tiers", headers=ADMIN).json()["embedding"]["backend"] == "provider"
 
 
-def test_a_confirmed_embedding_change_marks_the_pack_as_needing_a_recompile(client, actions):
+def test_a_confirmed_embedding_change_marks_the_pack_as_needing_a_recompile(client, actions, fakes):
     add_openai(client)
-    change = {"backend": "provider", "provider_id": "openai", "model": "text-embedding-3-large", "dimensions": 1024,
+    fakes.compiled = ("openai/text-embedding-3-large", 1024)
+    change = {"backend": "provider", "provider_id": "openai", "model": "text-embedding-3-small", "dimensions": 1536,
               "confirm_reindex": True}
 
     body = client.put("/models/embedding", headers=ADMIN, json=change).json()
 
-    assert body == {"backend": "provider", "provider_id": "openai", "model": "text-embedding-3-large",
-                    "dimensions": 1024, "needs_reindex": True}
+    assert body == {"backend": "provider", "provider_id": "openai", "model": "text-embedding-3-small",
+                    "dimensions": 1536, "needs_reindex": True}
     record = actions.records[-1]
     assert (record.action, record.old_value, record.new_value) == (
-        "embedding", "local/sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2", "openai/text-embedding-3-large",
+        "embedding", "openai/text-embedding-3-large", "openai/text-embedding-3-small",
     )
 
 

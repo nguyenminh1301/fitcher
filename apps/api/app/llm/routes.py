@@ -4,10 +4,12 @@ The mapping lives in the app state: setting group ``llm.tiers`` holds
 ``{"provider_id", "model"}`` per chat tier, and ``llm.embedding`` the embed
 tier's backend, model and vector size. Any model of a configured provider may
 serve a chat tier; an eval result informs the choice and no longer gates it.
-Adding the first provider fills every unmapped chat tier from ``defaults``.
-The embedding runs locally (``app/llm/local_embeddings.py``) unless an admin
-chooses a provider's embedding model, so no key is needed to index a pack
-(DECISIONS §14).
+Adding the first provider fills every unmapped chat tier from ``defaults``,
+and, while no embedding was chosen, the embed tier with the provider's
+embedding model: the local models lost retrieval recall against it
+(DECISIONS §14). With no provider that offers one, or when an admin chooses
+it, the embedding runs locally (``app/llm/local_embeddings.py``) and indexing
+a pack needs no key.
 
 ``SettingsRoutes`` reads the mapping on every call, so a change applies to the
 next call in every process that shares the app state.
@@ -115,6 +117,10 @@ class TierMapping:
         self._settings.set(TIERS_GROUP, tier, {"provider_id": mapped.provider_id, "model": mapped.model})
         return mapped
 
+    def embedding_chosen(self) -> bool:
+        """Whether a provider or an admin set the embedding; until then it is the local default."""
+        return self._settings.get(EMBEDDING_GROUP, "backend") is not None
+
     def embedding(self) -> EmbeddingChoice:
         if self._settings.get(EMBEDDING_GROUP, "backend") != "provider":
             model = self._settings.get(EMBEDDING_GROUP, "model")
@@ -153,12 +159,15 @@ class TierMapping:
         return used
 
 
-def fill_defaults(mapping: TierMapping, provider: Provider, *, dimensions: int = DEFAULT_DIMENSIONS) -> None:
-    """Map every unmapped chat tier to the provider's proposed models; the embedding stays as it is."""
+def fill_defaults(mapping: TierMapping, provider: Provider) -> None:
+    """Map every unmapped chat tier, and an embedding nobody chose, to the provider's proposed models."""
     current = mapping.tiers()
     for tier, model in defaults.chat_models(provider.kind).items():
         if tier not in current:
             mapping.set_tier(tier, provider.id, model)
+    embedding_model = defaults.embedding_model(provider.kind)
+    if embedding_model and not mapping.embedding_chosen():
+        mapping.set_embedding(provider.id, embedding_model, defaults.proposed_dimensions(embedding_model) or DEFAULT_DIMENSIONS)
 
 
 class SettingsRoutes:
@@ -200,17 +209,6 @@ class SettingsRoutes:
             ) from None
 
 
-def _dimensions(env: Mapping[str, str]) -> int:
-    value = env.get("EMBEDDING_DIMENSIONS") or str(DEFAULT_DIMENSIONS)
-    try:
-        dimensions = int(value)
-    except ValueError:
-        raise ValueError(f"EMBEDDING_DIMENSIONS must be a whole number, got {value[:20]!r}") from None
-    if dimensions < 1:
-        raise ValueError("EMBEDDING_DIMENSIONS must be at least 1")
-    return dimensions
-
-
 def _copy_legacy(mapping: TierMapping, created: list[Provider], aliases: Mapping[str, str]) -> None:
     by_kind = {provider.kind: provider.id for provider in created}
     for tier, alias in aliases.items():
@@ -220,10 +218,13 @@ def _copy_legacy(mapping: TierMapping, created: list[Provider], aliases: Mapping
 
 
 def _keep_compiled_embedding(mapping: TierMapping, created: list[Provider], compiled: tuple[str, int] | None) -> None:
-    """Keep the provider embedding a pack was compiled with, so its vectors still match."""
+    """Keep the embedding model a pack was compiled with, so its vectors still match."""
     if compiled is None:
         return
     label, dimensions = compiled
+    if label.startswith("local/") and label.removeprefix("local/") in LOCAL_MODELS:
+        mapping.set_local_embedding(label.removeprefix("local/"))
+        return
     kind, model = LEGACY_EMBEDDING_ALIASES.get(label, (None, None))
     if kind is None and "/" in label and not label.startswith("local/"):
         kind, model = label.split("/", 1)
@@ -252,7 +253,6 @@ def bootstrap_from_env(
               if env.get(setting, "").strip()]
     if not wanted:
         return []
-    dimensions = _dimensions(env)
     for kind, fields in wanted:
         check_fields(kind, **fields)
     created = [store.create(kind, **fields) for kind, fields in wanted]
@@ -261,7 +261,7 @@ def bootstrap_from_env(
         aliases.update(legacy_aliases())
     _copy_legacy(mapping, created, aliases)
     for provider in created:
-        fill_defaults(mapping, provider, dimensions=dimensions)
+        fill_defaults(mapping, provider)
     if compiled_embedding is not None:
         _keep_compiled_embedding(mapping, created, compiled_embedding())
     return created

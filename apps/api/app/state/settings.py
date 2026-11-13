@@ -36,7 +36,8 @@ SPECS: dict[tuple[str, str], SettingSpec] = {
     # The embed tier's model and vector size; changing them needs a full reindex (DECISIONS §14).
     # The optional prompt-injection classifier (DECISIONS §9); the EN/VI rules always run.
     ("screening", "classifier_enabled"): SettingSpec(bool, False),
-    ("llm.embedding", "backend"): SettingSpec(str, "local", ("local", "provider")),
+    # Unset until a provider proposes its embedding model or an admin chooses one.
+    ("llm.embedding", "backend"): SettingSpec(str, None, ("local", "provider")),
     ("llm.embedding", "provider_id"): SettingSpec(str),
     ("llm.embedding", "model"): SettingSpec(str),
     ("llm.embedding", "dimensions"): SettingSpec(int),

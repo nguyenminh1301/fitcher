@@ -40,7 +40,7 @@ class Sdk:
 def configured():
     store = ProviderStore(shared_state(), shared_vault())
     mapping = TierMapping(shared_state(), store)
-    fill_defaults(mapping, store.create("openai", api_key=KEY), dimensions=8)
+    fill_defaults(mapping, store.create("openai", api_key=KEY))
     mapping.set_embedding("openai", "text-embedding-3-large", 8)
 
 
@@ -94,7 +94,9 @@ def test_an_unknown_tier_is_refused(configured):
 
 def test_a_local_embedding_model_is_run_instead_of_called(monkeypatch, capsys):
     store = ProviderStore(shared_state(), shared_vault())
-    fill_defaults(TierMapping(shared_state(), store), store.create("openai", api_key=KEY), dimensions=8)
+    mapping = TierMapping(shared_state(), store)
+    fill_defaults(mapping, store.create("openai", api_key=KEY))
+    mapping.set_local_embedding("sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2")
     ran: list[list[str]] = []
 
     class Local:
