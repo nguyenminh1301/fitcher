@@ -34,6 +34,8 @@ SPECS: dict[tuple[str, str], SettingSpec] = {
     # Each chat tier's model: {"provider_id": ..., "model": ...} (app/llm/routes.py).
     **{("llm.tiers", tier): SettingSpec(dict) for tier in CHAT_TIERS},
     # The embed tier's model and vector size; changing them needs a full reindex (DECISIONS §14).
+    # The optional prompt-injection classifier (DECISIONS §9); the EN/VI rules always run.
+    ("screening", "classifier_enabled"): SettingSpec(bool, False),
     ("llm.embedding", "backend"): SettingSpec(str, "local", ("local", "provider")),
     ("llm.embedding", "provider_id"): SettingSpec(str),
     ("llm.embedding", "model"): SettingSpec(str),

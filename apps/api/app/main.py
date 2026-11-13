@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
-from app.api import admin, ask, auth, conversations, datasets, documents, evaluation, feedback, feedback_review, models, providers, review, runtime, setup, users
+from app.api import admin, ask, auth, conversations, datasets, documents, evaluation, feedback, feedback_review, models, providers, review, runtime, screening, setup, users
 from app.llm.clients import bootstrap
 from app.state.db import shared_state
 
@@ -33,16 +33,19 @@ app.include_router(evaluation.router)
 app.include_router(users.router)
 app.include_router(setup.router)
 app.include_router(providers.router)
+app.include_router(screening.router)
 
 
 @app.get("/health")
 def health() -> dict[str, str | None]:
-    """Liveness, with whether questions can be screened (DECISIONS §9).
+    """Liveness, with whether questions can be screened (DECISIONS §9): ``rules_only`` while the classifier is off.
 
     It never loads the classifier: until the screener is built, and whenever the model is missing, it
     reports ``screening: unavailable`` and stays healthy, so Compose and CI never depend on the gated model.
     """
     screener = runtime.loaded_screener()
+    if screener is not None and screener.disabled:
+        return {"status": "ok", "screening": "rules_only", "classifier": None}
     classifier = screener.loaded if screener else None
     return {
         "status": "ok", "screening": "ready" if classifier else "unavailable",
