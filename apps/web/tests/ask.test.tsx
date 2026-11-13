@@ -90,6 +90,8 @@ describe("asking a question", () => {
     });
 
     expect(state.threads[id].turns).toHaveLength(1);
+    // The first answer is still streaming; let it finish before the test environment is torn down.
+    await waitFor(() => expect(state.busy).toBeNull());
   });
 
   it("editing a question replaces that turn and drops the turns after it", async () => {
@@ -175,5 +177,6 @@ describe("asking through the api", () => {
 
     expect(requests[1]).toMatchObject({ question: "top gadgets", conversation_id: "api-1", edit_of_turn: 1, retry_of_turn: null });
     expect(requests[2]).toMatchObject({ question: "top gadgets", conversation_id: "api-1", edit_of_turn: null, retry_of_turn: 1 });
+    await waitFor(() => expect(state.busy).toBeNull());
   });
 });
