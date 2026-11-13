@@ -39,8 +39,12 @@ def read_accounts(path: Path = ACCOUNTS_FILE) -> list[DevAccount]:
 
 
 def seed(db: StateDb, wanted: list[DevAccount], password: str) -> int:
-    """Create or reset every account, then put the instance in team mode; returns the number of accounts."""
-    for account in wanted:
+    """Create or reset every account, then put the instance in team mode; returns the number of accounts.
+
+    Admin accounts come first, so an enabled admin exists before another account can lose the role: the
+    last-admin rule would otherwise stop a reset of an instance whose only admin is a changed account.
+    """
+    for account in sorted(wanted, key=lambda item: accounts.ADMIN not in item.roles):
         if accounts.get(db, account.id) is None:
             accounts.create(db, account.email, account.display_name, password, account.roles, account_id=account.id)
         else:

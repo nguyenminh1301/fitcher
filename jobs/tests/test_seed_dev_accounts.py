@@ -58,3 +58,14 @@ def test_the_password_comes_from_the_environment(tmp_path, monkeypatch):
 
     monkeypatch.setenv("DEV_ACCOUNT_PASSWORD", PASSWORD)
     assert job.main() == 0
+
+
+def test_a_reseed_restores_the_admin_when_another_account_holds_the_only_admin_role(db):
+    job.seed(db, job.read_accounts(), PASSWORD)
+    accounts.update(db, "lab.analyst", roles=["analyst", "admin"])
+    accounts.update(db, "lab.admin", enabled=False)
+
+    job.seed(db, job.read_accounts(), PASSWORD)
+
+    assert accounts.get(db, "lab.admin").enabled
+    assert accounts.get(db, "lab.analyst").roles == ("analyst",)
