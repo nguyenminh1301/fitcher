@@ -11,6 +11,7 @@ from datetime import UTC, datetime
 import json
 from typing import Any
 
+from app.llm.tiers import CHAT_TIERS
 from app.state.db import StateDb
 
 
@@ -30,6 +31,12 @@ INSTANCE_MODES = ("individual", "team")
 SPECS: dict[tuple[str, str], SettingSpec] = {
     ("instance", "mode"): SettingSpec(str, None, INSTANCE_MODES),
     ("setup", "complete"): SettingSpec(bool, False),
+    # Each chat tier's model: {"provider_id": ..., "model": ...} (app/llm/routes.py).
+    **{("llm.tiers", tier): SettingSpec(dict) for tier in CHAT_TIERS},
+    # The embed tier's model and vector size; changing them needs a full reindex (DECISIONS §14).
+    ("llm.embedding", "provider_id"): SettingSpec(str),
+    ("llm.embedding", "model"): SettingSpec(str),
+    ("llm.embedding", "dimensions"): SettingSpec(int),
 }
 
 
