@@ -1,0 +1,167 @@
+{
+  "$defs": {
+    "EmbeddingView": {
+      "additionalProperties": false,
+      "properties": {
+        "backend": {
+          "enum": [
+            "local",
+            "provider"
+          ],
+          "title": "Backend",
+          "type": "string"
+        },
+        "provider_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Provider Id"
+        },
+        "model": {
+          "title": "Model",
+          "type": "string"
+        },
+        "dimensions": {
+          "title": "Dimensions",
+          "type": "integer"
+        },
+        "needs_reindex": {
+          "title": "Needs Reindex",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "backend",
+        "provider_id",
+        "model",
+        "dimensions",
+        "needs_reindex"
+      ],
+      "title": "EmbeddingView",
+      "type": "object"
+    },
+    "EvalStatus": {
+      "additionalProperties": false,
+      "description": "The latest eval report of the active pack that ran the tier on this model; it informs and never gates.",
+      "properties": {
+        "evaluated": {
+          "title": "Evaluated",
+          "type": "boolean"
+        },
+        "passed": {
+          "title": "Passed",
+          "type": "boolean"
+        },
+        "reason": {
+          "title": "Reason",
+          "type": "string"
+        },
+        "report_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Report Id"
+        },
+        "report_ts": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Report Ts"
+        }
+      },
+      "required": [
+        "evaluated",
+        "passed",
+        "reason"
+      ],
+      "title": "EvalStatus",
+      "type": "object"
+    },
+    "TierView": {
+      "additionalProperties": false,
+      "properties": {
+        "tier": {
+          "title": "Tier",
+          "type": "string"
+        },
+        "provider_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Provider Id"
+        },
+        "model": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Model"
+        },
+        "eval": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/EvalStatus"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "tier",
+        "provider_id",
+        "model"
+      ],
+      "title": "TierView",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "tiers": {
+      "items": {
+        "$ref": "#/$defs/TierView"
+      },
+      "title": "Tiers",
+      "type": "array"
+    },
+    "embedding": {
+      "$ref": "#/$defs/EmbeddingView"
+    }
+  },
+  "required": [
+    "tiers",
+    "embedding"
+  ],
+  "title": "ModelTiersView",
+  "type": "object"
+}

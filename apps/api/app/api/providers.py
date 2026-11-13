@@ -28,15 +28,16 @@ from fastapi import APIRouter, Depends, HTTPException, Response, status
 from pydantic import BaseModel
 
 from app.api.console import require_admin
-from app.api.runtime import get_admin_action_log
+from app.api.runtime import get_admin_action_log, get_compiled_or_none, get_model_store, pack_identity
 from app.api.setup import get_state_db
 from app.auth.jwt import Principal
 from app.contracts.providers import (
-    EmbeddingChange, EmbeddingView, ModelTiersView, ProviderCreate, ProviderModels, ProviderTestRequest, ProviderTestResult,
+    EmbeddingChange, EmbeddingView, EvalStatus, ModelTiersView, ProviderCreate, ProviderModels, ProviderTestRequest, ProviderTestResult,
     ProviderUpdate, ProviderView, TierChange, TierView,
 )
 from app.llm import defaults
 from app.llm.client import LLMError, Prompt
+from app.llm.eligibility import eligibility, ReportSummary
 from app.llm.gateway import Gateway, Route
 from app.llm.provider_models import list_models, ModelListError
 from app.llm.providers import key_name, Provider, ProviderError, ProviderNotFound, ProviderStore
@@ -45,6 +46,7 @@ from app.llm.routes import EmbeddingChoice, fill_defaults, TierMapping
 from app.llm.tiers import CHAT_TIERS, EMBED_TIER
 from app.observability.events import AdminActionRecord, utc_now
 from app.observability.tracing import trusted_pack_calls
+from app.state import setup
 from app.state.db import StateDb
 from app.state.secrets import SecretError, SecretVault, shared_vault
 
@@ -72,6 +74,19 @@ def get_compiled_embedding() -> tuple[str, int] | None:
 
 
 Compiled = Annotated[tuple[str, int] | None, Depends(get_compiled_embedding)]
+
+
+def _active_reports() -> list[ReportSummary]:
+    """The active pack's latest eval report per tier and model; none when the pack or the store is unavailable."""
+    try:
+        return get_model_store().reports(pack_identity(get_compiled_or_none()).name)
+    except Exception:  # noqa: BLE001 - no compiled pack, no password or ClickHouse down: shown as not evaluated
+        logger.warning("the eval reports of the Models page could not be read", exc_info=True)
+        return []
+
+
+def get_eval_reports() -> Callable[[], list[ReportSummary]]:
+    return _active_reports
 
 
 def get_model_lister() -> Callable[[Provider, str | None], list[str]]:
@@ -149,12 +164,14 @@ def list_providers(_: Admin, store: Store, mapping: Mapping) -> list[ProviderVie
 
 
 @router.post("/providers", status_code=status.HTTP_201_CREATED)
-def add_provider(body: ProviderCreate, admin: Admin, store: Store, mapping: Mapping, log: Log) -> ProviderView:
+def add_provider(body: ProviderCreate, admin: Admin, store: Store, mapping: Mapping, log: Log,
+                 db: Annotated[StateDb, Depends(get_state_db)]) -> ProviderView:
     try:
         provider = store.create(body.kind, name=body.name, api_key=body.api_key, base_url=body.base_url)
     except ProviderError as error:
         raise _refused(error) from None
     fill_defaults(mapping, provider)
+    setup.mark_done(db, "models")
     _record(log, admin, "provider_add", provider.id, "", _described(provider))
     return _view(provider, mapping.providers_in_use())
 
@@ -247,18 +264,26 @@ def _embedding(choice: EmbeddingChoice, compiled: tuple[str, int] | None) -> Emb
                          dimensions=choice.dimensions, needs_reindex=stale)
 
 
-def _tiers(mapping: TierMapping, compiled: tuple[str, int] | None) -> ModelTiersView:
+def _eval(reports: list[ReportSummary], tier: str, provider_id: str, model: str) -> EvalStatus:
+    found = eligibility(reports, tier, f"{provider_id}/{model}")
+    return EvalStatus(evaluated=found.report_id is not None, passed=found.eligible, reason=found.reason,
+                      report_id=found.report_id, report_ts=found.report_ts)
+
+
+def _tiers(mapping: TierMapping, compiled: tuple[str, int] | None, reports: list[ReportSummary]) -> ModelTiersView:
     mapped = mapping.tiers()
     return ModelTiersView(
-        tiers=[TierView(tier=tier, provider_id=mapped[tier].provider_id if tier in mapped else None,
-                        model=mapped[tier].model if tier in mapped else None) for tier in CHAT_TIERS],
+        tiers=[TierView(tier=tier, provider_id=mapped[tier].provider_id, model=mapped[tier].model,
+                        eval=_eval(reports, tier, mapped[tier].provider_id, mapped[tier].model))
+               if tier in mapped else TierView(tier=tier, provider_id=None, model=None) for tier in CHAT_TIERS],
         embedding=_embedding(mapping.embedding(), compiled),
     )
 
 
 @router.get("/models/tiers")
-def model_tiers(_: Admin, mapping: Mapping, compiled: Compiled) -> ModelTiersView:
-    return _tiers(mapping, compiled)
+def model_tiers(_: Admin, mapping: Mapping, compiled: Compiled,
+                reports: Annotated[Callable, Depends(get_eval_reports)]) -> ModelTiersView:
+    return _tiers(mapping, compiled, reports())
 
 
 @router.put("/models/embedding")

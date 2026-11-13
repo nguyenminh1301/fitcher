@@ -1,0 +1,19 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "provider_id": {
+      "title": "Provider Id",
+      "type": "string"
+    },
+    "model": {
+      "title": "Model",
+      "type": "string"
+    }
+  },
+  "required": [
+    "provider_id",
+    "model"
+  ],
+  "title": "TierChange",
+  "type": "object"
+}

@@ -11,7 +11,7 @@ from datetime import UTC, datetime
 from app.state.db import StateDb
 from app.state.settings import INSTANCE_MODES, Settings
 
-STEPS = ("mode",)
+STEPS = ("mode", "models")
 
 
 class SetupError(ValueError):
@@ -59,6 +59,12 @@ def set_mode(db: StateDb, mode: str) -> None:
         raise SetupError(f"mode must be one of {', '.join(INSTANCE_MODES)}")
     Settings(db).set("instance", "mode", mode)
     _mark(db, "mode", "done")
+
+
+def mark_done(db: StateDb, step: str) -> None:
+    if step not in STEPS:
+        raise UnknownStep(f"unknown setup step {step!r}")
+    _mark(db, step, "done")
 
 
 def skip(db: StateDb, step: str) -> None:

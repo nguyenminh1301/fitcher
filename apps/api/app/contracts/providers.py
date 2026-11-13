@@ -3,6 +3,7 @@
 No contract carries a key: a provider shows only whether its key is set and its last four characters.
 """
 
+from datetime import datetime
 from typing import Literal
 
 from app.contracts.query_spec import ContractModel
@@ -55,10 +56,21 @@ class ProviderTestResult(ContractModel):
     error: str | None
 
 
+class EvalStatus(ContractModel):
+    """The latest eval report of the active pack that ran the tier on this model; it informs and never gates."""
+
+    evaluated: bool
+    passed: bool
+    reason: str
+    report_id: str | None = None
+    report_ts: datetime | None = None
+
+
 class TierView(ContractModel):
     tier: str
     provider_id: str | None
     model: str | None
+    eval: EvalStatus | None = None
 
 
 class EmbeddingView(ContractModel):

@@ -90,7 +90,8 @@ def test_adding_the_first_provider_shows_only_the_key_ending_and_fills_the_tiers
     assert body == {"id": "openai", "name": "OpenAI", "kind": "openai", "base_url": None, "key_set": True,
                     "key_last4": "7777", "hosted": True, "in_use": True}
     tiers = client.get("/models/tiers", headers=ADMIN).json()
-    assert tiers["tiers"][0] == {"tier": "fast", "provider_id": "openai", "model": "gpt-5.4-mini"}
+    fast = tiers["tiers"][0]
+    assert (fast["tier"], fast["provider_id"], fast["model"], fast["eval"]["evaluated"]) == ("fast", "openai", "gpt-5.4-mini", False)
     assert tiers["embedding"] == {"backend": "local", "provider_id": None, "dimensions": 384, "needs_reindex": False,
                                   "model": "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"}
     [action] = actions.records
@@ -187,7 +188,7 @@ def test_a_chat_tier_is_mapped_to_any_model_of_a_configured_provider(client, act
 
     response = client.put("/models/tiers/sql-gen", headers=ADMIN, json={"provider_id": "openai", "model": "gpt-5.5"})
 
-    assert response.json() == {"tier": "sql-gen", "provider_id": "openai", "model": "gpt-5.5"}
+    assert response.json() == {"tier": "sql-gen", "provider_id": "openai", "model": "gpt-5.5", "eval": None}
     change = actions.records[-1]
     assert (change.action, change.target, change.old_value, change.new_value) == (
         "model_tier", "sql-gen", "openai/gpt-5.4", "openai/gpt-5.5",
@@ -263,3 +264,29 @@ def test_the_embedding_can_move_back_to_a_local_model(client):
 def test_an_embedding_change_that_does_not_fit_is_refused(client, change):
     add_openai(client)
     assert client.put("/models/embedding", headers=ADMIN, json={**change, "confirm_reindex": True}).status_code == 422
+
+
+
+def test_adding_a_provider_answers_the_setups_models_step(client):
+    add_openai(client)
+
+    steps = {step["id"]: step["state"] for step in client.get("/setup/status", headers=ADMIN).json()["steps"]}
+
+    assert steps["models"] == "done"
+
+
+def test_each_tier_shows_the_latest_eval_result_of_its_model_without_limiting_the_choice(client):
+    from datetime import datetime, UTC
+
+    from app.llm.eligibility import ReportSummary
+
+    add_openai(client)
+    passed = ReportSummary("r1", datetime(2026, 11, 10, tzinfo=UTC), {"sql-gen": "openai/gpt-5.4"}, True, False)
+    app.dependency_overrides[providers_api.get_eval_reports] = lambda: (lambda: [passed])
+
+    tiers = {tier["tier"]: tier for tier in client.get("/models/tiers", headers=ADMIN).json()["tiers"]}
+
+    assert tiers["sql-gen"]["eval"] == {"evaluated": True, "passed": True, "reason": "the latest eval report with it passed without regression",
+                                        "report_id": "r1", "report_ts": "2026-11-10T00:00:00Z"}
+    assert tiers["fast"]["eval"]["evaluated"] is False
+    assert client.put("/models/tiers/fast", headers=ADMIN, json={"provider_id": "openai", "model": "gpt-5.5"}).status_code == 200

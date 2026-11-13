@@ -25,8 +25,7 @@ from app.conversation.store import ConversationStore, conversations_client
 from app.data.clickhouse import ClientWarehouse, QueryLimits
 from app.llm.client import LLMError
 from app.llm.clients import chat_client, embedding_client, index_embeddings
-from app.llm.model_store import CatalogClient, ClickHouseModelStore, model_tiers_client
-from app.llm.tiers import TierMap, TierStoreError
+from app.llm.model_store import ClickHouseModelStore, model_tiers_client
 from app.onboarding.documents import ClickHouseDocumentRegistry, DocumentService, pack_review_client
 from app.admin.logs import AdminLogs, trace_reader_client
 from app.auth.keycloak_admin import KeycloakAdmin, KeycloakAdminError
@@ -154,32 +153,6 @@ def get_model_store() -> ClickHouseModelStore:
         return ClickHouseModelStore(model_tiers_client())
     except Exception as error:  # noqa: BLE001 - a missing password or unreachable ClickHouse
         raise unavailable(f"the model store is unavailable: {error}") from None
-
-
-class LazyTierStore:
-    """The model store, looked up on every read: a store unavailable at startup is used once it is back."""
-
-    def read(self) -> dict[str, str]:
-        try:
-            store = get_model_store()
-        except HTTPException as error:
-            raise TierStoreError(str(error.detail)) from None
-        return store.read()
-
-    def write(self, tier, alias, changed_by, changed_at) -> None:
-        get_model_store().write(tier, alias, changed_by, changed_at)
-
-
-@cache
-def get_tier_map() -> TierMap:
-    """The process's tier lookup; while the model store is unavailable, every tier keeps its default."""
-    return TierMap(load_settings().model_tiers, LazyTierStore())
-
-
-@cache
-def get_catalog() -> CatalogClient:
-    settings = load_settings()
-    return CatalogClient(settings.litellm_base_url, settings.litellm_master_key)
 
 
 _call_log_writer = None

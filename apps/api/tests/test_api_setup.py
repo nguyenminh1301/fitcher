@@ -26,7 +26,8 @@ def client(tmp_path):
 
 def test_status_of_a_new_instance(client):
     body = client.get("/setup/status", headers=ADMIN).json()
-    assert body == {"mode": None, "steps": [{"id": "mode", "state": "pending"}], "complete": False}
+    assert body == {"mode": None, "steps": [{"id": "mode", "state": "pending"}, {"id": "models", "state": "pending"}],
+                    "complete": False}
 
 
 def test_any_signed_in_user_can_read_the_status_but_not_change_it(client):
@@ -44,7 +45,7 @@ def test_choosing_a_mode_is_stored_and_shown_again(client):
     response = client.put("/setup/mode", headers=ADMIN, json={"mode": "team"})
     assert response.status_code == 200
     body = client.get("/setup/status", headers=ADMIN).json()
-    assert body["mode"] == "team" and body["steps"] == [{"id": "mode", "state": "done"}]
+    assert body["mode"] == "team" and body["steps"][0] == {"id": "mode", "state": "done"}
 
 
 def test_an_unknown_mode_is_refused(client):
@@ -52,7 +53,7 @@ def test_an_unknown_mode_is_refused(client):
 
 
 def test_skip_and_unknown_step(client):
-    assert client.post("/setup/steps/mode/skip", headers=ADMIN).json()["steps"] == [{"id": "mode", "state": "skipped"}]
+    assert client.post("/setup/steps/mode/skip", headers=ADMIN).json()["steps"][0] == {"id": "mode", "state": "skipped"}
     assert client.post("/setup/steps/nope/skip", headers=ADMIN).status_code == 404
 
 
@@ -60,6 +61,7 @@ def test_complete_needs_every_step_answered(client):
     refused = client.post("/setup/complete", headers=ADMIN)
     assert refused.status_code == 409 and "mode" in refused.json()["detail"]
     client.put("/setup/mode", headers=ADMIN, json={"mode": "individual"})
+    client.post("/setup/steps/models/skip", headers=ADMIN)
     done = client.post("/setup/complete", headers=ADMIN)
     assert done.status_code == 200 and done.json()["complete"] is True
 

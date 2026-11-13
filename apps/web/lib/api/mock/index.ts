@@ -142,14 +142,16 @@ export function createMockApi(options: { latencyMs?: number; identity?: () => Pr
         find((await load()).console.users, id).enabled = enabled;
       },
     },
-    // The Models page has no sample data: it reads the gateway catalog and eval reports from the api.
-    models: {
-      list: () => Promise.reject(new Error("The Models page needs the api; it has no sample data.")),
-      set: () => Promise.reject(new Error("The Models page needs the api; it has no sample data.")),
-    },
+    // The Models page has no sample data: providers, keys and tiers live in the instance's app state.
+    models: Object.fromEntries([
+      "providers", "addProvider", "changeProvider", "removeProvider", "providerModels", "testProvider", "tiers", "setTier",
+      "setEmbedding", "classifier", "setClassifier",
+    ].map((name) => [name, () => Promise.reject(new Error("The Models page needs the api; it has no sample data."))])) as unknown as FitcherApi["models"],
     // The demo is an instance that was set up already, so it never redirects to the setup.
     setup: {
-      status: async () => ({ mode: "individual", steps: [{ id: "mode", state: "done" }], complete: true }),
+      status: async () => ({
+        mode: "individual", steps: [{ id: "mode", state: "done" }, { id: "models", state: "done" }], complete: true,
+      }),
       setMode: () => Promise.reject(new Error("The setup needs the api; it has no sample data.")),
       skip: () => Promise.reject(new Error("The setup needs the api; it has no sample data.")),
       complete: () => Promise.reject(new Error("The setup needs the api; it has no sample data.")),

@@ -6,36 +6,13 @@ from pathlib import Path
 import pytest
 import yaml
 
-from app.llm.tiers import (
-    BUILT_IN_DEFAULTS, CACHE_SECONDS, TIERS, TierMap, TierStoreError, provider_of, tier_defaults,
-)
+from app.llm.tiers import BUILT_IN_DEFAULTS, provider_of, TIERS, tier_defaults
 
 ROOT = Path(__file__).resolve().parents[3]
 LITELLM = ROOT / "infra" / "litellm"
 
 
-class Clock:
-    def __init__(self):
-        self.now = 0.0
 
-    def __call__(self) -> float:
-        return self.now
-
-
-class FakeTierStore:
-    def __init__(self, rows: dict[str, str] | None = None):
-        self.rows = dict(rows or {})
-        self.reads = 0
-        self.fail = False
-
-    def read(self) -> dict[str, str]:
-        self.reads += 1
-        if self.fail:
-            raise TierStoreError("clickhouse is down")
-        return dict(self.rows)
-
-    def write(self, tier, alias, changed_by, changed_at):
-        self.rows[tier] = alias
 
 
 def test_defaults_come_from_the_environment_with_built_in_fallbacks():
@@ -44,63 +21,6 @@ def test_defaults_come_from_the_environment_with_built_in_fallbacks():
     assert defaults["sql-small"] == "local-small"
     assert defaults["fast"] == BUILT_IN_DEFAULTS["fast"]
     assert set(defaults) == set(TIERS)
-
-
-def test_without_a_store_every_tier_keeps_its_default():
-    tiers = TierMap(BUILT_IN_DEFAULTS)
-
-    assert [tiers.alias(tier) for tier in TIERS] == [BUILT_IN_DEFAULTS[tier] for tier in TIERS]
-
-
-def test_a_stored_mapping_wins_and_a_change_is_read_within_the_cache_window():
-    clock, store = Clock(), FakeTierStore({"sql-small": "anthropic-small"})
-    tiers = TierMap(BUILT_IN_DEFAULTS, store, clock=clock)
-
-    assert tiers.alias("sql-small") == "anthropic-small"
-    store.rows["sql-small"] = "gemini-small"
-    clock.now = CACHE_SECONDS - 1
-    assert tiers.alias("sql-small") == "anthropic-small"
-    clock.now = CACHE_SECONDS
-    assert tiers.alias("sql-small") == "gemini-small"
-    assert store.reads == 2
-
-
-def test_the_cache_window_is_at_most_thirty_seconds():
-    assert CACHE_SECONDS <= 30
-
-
-def test_invalidate_reads_the_store_on_the_next_lookup():
-    store = FakeTierStore()
-    tiers = TierMap(BUILT_IN_DEFAULTS, store, clock=Clock())
-    tiers.alias("fast")
-    store.rows["fast"] = "openai-medium"
-
-    tiers.invalidate()
-
-    assert tiers.alias("fast") == "openai-medium"
-
-
-def test_a_stored_embed_row_never_changes_the_embedding_alias():
-    tiers = TierMap(BUILT_IN_DEFAULTS, FakeTierStore({"embed": "gemini-embed"}), clock=Clock())
-
-    assert tiers.alias("embed") == BUILT_IN_DEFAULTS["embed"]
-
-
-def test_an_unreadable_store_keeps_the_last_mapping():
-    clock, store = Clock(), FakeTierStore({"sql-gen": "anthropic-medium"})
-    tiers = TierMap(BUILT_IN_DEFAULTS, store, clock=clock)
-    tiers.alias("sql-gen")
-    store.fail = True
-    clock.now = CACHE_SECONDS * 2
-
-    assert tiers.alias("sql-gen") == "anthropic-medium"
-
-
-def test_an_unknown_tier_or_missing_default_is_refused():
-    with pytest.raises(ValueError, match="unknown tier"):
-        TierMap(BUILT_IN_DEFAULTS).alias("gpt-5.4")
-    with pytest.raises(ValueError, match="no default alias"):
-        TierMap({"fast": "openai-small"})
 
 
 def test_provider_is_the_alias_prefix():

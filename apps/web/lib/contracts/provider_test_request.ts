@@ -1,7 +1,7 @@
 // Generated from the backend Pydantic contract by npm run contracts:generate; do not edit.
 
-export type Alias = string;
+export type Model = string | null;
 
-export interface ModelTierChange {
-  alias: Alias;
+export interface ProviderTestRequest {
+  model?: Model;
 }
