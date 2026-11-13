@@ -70,4 +70,16 @@ So the plan's fallback applies, and DECISIONS §2 and §14 record it.
 - When a provider that offers one is added, its embedding model is proposed: OpenAI `text-embedding-3-large` at 1024 dimensions, Gemini `gemini-embedding-001` at 768, or Ollama `nomic-embed-text` at 768 on a model server the user runs.
 - MiniLM remains the local model used when no connected provider offers an embedding model, for example with Anthropic alone. An admin can also choose it, or mpnet, on the Models page; the page asks to confirm the full reindex that changing the model needs.
 
-After the measurement both development packs were compiled again with `text-embedding-3-large` at 1024 dimensions.
+## After the measurement
+
+Both development packs were compiled again with `text-embedding-3-large` at 1024 dimensions. `jobs.retrieval_eval` then matched the baseline on every collection and language, except `ecommerce_twin` column values, which rose from 0.917 to 1.000 at recall@5.
+
+The pack eval ran once on the Phase 14 stack: the in-process gateway, providers in the app state, no LiteLLM Proxy service, and the classifier off.
+
+```bash
+docker compose run --rm -v ./build/eval:/app/build/eval api python -m jobs.eval --pack ecommerce_twin \
+  --baseline packs/ecommerce_twin/eval_baseline.json --output-dir build/eval
+```
+
+The tiers ran the models the proxy aliases named before: `fast` and `sql-small` on `openai/gpt-5.4-mini`, `sql-gen` on `openai/gpt-5.4` and `sql-gen-hard` on `openai/gpt-5.5`.
+Execution match reached 93% (42/45), above the 80% threshold, and the run exited 0. Against the baseline it did not regress on any layer: extraction 20/22 (delta 0), retrieval 22/22 (0) and execution 21/22 (+1).
