@@ -76,6 +76,17 @@ def _base_url(kind: str, base_url: str | None) -> str | None:
     return base_url.strip().rstrip("/")
 
 
+def check_fields(kind: str, *, api_key: str | None = None, base_url: str | None = None) -> str | None:
+    """Refuse fields that do not fit ``kind``; returns the normalized base URL."""
+    if kind not in KINDS:
+        raise ProviderError(f"unknown provider kind {kind!r}; use one of {', '.join(KINDS)}")
+    if kind in HOSTED and not api_key:
+        raise ProviderError(f"a {kind} provider needs an API key")
+    if kind == "ollama" and api_key:
+        raise ProviderError("an ollama provider takes no API key")
+    return _base_url(kind, base_url)
+
+
 class ProviderStore:
     def __init__(self, db: StateDb, vault: SecretVault):
         self._db = db
@@ -108,13 +119,7 @@ class ProviderStore:
 
     def create(self, kind: str, *, name: str | None = None, api_key: str | None = None,
                base_url: str | None = None) -> Provider:
-        if kind not in KINDS:
-            raise ProviderError(f"unknown provider kind {kind!r}; use one of {', '.join(KINDS)}")
-        if kind in HOSTED and not api_key:
-            raise ProviderError(f"a {kind} provider needs an API key")
-        if kind == "ollama" and api_key:
-            raise ProviderError("an ollama provider takes no API key")
-        url = _base_url(kind, base_url)
+        url = check_fields(kind, api_key=api_key, base_url=base_url)
         name = (name or DISPLAY_NAMES[kind]).strip()
         if not name or self._name_taken(name):
             raise ProviderError(f"the name {name!r} is empty or already used by another provider")

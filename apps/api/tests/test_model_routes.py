@@ -162,3 +162,24 @@ def test_the_embedding_route_of_ollama_uses_the_embedding_prefix(state, store, m
     fill_defaults(mapping, store.create("ollama", base_url="http://host.docker.internal:11434"), dimensions=1024)
 
     assert SettingsRoutes(mapping, store, state[1].reader()).route("embed").model == "ollama/nomic-embed-text"
+
+
+@pytest.mark.parametrize("dimensions", [0, -5])
+def test_an_embedding_needs_a_positive_size(store, mapping, dimensions):
+    store.create("openai", api_key=KEY)
+    with pytest.raises(ValueError, match="at least one dimension"):
+        mapping.set_embedding("openai", "text-embedding-3-large", dimensions)
+
+
+@pytest.mark.parametrize("env", [
+    {"OPENAI_API_KEY": KEY, "EMBEDDING_DIMENSIONS": "invalid"},
+    {"OPENAI_API_KEY": KEY, "EMBEDDING_DIMENSIONS": "0"},
+    {"OPENAI_API_KEY": KEY, "OLLAMA_URL": "ftp://host.docker.internal:11434"},
+])
+def test_an_invalid_environment_creates_nothing_so_a_corrected_one_still_bootstraps(store, mapping, env):
+    with pytest.raises(ValueError):
+        bootstrap_from_env(store, mapping, env)
+    assert store.list() == []
+
+    assert [p.id for p in bootstrap_from_env(store, mapping, {"OPENAI_API_KEY": KEY})] == ["openai"]
+    assert mapping.tier("fast") == TierModel("openai", "gpt-5.4-mini")

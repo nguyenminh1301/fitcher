@@ -25,7 +25,7 @@ import os
 
 from app.llm import defaults
 from app.llm.gateway import Route
-from app.llm.providers import Provider, ProviderStore
+from app.llm.providers import check_fields, Provider, ProviderStore
 from app.llm.tiers import check_chat_tier, CHAT_TIERS, EMBED_TIER
 from app.state.db import shared_state, StateDb
 from app.state.secrets import SecretError, SecretReader, shared_vault
@@ -87,6 +87,8 @@ class TierMapping:
         return TierModel(provider_id, model), self._settings.get(EMBEDDING_GROUP, "dimensions") or DEFAULT_DIMENSIONS
 
     def set_embedding(self, provider_id: str, model: str, dimensions: int) -> None:
+        if dimensions < 1:
+            raise ValueError("the embedding needs at least one dimension")
         self._store.get(provider_id)
         self._settings.set(EMBEDDING_GROUP, "provider_id", provider_id)
         self._settings.set(EMBEDDING_GROUP, "model", model)
@@ -138,19 +140,35 @@ class SettingsRoutes:
             ) from None
 
 
+def _dimensions(env: Mapping[str, str]) -> int:
+    value = env.get("EMBEDDING_DIMENSIONS") or str(DEFAULT_DIMENSIONS)
+    try:
+        dimensions = int(value)
+    except ValueError:
+        raise ValueError(f"EMBEDDING_DIMENSIONS must be a whole number, got {value[:20]!r}") from None
+    if dimensions < 1:
+        raise ValueError("EMBEDDING_DIMENSIONS must be at least 1")
+    return dimensions
+
+
 def bootstrap_from_env(store: ProviderStore, mapping: TierMapping, env: Mapping[str, str]) -> list[Provider]:
-    """Create the environment's providers when none exists; returns the providers created."""
+    """Create the environment's providers when none exists; returns the providers created.
+
+    Every setting is checked before the first write, so an invalid environment creates nothing and a
+    corrected one bootstraps on the next start.
+    """
     if store.list():
         return []
-    created = []
-    for kind, setting, field in ENV_PROVIDERS:
-        value = env.get(setting, "").strip()
-        if value:
-            created.append(store.create(kind, **{field: value}))
-    if created:
-        dimensions = int(env.get("EMBEDDING_DIMENSIONS") or DEFAULT_DIMENSIONS)
-        for provider in created:
-            fill_defaults(mapping, provider, dimensions=dimensions)
+    wanted = [(kind, {field: env[setting].strip()}) for kind, setting, field in ENV_PROVIDERS
+              if env.get(setting, "").strip()]
+    if not wanted:
+        return []
+    dimensions = _dimensions(env)
+    for kind, fields in wanted:
+        check_fields(kind, **fields)
+    created = [store.create(kind, **fields) for kind, fields in wanted]
+    for provider in created:
+        fill_defaults(mapping, provider, dimensions=dimensions)
     return created
 
 
