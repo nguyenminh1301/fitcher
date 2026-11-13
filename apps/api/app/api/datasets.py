@@ -11,7 +11,7 @@ from fastapi import APIRouter, Depends
 
 from app.api.console import require_reviewer
 from app.api.runtime import get_compiled
-from app.auth.jwt import Principal
+from app.auth.principal import Principal
 from app.contracts.review import DatasetColumnView, DatasetView
 from app.packs.compiler import CompiledPack
 from app.packs.search_indices import PackRoles

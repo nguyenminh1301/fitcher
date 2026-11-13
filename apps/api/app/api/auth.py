@@ -1,20 +1,26 @@
-"""Bearer authentication for the endpoints, plus ``/me`` and ``/pack``.
+"""The principal of every request, plus ``/me`` and ``/pack``.
 
-``current_principal`` answers 401 for a missing, malformed or refused token
-and never says which check failed; ``current_role`` answers 403 when the
-token holds no pack role or the ``X-Active-Role`` header names one it does not
-hold. ``/pack`` is public: the sign-in screen names the active pack.
+``current_principal`` reads the session cookie of a signed-in account. While
+the web app still signs in through Keycloak, a request without the cookie may
+send a Keycloak bearer token instead; that path goes when Keycloak is removed.
+It answers 401 for a missing, unknown or expired session or a refused token and
+never says which check failed; ``current_role`` answers 403 when the
+principal holds no pack role or the ``X-Active-Role`` header names one it does
+not hold. ``/pack`` is public: the sign-in screen names the active pack.
 """
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Header, HTTPException, status
+from fastapi import APIRouter, Cookie, Depends, Header, HTTPException, status
 from pydantic import BaseModel
 
-from app.api.runtime import PackIdentity, get_compiled, get_pack_identity, get_verifier, unavailable
-from app.auth.jwt import AuthError, AuthUnavailable, Principal, TokenVerifier
+from app.api.runtime import PackIdentity, get_compiled, get_pack_identity, get_state_db, get_verifier, unavailable
+from app.auth import sessions
+from app.auth.jwt import AuthError, AuthUnavailable, TokenVerifier
+from app.auth.principal import SESSION_COOKIE, Principal
 from app.auth.roles import RoleError, active_role, known_roles
 from app.packs.compiler import CompiledPack
+from app.state.db import StateDb
 
 router = APIRouter()
 
@@ -28,12 +34,21 @@ def pack_roles(compiled: CompiledPack) -> list[str]:
 
 
 def current_principal(
-    verifier: Annotated[TokenVerifier, Depends(get_verifier)],
+    db: Annotated[StateDb, Depends(get_state_db)],
+    verifier: Annotated[TokenVerifier | None, Depends(get_verifier)],
+    session: Annotated[str | None, Cookie(alias=SESSION_COOKIE)] = None,
     authorization: Annotated[str | None, Header()] = None,
 ) -> Principal:
+    if session is not None:
+        principal = sessions.principal_for(db, session)
+        if principal is None:
+            raise UNAUTHORIZED
+        return principal
     scheme, _, credentials = (authorization or "").partition(" ")
     if scheme.lower() != "bearer" or not credentials.strip():
         raise UNAUTHORIZED
+    if verifier is None:
+        raise unavailable("KEYCLOAK_ISSUER, KEYCLOAK_AUDIENCE and KEYCLOAK_JWKS_URL must be set")
     try:
         return verifier.verify(credentials.strip())
     except AuthError:

@@ -20,7 +20,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from app.api.console import require_admin
 from app.api.runtime import get_admin_action_log, get_screener
 from app.api.setup import get_state_db
-from app.auth.jwt import Principal
+from app.auth.principal import Principal
 from app.config import load_settings
 from app.contracts.screening import ClassifierStatus
 from app.observability.events import AdminActionRecord, utc_now

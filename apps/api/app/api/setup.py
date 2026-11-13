@@ -12,17 +12,14 @@ from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.api.auth import current_principal
 from app.api.console import require_admin
-from app.auth.jwt import Principal
+from app.api.runtime import get_state_db
+from app.auth.principal import Principal
 from app.contracts.setup import SetupModeChange, SetupStatus, SetupStep
 from app.state import setup
-from app.state.db import StateDb, shared_state
+from app.state.db import StateDb
 
 router = APIRouter(prefix="/setup")
 Admin = Annotated[Principal, Depends(require_admin)]
-
-
-def get_state_db() -> StateDb:
-    return shared_state()
 
 
 State = Annotated[StateDb, Depends(get_state_db)]

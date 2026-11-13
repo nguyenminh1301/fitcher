@@ -4,6 +4,8 @@ version = "0.1.0"
 description = "Domain-neutral natural-language data analysis API"
 requires-python = ">=3.13,<3.14"
 dependencies = [
+    # Hashes local account passwords with Argon2id (app/auth/accounts.py).
+    "argon2-cffi==25.1.0",
     "clickhouse-connect==1.11.0",
     # Encrypts stored secrets with AES-256-GCM (app/state/secrets.py).
     "cryptography==50.0.2",

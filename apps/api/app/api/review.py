@@ -14,7 +14,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 
 from app.api.console import require_reviewer
 from app.api.runtime import get_review_service
-from app.auth.jwt import Principal
+from app.auth.principal import Principal
 from app.contracts.review import ReviewItem, ReviewItemPatch
 from app.onboarding.pack_yaml import ItemNotFound
 from app.onboarding.review import ReviewRefused, ReviewService

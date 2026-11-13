@@ -10,7 +10,7 @@ from typing import Annotated
 from fastapi import Depends, HTTPException, status
 
 from app.api.auth import current_principal
-from app.auth.jwt import Principal
+from app.auth.principal import Principal
 
 PACK_REVIEWER = "pack_reviewer"
 ADMIN = "admin"

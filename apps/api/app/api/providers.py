@@ -30,7 +30,7 @@ from pydantic import BaseModel
 from app.api.console import require_admin
 from app.api.runtime import get_admin_action_log, get_compiled_or_none, get_model_store, pack_identity
 from app.api.setup import get_state_db
-from app.auth.jwt import Principal
+from app.auth.principal import Principal
 from app.contracts.providers import (
     EmbeddingChange, EmbeddingView, EvalStatus, ModelTiersView, ProviderCreate, ProviderModels, ProviderTestRequest, ProviderTestResult,
     ProviderUpdate, ProviderView, TierChange, TierView,
