@@ -3,7 +3,7 @@
 from fastapi.testclient import TestClient
 import pytest
 
-from auth_fixtures import token, verifier
+from session_fixtures import SessionHeaders
 from state_fixtures import new_state
 
 from app.api import providers as providers_api, runtime, setup as setup_api
@@ -12,8 +12,8 @@ from app.llm.provider_models import ModelListError
 from app.main import app
 from app.state.settings import Settings
 
-ADMIN = {"Authorization": f"Bearer {token(preferred_username='lab.admin', realm_access={'roles': ['admin']})}"}
-VIEWER = {"Authorization": f"Bearer {token()}"}
+ADMIN = SessionHeaders(['admin'], user_id='lab.admin')
+VIEWER = SessionHeaders()
 KEY = "sk-test-endpoint-key-7777"
 
 
@@ -60,7 +60,6 @@ def actions():
 def client(tmp_path, fakes, actions):
     db, vault = new_state(tmp_path)
     Settings(db).set("instance", "mode", "team")
-    app.dependency_overrides[runtime.get_verifier] = lambda: verifier()
     app.dependency_overrides[setup_api.get_state_db] = lambda: db
     app.dependency_overrides[providers_api.get_vault] = lambda: vault
     app.dependency_overrides[providers_api.get_model_lister] = lambda: fakes.lister

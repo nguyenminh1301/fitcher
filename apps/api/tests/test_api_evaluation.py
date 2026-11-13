@@ -6,7 +6,7 @@ from fastapi.testclient import TestClient
 import pytest
 
 from agent_fixtures import compiled_fixture
-from auth_fixtures import token, verifier
+from session_fixtures import SessionHeaders
 
 from app.api import runtime
 from app.eval.console import EvalReports, EvalRuns, RunInProgress
@@ -14,9 +14,9 @@ from app.eval.runner import EvalRun
 from app.eval.scorers import CaseScore, LayerScore
 from app.main import app
 
-ADMIN = {"Authorization": f"Bearer {token(realm_access={'roles': ['admin']})}"}
-REVIEWER = {"Authorization": f"Bearer {token(realm_access={'roles': ['pack_reviewer']})}"}
-VIEWER = {"Authorization": f"Bearer {token()}"}
+ADMIN = SessionHeaders(['admin'])
+REVIEWER = SessionHeaders(['pack_reviewer'])
+VIEWER = SessionHeaders()
 TS = datetime(2026, 11, 6, tzinfo=UTC)
 PASS, FAIL, SKIP = LayerScore(status="pass"), LayerScore(status="fail", reason="no result"), LayerScore(status="not_scored")
 
@@ -36,7 +36,6 @@ def reports(rows):
 
 @pytest.fixture
 def client():
-    app.dependency_overrides[runtime.get_verifier] = lambda: verifier()
     app.dependency_overrides[runtime.get_compiled_or_none] = lambda: compiled_fixture()
     app.dependency_overrides[runtime.get_eval_reports] = lambda: reports([("r1", TS, RUN.model_dump_json(), False)])
     with TestClient(app) as test_client:

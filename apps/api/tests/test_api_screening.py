@@ -5,7 +5,7 @@ import json
 from fastapi.testclient import TestClient
 import pytest
 
-from auth_fixtures import token, verifier
+from session_fixtures import SessionHeaders
 from state_fixtures import new_state
 
 from app.api import runtime, screening as screening_api, setup as setup_api
@@ -14,8 +14,8 @@ from app.state.settings import Settings
 from app.screening.screen import Screener
 from fakes import FakeClassifier
 
-ADMIN = {"Authorization": f"Bearer {token(preferred_username='lab.admin', realm_access={'roles': ['admin']})}"}
-VIEWER = {"Authorization": f"Bearer {token()}"}
+ADMIN = SessionHeaders(['admin'], user_id='lab.admin')
+VIEWER = SessionHeaders()
 
 
 class Actions:
@@ -42,7 +42,6 @@ def client(tmp_path, model_dir, actions):
     Settings(db).set("instance", "mode", "team")
     loaded = []
     screener = Screener(None, loader=lambda: loaded.append(1) or FakeClassifier(), enabled=lambda: False)
-    app.dependency_overrides[runtime.get_verifier] = lambda: verifier()
     app.dependency_overrides[setup_api.get_state_db] = lambda: db
     app.dependency_overrides[screening_api.get_model_dir] = lambda: model_dir
     app.dependency_overrides[screening_api.get_classifier_screener] = lambda: screener

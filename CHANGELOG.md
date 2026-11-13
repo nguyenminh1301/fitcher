@@ -262,6 +262,7 @@
 
 ### Removed
 
+- Remove Keycloak sign-in from the api: requests no longer carry a Keycloak bearer token, `app/auth/jwt.py` keeps only the JWKS cache that OIDC sign-in uses, and the `KEYCLOAK_ISSUER`, `KEYCLOAK_AUDIENCE` and `KEYCLOAK_JWKS_URL` settings are gone; a request in team mode without a valid session cookie answers 401 `sign in again`. Tests sign in with session cookies of test accounts.
 - Remove the api's Keycloak Admin API client (`app/auth/keycloak_admin.py`) and the endpoints `PUT /admin/users/{id}/roles`, `POST /admin/users/{id}/disable` and `/enable`; the api no longer reads `KEYCLOAK_URL` or `KEYCLOAK_ADMIN_API_SECRET`.
 - Remove the LiteLLM Proxy service: the `litellm` Compose service, `infra/litellm/` (image, catalog, configuration, the `llm_calls` callback and the screening guardrail with its copy of the rules, so `apps/api/app/screening/rules.py` is the only copy), its image audit job and trivy ignore list, and the `LITELLM_MASTER_KEY`, `LITELLM_BASE_URL`, `MODEL_TIER_<TIER>` and `EMBEDDING_DIMENSIONS` settings. README, `infra/README.md`, `jobs/README.md`, `packs/README.md`, `docs/tracing.md`, `SECURITY.md` and `.env.example` describe providers connected in the application instead.
 - Remove the alias-based Models page: `GET` and `PUT /admin/models`, its `model_tiers` contracts, the cached `TierMap` over `data_meta.model_tiers` (now read only once by bootstrap), the gateway catalog client and the api's HTTP clients of the LiteLLM Proxy (`LiteLLMClient`, `LiteLLMEmbeddings`).

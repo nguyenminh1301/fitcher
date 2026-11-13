@@ -4,7 +4,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from agent_fixtures import compiled_fixture
-from auth_fixtures import token, verifier
+from session_fixtures import SessionHeaders
 from fakes import FakeConversationClient
 from pydantic import ValidationError
 from test_api_ask import QUESTION, FakeAgent, answer, ask_with, kinds, parse
@@ -16,8 +16,8 @@ from app.conversation.store import ConversationStore
 from app.main import app
 
 
-def headers(user: str = "lab.viewer") -> dict:
-    return {"Authorization": f"Bearer {token(preferred_username=user)}"}
+def headers(user: str = "lab.viewer") -> SessionHeaders:
+    return SessionHeaders(user_id=user)
 
 
 @pytest.fixture
@@ -27,7 +27,6 @@ def store():
 
 @pytest.fixture
 def client(store):
-    app.dependency_overrides[runtime.get_verifier] = lambda: verifier()
     app.dependency_overrides[runtime.get_compiled] = lambda: compiled_fixture()
     app.dependency_overrides[runtime.get_conversation_store] = lambda: store
     with TestClient(app) as test_client:
@@ -112,7 +111,7 @@ def test_another_users_conversation_or_group_is_not_found(client, store, method,
     assert store.thread("lab.analyst", theirs).conversation.title == "Doanh thu quý 1"
 
 
-def test_every_conversation_endpoint_needs_a_token(client):
+def test_every_conversation_endpoint_needs_a_session(client):
     for method, path in [("get", "/conversations"), ("get", "/conversations/search?q=x"), ("get", "/conversation-groups")]:
         assert client.request(method.upper(), path).status_code == 401
 

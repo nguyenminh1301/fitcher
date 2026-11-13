@@ -4,7 +4,7 @@ from fastapi.testclient import TestClient
 import pytest
 
 from agent_fixtures import compiled_fixture
-from auth_fixtures import token, verifier
+from session_fixtures import SessionHeaders
 from test_review_service import NOW, Warehouse, add_draft_metric, pack_dir, registry  # noqa: F401 - fixtures
 
 from app.api import runtime
@@ -12,8 +12,8 @@ from app.data.clickhouse import QueryLimits
 from app.main import app
 from app.onboarding.review import ReviewService
 
-REVIEWER = {"Authorization": f"Bearer {token(realm_access={'roles': ['pack_reviewer']})}"}
-VIEWER = {"Authorization": f"Bearer {token()}"}
+REVIEWER = SessionHeaders(['pack_reviewer'])
+VIEWER = SessionHeaders()
 
 
 @pytest.fixture
@@ -24,7 +24,6 @@ def client(pack_dir, registry):  # noqa: F811 - pytest fixtures
             limits=QueryLimits(), compiled_dir=pack_dir.parents[1] / "build", clock=lambda: NOW,
         )
 
-    app.dependency_overrides[runtime.get_verifier] = lambda: verifier()
     app.dependency_overrides[runtime.get_compiled] = lambda: compiled_fixture()
     app.dependency_overrides[runtime.get_review_service] = service
     with TestClient(app) as test_client:

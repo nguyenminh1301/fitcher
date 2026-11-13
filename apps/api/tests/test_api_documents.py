@@ -6,7 +6,7 @@ from fastapi.testclient import TestClient
 import pytest
 
 from agent_fixtures import compiled_fixture
-from auth_fixtures import token, verifier
+from session_fixtures import SessionHeaders
 from document_fixtures import MARKDOWN
 from fakes import FakeEmbeddings, FakeSearch
 from test_documents_service import WordScreener
@@ -16,8 +16,8 @@ from app.main import app
 from app.onboarding.documents import DocumentService, InMemoryDocumentRegistry, compile_lock_path
 
 NOW = datetime(2026, 11, 5, 8, 0, tzinfo=UTC)
-REVIEWER = {"Authorization": f"Bearer {token(realm_access={'roles': ['pack_reviewer']})}"}
-VIEWER = {"Authorization": f"Bearer {token()}"}
+REVIEWER = SessionHeaders(['pack_reviewer'])
+VIEWER = SessionHeaders()
 
 
 @pytest.fixture
@@ -34,7 +34,6 @@ def service(tmp_path):
 
 @pytest.fixture
 def client(service):
-    app.dependency_overrides[runtime.get_verifier] = lambda: verifier()
     app.dependency_overrides[runtime.get_compiled] = lambda: compiled_fixture()
     app.dependency_overrides[runtime.get_document_service] = lambda: service
     with TestClient(app) as test_client:

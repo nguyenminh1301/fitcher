@@ -1,25 +1,20 @@
-"""Verify Keycloak access tokens (DECISIONS §2 and §9).
+"""The signing keys of an OpenID Connect provider, read from its JWKS (DECISIONS §9).
 
-A token is accepted only when it is an RS256 JWT signed by a key of the realm's
-JWKS, issued by ``KEYCLOAK_ISSUER`` for the audience ``KEYCLOAK_AUDIENCE``,
-not expired, and names its subject. The JWKS is fetched once and cached; a
-token whose ``kid`` the cache does not know refreshes it, at most once per
-``min_refresh_seconds``, so a stream of forged key ids cannot hammer Keycloak.
+``app/auth/oidc.py`` checks ID tokens with these keys. The JWKS is fetched
+once and cached; a key id the cache does not know refreshes it, at most once
+per ``min_refresh_seconds``, so a stream of forged key ids cannot hammer the
+provider.
 """
 
 from collections.abc import Callable
-from dataclasses import dataclass
 import threading
 import time
 
 import httpx
 import jwt
 
-from app.auth.principal import Principal
 
-ALGORITHMS = ["RS256"]
 FETCH_TIMEOUT_SECONDS = 5.0
-REQUIRED_CLAIMS = ["exp", "iat", "iss", "aud", "sub"]
 
 
 class AuthError(Exception):
@@ -28,13 +23,6 @@ class AuthError(Exception):
 
 class AuthUnavailable(Exception):
     """The keys cannot be read, so no token can be checked."""
-
-
-@dataclass(frozen=True)
-class TokenSettings:
-    issuer: str
-    audience: str
-    jwks_url: str
 
 
 def fetch_json(url: str) -> dict:
@@ -80,37 +68,3 @@ class JwksCache:
             if kid not in self._keys:
                 raise AuthError(f"no signing key {kid!r} in the JWKS")
             return self._keys[kid]
-
-
-class TokenVerifier:
-    def __init__(self, settings: TokenSettings, jwks: JwksCache):
-        self._settings = settings
-        self._jwks = jwks
-
-    def verify(self, token: str) -> Principal:
-        try:
-            header = jwt.get_unverified_header(token)
-        except jwt.InvalidTokenError as error:
-            raise AuthError(f"malformed token: {error}") from None
-        if header.get("alg") not in ALGORITHMS:
-            raise AuthError(f"algorithm {header.get('alg')!r} is not accepted")
-        kid = header.get("kid")
-        if not kid:
-            raise AuthError("the token names no signing key")
-        key = self._jwks.key(kid)
-        try:
-            claims = jwt.decode(
-                token, key.key, algorithms=ALGORITHMS, audience=self._settings.audience,
-                issuer=self._settings.issuer, options={"require": REQUIRED_CLAIMS},
-            )
-        except jwt.ExpiredSignatureError:
-            raise AuthError("the token has expired") from None
-        except jwt.InvalidTokenError as error:
-            raise AuthError(f"the token was refused: {error}") from None
-        realm_roles = claims.get("realm_access", {}).get("roles", [])
-        subject = claims["sub"]
-        user_id = claims.get("preferred_username") or subject
-        return Principal(
-            user_id=user_id, subject=subject, display_name=claims.get("name") or user_id,
-            roles=tuple(role for role in realm_roles if isinstance(role, str)),
-        )

@@ -27,9 +27,6 @@ class Settings:
     log_flush_interval_ms: int
     log_queue_max: int
     # Access token checks (Phase 7); empty values leave the authenticated endpoints unavailable.
-    keycloak_issuer: str
-    keycloak_audience: str
-    keycloak_jwks_url: str
     # Questions per user per minute on /ask, refilled evenly; one api worker holds the buckets.
     rate_limit_per_minute: int
     # Input screening (DECISIONS §9 Layer 0): log records verdicts, enforce also stops a block.
@@ -87,9 +84,6 @@ def load_settings(env: Mapping[str, str] | None = None) -> Settings:
         log_batch_size=positive_int(env, "LOG_BATCH_SIZE", 100),
         log_flush_interval_ms=positive_int(env, "LOG_FLUSH_INTERVAL_MS", 1000),
         log_queue_max=positive_int(env, "LOG_QUEUE_MAX", 10_000),
-        keycloak_issuer=env.get("KEYCLOAK_ISSUER", ""),
-        keycloak_audience=env.get("KEYCLOAK_AUDIENCE", ""),
-        keycloak_jwks_url=env.get("KEYCLOAK_JWKS_URL", ""),
         rate_limit_per_minute=positive_int(env, "RATE_LIMIT_PER_MINUTE", 10),
         screen_mode=screen_mode,
         screen_flag_at=screen_flag_at,

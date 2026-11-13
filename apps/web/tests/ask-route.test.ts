@@ -65,12 +65,12 @@ describe("ask route", () => {
 
   it("passes the api's refusal through", async () => {
     await signedIn();
-    replies.push(Response.json({ detail: "the token holds no role of this pack" }, { status: 403 }));
+    replies.push(Response.json({ detail: "you hold no role of this pack" }, { status: 403 }));
 
     const response = await ask({ question: "q" });
 
     expect(response.status).toBe(403);
-    expect(await response.json()).toEqual({ detail: "the token holds no role of this pack" });
+    expect(await response.json()).toEqual({ detail: "you hold no role of this pack" });
   });
 
   it("passes the api's refusal of a request without a session as signed out", async () => {
