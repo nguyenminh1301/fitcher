@@ -43,7 +43,9 @@ export function createHttpAuth(fetcher: typeof fetch = (...args) => fetch(...arg
     },
     signOut: async () => {
       current = null;
-      await fetcher("/api/session", { method: "DELETE" });
+      const response = await fetcher("/api/session", { method: "DELETE" });
+      // A 401 means the api had already ended the session; anything else that failed leaves it signed in.
+      if (!response.ok && response.status !== 401) throw new Error(`sign-out answered ${response.status}`);
       return "/sign-in";
     },
   };

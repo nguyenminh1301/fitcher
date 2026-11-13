@@ -238,6 +238,35 @@ describe("users", () => {
     expect(reset).toHaveBeenCalledWith("ana", "new password");
   });
 
+  it("opens the reset dialog of another user with an empty password", async () => {
+    await api.users.create({ email: "bea@example.com", display_name: "Bea Buyer", password: "battery staple", roles: ["analyst"] });
+    show("users", <UsersSection />);
+    const ana = (await screen.findByText("Ana Analyst")).closest("tr") as HTMLElement;
+
+    fireEvent.click(within(ana).getByRole("button", { name: "Reset password" }));
+    fireEvent.change(screen.getByLabelText("New password"), { target: { value: "typed for ana" } });
+    fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Cancel" }));
+    const bea = (await screen.findByText("Bea Buyer")).closest("tr") as HTMLElement;
+    fireEvent.click(within(bea).getByRole("button", { name: "Reset password" }));
+
+    expect((screen.getByLabelText("New password") as HTMLInputElement).value).toBe("");
+  });
+
+  it("sends a new account once while the request runs", async () => {
+    const create = vi.spyOn(api.users, "create").mockReturnValue(new Promise(() => undefined));
+    show("users", <UsersSection />);
+    await screen.findByText("Ana Analyst");
+
+    fireEvent.click(screen.getByRole("button", { name: "New account" }));
+    const dialog = screen.getByRole("dialog", { name: "New account" });
+    await act(async () => fireEvent.click(within(dialog).getByRole("button", { name: "Create" })));
+    await act(async () => fireEvent.click(within(dialog).getByRole("button", { name: "Create" })));
+
+    expect(create).toHaveBeenCalledTimes(1);
+    expect(within(dialog).getByRole("button", { name: "Create" }).hasAttribute("disabled")).toBe(true);
+    expect(within(dialog).getByRole("button", { name: "Cancel" }).hasAttribute("disabled")).toBe(true);
+  });
+
   it("lists users for an admin who may not read the Datasets section", async () => {
     vi.spyOn(api.datasets, "list").mockRejectedValue(new Error("this console section needs the pack_reviewer role"));
     show("users", <UsersSection />);

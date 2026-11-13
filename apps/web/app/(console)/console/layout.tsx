@@ -13,7 +13,8 @@ import { sectionOf } from "@/lib/console/sections";
 export default function ConsoleAppLayout({ children }: { children: ReactNode }) {
   const router = useRouter();
   const signIn = useCallback(() => router.replace("/sign-in"), [router]);
-  const signOut = useCallback(() => void api.auth.signOut().then((url) => window.location.assign(url)), []);
+  // A sign-out the api did not complete keeps the user on the page, still signed in, rather than showing sign-in.
+  const signOut = useCallback(() => void api.auth.signOut().then((url) => window.location.assign(url)).catch(() => undefined), []);
   const pathname = usePathname();
   const navigate = useCallback((path: string, options?: { replace: boolean }) => (options?.replace ? router.replace(path) : router.push(path)), [router]);
   const openChat = useCallback(() => router.push("/"), [router]);

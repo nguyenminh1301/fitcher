@@ -39,6 +39,9 @@ export function UsersSection() {
   const [resetting, setResetting] = useState<UserRow | null>(null);
   const [newPassword, setNewPassword] = useState("");
   const [refusal, setRefusal] = useState<string | null>(null);
+  // A request in flight keeps its dialog open and its buttons disabled, so it is sent once and its answer
+  // can only close the dialog it came from.
+  const [saving, setSaving] = useState(false);
   const packRoles = pack?.roles ?? [];
   const roles = [...packRoles, ...CONSOLE_ROLES];
   const users = data?.users ?? [];
@@ -54,6 +57,8 @@ export function UsersSection() {
   }
 
   async function create() {
+    if (saving) return;
+    setSaving(true);
     setRefusal(null);
     try {
       const user = await api.users.create(draft);
@@ -63,12 +68,15 @@ export function UsersSection() {
       await reload();
     } catch (error) {
       setRefusal(error instanceof Error ? error.message : String(error));
+    } finally {
+      setSaving(false);
     }
   }
 
   async function resetPassword() {
     const user = resetting;
-    if (!user) return;
+    if (!user || saving) return;
+    setSaving(true);
     setRefusal(null);
     try {
       await api.users.resetPassword(user.id, newPassword);
@@ -77,6 +85,8 @@ export function UsersSection() {
       toast(t("ui.passwordReset", { name: user.display_name }));
     } catch (error) {
       setRefusal(error instanceof Error ? error.message : String(error));
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -131,7 +141,7 @@ export function UsersSection() {
                 if (isSelf(user)) return <span className="fc-muted">—</span>;
                 return (
                   <span className="fc-row" style={{ gap: "var(--base-size-4)" }}>
-                    <Button size="sm" variant="ghost" icon="lock" onClick={() => { setRefusal(null); setResetting(user); }}>{t("ui.resetPassword")}</Button>
+                    <Button size="sm" variant="ghost" icon="lock" onClick={() => { setRefusal(null); setNewPassword(""); setResetting(user); }}>{t("ui.resetPassword")}</Button>
                     {user.enabled
                       ? <Button size="sm" variant="ghost" icon="userX" onClick={() => setDisabling(user)}>{t("ui.disable")}</Button>
                       : <Button size="sm" icon="userCheck" onClick={() => void setEnabled(user, true)}>{t("ui.enable")}</Button>}
@@ -191,11 +201,11 @@ export function UsersSection() {
         }>
         {t("ui.disableText")}
       </Dialog>
-      <Dialog open={creating} title={t("ui.newAccount")} onClose={() => setCreating(false)}
+      <Dialog open={creating} title={t("ui.newAccount")} onClose={() => !saving && setCreating(false)}
         actions={
           <>
-            <Button onClick={() => setCreating(false)}>{t("ui.cancel")}</Button>
-            <Button variant="primary" icon="user" onClick={() => void create()}>{t("ui.create")}</Button>
+            <Button disabled={saving} onClick={() => setCreating(false)}>{t("ui.cancel")}</Button>
+            <Button variant="primary" icon="user" disabled={saving} onClick={() => void create()}>{t("ui.create")}</Button>
           </>
         }>
         <div className="fc-stack" style={{ gap: "var(--base-size-12)" }}>
@@ -218,11 +228,11 @@ export function UsersSection() {
           </span>
         </div>
       </Dialog>
-      <Dialog open={!!resetting} title={t("ui.resetPasswordTitle", { name: resetting?.display_name ?? "" })} onClose={() => setResetting(null)}
+      <Dialog open={!!resetting} title={t("ui.resetPasswordTitle", { name: resetting?.display_name ?? "" })} onClose={() => !saving && setResetting(null)}
         actions={
           <>
-            <Button onClick={() => setResetting(null)}>{t("ui.cancel")}</Button>
-            <Button variant="primary" onClick={() => void resetPassword()}>{t("ui.save")}</Button>
+            <Button disabled={saving} onClick={() => setResetting(null)}>{t("ui.cancel")}</Button>
+            <Button variant="primary" disabled={saving} onClick={() => void resetPassword()}>{t("ui.save")}</Button>
           </>
         }>
         <div className="fc-stack" style={{ gap: "var(--base-size-12)" }}>

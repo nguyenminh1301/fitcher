@@ -47,6 +47,18 @@ describe("http auth", () => {
     expect(fetch.mock.calls.filter(([url, init]) => url === "/api/session" && !init?.method)).toHaveLength(2);
   });
 
+  it("reports a sign-out the api did not complete, so the session is not shown as ended", async () => {
+    const auth = createHttpAuth(fetcher({ "DELETE /api/session": () => Response.json({ error: "api_unreachable" }, { status: 502 }) }));
+
+    await expect(auth.signOut()).rejects.toThrow("502");
+  });
+
+  it("treats a session the api already ended as signed out", async () => {
+    const auth = createHttpAuth(fetcher({ "DELETE /api/session": () => Response.json({ error: "signed_out" }, { status: 401 }) }));
+
+    expect(await auth.signOut()).toBe("/sign-in");
+  });
+
   it("signs in with an e-mail and password", async () => {
     const fetch = fetcher({ "POST /api/session": () => new Response(null, { status: 204 }) });
 
