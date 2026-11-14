@@ -40,7 +40,7 @@ from app.onboarding.documents import KB_DOCS, DocumentRegistry, chunk_payloads
 from app.llm.embeddings import EmbeddingClient
 from app.packs.loader import check_references, load_pack
 from app.packs.models import Pack
-from app.packs.policy_compiler import AccessControl, apply_policies
+from app.packs.policy_compiler import AccessControl, apply_policies, memory_cap
 from app.packs.search_indices import INDEX_NAMES, ColumnValue, alias_name, build_documents, generation_of, physical_name, points
 from app.screening.screen import Screener
 from app.search.client import QdrantSearch
@@ -411,7 +411,7 @@ def compile_pack(
     if access is not None:
         if not agent_secret:
             raise CompileError("CLICKHOUSE_AGENT_PASSWORD must be set to apply the access policies")
-        apply_policies(pack, access, agent_secret)
+        apply_policies(pack, access, agent_secret, memory_cap())
         roles_applied = [role.id for role in pack.policies.roles]
     summary = CompileSummary(
         pack=pack.name, metrics_tested=metrics_tested, coverage=read_coverage(pack, warehouse),

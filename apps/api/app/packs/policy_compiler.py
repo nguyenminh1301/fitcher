@@ -17,16 +17,18 @@ User passwords are never stored: each is derived from one secret with
 HMAC-SHA256 over the user name, and ClickHouse receives only its SHA-256 hash.
 """
 
-from collections.abc import Callable, Iterable, Sequence
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 import hashlib
 import hmac
+import os
 import re
 from typing import Protocol
 
 import sqlglot
 from sqlglot import exp
 
+from app.config import positive_int
 from app.data.forbidden_functions import forbidden_function
 from app.packs.models import DatasetGrant, Pack, Role
 
@@ -39,7 +41,22 @@ PROFILE_LIMITS = {
     "max_result_rows": (10_000, 100_000),
     "max_memory_usage": (2_000_000_000, 4_000_000_000),
 }
+# QUERY_MAX_MEMORY_USAGE lowers the memory limits so a query stays below a small server's memory cap.
+MEMORY_CAP_SETTING = "QUERY_MAX_MEMORY_USAGE"
 _IDENTIFIER = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
+
+
+def memory_cap(env: Mapping[str, str] | None = None) -> int | None:
+    """The memory cap of ``QUERY_MAX_MEMORY_USAGE``, or None when it is unset."""
+    env = os.environ if env is None else env
+    return positive_int(env, MEMORY_CAP_SETTING, 1) if env.get(MEMORY_CAP_SETTING) else None
+
+
+def profile_limits(cap: int | None) -> dict[str, tuple[int, int]]:
+    if cap is None:
+        return dict(PROFILE_LIMITS)
+    default, maximum = PROFILE_LIMITS["max_memory_usage"]
+    return PROFILE_LIMITS | {"max_memory_usage": (min(default, cap), min(maximum, cap))}
 
 
 class AccessControl(Protocol):
@@ -241,7 +258,9 @@ def _grant_statements(verb: str, grants: Iterable[Grant], direction: str) -> lis
     return statements
 
 
-def plan_statements(pack: Pack, current: ManagedObjects, password_hash: Callable[[str], str]) -> list[str]:
+def plan_statements(
+    pack: Pack, current: ManagedObjects, password_hash: Callable[[str], str], memory_cap: int | None = None
+) -> list[str]:
     """DDL that brings ClickHouse from ``current`` to the pack's policies.
 
     Objects are created before grants that name them, and dropped last, so
@@ -249,7 +268,7 @@ def plan_statements(pack: Pack, current: ManagedObjects, password_hash: Callable
     """
     names = Names(pack.name)
     wanted = desired_objects(pack)
-    limits = ", ".join(f"{name} = {default} MIN 1 MAX {maximum}" for name, (default, maximum) in PROFILE_LIMITS.items())
+    limits = ", ".join(f"{name} = {default} MIN 1 MAX {maximum}" for name, (default, maximum) in profile_limits(memory_cap).items())
     statements = [f"CREATE SETTINGS PROFILE OR REPLACE {quote(names.profile)} SETTINGS readonly = 2 CONST, {limits}"]
     statements += [f"CREATE ROLE IF NOT EXISTS {quote(role)}" for role in sorted(wanted.roles)]
     for role in pack.policies.roles:
@@ -317,13 +336,13 @@ def read_managed(admin: AccessControl, pack: str) -> ManagedObjects:
     )
 
 
-def apply_policies(pack: Pack, admin: AccessControl, secret: str) -> list[str]:
+def apply_policies(pack: Pack, admin: AccessControl, secret: str, memory_cap: int | None = None) -> list[str]:
     """Reconcile ClickHouse to the pack's policies as the admin user; return the statements run."""
 
     def password_hash(user: str) -> str:
         return hashlib.sha256(agent_password(secret, user).encode()).hexdigest()
 
-    statements = plan_statements(pack, read_managed(admin, pack.name), password_hash)
+    statements = plan_statements(pack, read_managed(admin, pack.name), password_hash, memory_cap)
     for statement in statements:
         admin.command(statement)
     return statements
