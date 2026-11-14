@@ -155,10 +155,13 @@ export function createMockApi(options: { latencyMs?: number; identity?: () => Pr
       "providers", "addProvider", "changeProvider", "removeProvider", "providerModels", "testProvider", "tiers", "setTier",
       "setEmbedding", "classifier", "setClassifier",
     ].map((name) => [name, () => Promise.reject(new Error("The Models page needs the api; it has no sample data."))])) as unknown as FitcherApi["models"],
+    sources: Object.fromEntries([
+      "list", "test", "create", "update", "remove", "tables", "changeTables", "sync", "cancel", "syncs", "upload", "loadFile",
+    ].map((name) => [name, () => Promise.reject(new Error("The Sources page needs the api; it has no sample data."))])) as unknown as FitcherApi["sources"],
     // The demo is an instance that was set up already, so it never redirects to the setup.
     setup: {
       status: async () => ({
-        mode: "individual", steps: [{ id: "mode", state: "done" }, { id: "models", state: "done" }], complete: true,
+        mode: "individual", steps: [{ id: "mode", state: "done" }, { id: "models", state: "done" }, { id: "data", state: "done" }], complete: true,
       }),
       setMode: () => Promise.reject(new Error("The setup needs the api; it has no sample data.")),
       skip: () => Promise.reject(new Error("The setup needs the api; it has no sample data.")),
