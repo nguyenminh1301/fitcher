@@ -60,10 +60,15 @@ class Table:
 
 @dataclass(frozen=True)
 class Source:
+    """A source of the Sources page. Its collection holds the credentials; ``database`` and ``schema`` are named
+    where the collection is used, so a source manifest, whose collection holds them, simply has neither."""
+
     name: str
     kind: str
     tables: tuple[Table, ...] = ()
     mode: str = "copy"
+    database: str | None = None
+    schema: str | None = None
 
 
 class TableLike(Protocol):
@@ -117,6 +122,18 @@ def loading_table(name: str) -> str:
     return f"{quote(RAW_DATABASE)}.{quote(name + LOADING_SUFFIX)}"
 
 
+def scope_arguments(source: SourceLike) -> str:
+    """``, database = '...', schema = '...'`` for a source that names them, else nothing."""
+    arguments = ""
+    database = getattr(source, "database", None)
+    if database:
+        arguments += f", database = {literal(database)}"
+    schema = getattr(source, "schema", None)
+    if schema and source.kind == "postgres":
+        arguments += f", schema = {literal(schema)}"
+    return arguments
+
+
 def _structure(table: TableLike) -> str:
     return ", ".join(f"{quote(column.name)} {column.type}" for column in table.columns)
 
@@ -125,7 +142,7 @@ def table_function(source: SourceLike, table: TableLike) -> str:
     """The table function that reads ``table`` for a copy."""
     collection = source.name
     if source.kind in TABLE_FUNCTIONS:
-        return f"{TABLE_FUNCTIONS[source.kind]}({collection}, table = {literal(table.source_name)})"
+        return f"{TABLE_FUNCTIONS[source.kind]}({collection}{scope_arguments(source)}, table = {literal(table.source_name)})"
     if source.kind == "mongodb":
         return (
             f"mongodb({collection}, collection = {literal(table.source_name)}, "
@@ -146,7 +163,8 @@ def live_statements(source: SourceLike) -> list[str]:
     database = quote(live_database(source))
     collection = source.name
     if source.kind in DATABASE_ENGINES:
-        return [f"CREATE DATABASE IF NOT EXISTS {database} ENGINE = {DATABASE_ENGINES[source.kind]}({collection})"]
+        engine = f"{DATABASE_ENGINES[source.kind]}({collection}{scope_arguments(source)})"
+        return [f"CREATE DATABASE IF NOT EXISTS {database} ENGINE = {engine}"]
     statements = [f"CREATE DATABASE IF NOT EXISTS {database}"]
     for table in source.tables:
         columns = f" ({_structure(table)})" if table.columns else ""
