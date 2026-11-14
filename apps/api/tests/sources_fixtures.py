@@ -75,3 +75,39 @@ class FakeClickHouse:
         else:
             rows = next((rows for fragment, rows in self.catalog.items() if fragment in sql), [])
         return type("Result", (), {"result_rows": rows})()
+
+
+class UploadClickHouse(FakeClickHouse):
+    """Adds schema inference and the streamed insert to the fake."""
+
+    def __init__(self, inferred=None, **kwargs):
+        super().__init__(**kwargs)
+        self.inferred = inferred or [("Mã đơn", "Nullable(String)"), ("Số tiền", "Nullable(Float64)"),
+                                     ("Ngày", "Nullable(Date)")]
+        self.inserted: list[tuple] = []
+
+    def query(self, sql, parameters=None, settings=None):
+        if sql.startswith("DESCRIBE TABLE format("):
+            self.sql.append(sql)
+            self.parameters = parameters
+            self.query_settings = settings
+            rows = [(name, kind, "", "", "", "", "") for name, kind in self.inferred]
+            return type("Result", (), {"result_rows": rows})()
+        return super().query(sql, parameters, settings)
+
+    def command(self, sql, parameters=None, settings=None):
+        if sql.startswith("CREATE TABLE `raw`") and "ENGINE = MergeTree ORDER BY tuple()" in sql and "AS SELECT" not in sql:
+            self.sql.append(sql)
+            self.raw[sql.split("`")[3]] = 0
+            return 0
+        if sql.startswith("SELECT count() FROM `raw`.`") and sql.split("`")[3].endswith("__loading"):
+            self.sql.append(sql)
+            return self.raw.get(sql.split("`")[3], 0)
+        return super().command(sql, parameters, settings)
+
+    def raw_insert(self, table, column_names=None, insert_block=None, settings=None, fmt=None, **_):
+        data = insert_block if isinstance(insert_block, bytes) else b"".join(insert_block)
+        self.inserted.append((table, fmt, settings, data))
+        self.raw[table.split(".")[1].strip("`")] = max(data.count(b"\n") - 1, 0)
+        if self.fail_on == "raw_insert":
+            raise self.error

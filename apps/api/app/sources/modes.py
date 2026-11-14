@@ -49,3 +49,16 @@ def joined_live_tables(tables: list[TableInfo], modes: dict[str, str]) -> set[st
             if key.ref_table in live and key.ref_table != table.name:
                 flagged |= {table.name, key.ref_table}
     return flagged
+
+
+# Source column types an incremental copy can follow: they only grow (numbers) or move forward (dates).
+CURSOR_TYPES = frozenset({
+    "smallint", "integer", "bigint", "numeric", "real", "double precision", "date", "timestamp",
+    "timestamp without time zone", "timestamp with time zone", "tinyint", "int", "mediumint", "decimal", "datetime",
+    "year",
+})
+
+
+def cursor_candidates(columns) -> list[str]:
+    """The columns of a table that can serve as an incremental copy's cursor, in column order."""
+    return [column.name for column in columns if column.type.lower() in CURSOR_TYPES]

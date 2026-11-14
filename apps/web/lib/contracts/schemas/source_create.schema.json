@@ -1,0 +1,98 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "kind": {
+      "enum": [
+        "postgres",
+        "mysql"
+      ],
+      "title": "Kind",
+      "type": "string"
+    },
+    "host": {
+      "maxLength": 255,
+      "title": "Host",
+      "type": "string"
+    },
+    "port": {
+      "anyOf": [
+        {
+          "maximum": 65535,
+          "minimum": 1,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Port"
+    },
+    "database": {
+      "maxLength": 255,
+      "title": "Database",
+      "type": "string"
+    },
+    "schema_name": {
+      "anyOf": [
+        {
+          "maxLength": 255,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Schema Name"
+    },
+    "user": {
+      "maxLength": 255,
+      "title": "User",
+      "type": "string"
+    },
+    "password": {
+      "maxLength": 1024,
+      "title": "Password",
+      "type": "string"
+    },
+    "tls_mode": {
+      "default": "prefer",
+      "enum": [
+        "prefer",
+        "require",
+        "verify"
+      ],
+      "title": "Tls Mode",
+      "type": "string"
+    },
+    "ca_certificate": {
+      "anyOf": [
+        {
+          "maxLength": 20000,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Ca Certificate"
+    },
+    "name": {
+      "maxLength": 40,
+      "title": "Name",
+      "type": "string"
+    }
+  },
+  "required": [
+    "kind",
+    "host",
+    "database",
+    "user",
+    "password",
+    "name"
+  ],
+  "title": "SourceCreate",
+  "type": "object"
+}

@@ -1,0 +1,88 @@
+{
+  "$defs": {
+    "TableChangeInput": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "selected": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Selected"
+        },
+        "mode": {
+          "anyOf": [
+            {
+              "enum": [
+                "live",
+                "copy"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Mode"
+        },
+        "interval_seconds": {
+          "anyOf": [
+            {
+              "maximum": 31536000,
+              "minimum": 60,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Interval Seconds"
+        },
+        "cursor_column": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Cursor Column"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "title": "TableChangeInput",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "tables": {
+      "items": {
+        "$ref": "#/$defs/TableChangeInput"
+      },
+      "maxItems": 5000,
+      "title": "Tables",
+      "type": "array"
+    }
+  },
+  "required": [
+    "tables"
+  ],
+  "title": "TablesChange",
+  "type": "object"
+}

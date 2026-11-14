@@ -66,10 +66,13 @@ class _Tracked:
 
 
 class SourceService:
-    def __init__(self, store: SourceStore, client, clock: Callable[[], datetime] = lambda: datetime.now(UTC)):
+    def __init__(self, store: SourceStore, client, clock: Callable[[], datetime] = lambda: datetime.now(UTC),
+                 files=None):
         self._store = store
         self._client = client
         self._clock = clock
+        # Reloads the stored original of a file source; without it a file source cannot be synced.
+        self._files = files
         self._collections = CollectionAdmin(client)
         self._inspector = Inspector(client)
         self._cancelled: set[int] = set()
@@ -226,6 +229,12 @@ class SourceService:
         results: list[dict] = []
         status, error = "succeeded", None
         try:
+            if stored.kind == "file":
+                rows = self._files.reload(stored.id)
+                self._store.record_table_sync(stored.id, stored.id, rows=rows, cursor_value=None,
+                                              next_run_at=self._clock() + timedelta(days=36500), synced_at=self._clock())
+                results.append({"table": stored.id, "mode": "copy", "rows": rows, "full": True})
+                selected = []
             live = [t for t in selected if t.mode == "live"]
             if live:
                 source = Source(stored.id, stored.kind, tuple(Table(t.name) for t in live),

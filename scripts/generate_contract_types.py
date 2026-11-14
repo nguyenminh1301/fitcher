@@ -32,6 +32,10 @@ from app.contracts.result import Result  # noqa: E402
 from app.contracts.review import DatasetView, ReviewItem, ReviewItemPatch  # noqa: E402
 from app.contracts.screening import ClassifierStatus  # noqa: E402
 from app.contracts.setup import SetupModeChange, SetupStatus  # noqa: E402
+from app.contracts.sources import (  # noqa: E402
+    FileLoad, FileUploadView, ProbeResult, SourceCreate, SourceDetail, SourcePatch, SourceView, SyncView, TablesChange,
+    SourceConnection,
+)
 from app.contracts.users import NewUser, PasswordReset, UserChange, UserView  # noqa: E402
 
 # Each contract with the JSON Schema mode of its direction: what the api accepts ("validation") or
@@ -75,6 +79,16 @@ CONTRACTS = {
     "proposal_result": (ProposalResult, "serialization"),
     "eval_report_view": (EvalReportView, "serialization"),
     "eval_run_started": (EvalRunStarted, "serialization"),
+    "source_connection": (SourceConnection, "validation"),
+    "source_create": (SourceCreate, "validation"),
+    "source_patch": (SourcePatch, "validation"),
+    "source_view": (SourceView, "serialization"),
+    "source_detail": (SourceDetail, "serialization"),
+    "probe_result": (ProbeResult, "serialization"),
+    "tables_change": (TablesChange, "validation"),
+    "sync_view": (SyncView, "serialization"),
+    "file_upload_view": (FileUploadView, "serialization"),
+    "file_load": (FileLoad, "validation"),
     "user_view": (UserView, "serialization"),
     "user_change": (UserChange, "validation"),
     "new_user": (NewUser, "validation"),

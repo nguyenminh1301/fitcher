@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
-from app.api import admin, ask, auth, conversations, datasets, documents, evaluation, feedback, feedback_review, oidc, providers, review, runtime, screening, session, setup, users
+from app.api import admin, ask, auth, conversations, datasets, documents, evaluation, feedback, feedback_review, oidc, providers, review, runtime, screening, session, setup, sources, users
 from app.auth.origin import HostOriginGuard
 from app.llm.clients import bootstrap
 from app.state.db import shared_state
@@ -15,6 +15,7 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     shared_state()
     bootstrap()
     runtime.build_screener_in_background()
+    runtime.start_source_scheduler()
     yield
     runtime.close()
 
@@ -37,6 +38,7 @@ app.include_router(users.router)
 app.include_router(setup.router)
 app.include_router(providers.router)
 app.include_router(screening.router)
+app.include_router(sources.router)
 
 
 @app.get("/health")
