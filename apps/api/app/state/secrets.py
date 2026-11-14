@@ -19,7 +19,9 @@ from pathlib import Path
 import secrets as random
 
 from cryptography.exceptions import InvalidTag
+from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 
 from app.state.db import StateDb
 
@@ -61,6 +63,15 @@ def load_key(data_dir: Path, env: dict[str, str] | None = None, db: StateDb | No
     with os.fdopen(fd, "w", encoding="ascii") as handle:
         handle.write(base64.b64encode(key).decode("ascii"))
     return key
+
+
+def derive_key(key: bytes, purpose: str) -> bytes:
+    """A key of ``KEY_BYTES`` for ``purpose``, derived from the instance key with HKDF-SHA256.
+
+    A component that needs its own key (ClickHouse's encrypted named collections) gets one from this, so the
+    instance key itself is never handed to it and each purpose has an unrelated key.
+    """
+    return HKDF(algorithm=hashes.SHA256(), length=KEY_BYTES, salt=None, info=purpose.encode("utf-8")).derive(key)
 
 
 class SecretReader:

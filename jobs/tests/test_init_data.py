@@ -8,8 +8,10 @@ import xml.etree.ElementTree as ElementTree
 
 import pytest
 
+from app.state.secrets import derive_key, load_key
 from jobs import init_data
 from jobs.init_data import (
+    COLLECTIONS_KEY_PURPOSE,
     ADMIN_PASSWORD,
     ADMIN_USER,
     PASSWORD_SETTINGS,
@@ -183,7 +185,7 @@ def test_a_large_machine_keeps_the_default_query_limit():
 def test_the_server_config_applies_the_low_memory_profile(tmp_path):
     profile = MemoryProfile(server_memory=2 * GIB, query_memory=GIB, mark_cache=128 * 1024**2, max_threads=4)
 
-    render_server_config(tmp_path, profile, data_dir=Path("/data"))
+    render_server_config(tmp_path, profile, data_dir=Path("/data"), collections_key=bytes(32))
 
     config = ElementTree.parse(tmp_path / "config.d" / "fitcher.xml").getroot()
     assert config.findtext("max_server_memory_usage") == str(2 * GIB)
@@ -199,6 +201,50 @@ def test_the_server_config_applies_the_low_memory_profile(tmp_path):
     assert defaults.findtext("max_threads") == "4"
     assert float(defaults.findtext("max_bytes_ratio_before_external_group_by")) > 0
     assert float(defaults.findtext("max_bytes_ratio_before_external_sort")) > 0
+
+
+def test_source_credentials_are_stored_in_named_collections_encrypted_with_a_derived_key(tmp_path):
+    profile = MemoryProfile(server_memory=2 * GIB, query_memory=GIB, mark_cache=128 * 1024**2, max_threads=4)
+    instance_key = bytes([5]) * 32
+
+    render_server_config(tmp_path, profile, data_dir=Path("/data"), collections_key=derive_key(instance_key, COLLECTIONS_KEY_PURPOSE))
+
+    config = ElementTree.parse(tmp_path / "config.d" / "fitcher.xml").getroot()
+    storage = config.find("named_collections_storage")
+    assert storage.findtext("type") == "local_encrypted"
+    assert storage.findtext("path") == "/data/clickhouse/named_collections"
+    assert storage.findtext("algorithm") == "aes_256_ctr"
+    key_hex = storage.findtext("key_hex")
+    assert key_hex == derive_key(instance_key, COLLECTIONS_KEY_PURPOSE).hex()
+    assert key_hex != instance_key.hex()
+
+
+def test_the_source_admin_user_is_rendered_with_a_password_hash_and_reaches_the_api(tmp_path):
+    passwords = ensure_passwords(tmp_path, env={})
+    render_users(USER_TEMPLATES, tmp_path / "users.d", passwords)
+
+    user = ElementTree.parse(tmp_path / "users.d" / "source_admin.xml").getroot().find("users/source_admin")
+    digest = hashlib.sha256(passwords["CLICKHOUSE_SOURCE_ADMIN_PASSWORD"].encode()).hexdigest()
+    assert user.findtext("password_sha256_hex") == digest
+    assert passwords["CLICKHOUSE_SOURCE_ADMIN_PASSWORD"] not in (tmp_path / "users.d" / "source_admin.xml").read_text()
+
+    write_environment(tmp_path, passwords, ("127.0.0.1", 8123, True), memory_profile(4 * GIB), env={})
+    assert read_env_file(tmp_path / "api.env")["CLICKHOUSE_SOURCE_ADMIN_PASSWORD"] == passwords[
+        "CLICKHOUSE_SOURCE_ADMIN_PASSWORD"]
+
+
+def test_the_collection_key_follows_the_instance_key_on_every_start(tmp_path):
+    data, run = tmp_path / "data", tmp_path / "run"
+    kwargs = dict(env={}, templates=USER_TEMPLATES, cgroup=tmp_path, meminfo=tmp_path / "x")
+    init_data.initialize(data, run, **kwargs)
+    first = ElementTree.parse(run / "clickhouse" / "config.d" / "fitcher.xml").getroot().findtext(
+        "named_collections_storage/key_hex")
+
+    init_data.initialize(data, run, **kwargs)
+
+    assert ElementTree.parse(run / "clickhouse" / "config.d" / "fitcher.xml").getroot().findtext(
+        "named_collections_storage/key_hex") == first
+    assert first == derive_key(load_key(data, {}), COLLECTIONS_KEY_PURPOSE).hex()
 
 
 # Environment of the services

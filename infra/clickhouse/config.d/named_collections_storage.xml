@@ -1,0 +1,20 @@
+<clickhouse>
+    <!--
+        Where the named collections created with SQL are stored (DECISIONS §4 Data
+        sources): one encrypted file per collection under the data volume. The
+        sources connected on the Sources page keep their host and password here,
+        so ClickHouse is the only place a source credential lives. The key is
+        read from the environment; the release image renders this setting with a
+        key derived from the instance key (jobs/init_data.py). Collections
+        declared in config.d/sources.xml are unaffected.
+
+        Losing or changing the key makes the stored collections unreadable: the
+        sources must then be connected again.
+    -->
+    <named_collections_storage>
+        <type>local_encrypted</type>
+        <path>/var/lib/clickhouse/named_collections</path>
+        <algorithm>aes_256_ctr</algorithm>
+        <key_hex from_env="CLICKHOUSE_NAMED_COLLECTIONS_KEY"/>
+    </named_collections_storage>
+</clickhouse>
