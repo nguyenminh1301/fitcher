@@ -334,3 +334,18 @@ def test_a_load_for_an_unknown_upload_is_not_found(client):
     response = client.post("/sources/files/missing/load", headers=ADMIN, json={"columns": [{"name": "a", "type": "String"}]})
 
     assert response.status_code == 404
+
+
+def test_connecting_a_source_answers_the_setups_data_step_and_a_failed_connection_does_not(client, parts):
+    def data_step():
+        steps = client.get("/setup/status", headers=ADMIN).json()["steps"]
+        return next(step["state"] for step in steps if step["id"] == "data")
+
+    parts[2].fail_on = "pg_namespace"
+    client.post("/sources", headers=ADMIN, json={"name": "shop", **BODY})
+    assert data_step() == "pending"
+    parts[2].fail_on = None
+
+    connect(client)
+
+    assert data_step() == "done"
