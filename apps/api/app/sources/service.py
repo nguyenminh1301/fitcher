@@ -17,7 +17,7 @@ import threading
 
 from app.sources.attach import RAW_DATABASE, Source, Table, attach_live, copy_table, drop_source, valid_name
 from app.sources.collections import CollectionAdmin, CollectionError, ca_key
-from app.sources.connection import Connection, validate
+from app.sources.connection import COPY_ONLY_KINDS, Connection, validate
 from app.sources.inspect import InspectError, Inspector, TableInfo, classify_error
 from app.sources.store import (
     DuplicateSource, NewSource, SourceStore, StoredSource, StoredTable, SyncBusy, SyncRecord,
@@ -67,15 +67,38 @@ class _Tracked:
 
 class SourceService:
     def __init__(self, store: SourceStore, client, clock: Callable[[], datetime] = lambda: datetime.now(UTC),
-                 files=None):
+                 files=None, sqlserver=None, vault=None):
         self._store = store
         self._client = client
         self._clock = clock
         # Reloads the stored original of a file source; without it a file source cannot be synced.
         self._files = files
+        # SQL Server is read by the api itself and its password is a secret of the app state (app/sources/sqlserver.py).
+        self._sqlserver = sqlserver
+        self._vault = vault
         self._collections = CollectionAdmin(client)
         self._inspector = Inspector(client)
         self._cancelled: set[int] = set()
+
+    # SQL Server: no named collection, the password lives in the vault
+
+    @staticmethod
+    def _password_name(source_id: str) -> str:
+        return f"source:{source_id}:password"
+
+    @staticmethod
+    def _login(connection: Connection) -> dict:
+        return {"host": connection.host, "port": connection.port, "database": connection.database,
+                "user": connection.user, "password": connection.password, "tls_mode": connection.tls_mode}
+
+    def _login_of(self, stored: StoredSource) -> dict:
+        """The stored login of a SQL Server source with its password from the vault."""
+        return {"host": stored.host, "port": stored.port, "database": stored.database, "user": stored.username,
+                "password": self._vault.reader().get(self._password_name(stored.id)), "tls_mode": stored.tls_mode}
+
+    def _sqlserver_tables(self, login: dict, schema: str) -> list[TableInfo]:
+        self._sqlserver.check(**login)
+        return self._sqlserver.tables(schema=schema, **login)
 
     # Connections
 
@@ -86,6 +109,8 @@ class SourceService:
     def probe(self, connection: Connection) -> list[TableInfo]:
         """Test a connection and list its tables through a collection that exists only for the test."""
         connection = validate(connection)
+        if connection.kind in COPY_ONLY_KINDS:
+            return self._sqlserver_tables(self._login(connection), connection.schema)
         name = PROBE_PREFIX + secrets.token_hex(6)
         self._collections.create(name, connection)
         try:
@@ -107,6 +132,8 @@ class SourceService:
         connection = validate(connection)
         if any(source.id == name for source in self._store.list()):
             raise DuplicateSource(f"a source named {name!r} already exists")
+        if connection.kind in COPY_ONLY_KINDS:
+            return self._create_copy_only(name, connection)
         try:
             self._collections.create(name, connection)
         except CollectionError as error:
@@ -127,6 +154,20 @@ class SourceService:
             raise
         return stored, self._store.tables(name)
 
+    def _create_copy_only(self, name: str, connection: Connection) -> tuple[StoredSource, list[StoredTable]]:
+        tables = self._sqlserver_tables(self._login(connection), connection.schema)
+        self._vault.set(self._password_name(name), connection.password)
+        try:
+            stored = self._store.create(NewSource(
+                id=name, kind=connection.kind, host=connection.host, port=connection.port,
+                database=connection.database, schema=connection.schema, username=connection.user,
+                tls_mode=connection.tls_mode, has_ca=False))
+            self._store.save_catalog(name, tables)
+        except BaseException:
+            self._vault.delete(self._password_name(name))
+            raise
+        return stored, self._store.tables(name)
+
     @staticmethod
     def _connection_of(stored: StoredSource) -> Connection:
         """The stored fields; the password and the CA certificate are not kept here, so both are ``None``."""
@@ -141,6 +182,8 @@ class SourceService:
             schema=patch.schema if patch.schema is not None else old.schema, user=patch.user or old.user,
             tls_mode=patch.tls_mode or old.tls_mode, password=patch.password,
             ca_certificate=patch.ca_certificate or None))
+        if new.kind in COPY_ONLY_KINDS:
+            return self._update_copy_only(stored, new, patch.password)
         remove_ca = patch.ca_certificate == ""
         drop = [ca_key(new.kind)] if remove_ca else []
         has_ca = False if remove_ca else (True if patch.ca_certificate else stored.has_ca)
@@ -168,8 +211,22 @@ class SourceService:
         self._store.save_catalog(source_id, self._inspector.tables(self._source(source_id, new)))
         return updated, self._store.tables(source_id)
 
+    def _update_copy_only(self, stored: StoredSource, new: Connection, password: str | None):
+        """Test the edited login (with the new or the stored password) and only then replace what is stored."""
+        login = {**self._login(new), "password": password if password is not None else self._login_of(stored)["password"]}
+        tables = self._sqlserver_tables(login, new.schema)
+        if password is not None:
+            self._vault.set(self._password_name(stored.id), password)
+        updated = self._store.update(stored.id, host=new.host, port=new.port, database=new.database,
+                                     schema=new.schema, username=new.user, tls_mode=new.tls_mode, has_ca=False)
+        self._store.save_catalog(stored.id, tables)
+        return updated, self._store.tables(stored.id)
+
     def refresh(self, source_id: str) -> list[StoredTable]:
         stored = self._store.get(source_id)
+        if stored.kind in COPY_ONLY_KINDS:
+            self._store.save_catalog(source_id, self._sqlserver_tables(self._login_of(stored), stored.schema))
+            return self._store.tables(source_id)
         self._store.save_catalog(source_id, self._inspector.tables(self._source(source_id, self._connection_of(stored))))
         return self._store.tables(source_id)
 
@@ -193,7 +250,10 @@ class SourceService:
             raise SyncBusy(f"a sync of {source_id!r} is running; cancel it first")
         tables = tuple(Table(table.name) for table in self._store.tables(source_id))
         drop_source(self._client, Source(source_id, stored.kind, tables))
-        self._collections.drop(source_id)
+        if stored.kind in COPY_ONLY_KINDS:
+            self._vault.delete(self._password_name(source_id))
+        else:
+            self._collections.drop(source_id)
         self._store.delete(source_id)
 
     # Syncing
@@ -242,9 +302,9 @@ class SourceService:
                 counts = attach_live(client, source)
                 results += [{"table": t.name, "mode": "live", "rows": counts[t.name], "full": None} for t in live]
             for table in (t for t in selected if t.mode == "copy"):
-                results.append(self._copy(client, stored, table))
+                results.append(self._copy(client, stored, table, record.id))
         except Exception as failure:  # noqa: BLE001 - only the reason is kept: the text can name hosts and users
-            error = classify_error(failure)
+            error = failure.reason if isinstance(failure, InspectError) else classify_error(failure)
             status = "failed"
             if record.id in self._cancelled or "QUERY_WAS_CANCELLED" in str(failure):
                 status, error = "cancelled", None
@@ -259,10 +319,15 @@ class SourceService:
         self._store.finish_sync(record.id, status, results=results, error=error, finished_at=self._clock())
         return self._store.sync(record.id)
 
-    def _copy(self, client, stored: StoredSource, table: StoredTable) -> dict:
+    def _copy(self, client, stored: StoredSource, table: StoredTable, record_id: int) -> dict:
         source = Source(stored.id, stored.kind, (Table(table.name),), database=stored.database, schema=stored.schema)
-        outcome = copy_table(client, source, source.tables[0], cursor_column=table.cursor_column,
-                             after=table.cursor_value)
+        if stored.kind in COPY_ONLY_KINDS:
+            outcome = self._sqlserver.copy(
+                self._client, source, table.name, cursor_column=table.cursor_column, after=table.cursor_value,
+                schema=stored.schema, should_stop=lambda: record_id in self._cancelled, **self._login_of(stored))
+        else:
+            outcome = copy_table(client, source, source.tables[0], cursor_column=table.cursor_column,
+                                 after=table.cursor_value)
         self._store.record_table_sync(
             stored.id, table.name, rows=outcome.rows, cursor_value=outcome.cursor,
             next_run_at=self._clock() + timedelta(seconds=table.interval_seconds), synced_at=self._clock())

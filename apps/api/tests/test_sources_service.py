@@ -299,3 +299,133 @@ def test_cancelling_kills_the_running_query_and_marks_the_sync_cancelled(parts):
 
     assert "KILL QUERY WHERE query_id = 'fitcher-sync-1'" in clickhouse.sql
     assert service.cancel("other") is False
+
+
+# SQL Server: copy only, the password in the vault and no named collection
+
+
+def sql_connection(**changes):
+    fields = dict(kind="sqlserver", host="mssql.internal", port=1433, database="erp", user="reader", password=SECRET,
+                  schema="dbo", tls_mode="require", ca_certificate=None)
+    return Connection(**(fields | changes))
+
+
+@pytest.fixture
+def mssql(tmp_path):
+    from sources_fixtures import FakeSqlServer
+
+    db, vault = new_state(tmp_path)
+    store, clickhouse = SourceStore(db), FakeClickHouse()
+    sqlserver = FakeSqlServer(clickhouse)
+    service = SourceService(store, clickhouse, clock=lambda: NOW, sqlserver=sqlserver, vault=vault)
+    return store, clickhouse, sqlserver, vault, service
+
+
+def test_a_sql_server_source_keeps_its_password_in_the_vault_and_creates_no_collection(mssql):
+    store, clickhouse, sqlserver, vault, service = mssql
+
+    source, tables = service.create("erp", sql_connection())
+
+    assert (source.kind, source.schema, source.host) == ("sqlserver", "dbo", "mssql.internal")
+    assert vault.has("source:erp:password") and vault.reader().get("source:erp:password") == SECRET
+    assert clickhouse.collections == set() and not any("NAMED COLLECTION" in sql for sql in clickhouse.sql)
+    assert {t.name: (t.mode, t.proposed_mode, t.reason) for t in tables} == {
+        "orders": ("copy", "copy", "copy_only"), "big": ("copy", "copy", "copy_only")}
+    assert SECRET not in repr(store.get("erp")) and SECRET not in repr(store.tables("erp"))
+
+
+def test_a_failed_sql_server_test_stores_nothing(mssql):
+    store, _, sqlserver, vault, service = mssql
+    sqlserver.error = InspectError("authentication")
+
+    with pytest.raises(InspectError):
+        service.create("erp", sql_connection())
+
+    assert store.list() == [] and not vault.has("source:erp:password")
+
+
+def test_a_sql_server_probe_lists_tables_without_saving_anything(mssql):
+    store, _, _, vault, service = mssql
+
+    tables = service.probe(sql_connection())
+
+    assert {t.name for t in tables} == {"orders", "big"} and store.list() == []
+    assert not vault.has("source:probe:password")
+
+
+def test_sql_server_tables_cannot_be_read_live(mssql):
+    store, _, _, _, service = mssql
+    service.create("erp", sql_connection())
+
+    with pytest.raises(ValueError, match="copy"):
+        store.set_tables("erp", [TableChange("orders", selected=True, mode="live")])
+
+
+def test_a_sql_server_sync_copies_with_the_stored_password_and_follows_the_cursor(mssql):
+    store, clickhouse, sqlserver, _, service = mssql
+    service.create("erp", sql_connection())
+    store.set_tables("erp", [TableChange("orders", selected=True, mode="copy", cursor_column="id")])
+
+    first = service.sync("erp", "manual")
+    second = service.sync("erp", "manual")
+
+    assert first.results == [{"table": "orders", "mode": "copy", "rows": 7, "full": True}]
+    copies = [params for kind, params in sqlserver.calls if kind == "copy"]
+    assert copies[0]["password"] == SECRET and copies[0]["after"] is None and copies[1]["after"] == "70"
+    assert store.tables("erp")[1].cursor_value == "70" if store.tables("erp")[0].name == "big" else True
+    assert second.status == "succeeded"
+
+
+def test_a_failed_sql_server_sync_records_the_reason(mssql):
+    store, _, sqlserver, _, service = mssql
+    service.create("erp", sql_connection())
+    store.set_tables("erp", [TableChange("orders", selected=True, mode="copy")])
+    sqlserver.error = InspectError("refused")
+
+    sync = service.sync("erp", "manual")
+
+    assert (sync.status, sync.error) == ("failed", "refused")
+
+
+def test_editing_the_password_tests_it_before_it_replaces_the_stored_one(mssql):
+    store, _, sqlserver, vault, service = mssql
+    service.create("erp", sql_connection())
+    sqlserver.error = InspectError("authentication")
+
+    with pytest.raises(InspectError):
+        service.update("erp", ConnectionPatch(password="wrong"))
+    assert vault.reader().get("source:erp:password") == SECRET
+
+    sqlserver.error = None
+    service.update("erp", ConnectionPatch(password="better", host="mssql2.internal"))
+    assert vault.reader().get("source:erp:password") == "better" and store.get("erp").host == "mssql2.internal"
+
+
+def test_editing_without_a_password_tests_with_the_stored_one(mssql):
+    _, _, sqlserver, _, service = mssql
+    service.create("erp", sql_connection())
+
+    service.update("erp", ConnectionPatch(host="mssql2.internal"))
+
+    check = [params for kind, params in sqlserver.calls if kind == "check"][-1]
+    assert check["password"] == SECRET and check["host"] == "mssql2.internal"
+
+
+def test_deleting_a_sql_server_source_removes_its_copies_and_its_secret(mssql):
+    store, clickhouse, _, vault, service = mssql
+    service.create("erp", sql_connection())
+    clickhouse.sql.clear()
+
+    service.delete("erp", confirm="erp")
+
+    assert "DROP TABLE IF EXISTS `raw`.`erp__orders`" in clickhouse.sql
+    assert not vault.has("source:erp:password") and store.list() == []
+
+
+def test_a_sql_server_cancel_stops_the_copy_between_batches(mssql):
+    store, _, sqlserver, _, service = mssql
+    service.create("erp", sql_connection())
+    running = store.start_sync("erp", "manual", NOW)
+
+    assert service.cancel("erp") is True
+    assert running.id in service._cancelled

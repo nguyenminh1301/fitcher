@@ -25,7 +25,7 @@ from app.onboarding.docs_parser import DocumentRejected
 from app.sources.attach import valid_name
 from app.sources.collections import CollectionError
 from app.sources import files as source_files
-from app.sources.connection import DEFAULT_PORTS, Connection, ConnectionFieldError
+from app.sources.connection import COPY_ONLY_KINDS, DEFAULT_PORTS, Connection, ConnectionFieldError
 from app.sources.files import FileService
 from app.sources.inspect import InspectError, TableInfo
 from app.sources.modes import cursor_candidates, joined_live_tables, propose
@@ -82,9 +82,10 @@ def _iso(value: str | None) -> datetime | None:
 
 
 def _connection(body: SourceConnection) -> Connection:
+    tls_mode = body.tls_mode or ("require" if body.kind == "sqlserver" else "prefer")
     return Connection(kind=body.kind, host=body.host, port=body.port or DEFAULT_PORTS[body.kind],
                       database=body.database, user=body.user, password=body.password, schema=body.schema_name,
-                      tls_mode=body.tls_mode, ca_certificate=body.ca_certificate or None)
+                      tls_mode=tls_mode, ca_certificate=body.ca_certificate or None)
 
 
 def _column_views(columns) -> list[ColumnView]:
@@ -107,8 +108,8 @@ def _table_view(table: StoredTable, slow: set[str]) -> TableView:
     )
 
 
-def _probe_view(table: TableInfo) -> TableView:
-    proposal = propose(table)
+def _probe_view(table: TableInfo, copy_only: bool = False) -> TableView:
+    proposal = propose(table, copy_only)
     return TableView(
         name=table.name, kind=table.kind, rows=table.rows, size_bytes=table.size_bytes,
         columns=_column_views(table.columns), primary_key=list(table.primary_key),
@@ -209,7 +210,8 @@ def list_sources(_: Admin, store: Store) -> list[SourceView]:
 @router.post("/test")
 def test_connection(body: SourceConnection, _: Admin, service: Service) -> ProbeResult:
     try:
-        return ProbeResult(tables=[_probe_view(table) for table in service.probe(_connection(body))])
+        copy_only = body.kind in COPY_ONLY_KINDS
+        return ProbeResult(tables=[_probe_view(table, copy_only) for table in service.probe(_connection(body))])
     except Exception as error:  # noqa: BLE001 - each failure maps to its status in _refusal
         raise _refusal(error) from None
 

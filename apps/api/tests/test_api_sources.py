@@ -8,7 +8,7 @@ import pytest
 from session_fixtures import SessionHeaders
 from io import BytesIO
 
-from sources_fixtures import UploadClickHouse
+from sources_fixtures import FakeSqlServer, UploadClickHouse
 from state_fixtures import new_state
 
 from app.api import runtime, setup as setup_api, sources as sources_api
@@ -35,17 +35,18 @@ class Actions:
 
 @pytest.fixture
 def parts(tmp_path):
-    db, _ = new_state(tmp_path)
+    db, vault = new_state(tmp_path)
     Settings(db).set("instance", "mode", "team")
     store, clickhouse, actions = SourceStore(db), UploadClickHouse(), Actions()
     files = FileService(store, clickhouse, tmp_path / "uploads", max_bytes=2048)
-    service = SourceService(store, clickhouse, files=files)
+    sqlserver = FakeSqlServer(clickhouse)
+    service = SourceService(store, clickhouse, files=files, sqlserver=sqlserver, vault=vault)
     app.dependency_overrides[sources_api.get_file_service] = lambda: files
     app.dependency_overrides[setup_api.get_state_db] = lambda: db
     app.dependency_overrides[sources_api.get_source_store] = lambda: store
     app.dependency_overrides[sources_api.get_source_service] = lambda: service
     app.dependency_overrides[runtime.get_admin_action_log] = lambda: actions
-    yield TestClient(app), store, clickhouse, actions
+    yield TestClient(app), store, clickhouse, actions, vault, sqlserver
     app.dependency_overrides.clear()
 
 
@@ -349,3 +350,47 @@ def test_connecting_a_source_answers_the_setups_data_step_and_a_failed_connectio
     connect(client)
 
     assert data_step() == "done"
+
+
+MSSQL = {"kind": "sqlserver", "host": "mssql.internal", "database": "erp", "user": "reader", "password": PASSWORD}
+
+
+def test_a_sql_server_source_defaults_to_port_1433_schema_dbo_and_required_encryption(client, parts):
+    created = client.post("/sources", headers=ADMIN, json={"name": "erp", **MSSQL})
+
+    assert created.status_code == 201, created.text
+    body = created.json()
+    assert (body["kind"], body["port"], body["schema_name"], body["tls_mode"]) == ("sqlserver", 1433, "dbo", "require")
+    assert {t["name"]: (t["mode"], t["proposed_mode"], t["reason"]) for t in body["tables"]} == {
+        "orders": ("copy", "copy", "copy_only"), "big": ("copy", "copy", "copy_only")}
+    login = [params for kind, params in parts[5].calls if kind == "check"][0]
+    assert login["port"] == 1433 and login["tls_mode"] == "require"
+    assert parts[4].has("source:erp:password") and PASSWORD not in created.text
+    assert not any("NAMED COLLECTION" in sql for sql in parts[2].sql)
+
+
+def test_testing_a_sql_server_connection_proposes_a_copy_for_every_table(client):
+    response = client.post("/sources/test", headers=ADMIN, json=MSSQL)
+
+    assert response.status_code == 200
+    assert {t["proposed_mode"] for t in response.json()["tables"]} == {"copy"}
+
+
+def test_a_sql_server_table_cannot_be_chosen_live_and_its_certificate_cannot_be_verified(client):
+    client.post("/sources", headers=ADMIN, json={"name": "erp", **MSSQL})
+
+    live = client.put("/sources/erp/tables", headers=ADMIN, json={"tables": [{"name": "orders", "mode": "live"}]})
+    verify = client.post("/sources/test", headers=ADMIN, json={**MSSQL, "tls_mode": "verify"})
+
+    assert live.status_code == 422 and "copy" in live.json()["detail"]
+    assert verify.status_code == 422 and "certificate" in verify.json()["detail"]
+
+
+def test_a_failed_sql_server_test_answers_with_one_fixed_reason(client, parts):
+    from app.sources.inspect import InspectError
+
+    parts[5].error = InspectError("tls")
+
+    response = client.post("/sources/test", headers=ADMIN, json=MSSQL)
+
+    assert response.status_code == 422 and response.json() == {"detail": {"reason": "tls"}}

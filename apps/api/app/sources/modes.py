@@ -18,11 +18,14 @@ GIB = 1024**3
 @dataclass(frozen=True)
 class Proposal:
     mode: str
-    # small, unknown_size, rows, size or view: the interface words the reason from this code.
+    # small, unknown_size, rows, size, view or copy_only: the interface words the reason from this code.
     reason: str
 
 
-def propose(table: TableInfo) -> Proposal:
+def propose(table: TableInfo, copy_only: bool = False) -> Proposal:
+    """The mode of a table; a source that cannot be read live (SQL Server) always gets a copy."""
+    if copy_only:
+        return Proposal("copy", "copy_only")
     if table.kind == "view":
         return Proposal("copy", "view")
     if table.rows is not None and table.rows >= LIVE_ROW_LIMIT:
@@ -53,7 +56,7 @@ def joined_live_tables(tables: list[TableInfo], modes: dict[str, str]) -> set[st
 
 # Source column types an incremental copy can follow: they only grow (numbers) or move forward (dates).
 CURSOR_TYPES = frozenset({
-    "smallint", "integer", "bigint", "numeric", "real", "double precision", "date", "timestamp",
+    "smallint", "integer", "bigint", "numeric", "real", "double precision", "date", "timestamp", "datetime2", "smalldatetime",
     "timestamp without time zone", "timestamp with time zone", "tinyint", "int", "mediumint", "decimal", "datetime",
     "year",
 })

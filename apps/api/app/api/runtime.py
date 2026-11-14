@@ -41,6 +41,7 @@ from app.sources.client import source_admin_client
 from app.sources.files import FileService
 from app.sources.schedule import SourceScheduler
 from app.sources.service import SourceService
+from app.sources.sqlserver import SqlServer
 from app.sources.store import SourceStore
 from app.state.db import StateDb, data_dir, shared_state
 from app.state.secrets import SecretVault, shared_vault
@@ -318,7 +319,8 @@ def get_file_service() -> FileService:
 def get_source_service() -> SourceService:
     """Connects, tests and syncs the sources of the Sources page as ``source_admin``."""
     try:
-        return SourceService(get_source_store(), source_admin_client(), files=get_file_service())
+        return SourceService(get_source_store(), source_admin_client(), files=get_file_service(),
+                             sqlserver=SqlServer(), vault=get_vault())
     except HTTPException:
         raise
     except Exception as error:  # noqa: BLE001 - a missing password or ClickHouse unreachable
