@@ -1,0 +1,31 @@
+#!/bin/sh
+# Finish script of every long-running service: s6 restarts a service that exits, but one that exits
+# MAX_RESTARTS times within WINDOW seconds stops the container with its exit code.
+# Arguments: service name, exit code (256 when killed by a signal), signal number.
+MAX_RESTARTS=5
+WINDOW=60
+name="$1"
+code="$2"
+signal="$3"
+if [ "$code" -eq 256 ]; then
+    code=$((128 + signal))
+    # A stop requested by s6 at shutdown is not a failure.
+    [ "$signal" -eq 15 ] && exit 0
+elif [ "$code" -eq 143 ]; then
+    # A process that exits 128 + SIGTERM after a stop request.
+    exit 0
+fi
+log=/run/fitcher/restarts-$name
+now=$(date +%s)
+echo "$now" >> "$log"
+recent=0
+for at in $(cat "$log"); do
+    [ $((now - at)) -lt "$WINDOW" ] && recent=$((recent + 1))
+done
+echo "$name exited with code $code ($recent times in ${WINDOW}s)" >&2
+if [ "$recent" -ge "$MAX_RESTARTS" ]; then
+    echo "$name keeps failing; stopping the container" >&2
+    [ "$code" -eq 0 ] && code=1
+    echo "$code" > /run/s6-linux-init-container-results/exitcode
+    exec /run/s6/basedir/bin/halt
+fi

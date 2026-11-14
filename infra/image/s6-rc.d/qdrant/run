@@ -1,0 +1,15 @@
+#!/command/with-contenv sh
+# Search collections (DECISIONS §5) until Phase 20 moves search into ClickHouse; loopback only.
+exec 2>&1
+cd /data/qdrant
+export QDRANT__SERVICE__HOST=127.0.0.1 \
+    QDRANT__SERVICE__HTTP_PORT=6333 \
+    QDRANT__SERVICE__GRPC_PORT=6334 \
+    QDRANT__SERVICE__ENABLE_STATIC_CONTENT=false \
+    QDRANT__STORAGE__STORAGE_PATH=/data/qdrant/storage \
+    QDRANT__STORAGE__SNAPSHOTS_PATH=/data/qdrant/snapshots \
+    QDRANT__AUDIT__ENABLED=false \
+    QDRANT__AUDIT__DIR=/data/qdrant/audit \
+    QDRANT__TELEMETRY_DISABLED=true \
+    QDRANT__LOG_LEVEL=WARN
+exec /opt/qdrant/qdrant --config-path /opt/qdrant/config/config.yaml

@@ -1,0 +1,4 @@
+#!/command/with-contenv sh
+# Data layout, generated secrets and the embedded ClickHouse configuration (jobs/init_data.py).
+cd /app
+exec python -m jobs.init_data

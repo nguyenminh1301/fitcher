@@ -1,0 +1,8 @@
+#!/command/with-contenv sh
+# The api on loopback; its environment from init-data never holds the ClickHouse admin password.
+exec 2>&1
+set -a
+. /data/secrets/api.env
+set +a
+cd /app
+exec uvicorn app.main:app --host 127.0.0.1 --port 8000 --workers 1 --no-access-log

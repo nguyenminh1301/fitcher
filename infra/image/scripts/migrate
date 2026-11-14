@@ -1,0 +1,16 @@
+#!/command/with-contenv sh
+# Waits for ClickHouse, then applies the pending schema changes as the ClickHouse admin (jobs/migrate.py).
+set -a
+. /data/secrets/admin.env
+set +a
+cd /app
+tries=0
+until python -c "import os, urllib.request; urllib.request.urlopen('http://%s:%s/ping' % (os.environ['CLICKHOUSE_HOST'], os.environ['CLICKHOUSE_HTTP_PORT']), timeout=2)" 2>/dev/null; do
+    tries=$((tries + 1))
+    if [ "$tries" -ge 120 ]; then
+        echo "migrate: ClickHouse at $CLICKHOUSE_HOST:$CLICKHOUSE_HTTP_PORT did not answer within 120 seconds" >&2
+        exit 1
+    fi
+    sleep 1
+done
+exec python -m jobs.migrate
