@@ -23,6 +23,9 @@ dependencies = [
     "numpy==2.5.4",
     "onnxruntime==1.31.1",
     "opentelemetry-sdk==1.45.2",
+    # Reads SQL Server (app/sources/sqlserver.py): ClickHouse has no native SQL Server engine and its ODBC bridge is
+    # not shipped in the 26.8 packages (docs/eval/sql-server-source-report.md). The wheels bundle FreeTDS.
+    "pymssql==2.4.6",
     # Reads the schema of an uploaded Parquet file (app/sources/files.py); the jobs read Hugging Face datasets with it too.
     "pyarrow==26.0.0",
     # Company documents (app/onboarding): read-only parsers; uploads are multipart forms.

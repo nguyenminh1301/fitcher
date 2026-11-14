@@ -575,7 +575,7 @@
     "chooseHint": "Chọn các bảng sẽ dùng và đọc trực tiếp hay sao chép.",
     "reason_unreachable": "Không tới được máy chủ. Kiểm tra tên máy chủ và mạng có cho phép kết nối không.",
     "reason_refused": "Máy chủ từ chối kết nối. Kiểm tra cổng.",
-    "reason_authentication": "Người dùng hoặc mật khẩu bị từ chối.",
+    "reason_authentication": "Người dùng hoặc mật khẩu bị từ chối. SQL Server cũng báo cơ sở dữ liệu không tồn tại theo cách này.",
     "reason_tls": "Cài đặt TLS không khớp với máy chủ.",
     "reason_database_not_found": "Không tìm thấy cơ sở dữ liệu hoặc người dùng này không được mở.",
     "reason_permission": "Người dùng không được đọc danh mục hoặc một bảng.",
@@ -643,6 +643,10 @@
     "type": "Kiểu",
     "sample": "Các dòng đầu",
     "typeOf": "Kiểu của {name}",
-    "loadFile": "Tải tệp"
+    "loadFile": "Tải tệp",
+    "kind_sqlserver": "SQL Server",
+    "sqlserverTls": "Chứng chỉ của kết nối SQL Server không được kiểm tra; kết nối được mã hóa khi bắt buộc TLS.",
+    "copyOnly": "Bảng SQL Server được đọc qua fitcher và chỉ sao chép; không có chế độ trực tiếp.",
+    "why_copy_only": "SQL Server chỉ sao chép"
   }
 }

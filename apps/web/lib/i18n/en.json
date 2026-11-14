@@ -575,7 +575,7 @@
     "chooseHint": "Choose the tables to use and whether to read them live or copy them.",
     "reason_unreachable": "The host could not be reached. Check the host name and that the network allows the connection.",
     "reason_refused": "The server refused the connection. Check the port.",
-    "reason_authentication": "The user or password was refused.",
+    "reason_authentication": "The user or password was refused. SQL Server reports an unknown database the same way.",
     "reason_tls": "The TLS settings do not match the server.",
     "reason_database_not_found": "The database was not found or this user may not open it.",
     "reason_permission": "The user may not read the catalog or a table.",
@@ -643,6 +643,10 @@
     "type": "Type",
     "sample": "First rows",
     "typeOf": "Type of {name}",
-    "loadFile": "Load file"
+    "loadFile": "Load file",
+    "kind_sqlserver": "SQL Server",
+    "sqlserverTls": "The certificate of a SQL Server connection is not verified; the connection is encrypted when TLS is required.",
+    "copyOnly": "SQL Server tables are read through fitcher and copied only; there is no live mode.",
+    "why_copy_only": "SQL Server is copied only"
   }
 }

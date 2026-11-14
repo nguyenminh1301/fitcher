@@ -111,3 +111,40 @@ class UploadClickHouse(FakeClickHouse):
         self.raw[table.split(".")[1].strip("`")] = max(data.count(b"\n") - 1, 0)
         if self.fail_on == "raw_insert":
             raise self.error
+
+
+class FakeSqlServer:
+    """Stands for ``app.sources.sqlserver.SqlServer``: the catalog it lists and what a copy does to ``raw``."""
+
+    def __init__(self, clickhouse, tables=None, error=None):
+        from app.sources.inspect import CatalogColumn, TableInfo
+
+        self.clickhouse = clickhouse
+        self.error = error
+        self.tables_listed = tables if tables is not None else [
+            TableInfo("orders", "table", 1200, 400_000, columns=(CatalogColumn("id", "int", False, 1),
+                                                                 CatalogColumn("placed", "datetime2", False, 2)),
+                      primary_key=("id",)),
+            TableInfo("big", "table", 9_000_000, 2 * 1024**3),
+        ]
+        self.calls: list[tuple] = []
+
+    def check(self, **params):
+        self.calls.append(("check", params))
+        if self.error:
+            raise self.error
+
+    def tables(self, *, schema, **params):
+        self.calls.append(("tables", {"schema": schema, **params}))
+        if self.error:
+            raise self.error
+        return self.tables_listed
+
+    def copy(self, clickhouse, source, table, *, cursor_column, after, schema, should_stop=None, **params):
+        from app.sources.attach import CopyOutcome
+
+        self.calls.append(("copy", {"table": table, "cursor_column": cursor_column, "after": after, "schema": schema, **params}))
+        if self.error:
+            raise self.error
+        clickhouse.raw[f"{source.name}__{table}"] = 7
+        return CopyOutcome(7, "70" if cursor_column else None, after is None)

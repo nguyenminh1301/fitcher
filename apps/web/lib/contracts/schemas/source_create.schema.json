@@ -4,7 +4,8 @@
     "kind": {
       "enum": [
         "postgres",
-        "mysql"
+        "mysql",
+        "sqlserver"
       ],
       "title": "Kind",
       "type": "string"
@@ -57,14 +58,21 @@
       "type": "string"
     },
     "tls_mode": {
-      "default": "prefer",
-      "enum": [
-        "prefer",
-        "require",
-        "verify"
+      "anyOf": [
+        {
+          "enum": [
+            "prefer",
+            "require",
+            "verify"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
       ],
-      "title": "Tls Mode",
-      "type": "string"
+      "default": null,
+      "title": "Tls Mode"
     },
     "ca_certificate": {
       "anyOf": [

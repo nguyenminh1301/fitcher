@@ -1,6 +1,6 @@
 """The connection fields of a source and the rules they must meet before anything is sent to ClickHouse.
 
-Only PostgreSQL and MySQL/MariaDB are connected from the Sources page. The password is part of ``Connection``
+PostgreSQL, MySQL/MariaDB and SQL Server are connected from the Sources page. The password is part of ``Connection``
 for the one call that writes it into a named collection; it is never stored by the app state, returned by an
 endpoint or included in a log line (DECISIONS §4).
 """
@@ -8,10 +8,12 @@ endpoint or included in a log line (DECISIONS §4).
 from dataclasses import dataclass, replace
 import re
 
-KINDS = ("postgres", "mysql")
-DEFAULT_PORTS = {"postgres": 5432, "mysql": 3306}
+KINDS = ("postgres", "mysql", "sqlserver")
+DEFAULT_PORTS = {"postgres": 5432, "mysql": 3306, "sqlserver": 1433}
+# ClickHouse has no engine for these: a copy streams their rows through the api (app/sources/sqlserver.py).
+COPY_ONLY_KINDS = frozenset({"sqlserver"})
+DEFAULT_SCHEMAS = {"postgres": "public", "sqlserver": "dbo"}
 TLS_MODES = ("prefer", "require", "verify")
-DEFAULT_SCHEMA = "public"
 # A host name, an IPv4 or an IPv6 address, as the user types it: no scheme, path, port or whitespace.
 HOST = re.compile(r"^[A-Za-z0-9]([A-Za-z0-9._-]*[A-Za-z0-9])?$|^[0-9A-Fa-f:]+$")
 
@@ -47,6 +49,11 @@ def validate(connection: Connection) -> Connection:
             raise ConnectionFieldError(f"the {label} is required")
     if connection.tls_mode not in TLS_MODES:
         raise ConnectionFieldError(f"the TLS mode must be one of {', '.join(TLS_MODES)}")
-    schema = (connection.schema or DEFAULT_SCHEMA).strip() if connection.kind == "postgres" else None
+    if connection.kind == "sqlserver" and connection.tls_mode == "verify":
+        raise ConnectionFieldError("SQL Server connections are encrypted but their certificate cannot be verified; use require or prefer")
+    if connection.kind == "sqlserver" and connection.ca_certificate:
+        raise ConnectionFieldError("a SQL Server connection takes no CA certificate")
+    default = DEFAULT_SCHEMAS.get(connection.kind)
+    schema = (connection.schema or default).strip() if default else None
     return replace(connection, host=host, database=connection.database.strip(), user=connection.user.strip(),
                    schema=schema)

@@ -19,6 +19,7 @@ import json
 import sqlite3
 
 from app.sources.attach import valid_name
+from app.sources.connection import COPY_ONLY_KINDS
 from app.sources.inspect import CatalogColumn, ForeignKey, TableInfo
 from app.sources.modes import propose
 from app.state.db import StateDb
@@ -248,14 +249,14 @@ class SourceStore:
 
     def save_catalog(self, source_id: str, tables: list[TableInfo]) -> None:
         """Store the catalog read from the source: new tables get the proposed mode, known ones keep their choices."""
-        self.get(source_id)
+        copy_only = self.get(source_id).kind in COPY_ONLY_KINDS
         with self._db.write() as conn:
             names = [table.name for table in tables]
             conn.execute(
                 f"DELETE FROM source_tables WHERE source_id = ? AND name NOT IN ({','.join('?' * len(names))})",
                 (source_id, *names))
             for table in tables:
-                proposal = propose(table)
+                proposal = propose(table, copy_only)
                 columns = json.dumps([{"name": c.name, "type": c.type, "nullable": c.nullable, "position": c.position}
                                       for c in table.columns])
                 keys = json.dumps([{"columns": list(k.columns), "ref_table": k.ref_table,
@@ -276,7 +277,10 @@ class SourceStore:
     def set_tables(self, source_id: str, changes: list[TableChange]) -> None:
         """Apply every change or none; raises ``TableNotFound`` or ``ValueError`` for one that does not fit."""
         known = {table.name: table for table in self.tables(source_id)}
+        copy_only = self.get(source_id).kind in COPY_ONLY_KINDS
         for change in changes:
+            if copy_only and change.mode == "live":
+                raise ValueError("this kind of source is copied only; choose the copy mode")
             table = known.get(change.name)
             if table is None:
                 raise TableNotFound(f"the source has no table {change.name!r}")

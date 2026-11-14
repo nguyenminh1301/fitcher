@@ -53,7 +53,7 @@ function Notes({ table }: { table: TableView }) {
 }
 
 /** The tables found by a test, before anything is saved. */
-export function TableList({ tables }: { tables: TableView[] }) {
+export function TableList({ tables, copyOnly }: { tables: TableView[]; copyOnly?: boolean }) {
   const { t } = useI18n();
   return (
     <div className="fc-stack" style={{ gap: "var(--base-size-8)" }}>
@@ -76,16 +76,19 @@ export function TableList({ tables }: { tables: TableView[] }) {
         </table>
       </div>
       <p className="fc-muted" style={{ margin: 0 }}>{t("sources.approx")}</p>
+      {copyOnly ? <p className="fc-muted" style={{ margin: 0 }}>{t("sources.copyOnly")}</p> : null}
     </div>
   );
 }
 
 type Choice = { selected: boolean; mode: "live" | "copy"; interval: number; cursor: string };
 
-export function TableChooser({ sources, id, tables, onSaved, onSynced }: {
+export function TableChooser({ sources, id, tables, copyOnly, onSaved, onSynced }: {
   sources: FitcherApi["sources"];
   id: string;
   tables: TableView[];
+  /** The source cannot be read live (SQL Server): every table is copied. */
+  copyOnly?: boolean;
   onSaved?: (tables: TableView[]) => void;
   /** Called after a sync was started, so the page shows it running. */
   onSynced?: () => void;
@@ -166,7 +169,7 @@ export function TableChooser({ sources, id, tables, onSaved, onSynced }: {
                   <td data-label={t("sources.mode")}>
                     <select className="fc-input" aria-label={t("sources.modeOf", { name: table.name })} value={choice.mode}
                       onChange={(event) => change(table.name, { mode: event.target.value as "live" | "copy" })}>
-                      <option value="live">{t("sources.live")}</option>
+                      {copyOnly ? null : <option value="live">{t("sources.live")}</option>}
                       <option value="copy">{t("sources.copy")}</option>
                     </select>
                   </td>
@@ -194,6 +197,7 @@ export function TableChooser({ sources, id, tables, onSaved, onSynced }: {
         </table>
       </div>
       <p className="fc-muted" style={{ margin: 0 }}>{t("sources.approx")} {t("sources.cursorHelp")}</p>
+      {copyOnly ? <p className="fc-muted" style={{ margin: 0 }}>{t("sources.copyOnly")}</p> : null}
       {error ? <WarningBanner tone="danger">{t("sources.failed", { reason: error })}</WarningBanner> : null}
       {saved ? <p style={{ margin: 0 }} role="status">{t("sources.saved")}</p> : null}
       <div className="fc-row" style={{ gap: "var(--base-size-8)" }}>

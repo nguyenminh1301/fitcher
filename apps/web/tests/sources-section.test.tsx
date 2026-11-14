@@ -290,4 +290,39 @@ describe("Sources page", () => {
       name: "orders", columns: [{ name: "id", type: "Nullable(Int64)" }, { name: "amount", type: "Nullable(Decimal(18, 2))" }],
     }));
   });
+
+  it("connects SQL Server with its own defaults: schema dbo, required encryption, no verification and copy only", async () => {
+    const user = userEvent.setup();
+    const sources = fakeSources([]);
+    sources.test = vi.fn(async () => ({ tables: [{ ...ORDERS, mode: "copy" as const, proposed_mode: "copy" as const, reason: "copy_only" }] }));
+    show(sources);
+    await user.click(await screen.findByRole("button", { name: "Add source" }));
+    await user.selectOptions(screen.getByLabelText("Database type"), "sqlserver");
+
+    expect((screen.getByLabelText("Port") as HTMLInputElement).placeholder).toBe("1433");
+    expect((screen.getByLabelText("Schema") as HTMLInputElement).placeholder).toBe("dbo");
+    expect((screen.getByLabelText("TLS") as HTMLSelectElement).value).toBe("require");
+    expect(screen.queryByRole("option", { name: /verify the server certificate/ })).toBeNull();
+    expect(screen.queryByLabelText("CA certificate (PEM)")).toBeNull();
+    expect(screen.getByText(/certificate of a SQL Server connection is not verified/)).toBeTruthy();
+    await fillConnection(user);
+    await user.click(screen.getByRole("button", { name: "Test connection" }));
+
+    expect(sources.test).toHaveBeenCalledWith(expect.objectContaining({ kind: "sqlserver", tls_mode: "require" }));
+    expect(await screen.findByText(/read through fitcher and copied only/)).toBeTruthy();
+  });
+
+  it("offers only the copy mode for the tables of a SQL Server source", async () => {
+    const user = userEvent.setup();
+    const sources = fakeSources([{ ...SHOP, id: "erp", kind: "sqlserver" }]);
+    sources.tables = vi.fn(async () => [{ ...ORDERS, mode: "copy" as const, proposed_mode: "copy" as const, reason: "copy_only" }]);
+    show(sources);
+    await user.click(await screen.findByRole("button", { name: "Tables of erp" }));
+
+    const orders = await screen.findByRole("row", { name: /orders/ });
+    const mode = within(orders).getByLabelText("Mode orders") as HTMLSelectElement;
+
+    expect(within(mode).queryByRole("option", { name: "Live" })).toBeNull();
+    expect(within(orders).getByText(/copied only/)).toBeTruthy();
+  });
 });

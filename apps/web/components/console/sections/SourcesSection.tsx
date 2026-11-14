@@ -41,7 +41,7 @@ function EditForm({ sources, source, onDone }: { sources: FitcherApi["sources"];
   const { t } = useI18n();
   const failure = useFailure();
   const [values, setValues] = useState<ConnectionValues>({
-    kind: source.kind === "mysql" ? "mysql" : "postgres", name: source.id, host: source.host ?? "", port: source.port ? String(source.port) : "",
+    kind: source.kind === "file" ? "postgres" : source.kind, name: source.id, host: source.host ?? "", port: source.port ? String(source.port) : "",
     database: source.database ?? "", schema_name: source.schema_name ?? "", user: source.user ?? "", password: "", tls_mode: source.tls_mode,
     ca_certificate: "",
   });
@@ -143,7 +143,7 @@ function SourceRow({ sources, source, syncing, onSyncing, onChanged, onDelete }:
       </div>
       {error ? <WarningBanner tone="danger">{error}</WarningBanner> : null}
       {panel === "tables" && tables ? (
-        <TableChooser sources={sources} id={source.id} tables={tables} onSaved={() => void onChanged()} />
+        <TableChooser sources={sources} id={source.id} tables={tables} copyOnly={source.kind === "sqlserver"} onSaved={() => void onChanged()} />
       ) : null}
       {panel === "edit" ? <EditForm sources={sources} source={source} onDone={() => { setPanel(null); void onChanged(); }} /> : null}
     </li>

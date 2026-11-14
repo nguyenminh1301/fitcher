@@ -70,6 +70,8 @@ The api connects as `source_admin` (`CLICKHOUSE_SOURCE_ADMIN_PASSWORD`), which m
 `source_admin` also creates the `src_*` databases, writes `raw` and sees the definitions of `marts` (`SHOW TABLES`, never data) so that a source read by a mart is not deleted.
 An existing ClickHouse server needs `source_admin.xml` and `named_collections_storage.xml` mounted and a restart; nothing else changes, because no collection created with SQL existed before.
 
+The SQL Server fixture (`sqlserver-fixture` in the `sources` profile) is the vendor's `mcr.microsoft.com/mssql/server` image: amd64 only, about 2 GB of memory, and starting it accepts Microsoft's licence terms (`ACCEPT_EULA`). It is seeded by `infra/sources/sqlserver/init.sh` and is never part of the release image. A SQL Server source connected in the application is not a named collection: the api reads it with `pymssql` and keeps its password in the app state's encrypted secrets (DECISIONS §4).
+
 Source credentials of the development manifests reach ClickHouse only: `config.d/sources.xml` defines one named collection per source manifest whose values come from the clickhouse service's environment, and `system.named_collections` hides them.
 `source_loader` (`CLICKHOUSE_SOURCES_PASSWORD`) is the only user granted the collections; it may create, fill, exchange and drop tables in `raw` and create the `src_*` databases and their table engines.
 ClickHouse requires `INSERT` to create a table on a writable engine, so it holds `INSERT` on `src_*`; the source system's read-only user still refuses every write.

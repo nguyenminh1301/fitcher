@@ -1,7 +1,7 @@
 // Generated from the backend Pydantic contract by npm run contracts:generate; do not edit.
 
 export type Id = string;
-export type Kind = "postgres" | "mysql" | "file";
+export type Kind = "postgres" | "mysql" | "sqlserver" | "file";
 export type Host = string | null;
 export type Port = number | null;
 export type Database = string | null;

@@ -309,6 +309,30 @@ services:
       retries: 40
       start_period: 20s
 
+  # The vendor's image: amd64 only, about 2 GB of memory, and ACCEPT_EULA accepts Microsoft's licence terms. It is a
+  # development fixture and never part of the release image (DECISIONS §4).
+  sqlserver-fixture:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    platform: linux/amd64
+    profiles: ["sources"]
+    user: "0:0"
+    entrypoint: ["/bin/bash", "/init.sh"]
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: ${FIXTURE_ADMIN_PASSWORD:-}
+      FIXTURE_SQLSERVER_DATABASE: ${FIXTURE_SQLSERVER_DATABASE:-}
+      FIXTURE_SQLSERVER_USER: ${FIXTURE_SQLSERVER_USER:-}
+      FIXTURE_SQLSERVER_PASSWORD: ${FIXTURE_SQLSERVER_PASSWORD:-}
+    volumes:
+      - ./infra/sources/fixtures/widgets:/fixtures:ro
+      - ./infra/sources/sqlserver/init.sh:/init.sh:ro
+    healthcheck:
+      test: ["CMD-SHELL", "test -f /tmp/seeded && /opt/mssql-tools18/bin/sqlcmd -C -S localhost -U \"$$FIXTURE_SQLSERVER_USER\" -P \"$$FIXTURE_SQLSERVER_PASSWORD\" -d \"$$FIXTURE_SQLSERVER_DATABASE\" -h -1 -Q \"SET NOCOUNT ON; SELECT TOP 1 1 FROM dbo.refunds\" | grep -q 1"]
+      interval: 5s
+      timeout: 10s
+      retries: 40
+      start_period: 40s
+
   mongodb-fixture:
     image: mongo:8.0.20
     profiles: ["sources"]

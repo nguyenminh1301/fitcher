@@ -12,7 +12,7 @@ from pydantic import Field
 
 from app.contracts.query_spec import ContractModel
 
-SourceKind = Literal["postgres", "mysql", "file"]
+SourceKind = Literal["postgres", "mysql", "sqlserver", "file"]
 Mode = Literal["live", "copy"]
 TlsMode = Literal["prefer", "require", "verify"]
 FailureReason = Literal["unreachable", "refused", "authentication", "tls", "database_not_found", "permission", "unknown",
@@ -22,15 +22,16 @@ FailureReason = Literal["unreachable", "refused", "authentication", "tls", "data
 class SourceConnection(ContractModel):
     """The connection fields of a PostgreSQL or MySQL/MariaDB source."""
 
-    kind: Literal["postgres", "mysql"]
+    kind: Literal["postgres", "mysql", "sqlserver"]
     host: str = Field(max_length=255)
     port: int | None = Field(default=None, ge=1, le=65535)
     database: str = Field(max_length=255)
-    # PostgreSQL only; "public" when empty.
+    # PostgreSQL ("public") and SQL Server ("dbo") only; the default when empty.
     schema_name: str | None = Field(default=None, max_length=255)
     user: str = Field(max_length=255)
     password: str = Field(max_length=1024, repr=False)
-    tls_mode: TlsMode = "prefer"
+    # "prefer" when absent, except for SQL Server, whose connection requires encryption by default.
+    tls_mode: TlsMode | None = None
     ca_certificate: str | None = Field(default=None, max_length=20_000)
 
 

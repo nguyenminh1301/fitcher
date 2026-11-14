@@ -67,7 +67,7 @@ After a PostgreSQL source restarts, ClickHouse's `PostgreSQL` engine fails the f
 
 ### Connecting a source in the interface
 
-An `admin` connects a PostgreSQL or MySQL/MariaDB database, or uploads a CSV, XLSX or Parquet file, on the Sources page of the console or in the Data step of the setup, with no manifest and no `.env` change ([DECISIONS §4 and §15](../docs/DECISIONS.md#data-sources)):
+An `admin` connects a PostgreSQL, MySQL/MariaDB or SQL Server database, or uploads a CSV, XLSX or Parquet file, on the Sources page of the console or in the Data step of the setup, with no manifest and no `.env` change ([DECISIONS §4 and §15](../docs/DECISIONS.md#data-sources)):
 
 1. Create the read-only user below on the source system.
 2. Open Sources, choose Add source, enter the name, host, port, database, schema (PostgreSQL), user and password, and choose a TLS mode (a CA certificate verifies a server with its own authority). A database on the Docker host is reached as `host.docker.internal`; on Linux the `docker run` command adds `--add-host=host.docker.internal:host-gateway`.
@@ -97,12 +97,23 @@ CREATE USER 'fitcher_reader'@'%' IDENTIFIED BY 'choose-a-password';
 GRANT SELECT ON erp.* TO 'fitcher_reader'@'%';
 ```
 
-The catalog is read with these same grants: PostgreSQL's `pg_catalog` and `information_schema` and MySQL's `information_schema` are readable by any user, and a table the user may not select simply does not appear.
+**SQL Server** (run on the source; replace the login, password and `erp`):
+
+```sql
+CREATE LOGIN fitcher_reader WITH PASSWORD = 'choose-a-password';
+USE erp;
+CREATE USER fitcher_reader FOR LOGIN fitcher_reader;
+ALTER ROLE db_datareader ADD MEMBER fitcher_reader;
+```
+
+A SQL Server source is copy only: ClickHouse has no engine for it, so the api reads the tables itself over TDS 7.4 with encryption required (choose "when the server offers it" to relax that), streams them into `raw.<name>__<table>` in batches and keeps the previous copy when a sync fails. The schema defaults to `dbo`, the port to 1433, and only SQL authentication works. The driver does not verify the server's certificate, and a database that does not exist is reported like a wrong password. Its password is stored encrypted in the app state, not in ClickHouse ([report](../docs/eval/sql-server-source-report.md)).
+
+The catalog is read with these same grants: PostgreSQL's `pg_catalog` and `information_schema`, MySQL's `information_schema` and SQL Server's `sys` views are readable by any user for the objects it may select, and a table the user may not select simply does not appear.
 `SOURCES_LIVE_TEST=1 uv run --project apps/api pytest -c apps/api/pyproject.toml -k sources` with the `sources` profile up checks this path against the fixtures.
 
 ### Fixture sources
 
-The `sources` Compose profile starts lab-only PostgreSQL, MySQL, MongoDB and S3-compatible (SeaweedFS) fixtures seeded with the synthetic widget dataset of [`infra/sources/fixtures`](../infra/sources/fixtures) (40 widgets, 3,000 sales and 300 refunds), each with a read-only user.
+The `sources` Compose profile starts lab-only PostgreSQL, MySQL, MongoDB, S3-compatible (SeaweedFS) and SQL Server fixtures seeded with the synthetic widget dataset of [`infra/sources/fixtures`](../infra/sources/fixtures) (40 widgets, 3,000 sales and 300 refunds), each with a read-only user.
 The manifests `fixture_postgres`, `fixture_mysql`, `fixture_mongodb` and `fixture_files` feed the `fixture_widgets` marts `widget_sales` and `widget_refunds`, whose columns cover the minimal test pack.
 
 ```bash

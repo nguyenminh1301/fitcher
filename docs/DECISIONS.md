@@ -19,7 +19,7 @@ This document states the target. §16 lists each decision that differs from the 
 
 ### Out of scope
 
-- Querying a source database from the engine in its own dialect or over its own driver. Every source is reached through ClickHouse (§4), so the agent writes one SQL dialect and RBAC stays in ClickHouse (§9).
+- Querying a source database from the engine in its own dialect or over its own driver. Every source is reached through ClickHouse (§4), so the agent writes one SQL dialect and RBAC stays in ClickHouse (§9). The one driver in `api` copies a SQL Server source into `raw`; the agent never queries it.
 - Writing to a source database.
 - Caching (Redis, result cache, answer cache).
 - Clustered operation: HA, autoscaling, multi-region, Kubernetes, an external secret manager.
@@ -113,15 +113,16 @@ A company's data is always reached through ClickHouse. A source is created on th
 | PostgreSQL | `PostgreSQL` database engine in database `src_<source>` | scheduled `INSERT INTO raw.* SELECT` from the source |
 | MySQL / MariaDB | `MySQL` database engine in database `src_<source>` | same |
 | MongoDB | `MongoDB` table engine with declared columns (flat collections only) | same |
-| SQL Server | `ODBC` table engine through `clickhouse-odbc-bridge` and FreeTDS | same |
+| SQL Server | none: copy only | rows read by `api` with a FreeTDS-based driver (`pymssql`) and streamed in batches into `raw` (a reload and swap, or an incremental append) |
 | Uploaded CSV / Excel / Parquet file | none | load into `raw` |
 | S3 files (manifest only) | `S3` table engine | load into `raw` |
 
 - The mode is chosen per table. **Live** is the default for a small table: nothing is stored twice and answers are always fresh. **Copy** is proposed for a table above the size threshold (§14), because ClickHouse pushes only simple `WHERE` filters to a source and runs joins, aggregation and sorting itself after reading the rows; a copied table is queried at ClickHouse speed and is as fresh as its last sync.
 - A copy is refreshed on a schedule kept in the app state and run inside `api`. A table with an increasing key or modification time is copied incrementally from the last value seen; any other table is reloaded and swapped atomically.
+- SQL Server has no ClickHouse engine, and the ODBC bridge that would reach it through FreeTDS is not shipped in the ClickHouse 26.8 packages ([sql-server-source-report.md](eval/sql-server-source-report.md)), so the kind is copy only: `api` reads the source with encryption required and writes into `raw`, which keeps the agent on ClickHouse alone. Its password is the one credential that is not in ClickHouse: it is a secret of the app state (§9), encrypted with the instance key, and the driver does not verify the server's certificate.
 - MongoDB and S3 sources are declared in a manifest only; the Sources page does not offer them.
 - The agent still queries only marts, writes ClickHouse SQL and runs under the ClickHouse RBAC of §9; `src_*` databases are granted to no agent role.
-- Each source has a read-only user on the source system. Its credentials are written once into a ClickHouse named collection created with SQL and stored encrypted by ClickHouse; the app state keeps only the source's name, kind, host and tables. Credentials are never read back, never shown again in the interface and never reach a prompt or the LLM.
+- Each source has a read-only user on the source system. Its credentials are written once into a ClickHouse named collection created with SQL and stored encrypted by ClickHouse (SQL Server excepted, above); the app state keeps only the source's name, kind, host and tables. Credentials are never read back, never shown again in the interface and never reach a prompt or the LLM.
 - Generating MongoDB queries (or any non-SQL query language) is out of scope: a document collection that is not flat is copied and flattened by dbt.
 
 ## 5. Domain Pack
@@ -334,7 +335,7 @@ Principles:
   - A blocked chunk is not indexed. A flagged column value is reported by the compiler and still indexed, because it is real data the filters need.
   - The LLM client in `api` is the only code that calls a provider. It rejects any call without `screening` metadata and reruns the rules on the whole request, which closes code paths that forgot to screen; it is not an authentication boundary.
   - Out of scope: scanning model output, and fine-tuning the classifier.
-- Source database users are read-only; their credentials stay in ClickHouse named collections (§4). In team mode only an `admin` creates, edits or deletes a source.
+- Source database users are read-only; their credentials stay in ClickHouse named collections (§4), except a SQL Server password, which is an encrypted secret of the app state like a provider key. In team mode only an `admin` creates, edits or deletes a source.
 - Provider keys and the OIDC client secret are encrypted in the app state with the instance's secret key (§3) and are never returned by any endpoint; the interface shows only whether a key is set and its last four characters.
 
 ## 10. Logging (ClickHouse `agent_logs`)
@@ -455,7 +456,7 @@ The code built in Phases 0 to 12 follows v3. Each row is replaced by the phase n
 | Keycloak sign-in, sessions in the web process, roles from the JWT | Individual and team modes with local accounts and optional OIDC (§9) | 15 |
 | Six Compose services | One image and one container; Qdrant runs as an internal process until Phase 20 (§3) | 16 |
 | Sources declared only in manifests, credentials from `.env`, manual full reloads | Sources page, named collections created with SQL, scheduled and incremental copies (§4, §15) | 17 |
-| No SQL Server source | SQL Server through ODBC (§4) | 18 |
+| No SQL Server source | SQL Server as a copy-only source read by `api` with a FreeTDS-based driver (§4) | 18 |
 | Marts hand-written in dbt, pack usable only after review and eval | Instant pack (§11) | 19 |
 | Qdrant | Search in ClickHouse, documents optional (§2, §5) | 20 |
 | 90-day expiry of conversations, one worker, development datasets in the image | Retention split, hardening, release and demo (§3, §14) | 21 |
