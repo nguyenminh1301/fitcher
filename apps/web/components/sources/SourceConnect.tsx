@@ -18,8 +18,10 @@ import { useI18n } from "@/lib/i18n/react";
 
 type Kind = SourceConnection["kind"];
 type Tls = NonNullable<SourceConnection["tls_mode"]>;
-const KINDS: Kind[] = ["postgres", "mysql"];
+const KINDS: Kind[] = ["postgres", "mysql", "sqlserver"];
 const TLS: Tls[] = ["prefer", "require", "verify"];
+const DEFAULT_PORTS: Record<Kind, string> = { postgres: "5432", mysql: "3306", sqlserver: "1433" };
+const DEFAULT_SCHEMAS: Partial<Record<Kind, string>> = { postgres: "public", sqlserver: "dbo" };
 
 /** One fixed message for a failure: the api's reason when it gave one, else its own message. */
 export function useFailure() {
@@ -47,8 +49,8 @@ export function connectionBody(values: ConnectionValues): SourceConnection {
     password: values.password, tls_mode: values.tls_mode,
   };
   if (values.port) body.port = Number(values.port);
-  if (values.kind === "postgres" && values.schema_name) body.schema_name = values.schema_name.trim();
-  if (values.ca_certificate.trim()) body.ca_certificate = values.ca_certificate;
+  if (DEFAULT_SCHEMAS[values.kind] && values.schema_name) body.schema_name = values.schema_name.trim();
+  if (values.kind !== "sqlserver" && values.ca_certificate.trim()) body.ca_certificate = values.ca_certificate;
   return body;
 }
 
@@ -58,13 +60,20 @@ export function ConnectionFields({ values, onChange, disabled, editing }: {
 }) {
   const { t } = useI18n();
   const set = (patch: Partial<ConnectionValues>) => onChange({ ...values, ...patch });
+  const sqlserver = values.kind === "sqlserver";
+  // A SQL Server connection requires encryption unless the user asks for it only when offered, and its driver
+  // cannot verify the certificate, so that mode is not offered.
+  const modes = sqlserver ? TLS.filter((mode) => mode !== "verify") : TLS;
   return (
     <div className="fc-stack" style={{ gap: "var(--base-size-12)" }}>
       {editing ? null : (
         <div className="fc-field">
           <label className="fc-field-label" htmlFor="source-kind">{t("sources.databaseType")}</label>
           <select id="source-kind" className="fc-input" value={values.kind} disabled={disabled}
-            onChange={(event) => set({ kind: event.target.value as Kind })}>
+            onChange={(event) => {
+              const kind = event.target.value as Kind;
+              set({ kind, tls_mode: kind === "sqlserver" ? "require" : values.tls_mode === "require" ? "prefer" : values.tls_mode });
+            }}>
             {KINDS.map((kind) => <option key={kind} value={kind}>{t(`sources.kind_${kind}`)}</option>)}
           </select>
         </div>
@@ -74,11 +83,11 @@ export function ConnectionFields({ values, onChange, disabled, editing }: {
       <TextField label={t("sources.host")} value={values.host} disabled={disabled} help={t("sources.hostHint")}
         onChange={(event) => set({ host: event.target.value })} />
       <TextField label={t("sources.port")} type="number" value={values.port} disabled={disabled}
-        placeholder={values.kind === "postgres" ? "5432" : "3306"} onChange={(event) => set({ port: event.target.value })} />
+        placeholder={DEFAULT_PORTS[values.kind]} onChange={(event) => set({ port: event.target.value })} />
       <TextField label={t("sources.database")} value={values.database} disabled={disabled}
         onChange={(event) => set({ database: event.target.value })} />
-      {values.kind === "postgres" ? (
-        <TextField label={t("sources.schema")} value={values.schema_name} disabled={disabled} placeholder="public"
+      {DEFAULT_SCHEMAS[values.kind] ? (
+        <TextField label={t("sources.schema")} value={values.schema_name} disabled={disabled} placeholder={DEFAULT_SCHEMAS[values.kind]}
           onChange={(event) => set({ schema_name: event.target.value })} />
       ) : null}
       <TextField label={t("sources.user")} value={values.user} disabled={disabled} autoComplete="off" help={t("sources.readOnlyHint")}
@@ -89,11 +98,14 @@ export function ConnectionFields({ values, onChange, disabled, editing }: {
         <label className="fc-field-label" htmlFor="source-tls">{t("sources.tls")}</label>
         <select id="source-tls" className="fc-input" value={values.tls_mode} disabled={disabled}
           onChange={(event) => set({ tls_mode: event.target.value as Tls })}>
-          {TLS.map((mode) => <option key={mode} value={mode}>{t(`sources.tls_${mode}`)}</option>)}
+          {modes.map((mode) => <option key={mode} value={mode}>{t(`sources.tls_${mode}`)}</option>)}
         </select>
+        {sqlserver ? <span className="fc-field-help">{t("sources.sqlserverTls")}</span> : null}
       </div>
-      <TextField label={t("sources.caCertificate")} multiline rows={3} value={values.ca_certificate} disabled={disabled}
-        help={editing ? t("sources.caKeep") : t("sources.caHelp")} onChange={(event) => set({ ca_certificate: event.target.value })} />
+      {sqlserver ? null : (
+        <TextField label={t("sources.caCertificate")} multiline rows={3} value={values.ca_certificate} disabled={disabled}
+          help={editing ? t("sources.caKeep") : t("sources.caHelp")} onChange={(event) => set({ ca_certificate: event.target.value })} />
+      )}
     </div>
   );
 }
@@ -148,7 +160,7 @@ function DatabaseForm({ sources, onConnected }: { sources: FitcherApi["sources"]
       {tables ? (
         <div className="fc-stack" style={{ gap: "var(--base-size-8)" }}>
           <WarningBanner tone="success">{t("sources.tested", { count: tables.length })}</WarningBanner>
-          <TableList tables={tables} />
+          <TableList tables={tables} copyOnly={values.kind === "sqlserver"} />
         </div>
       ) : null}
       <div className="fc-row" style={{ gap: "var(--base-size-8)" }}>
@@ -265,7 +277,8 @@ export function SourceConnect({ sources, onConnected, onChosen, onSynced }: {
       <div className="fc-stack" style={{ gap: "var(--base-size-12)" }}>
         <WarningBanner tone="success">{t("sources.connected", { name: connected.id })}</WarningBanner>
         <p className="fc-muted" style={{ margin: 0 }}>{t("sources.chooseHint")}</p>
-        <TableChooser sources={sources} id={connected.id} tables={connected.tables} onSaved={onChosen} onSynced={onSynced} />
+        <TableChooser sources={sources} id={connected.id} tables={connected.tables} copyOnly={connected.kind === "sqlserver"}
+          onSaved={onChosen} onSynced={onSynced} />
       </div>
     );
   }

@@ -96,6 +96,7 @@
       "enum": [
         "postgres",
         "mysql",
+        "sqlserver",
         "file"
       ],
       "title": "Kind",
