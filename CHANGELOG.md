@@ -254,6 +254,7 @@
 
 ### Security
 
+- Scan the release image in the Security workflow next to the Compose images, through `scripts/scan_image.sh`, the checksum-verified Trivy gate both the Security and Release workflows now share.
 - Keep the model gateway from loading a `.env` file: LiteLLM reads one from the working directory into the environment on import unless it runs in production mode, which would have handed the api or a job every key and password in the repository's `.env`; the gateway now sets `LITELLM_MODE=PRODUCTION` before importing it.
 - Upgrade the LiteLLM gateway image's nodejs-26 from 26.13.0-r0 to at least 26.13.1-r0 (`infra/litellm/Dockerfile`), which fixes the HTTP/2 denial of service CVE-2026-123863 that upstream v1.106.7 still ships.
 - Build the Qdrant service from `infra/qdrant/Dockerfile`, which upgrades the upstream v1.20.0 image's zlib1g to the Debian fix for CVE-2026-76844 and CVE-2026-85091 until a Qdrant release ships it.
