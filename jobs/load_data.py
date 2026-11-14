@@ -19,11 +19,10 @@ import pyarrow.compute as pc
 import pyarrow.parquet as pq
 from huggingface_hub import hf_hub_download
 
+from app.sources.attach import loading_table, publish_raw_table, quote as _quote
 from jobs.lib.clickhouse import admin_client
 from jobs.lib.source_manifest import ManifestError, SourceManifest, TableSpec, load_manifest
 
-RAW_DATABASE = "raw"
-LOADING_SUFFIX = "__loading"
 BATCH_ROWS = 500_000
 DEFAULT_DATA_DIR = Path("data/hf")
 
@@ -149,30 +148,9 @@ def _bounds(table: TableSpec, schema: pa.Schema):
     return schema.get_field_index(column), start, end
 
 
-def publish_raw_table(client, name: str) -> None:
-    loading, target = loading_table(name), _target(name)
-    if int(client.command(f"EXISTS TABLE {target}")):
-        client.command(f"EXCHANGE TABLES {loading} AND {target}")
-        client.command(f"DROP TABLE {loading}")
-    else:
-        client.command(f"RENAME TABLE {loading} TO {target}")
-
-
 def _drop_loading(client, manifest: SourceManifest) -> None:
     for table in manifest.tables:
         client.command(f"DROP TABLE IF EXISTS {loading_table(table.name)}")
-
-
-def _target(name: str) -> str:
-    return f"{_quote(RAW_DATABASE)}.{_quote(name)}"
-
-
-def loading_table(name: str) -> str:
-    return f"{_quote(RAW_DATABASE)}.{_quote(name + LOADING_SUFFIX)}"
-
-
-def _quote(identifier: str) -> str:
-    return "`" + identifier.replace("\\", "\\\\").replace("`", "\\`") + "`"
 
 
 def print_summary(results: list[TableResult]) -> None:
