@@ -99,3 +99,18 @@ docker compose run --rm jobs python -m jobs.seed_dev_accounts
 
 A second run resets their passwords, roles and status. Their ids are the usernames the development users had under Keycloak, so their conversations and run logs stay theirs.
 An admin may register one OpenID Connect provider with `PUT /settings/oidc`; register `http://localhost:3000/auth/oidc/callback` (or the instance's public address) as its redirect URI.
+
+## Release image
+
+The root `Dockerfile` builds the one-container image of DECISIONS §3; [docs/install.md](../docs/install.md) is its user guide.
+
+| Path | Purpose |
+| --- | --- |
+| `image/s6-rc.d/` | s6-overlay services: `init-data` and `migrate` (oneshots), `clickhouse`, `qdrant`, `api` and `web` |
+| `image/user-bundles.d/user/` | The bundle s6-overlay starts, listing every service |
+| `image/scripts/` | `init-data` (runs `jobs.init_data`), `migrate` (waits for ClickHouse, then runs `jobs.migrate` as its admin) and `finish`, which stops the container after five exits of one service within a minute |
+| `image/clickhouse/users.d/admin.xml` | The embedded server's administrator `fitcher_admin`; `jobs.init_data` renders it and `clickhouse/users.d/` with password hashes on every start |
+| `image/healthcheck.sh` | The image healthcheck: web, api and ClickHouse must all answer |
+| `image/fitcher` | `docker exec <container> fitcher <job> [args]` runs a job module with the admin environment |
+
+`../deploy/compose.external-clickhouse.yaml` runs the image against a separate ClickHouse server through `CLICKHOUSE_URL`.
