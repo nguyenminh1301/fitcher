@@ -240,3 +240,29 @@ def test_cases_run_through_the_role_runners(packs_dir):
 
     assert code == 0
     assert requested and all(item == ("minimal", "viewer") for item in requested)
+
+
+def test_cases_from_another_pack_answer_as_the_first_role_and_check_as_the_case_role(packs_dir, tmp_path):
+    shutil.copytree(packs_dir / "minimal", packs_dir / "generated")
+    (packs_dir / "generated" / "eval.yaml").unlink()
+    asked: list[tuple[str, str]] = []
+
+    def runners_factory(pack: str):
+        def runner_for(role: str) -> FakeRunner:
+            asked.append((pack, role))
+            return FakeRunner(runs=[good_output()])
+        return runner_for
+
+    seen: list = []
+    code = main(
+        ["--pack", "generated", "--cases-from", "minimal", "--packs-dir", str(packs_dir), "--output-dir", str(tmp_path)],
+        deps_factory=_factory(FakeRunner(), seen=seen), runners_factory=runners_factory,
+    )
+
+    case_role = yaml.safe_load((packs_dir / "minimal" / "eval.yaml").read_text(encoding="utf-8"))["cases"][0]["role"]
+    first_role = yaml.safe_load((packs_dir / "generated" / "policies.yaml").read_text(encoding="utf-8"))["roles"][0]["id"]
+    assert code == 0
+    assert seen[0][0] == "generated"
+    assert ("generated", first_role) in asked and ("minimal", case_role) in asked
+    run = EvalRun.model_validate_json((tmp_path / "generated-eval.json").read_text(encoding="utf-8"))
+    assert run.pack == "generated" and [case.case_id for case in run.cases] == [CASE_ID]

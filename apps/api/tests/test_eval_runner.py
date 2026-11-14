@@ -249,3 +249,26 @@ def test_a_chart_edit_case_redraws_the_previous_answer_without_sql():
 
     assert (score.layers["intent"].status, score.layers["execution"].status) == ("pass", "pass")
     assert [call[0] for call in agent.runner.calls] == ["explain", "run"]
+
+
+def test_cases_of_another_pack_run_as_one_role_and_their_references_as_the_case_role():
+    agent = deps([routing_reply(), extraction_reply(), GOOD_SQL, "Blue led."], runner=None)
+    runners: dict[str, FakeRunner] = {}
+    references: dict[str, FakeRunner] = {}
+
+    def runner_for(role: str) -> FakeRunner:
+        return runners.setdefault(role, FakeRunner(runs=[good_output()]))
+
+    def reference_runner_for(role: str) -> FakeRunner:
+        return references.setdefault(role, FakeRunner(runs=[good_output()]))
+
+    run = run_eval(
+        "minimal", _set(_case("first", role="auditor")), agent, timeout=5.0, threshold=0.8,
+        runner_for=runner_for, agent_role="viewer", reference_runner_for=reference_runner_for,
+    )
+
+    assert set(runners) == {"viewer"}
+    assert set(references) == {"auditor"}
+    assert [call[0] for call in references["auditor"].calls] == ["run"]
+    assert {role for request in agent.search.queries for role in request.roles} == {"viewer"}
+    assert run.cases[0].layers["execution"].status == "pass"
