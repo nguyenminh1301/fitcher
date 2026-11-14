@@ -11,6 +11,7 @@ import { httpFeedback } from "./feedback";
 import { httpModels } from "./models";
 import { httpReview } from "./review";
 import { httpSetup } from "./setup";
+import { httpSources } from "./sources";
 
 export const httpApi: FitcherApi = {
   auth: httpAuth,
@@ -27,5 +28,6 @@ export const httpApi: FitcherApi = {
   costs: httpCosts,
   users: httpUsers,
   models: httpModels,
+  sources: httpSources,
   setup: httpSetup,
 };

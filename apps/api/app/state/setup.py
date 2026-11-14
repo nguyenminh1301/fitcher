@@ -13,7 +13,7 @@ from app.auth.principal import OWNER_ID
 from app.state.db import StateDb
 from app.state.settings import INSTANCE_MODES, Settings
 
-STEPS = ("mode", "models")
+STEPS = ("mode", "models", "data")
 
 
 class SetupError(ValueError):

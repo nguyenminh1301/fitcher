@@ -16,13 +16,16 @@ describe("generated contract types", () => {
       "dataset_view.schema.json", "document_list.schema.json", "document_roles_change.schema.json",
       "document_view.schema.json", "draft_result.schema.json", "embedding_change.schema.json",
       "embedding_view.schema.json", "eval_report_view.schema.json", "eval_run_started.schema.json",
-      "feedback_input.schema.json", "feedback_row.schema.json", "group_input.schema.json",
-      "model_tiers_view.schema.json", "new_user.schema.json", "password_reset.schema.json", "proposal_result.schema.json", "provider_create.schema.json",
-      "provider_models.schema.json", "provider_test_request.schema.json", "provider_test_result.schema.json",
-      "provider_update.schema.json", "provider_view.schema.json", "query_spec.schema.json", "result.schema.json",
-      "review_item.schema.json", "review_item_patch.schema.json", "run_row.schema.json", "run_trace.schema.json",
-      "setup_mode_change.schema.json", "setup_status.schema.json", "tier_change.schema.json", "tier_view.schema.json",
-      "user_change.schema.json", "user_view.schema.json",
+      "feedback_input.schema.json", "feedback_row.schema.json", "file_load.schema.json",
+      "file_upload_view.schema.json", "group_input.schema.json", "model_tiers_view.schema.json",
+      "new_user.schema.json", "password_reset.schema.json", "probe_result.schema.json", "proposal_result.schema.json",
+      "provider_create.schema.json", "provider_models.schema.json", "provider_test_request.schema.json",
+      "provider_test_result.schema.json", "provider_update.schema.json", "provider_view.schema.json",
+      "query_spec.schema.json", "result.schema.json", "review_item.schema.json", "review_item_patch.schema.json",
+      "run_row.schema.json", "run_trace.schema.json", "setup_mode_change.schema.json", "setup_status.schema.json",
+      "source_connection.schema.json", "source_create.schema.json", "source_detail.schema.json",
+      "source_patch.schema.json", "source_view.schema.json", "sync_view.schema.json", "tables_change.schema.json",
+      "tier_change.schema.json", "tier_view.schema.json", "user_change.schema.json", "user_view.schema.json",
     ]);
   });
 

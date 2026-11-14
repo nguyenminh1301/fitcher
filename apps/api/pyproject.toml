@@ -23,6 +23,8 @@ dependencies = [
     "numpy==2.5.4",
     "onnxruntime==1.31.1",
     "opentelemetry-sdk==1.45.2",
+    # Reads the schema of an uploaded Parquet file (app/sources/files.py); the jobs read Hugging Face datasets with it too.
+    "pyarrow==26.0.0",
     # Company documents (app/onboarding): read-only parsers; uploads are multipart forms.
     "openpyxl==3.1.5",
     "pydantic==2.14.1",
@@ -47,7 +49,6 @@ dev = [
 jobs = [
     "dbt-clickhouse==1.10.3",
     "dbt-core==1.12.6",
-    "pyarrow==26.0.0",
 ]
 
 [tool.uv]

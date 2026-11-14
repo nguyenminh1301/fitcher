@@ -64,7 +64,13 @@ With the stack running, `AGENT_LOGS_LIVE_TEST=1` and the seven passwords in the 
 
 ### Data sources
 
-Source credentials reach ClickHouse only: `config.d/sources.xml` defines one named collection per source manifest whose values come from the clickhouse service's environment, and `system.named_collections` hides them.
+A source connected on the Sources page (DECISIONS §4, §15) keeps its credentials in a named collection created with SQL and stored encrypted by ClickHouse: `config.d/named_collections_storage.xml` selects the `local_encrypted` storage under `/var/lib/clickhouse/named_collections` with the key in `CLICKHOUSE_NAMED_COLLECTIONS_KEY` (64 hex characters).
+The release image renders the same setting with a key derived from the instance key (`jobs/init_data.py`), so the key is as safe as `/data/secret.key`; changing or losing it makes the stored collections unreadable and the sources must be connected again.
+The api connects as `source_admin` (`CLICKHOUSE_SOURCE_ADMIN_PASSWORD`), which may create, alter, drop and use named collections but holds no `SHOW NAMED COLLECTIONS SECRETS` grant, so no query returns a password; ClickHouse writes `CREATE` and `ALTER NAMED COLLECTION` to its query log and server log with every value hidden.
+`source_admin` also creates the `src_*` databases, writes `raw` and sees the definitions of `marts` (`SHOW TABLES`, never data) so that a source read by a mart is not deleted.
+An existing ClickHouse server needs `source_admin.xml` and `named_collections_storage.xml` mounted and a restart; nothing else changes, because no collection created with SQL existed before.
+
+Source credentials of the development manifests reach ClickHouse only: `config.d/sources.xml` defines one named collection per source manifest whose values come from the clickhouse service's environment, and `system.named_collections` hides them.
 `source_loader` (`CLICKHOUSE_SOURCES_PASSWORD`) is the only user granted the collections; it may create, fill, exchange and drop tables in `raw` and create the `src_*` databases and their table engines.
 ClickHouse requires `INSERT` to create a table on a writable engine, so it holds `INSERT` on `src_*`; the source system's read-only user still refuses every write.
 The admin and dbt read `src_*` tables without the collections, and live marts are views that run with their definer's privileges, so no agent role is granted `raw` or `src_*`.

@@ -62,3 +62,13 @@ export type Cell = Result["rows"][number][number];
 
 /** A chart type of DECISIONS §8. */
 export type ChartType = ChartSpec["type"];
+export type { SourceConnection } from "./source_connection";
+export type { SourceCreate } from "./source_create";
+export type { SourcePatch } from "./source_patch";
+export type { SourceView } from "./source_view";
+export type { SourceDetail, TableView, ColumnView, ForeignKeyView } from "./source_detail";
+export type { ProbeResult } from "./probe_result";
+export type { TablesChange, TableChangeInput } from "./tables_change";
+export type { SyncView } from "./sync_view";
+export type { FileUploadView } from "./file_upload_view";
+export type { FileLoad, FileColumn } from "./file_load";

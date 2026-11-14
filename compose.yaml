@@ -23,6 +23,10 @@ services:
       CLICKHOUSE_PACK_REVIEW_PASSWORD: ${CLICKHOUSE_PACK_REVIEW_PASSWORD:?set CLICKHOUSE_PACK_REVIEW_PASSWORD in .env}
       # Read by users.d/sources.xml for source_loader, the only user of the source named collections.
       CLICKHOUSE_SOURCES_PASSWORD: ${CLICKHOUSE_SOURCES_PASSWORD:?set CLICKHOUSE_SOURCES_PASSWORD in .env}
+      # Read by users.d/source_admin.xml: the user the api connects as to connect sources in the application.
+      CLICKHOUSE_SOURCE_ADMIN_PASSWORD: ${CLICKHOUSE_SOURCE_ADMIN_PASSWORD:?set CLICKHOUSE_SOURCE_ADMIN_PASSWORD in .env}
+      # 64 hex characters: the key that encrypts the named collections created with SQL (config.d/named_collections_storage.xml).
+      CLICKHOUSE_NAMED_COLLECTIONS_KEY: ${CLICKHOUSE_NAMED_COLLECTIONS_KEY:?set CLICKHOUSE_NAMED_COLLECTIONS_KEY in .env}
       # Read-only source credentials, read by config.d/sources.xml (DECISIONS §4 Data sources).
       # They reach no other service; an unset source leaves its collection unusable.
       FIXTURE_POSTGRES_HOST: ${FIXTURE_POSTGRES_HOST:-}
@@ -62,7 +66,9 @@ services:
       - ./infra/clickhouse/users.d/model_tiers.xml:/etc/clickhouse-server/users.d/model_tiers.xml:ro
       - ./infra/clickhouse/users.d/pack_review.xml:/etc/clickhouse-server/users.d/pack_review.xml:ro
       - ./infra/clickhouse/users.d/sources.xml:/etc/clickhouse-server/users.d/sources.xml:ro
+      - ./infra/clickhouse/users.d/source_admin.xml:/etc/clickhouse-server/users.d/source_admin.xml:ro
       - ./infra/clickhouse/config.d/sources.xml:/etc/clickhouse-server/config.d/sources.xml:ro
+      - ./infra/clickhouse/config.d/named_collections_storage.xml:/etc/clickhouse-server/config.d/named_collections_storage.xml:ro
       - ./infra/clickhouse/changes:/docker-entrypoint-initdb.d:ro
     ulimits:
       nofile:
@@ -133,6 +139,8 @@ services:
       CLICKHOUSE_REVIEW_READER_PASSWORD: ${CLICKHOUSE_REVIEW_READER_PASSWORD:?set CLICKHOUSE_REVIEW_READER_PASSWORD in .env}
       # Writes the document registry and test-runs reviewed metrics (users.d/pack_review.xml).
       CLICKHOUSE_PACK_REVIEW_PASSWORD: ${CLICKHOUSE_PACK_REVIEW_PASSWORD:?set CLICKHOUSE_PACK_REVIEW_PASSWORD in .env}
+      # Connects, attaches and copies the sources of the Sources page; it holds no source credential (users.d/source_admin.xml).
+      CLICKHOUSE_SOURCE_ADMIN_PASSWORD: ${CLICKHOUSE_SOURCE_ADMIN_PASSWORD:?set CLICKHOUSE_SOURCE_ADMIN_PASSWORD in .env}
       # Company documents (DECISIONS §5) and the pack working tree the Review UI writes (never committed by the app).
       DOCUMENTS_DIR: /app/build/documents
       DOCUMENT_MAX_BYTES: ${DOCUMENT_MAX_BYTES:-20971520}

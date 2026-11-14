@@ -17,5 +17,5 @@ export default function SetupPage() {
     }).catch(() => router.replace("/sign-in"));
   }, [router]);
   if (isAdmin === null) return null;
-  return <SetupScreen setup={api.setup} models={api.models} isAdmin={isAdmin} onSignedOut={() => router.replace("/sign-in")} onOpenChat={() => router.push("/")} />;
+  return <SetupScreen setup={api.setup} models={api.models} sources={api.sources} isAdmin={isAdmin} onSignedOut={() => router.replace("/sign-in")} onOpenChat={() => router.push("/")} />;
 }

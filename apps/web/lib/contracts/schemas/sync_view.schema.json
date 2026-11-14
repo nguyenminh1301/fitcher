@@ -1,0 +1,85 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "title": "Id",
+      "type": "integer"
+    },
+    "status": {
+      "enum": [
+        "running",
+        "succeeded",
+        "failed",
+        "cancelled"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "started_by": {
+      "enum": [
+        "manual",
+        "schedule",
+        "setup"
+      ],
+      "title": "Started By",
+      "type": "string"
+    },
+    "started_at": {
+      "format": "date-time",
+      "title": "Started At",
+      "type": "string"
+    },
+    "finished_at": {
+      "anyOf": [
+        {
+          "format": "date-time",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Finished At"
+    },
+    "results": {
+      "items": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "title": "Results",
+      "type": "array"
+    },
+    "error": {
+      "anyOf": [
+        {
+          "enum": [
+            "unreachable",
+            "refused",
+            "authentication",
+            "tls",
+            "database_not_found",
+            "permission",
+            "unknown",
+            "interrupted"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Error"
+    }
+  },
+  "required": [
+    "id",
+    "status",
+    "started_by",
+    "started_at",
+    "finished_at",
+    "results",
+    "error"
+  ],
+  "title": "SyncView",
+  "type": "object"
+}

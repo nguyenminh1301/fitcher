@@ -27,7 +27,7 @@ import shutil
 import sys
 from urllib.parse import urlsplit
 
-from app.state.secrets import load_key
+from app.state.secrets import derive_key, load_key
 
 ADMIN_USER = "fitcher_admin"
 ADMIN_PASSWORD = "CLICKHOUSE_ADMIN_PASSWORD"
@@ -44,9 +44,13 @@ PASSWORD_SETTINGS = (
     "CLICKHOUSE_MODEL_TIERS_PASSWORD",
     "CLICKHOUSE_PACK_REVIEW_PASSWORD",
     "CLICKHOUSE_SOURCES_PASSWORD",
+    # The api creates and drops the named collections of the sources connected on the Sources page.
+    "CLICKHOUSE_SOURCE_ADMIN_PASSWORD",
 )
 # Needed only by migrate and the jobs that manage ClickHouse users or copy sources.
 ADMIN_ONLY = frozenset({ADMIN_PASSWORD, "CLICKHOUSE_SOURCES_PASSWORD"})
+# ClickHouse stores the named collections of connected sources encrypted with a key derived from the instance key.
+COLLECTIONS_KEY_PURPOSE = "clickhouse named collections"
 DATA_DIRS = ("clickhouse", "clickhouse/tmp", "packs", "compiled", "documents", "models", "models/guard", "qdrant", "secrets")
 PASSWORDS_FILE = "clickhouse.env"
 EMBEDDED_HOST = "127.0.0.1"
@@ -182,8 +186,9 @@ def memory_profile(limit: int | None) -> MemoryProfile:
                          max_threads=min(MAX_QUERY_THREADS, os.cpu_count() or 1))
 
 
-def render_server_config(out_dir: Path, profile: MemoryProfile, data_dir: Path) -> None:
-    """The embedded server's overrides: loopback only, paths under the volume and the low-memory profile."""
+def render_server_config(out_dir: Path, profile: MemoryProfile, data_dir: Path, collections_key: bytes) -> None:
+    """The embedded server's overrides: loopback only, paths under the volume, the low-memory profile and the
+    encrypted storage of the named collections created with SQL (DECISIONS §4)."""
     out_dir = Path(out_dir)
     clickhouse = f"{Path(data_dir) / 'clickhouse'}/"
     removed = "\n".join(f'    <{name} remove="1"/>' for name in DISABLED_SYSTEM_LOGS)
@@ -207,6 +212,12 @@ def render_server_config(out_dir: Path, profile: MemoryProfile, data_dir: Path) 
         <level>warning</level>
         <console>1</console>
     </logger>
+    <named_collections_storage>
+        <type>local_encrypted</type>
+        <path>{clickhouse}named_collections</path>
+        <algorithm>aes_256_ctr</algorithm>
+        <key_hex>{collections_key.hex()}</key_hex>
+    </named_collections_storage>
     <max_server_memory_usage>{profile.server_memory}</max_server_memory_usage>
     <mark_cache_size>{profile.mark_cache}</mark_cache_size>
     <index_mark_cache_size>0</index_mark_cache_size>
@@ -255,7 +266,7 @@ def initialize(data_dir: Path, run_dir: Path, env: Mapping[str, str], templates:
     for name in DATA_DIRS:
         (data_dir / name).mkdir(parents=True, exist_ok=True)
     os.chmod(data_dir / "secrets", 0o700)
-    load_key(data_dir, dict(env))
+    instance_key = load_key(data_dir, dict(env))
     secrets_dir = data_dir / "secrets"
     passwords = ensure_passwords(secrets_dir, env)
     endpoint = clickhouse_endpoint(env)
@@ -269,7 +280,7 @@ def initialize(data_dir: Path, run_dir: Path, env: Mapping[str, str], templates:
     if stock_config is not None:
         shutil.copytree(stock_config, target)
     render_users(templates, target / "users.d", passwords)
-    render_server_config(target, profile, data_dir)
+    render_server_config(target, profile, data_dir, derive_key(instance_key, COLLECTIONS_KEY_PURPOSE))
 
 
 def main() -> int:

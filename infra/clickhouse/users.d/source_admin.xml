@@ -1,0 +1,36 @@
+<clickhouse>
+    <!--
+        source_admin is the user the api connects as to connect a source from the
+        Sources page (DECISIONS §4 Data sources, §9): it creates, replaces and drops
+        the named collection that holds a source's credentials, attaches the source
+        as database src_<source>, copies its tables into raw and removes them again.
+
+        It may use and manage named collections but has no SHOW NAMED COLLECTIONS
+        SECRETS grant, so no query of this user returns a stored password, and the
+        server writes CREATE and ALTER NAMED COLLECTION with every value hidden to
+        its query log. It reads no mart, no agent_logs table and no object of an
+        agent role. The password comes from CLICKHOUSE_SOURCE_ADMIN_PASSWORD.
+    -->
+    <users>
+        <source_admin>
+            <password from_env="CLICKHOUSE_SOURCE_ADMIN_PASSWORD"/>
+            <networks>
+                <ip>::/0</ip>
+            </networks>
+            <profile>default</profile>
+            <quota>default</quota>
+            <grants>
+                <query>GRANT CREATE NAMED COLLECTION, ALTER NAMED COLLECTION, DROP NAMED COLLECTION, SHOW NAMED COLLECTIONS, NAMED COLLECTION ON *</query>
+                <query>GRANT SELECT ON system.named_collections</query>
+                <!-- Statistics of the source's tables are read through the catalog of its own system. -->
+                <query>GRANT READ ON POSTGRES, READ ON MYSQL</query>
+                <query>GRANT TABLE ENGINE ON PostgreSQL, TABLE ENGINE ON MySQL, TABLE ENGINE ON MergeTree</query>
+                <query>GRANT CREATE TEMPORARY TABLE ON *.*</query>
+                <!-- Lists the marts whose definition reads a source, so it is not deleted while one does; no data. -->
+                <query>GRANT SHOW TABLES ON marts.*</query>
+                <query>GRANT SELECT, INSERT, CREATE TABLE, DROP TABLE ON raw.*</query>
+                <query>GRANT SELECT, INSERT, CREATE DATABASE, CREATE TABLE, DROP TABLE, DROP DATABASE ON src_*.*</query>
+            </grants>
+        </source_admin>
+    </users>
+</clickhouse>

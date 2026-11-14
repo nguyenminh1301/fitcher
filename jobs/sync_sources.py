@@ -21,10 +21,10 @@ import argparse
 import dataclasses
 import sys
 
+from app.sources.attach import attach_live, loading_table, publish_copy, raw_table, stage_copy
 from jobs.lib.clickhouse import sources_client
-from jobs.lib.source_engines import live_statements, raw_table, relations, table_function
 from jobs.lib.source_manifest import HUGGINGFACE, ManifestError, SourceManifest, load_manifest
-from jobs.load_data import LoadError, TableResult, loading_table, print_summary, publish_raw_table
+from jobs.load_data import LoadError, TableResult, print_summary
 
 
 def with_mode(manifest: SourceManifest, mode: str | None) -> SourceManifest:
@@ -45,12 +45,7 @@ def _copy(manifest: SourceManifest, client) -> list[TableResult]:
     results: list[TableResult] = []
     try:
         for table in manifest.tables:
-            loading = loading_table(raw_table(manifest, table))
-            client.command(
-                f"CREATE TABLE {loading} ENGINE = MergeTree ORDER BY tuple() "
-                f"AS SELECT * FROM {table_function(manifest, table)}"
-            )
-            results.append(TableResult(table.name, table.expected_rows, int(client.command(f"SELECT count() FROM {loading}"))))
+            results.append(TableResult(table.name, table.expected_rows, stage_copy(client, manifest, table)))
     except Exception as error:
         _drop_loading(manifest, client)
         failed = manifest.tables[len(results)].name
@@ -61,17 +56,13 @@ def _copy(manifest: SourceManifest, client) -> list[TableResult]:
         _drop_loading(manifest, client)
         raise LoadError(f"row counts do not match the manifest for {mismatched}", results)
     for table in manifest.tables:
-        publish_raw_table(client, raw_table(manifest, table))
+        publish_copy(client, manifest, table)
     return results
 
 
 def _attach_live(manifest: SourceManifest, client) -> list[TableResult]:
-    for statement in live_statements(manifest):
-        client.command(statement)
-    results = [
-        TableResult(table.name, table.expected_rows, int(client.command(f"SELECT count() FROM {relation}")))
-        for table, relation in zip(manifest.tables, relations(manifest).values(), strict=True)
-    ]
+    counts = attach_live(client, manifest)
+    results = [TableResult(table.name, table.expected_rows, counts[table.name]) for table in manifest.tables]
     mismatched = [result.name for result in results if not result.ok]
     if mismatched:
         raise LoadError(f"row counts do not match the manifest for {mismatched}", results)
