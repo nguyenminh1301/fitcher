@@ -43,7 +43,7 @@ def test_a_view_of_the_source_is_proposed_as_a_copy_because_it_runs_its_query_th
 
 
 def test_live_tables_that_reference_each_other_are_flagged_as_slow():
-    orders = table("orders", foreign_keys=(ForeignKey(("customer_id",), "customers", ("id",)),))
+    orders = table("orders", foreign_keys=(ForeignKey(("buyer_ref",), "customers", ("id",)),))
     customers = table("customers")
     audit = table("audit")
     modes = {"orders": "live", "customers": "live", "audit": "live"}
@@ -52,13 +52,13 @@ def test_live_tables_that_reference_each_other_are_flagged_as_slow():
 
 
 def test_a_copied_table_is_never_flagged_because_it_is_joined_at_clickhouse_speed():
-    orders = table("orders", foreign_keys=(ForeignKey(("customer_id",), "customers", ("id",)),))
+    orders = table("orders", foreign_keys=(ForeignKey(("buyer_ref",), "customers", ("id",)),))
     customers = table("customers")
 
     assert joined_live_tables([orders, customers], {"orders": "live", "customers": "copy"}) == set()
 
 
 def test_a_table_that_is_not_selected_is_not_flagged():
-    orders = table("orders", foreign_keys=(ForeignKey(("customer_id",), "customers", ("id",)),))
+    orders = table("orders", foreign_keys=(ForeignKey(("buyer_ref",), "customers", ("id",)),))
 
     assert joined_live_tables([orders, table("customers")], {"orders": "live"}) == set()

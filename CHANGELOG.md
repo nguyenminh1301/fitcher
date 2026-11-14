@@ -224,6 +224,7 @@
 
 ### Fixed
 
+- Update `opentelemetry-sdk` to 1.45.2, which brings `opentelemetry-api` 1.45.2 with the fix for CVE-2026-126360.
 - A successful sign-in releases only its own count in the sign-in throttle: it no longer clears the e-mail's other counted attempts, so password checks running in parallel for the same e-mail keep counting toward the limit of five.
 - Export a chart as a real PNG: charts are drawn as SVG, so Export PNG used to save an SVG document named `fitcher-chart.png` that image viewers could not open; the chart is now drawn once more on an off-screen canvas at twice its size in the page's font and saved as PNG.
 - Keep a donut chart's labels off its legend: the ring is drawn in the area above the legend and slightly smaller, so the outside label of a slice at the bottom no longer overlaps the legend entries.

@@ -31,7 +31,7 @@ def catalog():
     return [
         TableInfo("orders", "table", 1200, 400_000, columns=(CatalogColumn("id", "integer", False, 1),
                   CatalogColumn("created_at", "timestamp", False, 2)), primary_key=("id",),
-                  foreign_keys=(ForeignKey(("customer_id",), "customers", ("id",)),), unusual_columns=("meta",)),
+                  foreign_keys=(ForeignKey(("buyer_ref",), "customers", ("id",)),), unusual_columns=("meta",)),
         TableInfo("big", "table", 9_000_000, 2 * 1024**3),
     ]
 
@@ -88,7 +88,7 @@ def test_the_catalog_is_saved_with_the_proposed_mode_and_a_selection_of_nothing(
     assert tables["big"].proposed_mode == "copy" and tables["big"].reason == "rows"
     assert not tables["orders"].selected and tables["orders"].mode == "live"
     assert tables["orders"].primary_key == ("id",)
-    assert tables["orders"].foreign_keys == (ForeignKey(("customer_id",), "customers", ("id",)),)
+    assert tables["orders"].foreign_keys == (ForeignKey(("buyer_ref",), "customers", ("id",)),)
     assert tables["orders"].unusual_columns == ("meta",)
     assert [column.name for column in tables["orders"].columns] == ["id", "created_at"]
 

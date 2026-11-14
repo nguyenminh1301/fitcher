@@ -7,10 +7,10 @@ PG_CATALOG = {
     "pg_stat_user_tables": [("order_items", 40000)],
     "table = 'columns'": [
         ("orders", "id", "integer", "int4", "NO", 1), ("orders", "created_at", "timestamp", "timestamp", "NO", 2),
-        ("order_items", "order_id", "integer", "int4", "NO", 1),
+        ("order_items", "line_ref", "integer", "int4", "NO", 1),
     ],
     "pg_constraint": [("orders_pkey", "p", "100", "0", [1], []), ("items_fkey", "f", "101", "100", [1], [1])],
-    "pg_attribute": [("100", 1, "id"), ("101", 1, "order_id")],
+    "pg_attribute": [("100", 1, "id"), ("101", 1, "line_ref")],
 }
 
 

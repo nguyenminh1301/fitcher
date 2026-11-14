@@ -32,11 +32,11 @@ PG_ROUTES = {
     "pg_stat_user_tables": [("order_items", 40000)],
     "table = 'columns'": [
         ("orders", "id", "integer", "int4", "NO", 1), ("orders", "tags", "ARRAY", "_text", "YES", 2),
-        ("orders", "meta", "jsonb", "jsonb", "YES", 3), ("order_items", "order_id", "integer", "int4", "NO", 1),
+        ("orders", "meta", "jsonb", "jsonb", "YES", 3), ("order_items", "line_ref", "integer", "int4", "NO", 1),
         ("v_open", "id", "integer", "int4", "YES", 1),
     ],
     "pg_constraint": [("orders_pkey", "p", "100", "0", [1], []), ("items_order_fkey", "f", "101", "100", [1], [1])],
-    "pg_attribute": [("100", 1, "id"), ("101", 1, "order_id")],
+    "pg_attribute": [("100", 1, "id"), ("101", 1, "line_ref")],
 }
 
 
@@ -48,7 +48,7 @@ def test_a_postgres_table_list_carries_estimates_sizes_keys_and_flags():
     assert items.rows == 40000, "a table never analysed reports -1, so the live-tuple statistic is used"
     assert view.kind == "view" and view.rows is None and view.size_bytes is None
     assert orders.primary_key == ("id",) and items.primary_key == ()
-    assert [(fk.columns, fk.ref_table, fk.ref_columns) for fk in items.foreign_keys] == [(("order_id",), "orders", ("id",))]
+    assert [(fk.columns, fk.ref_table, fk.ref_columns) for fk in items.foreign_keys] == [(("line_ref",), "orders", ("id",))]
     assert orders.unusual_columns == ("tags", "meta")
     assert [column.name for column in orders.columns] == ["id", "tags", "meta"]
     assert orders.columns[0].nullable is False and orders.columns[1].nullable is True
@@ -71,7 +71,7 @@ MY_ROUTES = {
     ],
     "table = 'KEY_COLUMN_USAGE'": [
         ("PRIMARY", "orders", "id", 1, None, None),
-        ("fk_cust", "orders", "customer_id", 1, "customers", "id"),
+        ("fk_cust", "orders", "buyer_ref", 1, "customers", "id"),
     ],
 }
 
@@ -84,7 +84,7 @@ def test_a_mysql_table_list_uses_the_information_schema():
     assert tables["v_open"].kind == "view" and tables["v_open"].rows is None
     assert orders.primary_key == ("id",)
     assert [(fk.columns, fk.ref_table, fk.ref_columns) for fk in orders.foreign_keys] == [
-        (("customer_id",), "customers", ("id",))]
+        (("buyer_ref",), "customers", ("id",))]
     assert orders.unusual_columns == ("status", "geo")
 
 
