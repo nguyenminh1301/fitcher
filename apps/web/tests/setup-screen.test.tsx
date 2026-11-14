@@ -45,13 +45,15 @@ function fakeModels() {
   } as unknown as FitcherApi["models"];
 }
 
+const noSources = {} as FitcherApi["sources"];
+
 function wrap(node: React.ReactNode) {
   return render(<ThemeProvider><I18nProvider initial="en">{node}</I18nProvider></ThemeProvider>);
 }
 
 describe("setup screen", () => {
   it("lists the steps with the current one open", async () => {
-    wrap(<SetupScreen models={fakeModels()} setup={fakeSetup()} isAdmin onSignedOut={() => {}} onOpenChat={() => {}} />);
+    wrap(<SetupScreen sources={noSources} models={fakeModels()} setup={fakeSetup()} isAdmin onSignedOut={() => {}} onOpenChat={() => {}} />);
     const steps = await screen.findByRole("list", { name: "Steps" });
     expect(steps.textContent).toContain("Who uses this instance");
     expect((screen.getByRole("radio", { name: /One person/ }) as HTMLInputElement).checked).toBe(true);
@@ -59,7 +61,7 @@ describe("setup screen", () => {
 
   it("stores the chosen mode, then offers to finish", async () => {
     const setup = fakeSetup();
-    wrap(<SetupScreen models={fakeModels()} setup={setup} isAdmin onSignedOut={() => {}} onOpenChat={() => {}} />);
+    wrap(<SetupScreen sources={noSources} models={fakeModels()} setup={setup} isAdmin onSignedOut={() => {}} onOpenChat={() => {}} />);
     await userEvent.click(await screen.findByRole("radio", { name: /A team/ }));
     await userEvent.type(screen.getByLabelText("Your e-mail"), "ana@example.com");
     await userEvent.type(screen.getByLabelText("Your name"), "Ana");
@@ -72,26 +74,26 @@ describe("setup screen", () => {
   });
 
   it("asks for the first admin only when the instance is not in team mode yet", async () => {
-    wrap(<SetupScreen models={fakeModels()} setup={fakeSetup()} isAdmin onSignedOut={() => {}} onOpenChat={() => {}} />);
+    wrap(<SetupScreen sources={noSources} models={fakeModels()} setup={fakeSetup()} isAdmin onSignedOut={() => {}} onOpenChat={() => {}} />);
     await screen.findByRole("radio", { name: /One person/ });
     expect(screen.queryByLabelText("Your e-mail")).toBeNull();
     cleanup();
 
     const stored: SetupStatus = { mode: "team", steps: [{ id: "mode", state: "pending" }], complete: false };
     const setup = fakeSetup(stored);
-    wrap(<SetupScreen models={fakeModels()} setup={setup} isAdmin onSignedOut={() => {}} onOpenChat={() => {}} />);
+    wrap(<SetupScreen sources={noSources} models={fakeModels()} setup={setup} isAdmin onSignedOut={() => {}} onOpenChat={() => {}} />);
     await screen.findByRole("radio", { name: /A team/ });
     expect(screen.queryByLabelText("Your e-mail")).toBeNull();
   });
 
   it("shows the stored mode again after a reload", async () => {
     const stored: SetupStatus = { mode: "team", steps: [{ id: "mode", state: "pending" }], complete: false };
-    wrap(<SetupScreen models={fakeModels()} setup={fakeSetup(stored)} isAdmin onSignedOut={() => {}} onOpenChat={() => {}} />);
+    wrap(<SetupScreen sources={noSources} models={fakeModels()} setup={fakeSetup(stored)} isAdmin onSignedOut={() => {}} onOpenChat={() => {}} />);
     expect(((await screen.findByRole("radio", { name: /A team/ })) as HTMLInputElement).checked).toBe(true);
   });
 
   it("does not let a user who is not an admin answer", async () => {
-    wrap(<SetupScreen models={fakeModels()} setup={fakeSetup()} isAdmin={false} onSignedOut={() => {}} onOpenChat={() => {}} />);
+    wrap(<SetupScreen sources={noSources} models={fakeModels()} setup={fakeSetup()} isAdmin={false} onSignedOut={() => {}} onOpenChat={() => {}} />);
     expect(await screen.findByText("Only an admin can set up this instance.")).toBeTruthy();
     expect((screen.getByRole("button", { name: "Save and continue" }) as HTMLButtonElement).disabled).toBe(true);
   });
@@ -100,7 +102,7 @@ describe("setup screen", () => {
     const setup = fakeSetup();
     setup.status = vi.fn(async () => { throw new Error("The api answered 401: signed_out"); });
     const onSignedOut = vi.fn();
-    wrap(<SetupScreen models={fakeModels()} setup={setup} isAdmin onSignedOut={onSignedOut} onOpenChat={() => {}} />);
+    wrap(<SetupScreen sources={noSources} models={fakeModels()} setup={setup} isAdmin onSignedOut={onSignedOut} onOpenChat={() => {}} />);
     await waitFor(() => expect(onSignedOut).toHaveBeenCalled());
   });
 });
@@ -113,7 +115,7 @@ describe("setup models step", () => {
   it("adds a provider with its key, tests it as a paid call and shows the proposed models", async () => {
     const setup = fakeSetup(MODELS_PENDING);
     const models = fakeModels();
-    wrap(<SetupScreen setup={setup} models={models} isAdmin onSignedOut={() => {}} onOpenChat={() => {}} />);
+    wrap(<SetupScreen sources={noSources} setup={setup} models={models} isAdmin onSignedOut={() => {}} onOpenChat={() => {}} />);
 
     await userEvent.type(await screen.findByLabelText("API key"), "sk-test-0000-7777");
     await userEvent.click(screen.getByRole("button", { name: "Add provider" }));
@@ -131,7 +133,7 @@ describe("setup models step", () => {
 
   it("asks a model server for its base URL with the host hint", async () => {
     const models = fakeModels();
-    wrap(<SetupScreen setup={fakeSetup(MODELS_PENDING)} models={models} isAdmin onSignedOut={() => {}} onOpenChat={() => {}} />);
+    wrap(<SetupScreen sources={noSources} setup={fakeSetup(MODELS_PENDING)} models={models} isAdmin onSignedOut={() => {}} onOpenChat={() => {}} />);
 
     await userEvent.selectOptions(await screen.findByLabelText("Provider"), "ollama");
 
@@ -144,7 +146,7 @@ describe("setup models step", () => {
 
   it("can be skipped", async () => {
     const setup = fakeSetup(MODELS_PENDING);
-    wrap(<SetupScreen setup={setup} models={fakeModels()} isAdmin onSignedOut={() => {}} onOpenChat={() => {}} />);
+    wrap(<SetupScreen sources={noSources} setup={setup} models={fakeModels()} isAdmin onSignedOut={() => {}} onOpenChat={() => {}} />);
 
     await userEvent.click(await screen.findByRole("button", { name: "Skip for now" }));
 
@@ -183,5 +185,74 @@ describe("setup gate", () => {
     setup.status = vi.fn(async () => { throw new Error("down"); });
     wrap(<SetupGate api={gateApi(setup, admin)} redirect={() => {}}>app</SetupGate>);
     expect(await screen.findByText("app")).toBeTruthy();
+  });
+});
+
+
+describe("setup data step", () => {
+  const DATA_PENDING: SetupStatus = {
+    mode: "individual",
+    steps: [{ id: "mode", state: "done" }, { id: "models", state: "done" }, { id: "data", state: "pending" }],
+    complete: false,
+  };
+  const TABLE = {
+    name: "orders", kind: "table" as const, rows: 10, size_bytes: 2048, columns: [{ name: "id", type: "integer", nullable: false }],
+    primary_key: ["id"], foreign_keys: [], unusual_columns: [], selected: false, mode: "live" as const, proposed_mode: "live" as const,
+    reason: "small", slow: false, interval_seconds: 86_400, cursor_column: null, cursor_candidates: ["id"], last_synced_at: null,
+    last_rows: null, next_run_at: null,
+  };
+  const CREATED = {
+    id: "erp", kind: "postgres" as const, host: "db", port: 5432, database: "erp", schema_name: "public", user: "reader",
+    tls_mode: "prefer" as const, has_ca: false, created_at: "2026-11-14T08:00:00Z", table_count: 1, selected_count: 0, last_sync: null,
+    tables: [TABLE],
+  };
+
+  function fakeSources() {
+    return {
+      test: vi.fn(async () => ({ tables: [TABLE] })),
+      create: vi.fn(async () => CREATED),
+      changeTables: vi.fn(async () => [{ ...TABLE, selected: true }]),
+      sync: vi.fn(async () => ({ id: 1, status: "running" })),
+    } as unknown as FitcherApi["sources"];
+  }
+
+  it("asks which data to read and can be skipped", async () => {
+    const setup = fakeSetup(DATA_PENDING);
+    wrap(<SetupScreen sources={fakeSources()} models={fakeModels()} setup={setup} isAdmin onSignedOut={() => {}} onOpenChat={() => {}} />);
+
+    expect(await screen.findByText("Which data should fitcher read?")).toBeTruthy();
+    expect(screen.getByLabelText("Host")).toBeTruthy();
+    await userEvent.click(screen.getByRole("button", { name: "Skip for now" }));
+
+    expect(setup.skip).toHaveBeenCalledWith("data");
+  });
+
+  it("connects a database, chooses its tables and continues", async () => {
+    const setup = fakeSetup(DATA_PENDING);
+    const sources = fakeSources();
+    wrap(<SetupScreen sources={sources} models={fakeModels()} setup={setup} isAdmin onSignedOut={() => {}} onOpenChat={() => {}} />);
+    await screen.findByText("Which data should fitcher read?");
+
+    await userEvent.type(screen.getByLabelText("Name"), "erp");
+    await userEvent.type(screen.getByLabelText("Host"), "db");
+    await userEvent.type(screen.getByLabelText("Database"), "erp");
+    await userEvent.type(screen.getByLabelText("User"), "reader");
+    await userEvent.type(screen.getByLabelText("Password"), "pw");
+    await userEvent.click(screen.getByRole("button", { name: "Test connection" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Connect" }));
+    await userEvent.click(await screen.findByRole("checkbox", { name: "Use orders" }));
+    await userEvent.click(screen.getByRole("button", { name: "Save selection" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Continue" }));
+
+    expect(sources.create).toHaveBeenCalledWith(expect.objectContaining({ name: "erp", password: "pw" }));
+    expect(sources.changeTables).toHaveBeenCalled();
+    await waitFor(() => expect(setup.status).toHaveBeenCalledTimes(2));
+  });
+
+  it("does not let a user who is not an admin connect a source", async () => {
+    wrap(<SetupScreen sources={fakeSources()} models={fakeModels()} setup={fakeSetup(DATA_PENDING)} isAdmin={false} onSignedOut={() => {}} onOpenChat={() => {}} />);
+
+    expect(await screen.findByText("Only an admin can set up this instance.")).toBeTruthy();
+    expect(screen.queryByLabelText("Host")).toBeNull();
   });
 });

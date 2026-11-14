@@ -13,6 +13,9 @@ import type {
   EvalReport,
   EvalRunStarted,
   FeedbackRow,
+  FileLoad,
+  FileUploadView,
+  ProbeResult,
   ProposalResult,
   RunRow,
   TraceItem,
@@ -34,6 +37,14 @@ import type {
   ReviewItemPatch,
   SetupModeChange,
   SetupStatus,
+  SourceConnection,
+  SourceCreate,
+  SourceDetail,
+  SourcePatch,
+  SourceView,
+  SyncView,
+  TableView,
+  TablesChange,
 } from "@/lib/contracts";
 
 import type { Conversation, ConversationGroup, ConversationThread } from "./conversations";
@@ -132,6 +143,23 @@ export interface FitcherApi {
     setEmbedding(change: EmbeddingChange): Promise<EmbeddingView>;
     classifier(): Promise<ClassifierStatus>;
     setClassifier(enabled: boolean): Promise<ClassifierStatus>;
+  };
+  /** Data sources (DECISIONS §4, §15): an admin connects, tests, edits, deletes and syncs them. No call returns a password. */
+  sources: {
+    list(): Promise<SourceView[]>;
+    /** Test a connection and list its tables with sizes and the proposed mode; nothing is saved. */
+    test(body: SourceConnection): Promise<ProbeResult>;
+    create(body: SourceCreate): Promise<SourceDetail>;
+    update(id: string, body: SourcePatch): Promise<SourceDetail>;
+    /** Delete a source after confirming its name; the api refuses while a mart reads it. */
+    remove(id: string, confirm: string): Promise<void>;
+    tables(id: string, refresh?: boolean): Promise<TableView[]>;
+    changeTables(id: string, change: TablesChange): Promise<TableView[]>;
+    sync(id: string): Promise<SyncView>;
+    cancel(id: string): Promise<SyncView>;
+    syncs(id: string): Promise<SyncView[]>;
+    upload(file: File): Promise<FileUploadView>;
+    loadFile(id: string, body: FileLoad): Promise<SourceDetail>;
   };
   /** First-run setup (DECISIONS §15); the changes need the admin role. */
   setup: {

@@ -3,12 +3,14 @@
 // First-run setup (DECISIONS §15): the steps as a list with the current one open. A step that has no
 // implementation yet is not listed (the api lists the steps it knows). Only an admin can answer a step.
 // The Models step adds a provider, tests it and shows the models proposed for each tier; adding the
-// provider answers the step, and the setup can be left after it.
+// provider answers the step, and the setup can be left after it. The Data step connects a database or a
+// file and chooses its tables; it can be skipped and repeated later on the Sources page.
 
 import { useCallback, useEffect, useState } from "react";
 
 import { Logo } from "@/components/brand/Logo";
 import { ProviderForm, ProviderTestButton, TestOutcome } from "@/components/models/ProviderForm";
+import { SourceConnect } from "@/components/sources/SourceConnect";
 import { Button, TextField } from "@/components/ui/controls";
 import { WarningBanner } from "@/components/ui/feedback";
 import { Preferences } from "@/components/ui/Preferences";
@@ -22,6 +24,7 @@ const MODES: Mode[] = ["individual", "team"];
 export type SetupScreenProps = {
   setup: FitcherApi["setup"];
   models: FitcherApi["models"];
+  sources: FitcherApi["sources"];
   /** Whether the signed-in user may answer the steps. */
   isAdmin: boolean;
   onSignedOut: () => void;
@@ -77,7 +80,27 @@ function ModelsStep({ models, disabled, onDone, onSkip }: {
   );
 }
 
-export function SetupScreen({ setup, models, isAdmin, onSignedOut, onOpenChat }: SetupScreenProps) {
+function DataStep({ sources, disabled, onDone, onSkip }: {
+  sources: FitcherApi["sources"]; disabled: boolean; onDone: () => void; onSkip: () => void;
+}) {
+  const { t } = useI18n();
+  const [connected, setConnected] = useState(false);
+  return (
+    <section className="fc-card" aria-label={t("setup.step_data")}>
+      <div className="fc-card-head"><h2 className="fc-card-title">{t("setup.dataQuestion")}</h2></div>
+      <div className="fc-card-body fc-stack">
+        <p className="fc-muted" style={{ margin: 0 }}>{t("setup.dataHint")}</p>
+        {disabled ? null : <SourceConnect sources={sources} onConnected={() => setConnected(true)} />}
+        <div className="fc-row" style={{ gap: "var(--base-size-8)" }}>
+          {connected ? <Button variant="primary" onClick={onDone}>{t("setup.continue")}</Button> : null}
+          {connected || disabled ? null : <Button onClick={onSkip}>{t("setup.skip")}</Button>}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+export function SetupScreen({ setup, models, sources, isAdmin, onSignedOut, onOpenChat }: SetupScreenProps) {
   const { t } = useI18n();
   const [status, setStatus] = useState<SetupStatus | null>(null);
   const [error, setError] = useState<"load" | "save" | null>(null);
@@ -112,11 +135,15 @@ export function SetupScreen({ setup, models, isAdmin, onSignedOut, onOpenChat }:
   };
 
   const [modelsOpen, setModelsOpen] = useState(false);
+  const [dataOpen, setDataOpen] = useState(false);
   const pending = status?.steps.find((step) => step.state === "pending");
-  // The Models step stays open after a provider is added, until the admin has seen the test and the tiers.
-  const current = modelsOpen ? { id: "models", state: "pending" as const } : pending;
+  // The Models step stays open after a provider is added, and the Data step after a source is connected,
+  // until the admin has seen the test, the tiers or the tables.
+  const current = modelsOpen ? { id: "models", state: "pending" as const }
+    : dataOpen ? { id: "data", state: "pending" as const } : pending;
   useEffect(() => {
     if (pending?.id === "models") setModelsOpen(true);
+    if (pending?.id === "data") setDataOpen(true);
   }, [pending?.id]);
   return (
     <div className="fc-app" style={{ flexDirection: "column", minHeight: "100vh" }}>
@@ -155,6 +182,10 @@ export function SetupScreen({ setup, models, isAdmin, onSignedOut, onOpenChat }:
                 <ModelsStep models={models} disabled={!isAdmin || busy}
                   onDone={() => { setModelsOpen(false); void run(() => setup.status()); }}
                   onSkip={() => { setModelsOpen(false); void run(() => setup.skip("models")); }} />
+              ) : current?.id === "data" ? (
+                <DataStep sources={sources} disabled={!isAdmin || busy}
+                  onDone={() => { setDataOpen(false); void run(() => setup.status()); }}
+                  onSkip={() => { setDataOpen(false); void run(() => setup.skip("data")); }} />
               ) : current?.id === "mode" ? (
                 <section className="fc-card" aria-label={t("setup.step_mode")}>
                   <div className="fc-card-head"><h2 className="fc-card-title">{t("setup.modeQuestion")}</h2></div>
