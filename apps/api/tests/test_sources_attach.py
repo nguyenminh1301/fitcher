@@ -160,3 +160,23 @@ def test_columns_are_declared_for_a_file_copy():
     assert attach.table_function(source(table, kind="files"), table) == (
         "s3(shop, filename = 'orders.csv', format = 'CSVWithNames', structure = '`id` Int64')"
     )
+
+
+def test_a_source_of_the_sources_page_names_its_database_and_schema_where_the_collection_is_used():
+    shop = Source(name="shop", kind="postgres", tables=(ORDERS,), database="erp", schema="sales")
+
+    assert attach.table_function(shop, ORDERS) == (
+        "postgresql(shop, database = 'erp', schema = 'sales', table = 'orders')"
+    )
+    assert attach.live_statements(shop) == [
+        "CREATE DATABASE IF NOT EXISTS `src_shop` ENGINE = PostgreSQL(shop, database = 'erp', schema = 'sales')",
+    ]
+
+
+def test_a_mysql_source_names_only_its_database():
+    shop = Source(name="shop", kind="mysql", tables=(ORDERS,), database="erp", schema="ignored")
+
+    assert attach.table_function(shop, ORDERS) == "mysql(shop, database = 'erp', table = 'orders')"
+    assert attach.live_statements(shop) == [
+        "CREATE DATABASE IF NOT EXISTS `src_shop` ENGINE = MySQL(shop, database = 'erp')",
+    ]
