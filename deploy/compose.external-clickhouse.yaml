@@ -20,6 +20,7 @@ x-passwords: &passwords
   CLICKHOUSE_MODEL_TIERS_PASSWORD: ${CLICKHOUSE_MODEL_TIERS_PASSWORD:?set CLICKHOUSE_MODEL_TIERS_PASSWORD}
   CLICKHOUSE_PACK_REVIEW_PASSWORD: ${CLICKHOUSE_PACK_REVIEW_PASSWORD:?set CLICKHOUSE_PACK_REVIEW_PASSWORD}
   CLICKHOUSE_SOURCES_PASSWORD: ${CLICKHOUSE_SOURCES_PASSWORD:?set CLICKHOUSE_SOURCES_PASSWORD}
+  CLICKHOUSE_SOURCE_ADMIN_PASSWORD: ${CLICKHOUSE_SOURCE_ADMIN_PASSWORD:?set CLICKHOUSE_SOURCE_ADMIN_PASSWORD}
 
 services:
   clickhouse:
@@ -29,6 +30,8 @@ services:
       CLICKHOUSE_USER: ${CLICKHOUSE_ADMIN_USER:-fitcher_admin}
       CLICKHOUSE_PASSWORD: ${CLICKHOUSE_ADMIN_PASSWORD:?set CLICKHOUSE_ADMIN_PASSWORD}
       CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: "1"
+      # 64 hex characters: encrypts the named collections of the sources connected in the application.
+      CLICKHOUSE_NAMED_COLLECTIONS_KEY: ${CLICKHOUSE_NAMED_COLLECTIONS_KEY:?set CLICKHOUSE_NAMED_COLLECTIONS_KEY}
     volumes:
       - clickhouse-data:/var/lib/clickhouse
       # One file each: the entrypoint writes its admin user into users.d.
@@ -39,6 +42,8 @@ services:
       - ../infra/clickhouse/users.d/model_tiers.xml:/etc/clickhouse-server/users.d/model_tiers.xml:ro
       - ../infra/clickhouse/users.d/pack_review.xml:/etc/clickhouse-server/users.d/pack_review.xml:ro
       - ../infra/clickhouse/users.d/sources.xml:/etc/clickhouse-server/users.d/sources.xml:ro
+      - ../infra/clickhouse/users.d/source_admin.xml:/etc/clickhouse-server/users.d/source_admin.xml:ro
+      - ../infra/clickhouse/config.d/named_collections_storage.xml:/etc/clickhouse-server/config.d/named_collections_storage.xml:ro
     ulimits:
       nofile:
         soft: 262144

@@ -99,3 +99,15 @@ def test_vault_has_no_method_that_returns_a_secret():
 def test_empty_secret_is_refused(db):
     with pytest.raises(SecretError):
         SecretVault(db, bytes([1]) * 32).set("openai", "")
+
+
+def test_a_derived_key_is_stable_distinct_per_purpose_and_never_the_instance_key():
+    from app.state.secrets import derive_key
+
+    key = bytes([9]) * 32
+    first = derive_key(key, "clickhouse named collections")
+
+    assert first == derive_key(key, "clickhouse named collections")
+    assert len(first) == 32 and first != key
+    assert first != derive_key(key, "another purpose")
+    assert first != derive_key(bytes([8]) * 32, "clickhouse named collections")
