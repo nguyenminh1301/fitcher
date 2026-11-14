@@ -22,7 +22,7 @@ dependencies = [
     # The screening classifier (app/screening/classifier.py) runs on CPU with ONNX Runtime.
     "numpy==2.5.4",
     "onnxruntime==1.31.1",
-    "opentelemetry-sdk==1.45.1",
+    "opentelemetry-sdk==1.45.2",
     # Company documents (app/onboarding): read-only parsers; uploads are multipart forms.
     "openpyxl==3.1.5",
     "pydantic==2.14.1",
