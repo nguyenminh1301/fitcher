@@ -58,24 +58,21 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        service: [api, web, clickhouse, qdrant]
+        # release is the one-container image of the root Dockerfile; the others are the Compose services.
+        service: [api, web, clickhouse, qdrant, release]
     env:
       SERVICE: ${{ matrix.service }}
-      TRIVY_VERSION: "0.76.1"
-      TRIVY_SHA256: c7cbe3137fb8a48a17574bede3dd6beb16742d1e9772929940fc90082c39d9c0
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
-      - name: Install checksum-verified scanner
-        run: |
-          curl --fail --location --retry 3 \
-            "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz" \
-            --output "$RUNNER_TEMP/trivy.tar.gz"
-          echo "$TRIVY_SHA256  $RUNNER_TEMP/trivy.tar.gz" | sha256sum --check
-          tar -xzf "$RUNNER_TEMP/trivy.tar.gz" -C "$RUNNER_TEMP" trivy
       - name: Build repository images or pull pinned third-party images
         run: |
+          if [ "$SERVICE" = release ]; then
+            docker build --pull --no-cache --tag fitcher-release:scan .
+            echo "IMAGE=fitcher-release:scan" >> "$GITHUB_ENV"
+            exit 0
+          fi
           cp .env.example .env
           image="$(docker compose config --format json | jq -r --arg s "$SERVICE" '.services[$s].image // empty')"
           if [ -z "$image" ]; then
@@ -86,16 +83,8 @@ jobs:
           fi
           echo "IMAGE=$image" >> "$GITHUB_ENV"
       - name: Save all advisories and block fixable High or Critical findings
-        run: |
-          "$RUNNER_TEMP/trivy" image --image-src docker --scanners vuln \
-            --format json --output image-report.json "$IMAGE"
-          ignore=()
-          if [ -f ".github/trivy/${SERVICE}.trivyignore.yaml" ]; then
-            ignore=(--ignorefile ".github/trivy/${SERVICE}.trivyignore.yaml")
-          fi
-          # Exceptions apply only to this image and expire; see SECURITY.md, Image exceptions.
-          "$RUNNER_TEMP/trivy" image --image-src docker --scanners vuln \
-            --ignore-unfixed --severity HIGH,CRITICAL --exit-code 1 "${ignore[@]}" "$IMAGE"
+        # Exceptions apply only to this image and expire; see SECURITY.md, Image exceptions.
+        run: bash scripts/scan_image.sh "$IMAGE" ".github/trivy/${SERVICE}.trivyignore.yaml"
       - name: Preserve complete image report
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

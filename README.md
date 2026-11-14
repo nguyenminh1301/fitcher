@@ -55,83 +55,23 @@ Each company's access rules live in one policy file. Publishing the pack turns i
 
 ## Where fitcher is going
 
-Today fitcher runs as four services from this repository; models are connected in the application (Phase 14) and sign-in is built into the API (Phase 15). The next phases turn it into one image that starts with a single `docker run`, with data sources set up in the application instead of in files: see the [assessment](docs/self-hosted-product-assessment.md) (in Vietnamese), the [decisions](docs/DECISIONS.md) and the [master plan](docs/MASTER_PLAN.md), Phases 13 to 21. The Quick start below describes the current four-service setup.
+fitcher now ships as one image that starts with a single `docker run` (Phase 16); the next phases set up data sources in the application instead of in files and build a first pack automatically: see the [assessment](docs/self-hosted-product-assessment.md) (in Vietnamese), the [decisions](docs/DECISIONS.md) and the [master plan](docs/MASTER_PLAN.md), Phases 13 to 21.
 
 ## Quick start
 
-You need Docker with Compose v2 and about 8 GB of memory for Docker. Run the commands from the repository root, in Bash or PowerShell.
-
-1. Copy [.env.example](.env.example) to `.env` and replace every `change-me` value. Never commit `.env`. You add a model provider in the app's setup (step 4); to script it instead, set `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GEMINI_API_KEY` or `OLLAMA_URL` in `.env`, which creates that provider on the first start.
-
-2. Start the services. They all report healthy before any model provider is connected.
-
-   ```bash
-   docker compose up --build --wait
-   ```
-
-3. Create the development accounts with the password set as `DEV_ACCOUNT_PASSWORD` in `.env`. This also puts the instance in team mode, where everyone signs in. Skip it to use the app alone without signing in (individual mode).
-
-   ```bash
-   docker compose run --rm jobs python -m jobs.seed_dev_accounts
-   ```
-
-4. Open [localhost:3000](http://localhost:3000) and sign in as `lab.admin@fitcher.test`. The setup asks who uses the instance and which models to use: a provider and its key, or a model server on this computer (Ollama, LM Studio or any OpenAI-compatible endpoint, reached as `host.docker.internal`). Its test call shows the model each task will use.
-
-5. Load the sample e-commerce data and build the tables the agent reads. This downloads [FreeEcommerceTwin14M](https://huggingface.co/datasets/ziadatalabs/FreeEcommerceTwin14M), 14.3 million rows licensed for non-commercial use only. On Linux, `./data` must be writable by user ID 10001.
-
-   ```bash
-   docker compose run --rm jobs python -m jobs.refresh_data --source ecommerce_twin
-   ```
-
-6. Publish the e-commerce Domain Pack. This checks it, test-runs its metrics, writes the database permissions and builds the search index with the embedding model of the provider from step 4, which costs a little with a hosted provider. With a provider that has no embedding model, such as Anthropic alone, a local model is downloaded once (about 0.2 GB) instead; it finds fewer matches ([measurement](docs/eval/local-embedding-report.md)).
-
-   ```bash
-   docker compose run --rm jobs python -m jobs.compile_pack --pack ecommerce_twin
-   ```
-
-7. Optionally, install the prompt-injection classifier. Questions are always screened by English and Vietnamese rules; the classifier adds a model score. Accept the licence of `meta-llama/Llama-Prompt-Guard-2-86M` on Hugging Face, put your token in `.env` as `HF_TOKEN`, run the command below and turn the classifier on on the Models page.
-
-   ```bash
-   docker compose run --rm guard-model
-   ```
-
-8. Sign in as `lab.analyst@fitcher.test` and pick one of the suggested questions. A hosted provider bills every question.
-
-You can also ask from the command line:
+You need Docker. Start fitcher with one command:
 
 ```bash
-docker compose run --rm api python -m jobs.ask "Top 10 best-selling products in Q1 2024 compared with Q1 2025"
+docker run -d --name fitcher -p 127.0.0.1:3000:3000 -v fitcher-data:/data ghcr.io/nguyenminh1301/fitcher
 ```
 
-`make up`, `make ps`, `make logs`, `make smoke` and `make down` are shortcuts for the Compose commands. Stopping the services keeps the data.
+Open [localhost:3000](http://localhost:3000) and follow the setup: choose whether only you or a team uses the instance, then connect a model provider and its key, or a model server on this computer reached as `host.docker.internal` (on Linux add `--add-host=host.docker.internal:host-gateway` to the command). Everything is kept in the `fitcher-data` volume. [docs/install.md](docs/install.md) covers the data volume, settings, upgrades, jobs, local models, an external ClickHouse and measured memory use.
 
-### Development accounts
-
-Each signs in with its e-mail, `<user>@fitcher.test`, and `DEV_ACCOUNT_PASSWORD`.
-
-| User | What they can see |
-| --- | --- |
-| `lab.analyst` | All sales, returns and site traffic |
-| `lab.marketing` | Site traffic only, so a sales question is refused |
-| `lab.northwest` | Sales and returns of the Northwest region only |
-| `lab.partner` | Daily sales and units by product category, never single orders |
-| `lab.reviewer` | What the analyst sees, plus the console's Review, Documents, Datasets, Feedback and Evaluation pages |
-| `lab.admin` | What the analyst sees, plus Runs and trace, Audit, Costs, Models and Users |
-
-### Services
-
-| Service | Address |
-| --- | --- |
-| Web app | [localhost:3000](http://localhost:3000) |
-| API | [localhost:8000](http://localhost:8000/health), with interactive [API docs](http://localhost:8000/docs) |
-| Qdrant | localhost:6333 |
-| ClickHouse | localhost:8123 (HTTP) and localhost:9000 (native) |
-
-All ports listen on the local machine only.
+To work on fitcher itself with the development datasets, the sample packs and separate services, follow the [development setup](CONTRIBUTING.md#development-setup).
 
 ## Using the API
 
-The API streams each answer as server-sent events. In individual mode a request from the local machine needs no sign-in; in team mode, sign in once to get the session cookie and send it with each request. In individual mode a request that changes something must name the page it comes from in `Origin`, which the example sends in both modes:
+These examples use the [development setup](CONTRIBUTING.md#development-setup), which publishes the API on port 8000. The API streams each answer as server-sent events. In individual mode a request from the local machine needs no sign-in; in team mode, sign in once to get the session cookie and send it with each request. In individual mode a request that changes something must name the page it comes from in `Origin`, which the example sends in both modes:
 
 ```bash
 curl -s -c fitcher.cookies -H "Content-Type: application/json" -H "Origin: http://127.0.0.1:8000" -d "{\"email\":\"lab.analyst@fitcher.test\",\"password\":\"$DEV_ACCOUNT_PASSWORD\"}" http://127.0.0.1:8000/session
