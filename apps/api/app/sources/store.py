@@ -130,6 +130,22 @@ class SyncRecord:
 
 
 @dataclass(frozen=True)
+class StoredFile:
+    """An uploaded file: waiting for its types to be confirmed (``source_id`` is None) or the original of a source."""
+
+    id: str
+    source_id: str | None
+    file_name: str
+    format: str
+    size_bytes: int
+    sha256: str
+    columns: tuple[tuple[str, str], ...]
+    stored_path: str
+    uploaded_by: str | None
+    created_at: str
+
+
+@dataclass(frozen=True)
 class Claim:
     source_id: str
     sync_id: int
@@ -299,6 +315,39 @@ class SourceStore:
         with self._db.write() as conn:
             conn.execute("UPDATE source_tables SET next_run_at = ? WHERE source_id = ? AND name = ?",
                          (_iso(next_run_at), source_id, name))
+
+    # Uploaded files
+
+    _FILE_COLUMNS = "id, source_id, file_name, format, size_bytes, sha256, columns, stored_path, uploaded_by, created_at"
+
+    @staticmethod
+    def _file(row) -> StoredFile:
+        return StoredFile(row[0], row[1], row[2], row[3], row[4], row[5],
+                          tuple((c["name"], c["type"]) for c in json.loads(row[6])), row[7], row[8], row[9])
+
+    def add_file(self, file: StoredFile) -> None:
+        with self._db.write() as conn:
+            conn.execute(
+                f"INSERT INTO source_files ({self._FILE_COLUMNS}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (file.id, file.source_id, file.file_name, file.format, file.size_bytes, file.sha256,
+                 json.dumps([{"name": n, "type": t} for n, t in file.columns]), file.stored_path, file.uploaded_by,
+                 file.created_at))
+
+    def get_file(self, file_id: str) -> StoredFile | None:
+        row = self._db.connection().execute(
+            f"SELECT {self._FILE_COLUMNS} FROM source_files WHERE id = ?", (file_id,)).fetchone()
+        return None if row is None else self._file(row)
+
+    def file_of_source(self, source_id: str) -> StoredFile | None:
+        row = self._db.connection().execute(
+            f"SELECT {self._FILE_COLUMNS} FROM source_files WHERE source_id = ?", (source_id,)).fetchone()
+        return None if row is None else self._file(row)
+
+    def attach_file(self, file_id: str, source_id: str, columns: tuple[tuple[str, str], ...]) -> None:
+        """Link an upload to its source and keep the column types the user confirmed."""
+        with self._db.write() as conn:
+            conn.execute("UPDATE source_files SET source_id = ?, columns = ? WHERE id = ?",
+                         (source_id, json.dumps([{"name": n, "type": t} for n, t in columns]), file_id))
 
     # Syncs
 

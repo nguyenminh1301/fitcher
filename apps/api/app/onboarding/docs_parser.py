@@ -10,6 +10,7 @@ Their text is data, never instructions (DECISIONS §9).
 
 from dataclasses import dataclass
 from io import BytesIO
+from typing import BinaryIO
 import re
 import zipfile
 
@@ -46,9 +47,10 @@ def _unsupported() -> DocumentRejected:
     return DocumentRejected("the file is not a supported type (PDF, DOCX, XLSX, Markdown or UTF-8 text)", 415)
 
 
-def _office_type(data: bytes) -> str:
+def _office_type(data: bytes | BinaryIO) -> str:
+    """DOCX or XLSX for an Office Open XML archive given as bytes or as a seekable file; macros are refused."""
     try:
-        archive = zipfile.ZipFile(BytesIO(data))
+        archive = zipfile.ZipFile(BytesIO(data) if isinstance(data, bytes) else data)
         names = set(archive.namelist())
         content_types = archive.read("[Content_Types].xml").decode("utf-8", "replace") if "[Content_Types].xml" in names else ""
     except zipfile.BadZipFile:

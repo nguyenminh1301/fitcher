@@ -1,0 +1,81 @@
+{
+  "$defs": {
+    "FileColumn": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "type": {
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "type"
+      ],
+      "title": "FileColumn",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "title": "Id",
+      "type": "string"
+    },
+    "file_name": {
+      "title": "File Name",
+      "type": "string"
+    },
+    "format": {
+      "enum": [
+        "csv",
+        "xlsx",
+        "parquet"
+      ],
+      "title": "Format",
+      "type": "string"
+    },
+    "size_bytes": {
+      "title": "Size Bytes",
+      "type": "integer"
+    },
+    "columns": {
+      "items": {
+        "$ref": "#/$defs/FileColumn"
+      },
+      "title": "Columns",
+      "type": "array"
+    },
+    "sample": {
+      "items": {
+        "items": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "type": "array"
+      },
+      "title": "Sample",
+      "type": "array"
+    }
+  },
+  "required": [
+    "id",
+    "file_name",
+    "format",
+    "size_bytes",
+    "columns",
+    "sample"
+  ],
+  "title": "FileUploadView",
+  "type": "object"
+}

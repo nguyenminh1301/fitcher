@@ -8,6 +8,7 @@ keeps working; a failure is not cached, so the next request tries again.
 from dataclasses import dataclass
 from functools import cache
 import logging
+import os
 from pathlib import Path
 import threading
 
@@ -20,7 +21,7 @@ from fastapi import Depends, HTTPException, status
 
 from app.api.agent import Agent
 from app.api.rate_limit import RateLimiter
-from app.config import load_settings
+from app.config import load_settings, positive_int
 from app.conversation.store import ConversationStore, conversations_client
 from app.data.clickhouse import ClientWarehouse, QueryLimits
 from app.llm.client import LLMError
@@ -36,7 +37,12 @@ from app.onboarding.review import ReviewService
 from app.packs.compiler import CompileError, CompiledPack, load_compiled
 from app.screening.screen import Screener
 from app.search.client import QdrantSearch
-from app.state.db import StateDb, shared_state
+from app.sources.client import source_admin_client
+from app.sources.files import FileService
+from app.sources.schedule import SourceScheduler
+from app.sources.service import SourceService
+from app.sources.store import SourceStore
+from app.state.db import StateDb, data_dir, shared_state
 from app.state.secrets import SecretVault, shared_vault
 
 
@@ -298,8 +304,49 @@ def get_rate_limiter() -> RateLimiter:
     return RateLimiter(load_settings().rate_limit_per_minute)
 
 
+@cache
+def get_file_service() -> FileService:
+    """Uploaded data files: originals under the data directory, rows streamed into ``raw`` as ``source_admin``."""
+    try:
+        return FileService(get_source_store(), source_admin_client(), data_dir() / "sources" / "files",
+                           positive_int(os.environ, "SOURCE_FILE_MAX_BYTES", 256 * 1024 * 1024))
+    except Exception as error:  # noqa: BLE001 - a missing password or an invalid size cap
+        raise unavailable(f"the file upload is unavailable: {error}") from None
+
+
+@cache
+def get_source_service() -> SourceService:
+    """Connects, tests and syncs the sources of the Sources page as ``source_admin``."""
+    try:
+        return SourceService(get_source_store(), source_admin_client(), files=get_file_service())
+    except HTTPException:
+        raise
+    except Exception as error:  # noqa: BLE001 - a missing password or ClickHouse unreachable
+        raise unavailable(f"the sources service is unavailable: {error}") from None
+
+
+def get_source_store() -> SourceStore:
+    return SourceStore(shared_state())
+
+
+_source_scheduler: SourceScheduler | None = None
+
+
+def start_source_scheduler() -> None:
+    """Run the due copies in the background; without the ``source_admin`` password there is nothing to run them as."""
+    global _source_scheduler
+    try:
+        _source_scheduler = SourceScheduler(get_source_service(), get_source_store())
+    except HTTPException:
+        logger.warning("scheduled source copies are off: CLICKHOUSE_SOURCE_ADMIN_PASSWORD is not set or ClickHouse is down")
+        return
+    _source_scheduler.start()
+
+
 def close() -> None:
     """Flush and stop the agent's log writer if a question ever built the agent, and the api's call log."""
+    if _source_scheduler is not None:
+        _source_scheduler.stop()
     global _call_log_writer
     if get_agent.cache_info().currsize:
         get_agent().close()
