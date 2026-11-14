@@ -148,7 +148,7 @@ Each user may ask 10 questions a minute by default. The same API manages convers
 
 A new company needs its own Domain Pack and nothing else. The Iowa Liquor Sales pack was built this way from a PostgreSQL database.
 
-1. Connect the company's PostgreSQL, MySQL, MongoDB or file sources. ClickHouse either copies the data on a schedule or reads it live, and only ClickHouse holds the read-only credentials.
+1. Connect the company's PostgreSQL or MySQL database, or upload a CSV, Excel or Parquet file, on the console's Sources page or in the setup's Data step: enter the connection, test it, choose the tables and whether to read each live or copy it on a schedule (the [Sources section of the jobs guide](jobs/README.md#connecting-a-source-in-the-interface) gives the read-only user to create). Only ClickHouse holds the credentials. MongoDB and S3 sources are declared in a manifest.
 2. Profile the tables to find their columns, date ranges and common values.
 3. Upload manuals, policies and glossaries on the console's Documents page.
 4. Let the AI draft the pack's terms, metrics and example questions, each with the evidence it used.

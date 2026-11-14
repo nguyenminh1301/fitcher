@@ -65,6 +65,41 @@ Column grants, row policies and aggregate-only views behave the same on live mar
 A MongoDB collection is read live only when it is flat; a nested collection is copied with its documents' top-level fields and flattened in dbt.
 After a PostgreSQL source restarts, ClickHouse's `PostgreSQL` engine fails the first query on each pooled connection with `broken_connection` and reconnects for the next one, so a live question can fail once and succeed when asked again; the MySQL, MongoDB and S3 engines reconnect without an error.
 
+### Connecting a source in the interface
+
+An `admin` connects a PostgreSQL or MySQL/MariaDB database, or uploads a CSV, XLSX or Parquet file, on the Sources page of the console or in the Data step of the setup, with no manifest and no `.env` change ([DECISIONS §4 and §15](../docs/DECISIONS.md#data-sources)):
+
+1. Create the read-only user below on the source system.
+2. Open Sources, choose Add source, enter the name, host, port, database, schema (PostgreSQL), user and password, and choose a TLS mode (a CA certificate verifies a server with its own authority). A database on the Docker host is reached as `host.docker.internal`; on Linux the `docker run` command adds `--add-host=host.docker.internal:host-gateway`.
+3. Test the connection. It lists each table with its row estimate and size from the source's own statistics (labelled approximate), its keys and the mode fitcher proposes: live below 1 million rows and 1 GB, copy above or for a view of the source. A failed test shows one reason: unreachable, refused, authentication, TLS, database not found or permission.
+4. Connect, then choose the tables, the mode of each, how often a copy refreshes (every 15 minutes up to every week) and, for a copy, optionally a numeric or date column to follow. Without a column a sync reloads the table and swaps it in atomically; with one it appends only the rows above the last value seen, so a row changed in place is not picked up. Live tables joined with another live table are flagged slow.
+5. Sync now, or wait for the schedule: the api runs due copies itself, one sync per source at a time, and keeps the previous copy when a sync fails.
+
+A file is loaded as a copy of one table: its column types are inferred from a sample and shown for confirmation, and its original is kept so Sync reloads it. Arrays, JSON, enums and geometry columns arrive as text and are marked in the table list.
+
+The password is written once into a ClickHouse named collection (`CREATE NAMED COLLECTION`, stored encrypted) by the `source_admin` user, which cannot read it back; the app state, the api's responses and logs and ClickHouse's query log never hold it. A source cannot be deleted while a mart reads it; deleting drops its `src_<name>` database, its `raw.<name>__*` tables and its collection.
+
+**PostgreSQL** (run as a superuser on the source; replace `fitcher_reader`, the password, `erp` and `public`):
+
+```sql
+CREATE ROLE fitcher_reader LOGIN PASSWORD 'choose-a-password';
+ALTER ROLE fitcher_reader SET default_transaction_read_only = on;
+GRANT CONNECT ON DATABASE erp TO fitcher_reader;
+GRANT USAGE ON SCHEMA public TO fitcher_reader;
+GRANT SELECT ON ALL TABLES IN SCHEMA public TO fitcher_reader;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO fitcher_reader;
+```
+
+**MySQL / MariaDB** (replace the user, password and `erp`):
+
+```sql
+CREATE USER 'fitcher_reader'@'%' IDENTIFIED BY 'choose-a-password';
+GRANT SELECT ON erp.* TO 'fitcher_reader'@'%';
+```
+
+The catalog is read with these same grants: PostgreSQL's `pg_catalog` and `information_schema` and MySQL's `information_schema` are readable by any user, and a table the user may not select simply does not appear.
+`SOURCES_LIVE_TEST=1 uv run --project apps/api pytest -c apps/api/pyproject.toml -k sources` with the `sources` profile up checks this path against the fixtures.
+
 ### Fixture sources
 
 The `sources` Compose profile starts lab-only PostgreSQL, MySQL, MongoDB and S3-compatible (SeaweedFS) fixtures seeded with the synthetic widget dataset of [`infra/sources/fixtures`](../infra/sources/fixtures) (40 widgets, 3,000 sales and 300 refunds), each with a read-only user.
