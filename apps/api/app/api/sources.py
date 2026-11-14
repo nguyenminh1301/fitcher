@@ -14,7 +14,7 @@ from typing import Annotated, Protocol
 from fastapi import APIRouter, Depends, File, HTTPException, Response, UploadFile, status
 
 from app.api.console import require_admin
-from app.api.runtime import get_admin_action_log, get_file_service, get_source_service, get_source_store, unavailable
+from app.api.runtime import get_admin_action_log, get_file_service, get_source_service, get_source_store, get_state_db, unavailable
 from app.auth.principal import Principal
 from app.contracts.sources import (
     ColumnView, FileColumn, FileLoad, FileUploadView, ForeignKeyView, ProbeResult, SourceConnection, SourceCreate, SourceDetail, SourcePatch, SourceView,
@@ -30,6 +30,8 @@ from app.sources.files import FileService
 from app.sources.inspect import InspectError, TableInfo
 from app.sources.modes import cursor_candidates, joined_live_tables, propose
 from app.sources.service import ConnectionPatch, SourceInUse, SourceService
+from app.state import setup
+from app.state.db import StateDb
 from app.sources.store import (
     DuplicateSource, SourceNotFound, SourceStore, StoredSource, StoredTable, SyncBusy, SyncRecord, TableChange,
     TableNotFound, UNSET,
@@ -48,6 +50,15 @@ class ActionLog(Protocol):
 
 Log = Annotated[ActionLog, Depends(get_admin_action_log)]
 Files = Annotated[FileService, Depends(get_file_service)]
+State = Annotated[StateDb, Depends(get_state_db)]
+
+
+def _setup_data_step_done(db: StateDb) -> None:
+    """Connecting a source answers the setup's Data step."""
+    try:
+        setup.mark_done(db, "data")
+    except Exception:  # noqa: BLE001 - the source is connected; the step is only a display state
+        logger.exception("the setup's data step could not be marked done")
 
 
 def _record(log: ActionLog, admin: Principal, action: str, target: str, old: str, new: str) -> None:
@@ -180,12 +191,13 @@ def upload_file(admin: Admin, service: Files, file: Annotated[UploadFile, File()
 
 
 @router.post("/files/{file_id}/load", status_code=status.HTTP_201_CREATED)
-def load_file(file_id: str, body: FileLoad, admin: Admin, service: Files, store: Store, log: Log) -> SourceDetail:
+def load_file(file_id: str, body: FileLoad, admin: Admin, service: Files, store: Store, log: Log, db: State) -> SourceDetail:
     try:
         source = service.load(file_id, body.name, [source_files.FileColumn(c.name, c.type) for c in body.columns])
     except Exception as error:  # noqa: BLE001 - each failure maps to its status in _refusal
         raise _refusal(error) from None
     _record(log, admin, "source_add", source.id, "", _described(source))
+    _setup_data_step_done(db)
     return _detail(source, store)
 
 
@@ -203,7 +215,7 @@ def test_connection(body: SourceConnection, _: Admin, service: Service) -> Probe
 
 
 @router.post("", status_code=status.HTTP_201_CREATED)
-def create_source(body: SourceCreate, admin: Admin, store: Store, service: Service, log: Log) -> SourceDetail:
+def create_source(body: SourceCreate, admin: Admin, store: Store, service: Service, log: Log, db: State) -> SourceDetail:
     if not valid_name(body.name):
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT,
                             detail="the name must be lower-case letters, digits and underscores, starting with a letter")
@@ -212,6 +224,7 @@ def create_source(body: SourceCreate, admin: Admin, store: Store, service: Servi
     except Exception as error:  # noqa: BLE001 - each failure maps to its status in _refusal
         raise _refusal(error) from None
     _record(log, admin, "source_add", source.id, "", _described(source))
+    _setup_data_step_done(db)
     return _detail(source, store)
 
 

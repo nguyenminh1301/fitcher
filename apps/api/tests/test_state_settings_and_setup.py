@@ -83,5 +83,8 @@ def test_complete_needs_every_step_decided(db):
     with pytest.raises(setup.SetupError, match="models"):
         setup.complete(db)
     setup.mark_done(db, "models")
+    with pytest.raises(setup.SetupError, match="data"):
+        setup.complete(db)
+    setup.skip(db, "data")
     setup.complete(db)
     assert setup.status(db).complete
