@@ -20,7 +20,6 @@ from fastapi import Depends, HTTPException, status
 
 from app.api.agent import Agent
 from app.api.rate_limit import RateLimiter
-from app.auth.jwt import JwksCache, TokenSettings, TokenVerifier
 from app.config import load_settings
 from app.conversation.store import ConversationStore, conversations_client
 from app.data.clickhouse import ClientWarehouse, QueryLimits
@@ -46,16 +45,6 @@ logger = logging.getLogger(__name__)
 
 def unavailable(detail: str) -> HTTPException:
     return HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, detail=detail)
-
-
-@cache
-def get_verifier() -> TokenVerifier | None:
-    """The Keycloak access-token verifier, or None when its settings are not set."""
-    settings = load_settings()
-    token = TokenSettings(settings.keycloak_issuer, settings.keycloak_audience, settings.keycloak_jwks_url)
-    if not all((token.issuer, token.audience, token.jwks_url)):
-        return None
-    return TokenVerifier(token, JwksCache(token.jwks_url))
 
 
 def get_state_db() -> StateDb:

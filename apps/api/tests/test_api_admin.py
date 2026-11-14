@@ -7,15 +7,15 @@ from fastapi.testclient import TestClient
 import pytest
 
 from agent_fixtures import compiled_fixture
-from auth_fixtures import token, verifier
+from session_fixtures import SessionHeaders
 
 from app.admin.logs import PAGE_SIZE, AdminLogs
 from app.api import runtime
 from app.main import app
 
 TS = datetime(2026, 11, 5, 9, 0, tzinfo=UTC)
-ADMIN = {"Authorization": f"Bearer {token(realm_access={'roles': ['admin']})}"}
-REVIEWER = {"Authorization": f"Bearer {token(realm_access={'roles': ['pack_reviewer']})}"}
+ADMIN = SessionHeaders(['admin'])
+REVIEWER = SessionHeaders(['pack_reviewer'])
 RUN = ("t1", TS, "lab.analyst", "viewer", "Revenue by widget", "data_query", "succeeded", 1200, 0.0042, "")
 
 
@@ -41,7 +41,6 @@ def logs(answers) -> tuple[AdminLogs, Script]:
 
 @pytest.fixture
 def client():
-    app.dependency_overrides[runtime.get_verifier] = lambda: verifier()
     app.dependency_overrides[runtime.get_compiled] = lambda: compiled_fixture()
     with TestClient(app) as test_client:
         yield test_client

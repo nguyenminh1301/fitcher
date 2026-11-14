@@ -11,7 +11,7 @@ description: Always active. Sets communication, scope, repository boundaries and
 - Chat with the owner in Vietnamese.
 - Write code identifiers, comments, documentation and GitHub content in English.
 - fitcher is a domain-neutral, self-hosted data question-answering product; `docs/DECISIONS.md` is the binding source of truth and `docs/MASTER_PLAN.md` orders the phases.
-- The repository is a monorepo. Phases 0 to 12 built a Compose stack of six services: `apps/api` (FastAPI), `apps/web` (Next.js), ClickHouse, Qdrant, LiteLLM and Keycloak configured under `infra/`, plus `packs/`, `dbt/` and `jobs/`. Phases 13 to 21 turn it into one self-hosted image without Keycloak, the LiteLLM Proxy and Qdrant (DECISIONS §16); a phase removes only the service it replaces; Phase 14 replaced the LiteLLM Proxy with the api's in-process model gateway. Read README.md for current status and available commands.
+- The repository is a monorepo. Phases 0 to 12 built a Compose stack of six services: `apps/api` (FastAPI), `apps/web` (Next.js), ClickHouse, Qdrant, LiteLLM and Keycloak configured under `infra/`, plus `packs/`, `dbt/` and `jobs/`. Phases 13 to 21 turn it into one self-hosted image without Keycloak, the LiteLLM Proxy and Qdrant (DECISIONS §16); a phase removes only the service it replaces; Phase 14 replaced the LiteLLM Proxy with the api's in-process model gateway; Phase 15 replaced Keycloak with sign-in built into the api. Read README.md for current status and available commands.
 - Before working on a phase, read DECISIONS.md and that phase's plan in `docs/plans/`. Stop and ask before going against a decision; never add an out-of-scope component from DECISIONS §1.
 - Engine code under `apps/` never hard-codes pack table, column, metric or industry names; LLM calls name a model tier only, never a model.
 - Implement only the requested scope; do not add speculative application code, dependencies or abstractions.
@@ -40,7 +40,7 @@ Repository checks alone support Python 3.11 or newer.
 | API or job Python source, tests or dependencies | `uv sync --project apps/api --frozen` and `uv run --project apps/api pytest -c apps/api/pyproject.toml` |
 | Web TypeScript/React source or dependencies | `npm --prefix apps/web ci`, `npm --prefix apps/web run typecheck`, `npm --prefix apps/web run test` and `npm --prefix apps/web run build` |
 | Compose, Dockerfiles or service initialization | `docker compose config --quiet`, `docker compose up --build --wait` and checks for the affected health/readiness behavior |
-| ClickHouse, Qdrant or Keycloak initialization | Verify behavior on a fresh volume and provide an idempotent apply path for existing volumes |
+| ClickHouse, Qdrant or app state initialization | Verify behavior on a fresh volume and provide an idempotent apply path for existing volumes |
 | Domain Pack files or agent behavior (from Phase 4) | `eval.py --pack <pack>` with the baseline; scores must not regress |
 | GitHub Actions workflows | `go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.12`; report explicitly if unavailable locally |
 

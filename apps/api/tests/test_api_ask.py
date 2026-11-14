@@ -8,7 +8,7 @@ import time
 import uuid
 
 from agent_fixtures import GOOD_SQL, compiled_fixture, deps, extraction_reply, good_output, routing_reply
-from auth_fixtures import token, verifier
+from session_fixtures import UNKNOWN_SESSION, SessionHeaders
 from fakes import FakeClassifier, FakeConversationClient, FakeRunner
 from fastapi.testclient import TestClient
 import pytest
@@ -69,7 +69,6 @@ def serve(agent: FakeAgent, compiled, per_minute: int = 3, store: ConversationSt
     limiter = RateLimiter(per_minute)
     store = store or ConversationStore(FakeConversationClient())
     app.dependency_overrides[runtime.get_conversation_store] = lambda: store
-    app.dependency_overrides[runtime.get_verifier] = lambda: verifier()
     app.dependency_overrides[runtime.get_compiled] = lambda: compiled
     app.dependency_overrides[runtime.get_agent] = lambda: agent
     app.dependency_overrides[runtime.get_rate_limiter] = lambda: limiter
@@ -103,7 +102,7 @@ def kinds(events: list[dict]) -> list[str]:
 
 
 def post(client, question=QUESTION, headers=None, **body):
-    return client.post("/ask", json={"question": question, **body}, headers={"Authorization": f"Bearer {token()}", **(headers or {})})
+    return client.post("/ask", json={"question": question, **body}, headers={**SessionHeaders(), **(headers or {})})
 
 
 def test_a_data_question_streams_status_sql_result_chart_summary_and_done(ask_client):
@@ -164,10 +163,10 @@ def test_a_role_without_permission_receives_a_deny_event():
     compiled = pack_with_refunds_clerk()
     agent = FakeAgent([routing_reply(), extraction_reply()], compiled=compiled)
     serve(agent, compiled)
-    clerk = token(realm_access={"roles": ["refunds_clerk"]})
+    clerk = SessionHeaders(["refunds_clerk"])
     try:
         with TestClient(app) as client:
-            response = client.post("/ask", json={"question": QUESTION}, headers={"Authorization": f"Bearer {clerk}"})
+            response = client.post("/ask", json={"question": QUESTION}, headers=clerk)
     finally:
         app.dependency_overrides.clear()
 
@@ -291,16 +290,16 @@ def collect(agent: FakeAgent, role="viewer") -> list[dict]:
     return parse("".join(asyncio.run(drain(event_stream(run, QUESTION, AnswerEvents(role))))))
 
 
-def test_a_missing_or_invalid_token_is_unauthorized_before_the_graph_starts(ask_client):
+def test_a_missing_or_unknown_session_is_unauthorized_before_the_graph_starts(ask_client):
     assert ask_client.post("/ask", json={"question": QUESTION}).status_code == 401
-    expired = ask_client.post("/ask", json={"question": QUESTION}, headers={"Authorization": f"Bearer {token(exp=1_000_000)}"})
+    expired = ask_client.post("/ask", json={"question": QUESTION}, headers=UNKNOWN_SESSION)
     assert expired.status_code == 401
     assert ask_client.agent.started == []
 
 
-def test_a_token_without_a_pack_role_is_forbidden(ask_client):
+def test_a_user_without_a_pack_role_is_forbidden(ask_client):
     response = ask_client.post(
-        "/ask", json={"question": QUESTION}, headers={"Authorization": f"Bearer {token(realm_access={'roles': ['admin']})}"},
+        "/ask", json={"question": QUESTION}, headers=SessionHeaders(['admin']),
     )
 
     assert response.status_code == 403
@@ -319,7 +318,7 @@ def test_too_many_questions_are_refused_before_the_graph_starts(ask_client):
 
 @pytest.mark.parametrize("body", [{"question": ""}, {"question": QUESTION, "timezone": "Mars/Base"}, {"question": QUESTION, "extra": 1}])
 def test_an_invalid_request_is_unprocessable(ask_client, body):
-    response = ask_client.post("/ask", json=body, headers={"Authorization": f"Bearer {token()}"})
+    response = ask_client.post("/ask", json=body, headers=SessionHeaders())
 
     assert response.status_code == 422
     assert ask_client.agent.started == []

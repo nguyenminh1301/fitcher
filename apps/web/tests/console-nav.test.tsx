@@ -58,6 +58,11 @@ describe("console sections", () => {
     expect(allowedSections(["analyst", "marketing"])).toEqual([]);
   });
 
+  it("hides the Users section in individual mode, which has no accounts", () => {
+    expect(allowedSections(["admin"], "individual").map((section) => section.key)).not.toContain("users");
+    expect(allowedSections(["admin"], "team").map((section) => section.key)).toContain("users");
+  });
+
   it("lists a section once for a user with both console roles", () => {
     const keys = allowedSections(["admin", "pack_reviewer"]).map((section) => section.key);
     expect(keys.filter((key) => key === "evaluation")).toHaveLength(1);

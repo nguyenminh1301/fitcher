@@ -19,11 +19,22 @@ import type {
 import type { ConversationThread } from "./conversations";
 import type { AskEvent } from "./events";
 
-/** Who is signed in; Keycloak replaces the demo identities in Phase 7. */
+/** Who a request acts as: the signed-in account, or the owner in individual mode; demo identities on sample data. */
 export interface Identity {
   user_id: string;
   display_name: string;
   roles: string[];
+  /** Individual mode has no sign-in; absent on sample data, which behaves as team mode. */
+  mode?: "individual" | "team";
+  /** Individual mode reachable through a name other than localhost (DECISIONS §9). */
+  exposed?: boolean;
+}
+
+/** Why a sign-in was refused: a wrong e-mail or password, or too many failures in a row. */
+export class SignInError extends Error {
+  constructor(readonly reason: "invalid" | "throttled" | "unavailable") {
+    super(`sign-in refused: ${reason}`);
+  }
 }
 
 /** A sample document row; the mock fills the rest of DocumentView, which only the api knows. */

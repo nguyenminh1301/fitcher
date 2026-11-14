@@ -12,6 +12,7 @@ import { Button, TextField } from "@/components/ui/controls";
 import { Dialog, Menu, type MenuItem } from "@/components/ui/overlay";
 import { SampleDataBadge } from "@/components/ui/SampleDataBadge";
 import type { Conversation, ConversationGroup } from "@/lib/api/conversations";
+import { ExposureBanner } from "@/components/ui/ExposureBanner";
 import { recency, useChat } from "@/lib/chat/ChatContext";
 import { useI18n } from "@/lib/i18n/react";
 
@@ -27,7 +28,7 @@ type DialogState = { kind: "rename-conv" | "rename-group" | "delete-conv" | "del
 
 export function ChatLayout({ children, onConsole, onSignOut }: { children: ReactNode; onConsole?: () => void; onSignOut?: () => void }) {
   const { t } = useI18n();
-  const { api, conversations, groups, activeId, navigate, refresh, now } = useChat();
+  const { api, conversations, groups, activeId, navigate, refresh, now, identity } = useChat();
   const [drawer, setDrawer] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
   const [width, setWidth] = useState(SIDE_DEFAULT);
@@ -314,6 +315,7 @@ export function ChatLayout({ children, onConsole, onSignOut }: { children: React
           <SampleDataBadge feature="chat" />
           <Button variant="ghost" iconOnly icon="squarePen" label={t("ui.newChat")} className="fc-drawer-only" onClick={() => open(null)} />
         </header>
+        <ExposureBanner identity={identity} />
         {children}
       </div>
       {drawer ? <div className="fc-drawer-scrim" onClick={() => setDrawer(false)} /> : null}

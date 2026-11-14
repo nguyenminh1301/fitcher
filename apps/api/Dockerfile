@@ -30,8 +30,8 @@ COPY packs ./packs
 COPY apps/api/tests/screening ./tests/screening
 # jobs.migrate applies these ClickHouse changes, the same files the ClickHouse entrypoint runs on a fresh volume.
 COPY infra/clickhouse/changes ./infra/clickhouse/changes
-# jobs.set_lab_passwords reads the lab users of the realm Keycloak imports.
-COPY infra/keycloak/realm-finch.json ./infra/keycloak/realm-finch.json
+# jobs.seed_dev_accounts reads the development accounts.
+COPY infra/dev/accounts.yaml ./infra/dev/accounts.yaml
 # FITCHER_DATA_DIR (/data) holds the app state and the secret key.
 # Compiled packs, the guard model and documents live in named volumes mounted
 # here; Docker copies each directory's owner into a new volume, so the app user

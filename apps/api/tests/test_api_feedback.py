@@ -4,7 +4,7 @@ from fastapi.testclient import TestClient
 import pytest
 
 from agent_fixtures import compiled_fixture
-from auth_fixtures import token, verifier
+from session_fixtures import SessionHeaders
 from fakes import FakeConversationClient
 
 from app.api import runtime
@@ -14,8 +14,8 @@ from app.main import app
 TRACE = "a" * 32
 
 
-def headers(user: str = "lab.viewer") -> dict:
-    return {"Authorization": f"Bearer {token(preferred_username=user)}"}
+def headers(user: str = "lab.viewer") -> SessionHeaders:
+    return SessionHeaders(user_id=user)
 
 
 @pytest.fixture
@@ -29,7 +29,6 @@ def client(tables):
     turn = store.open_turn("lab.viewer", None, "Top widgets")
     store.question(turn)
     store.answer(turn, trace_id=TRACE, content="Blue led.", query_spec=None, result=None)
-    app.dependency_overrides[runtime.get_verifier] = lambda: verifier()
     app.dependency_overrides[runtime.get_compiled] = lambda: compiled_fixture()
     app.dependency_overrides[runtime.get_conversation_store] = lambda: store
     with TestClient(app) as test_client:

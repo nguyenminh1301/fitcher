@@ -1,9 +1,9 @@
-// Sign-in through Keycloak (Phase 7): the web server holds the session (app/auth/*) and answers who is
-// signed in from the api's /me (app/api/session). There is one identity per browser session, so there is
-// nothing to switch to.
+// Sign-in with an account of the instance (DECISIONS §9): the api keeps the session and the web server's
+// /api/session passes its cookie through. In individual mode every request is the owner, so there is no
+// sign-in. There is one identity per browser session, so there is nothing to switch to.
 
 import type { FitcherApi } from "../client";
-import type { Identity } from "../provisional";
+import { type Identity, SignInError } from "../provisional";
 
 async function json<T>(response: Response): Promise<T> {
   if (!response.ok) throw new Error(`${response.url || "request"} answered ${response.status}`);
@@ -25,12 +25,28 @@ export function createHttpAuth(fetcher: typeof fetch = (...args) => fetch(...arg
       return identity ? [identity] : [];
     },
     switchTo: async () => {
-      throw new Error("A Keycloak session has one identity; sign out to use another account.");
+      throw new Error("A session has one identity; sign out to use another account.");
     },
     pack: async () => json(await fetcher("/api/pack", { cache: "no-store" })),
+    signIn: async (email, password) => {
+      const response = await fetcher("/api/session", {
+        method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ email, password }),
+      });
+      if (response.status === 401) throw new SignInError("invalid");
+      if (response.status === 429) throw new SignInError("throttled");
+      if (!response.ok) throw new SignInError("unavailable");
+      current = null;
+    },
+    oidcEnabled: async () => {
+      const response = await fetcher("/api/session/oidc", { cache: "no-store" });
+      return response.ok && ((await response.json()) as { enabled?: boolean }).enabled === true;
+    },
     signOut: async () => {
       current = null;
-      return (await json<{ url: string }>(await fetcher("/auth/sign-out", { method: "POST" }))).url;
+      const response = await fetcher("/api/session", { method: "DELETE" });
+      // A 401 means the api had already ended the session; anything else that failed leaves it signed in.
+      if (!response.ok && response.status !== 401) throw new Error(`sign-out answered ${response.status}`);
+      return "/sign-in";
     },
   };
 }

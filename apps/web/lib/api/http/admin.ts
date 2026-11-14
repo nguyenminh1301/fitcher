@@ -2,7 +2,7 @@
 // which add the session's access token. The api answers runs, audit, costs and users only to an admin,
 // feedback to a pack_reviewer, and eval reports to either.
 
-import type { UserChange } from "@/lib/contracts";
+import type { PasswordReset, UserChange } from "@/lib/contracts";
 
 import type { FitcherApi } from "../client";
 import { refused } from "./conversations";
@@ -15,6 +15,9 @@ async function call(fetcher: Fetcher, url: string, init?: RequestInit): Promise<
   return response;
 }
 
+const post = (body: unknown): RequestInit => ({
+  method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body),
+});
 const patch = (body: UserChange): RequestInit => ({
   method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify(body),
 });
@@ -68,6 +71,10 @@ export function createHttpUsers(fetcher: Fetcher = (...args) => fetch(...args)):
     },
     setEnabled: async (userId, enabled) => {
       await call(fetcher, `/api/admin/users/${id(userId)}`, patch({ enabled }));
+    },
+    create: async (user) => (await call(fetcher, "/api/admin/users", post(user))).json(),
+    resetPassword: async (userId, password) => {
+      await call(fetcher, `/api/admin/users/${id(userId)}/password`, post({ password } satisfies PasswordReset));
     },
   };
 }

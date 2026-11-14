@@ -28,7 +28,7 @@ The web app has a chat for everyone and a workspace console for reviewers and ad
 
 ![How the pieces fit together](docs/architecture/system.svg)
 
-The user talks to the web app, which signs them in through Keycloak and streams answers from the API. The API runs the agent: it looks up the company's terms in the search index, sends language tasks to the AI models an admin connected in the app, and runs SQL in ClickHouse as the user's role. Models are called by task (fast replies, simple SQL, harder SQL), any task can use any model of a connected provider, and the pack's test results are shown next to each model. Search uses the provider's embedding model, or a local one when the provider has none. All of these services run together with Docker Compose on one machine.
+The user talks to the web app, which streams answers from the API. One person uses it without signing in; a team signs in with accounts the API keeps, or through the company's OpenID Connect provider. The API runs the agent: it looks up the company's terms in the search index, sends language tasks to the AI models an admin connected in the app, and runs SQL in ClickHouse as the user's role. Models are called by task (fast replies, simple SQL, harder SQL), any task can use any model of a connected provider, and the pack's test results are shown next to each model. Search uses the provider's embedding model, or a local one when the provider has none. All of these services run together with Docker Compose on one machine.
 
 ![How a question is answered](docs/architecture/question-flow.svg)
 
@@ -45,7 +45,7 @@ Each company's access rules live in one policy file. Publishing the pack turns i
 | Component | Technology |
 | --- | --- |
 | Web app | Next.js, ECharts, TanStack Table |
-| Sign-in | Keycloak (OpenID Connect) |
+| Sign-in | Accounts kept by the API (Argon2id, server-side sessions); optional OpenID Connect provider |
 | API and agent | FastAPI with streamed responses, LangGraph, sqlglot |
 | AI models | OpenAI, Anthropic, Gemini, a local Ollama model or any OpenAI-compatible endpoint, called in process through the LiteLLM SDK; the provider's embedding model, or a local multilingual one with fastembed |
 | Data and run logs | ClickHouse |
@@ -55,7 +55,7 @@ Each company's access rules live in one policy file. Publishing the pack turns i
 
 ## Where fitcher is going
 
-Today fitcher runs as five services from this repository; models are already connected in the application (Phase 14). The next phases turn it into one image that starts with a single `docker run`, with data sources and sign-in set up in the application instead of in files: see the [assessment](docs/self-hosted-product-assessment.md) (in Vietnamese), the [decisions](docs/DECISIONS.md) and the [master plan](docs/MASTER_PLAN.md), Phases 13 to 21. The Quick start below describes the current five-service setup.
+Today fitcher runs as four services from this repository; models are connected in the application (Phase 14) and sign-in is built into the API (Phase 15). The next phases turn it into one image that starts with a single `docker run`, with data sources set up in the application instead of in files: see the [assessment](docs/self-hosted-product-assessment.md) (in Vietnamese), the [decisions](docs/DECISIONS.md) and the [master plan](docs/MASTER_PLAN.md), Phases 13 to 21. The Quick start below describes the current four-service setup.
 
 ## Quick start
 
@@ -69,13 +69,13 @@ You need Docker with Compose v2 and about 8 GB of memory for Docker. Run the com
    docker compose up --build --wait
    ```
 
-3. Give the demo users the password set as `KEYCLOAK_LAB_USER_PASSWORD` in `.env`.
+3. Create the development accounts with the password set as `DEV_ACCOUNT_PASSWORD` in `.env`. This also puts the instance in team mode, where everyone signs in. Skip it to use the app alone without signing in (individual mode).
 
    ```bash
-   docker compose run --rm jobs python -m jobs.set_lab_passwords
+   docker compose run --rm jobs python -m jobs.seed_dev_accounts
    ```
 
-4. Open [localhost:3000](http://localhost:3000), choose Continue with company account and sign in as `lab.admin`. The setup asks who uses the instance and which models to use: a provider and its key, or a model server on this computer (Ollama, LM Studio or any OpenAI-compatible endpoint, reached as `host.docker.internal`). Its test call shows the model each task will use.
+4. Open [localhost:3000](http://localhost:3000) and sign in as `lab.admin@fitcher.test`. The setup asks who uses the instance and which models to use: a provider and its key, or a model server on this computer (Ollama, LM Studio or any OpenAI-compatible endpoint, reached as `host.docker.internal`). Its test call shows the model each task will use.
 
 5. Load the sample e-commerce data and build the tables the agent reads. This downloads [FreeEcommerceTwin14M](https://huggingface.co/datasets/ziadatalabs/FreeEcommerceTwin14M), 14.3 million rows licensed for non-commercial use only. On Linux, `./data` must be writable by user ID 10001.
 
@@ -95,7 +95,7 @@ You need Docker with Compose v2 and about 8 GB of memory for Docker. Run the com
    docker compose run --rm guard-model
    ```
 
-8. Sign in as `lab.analyst` and pick one of the suggested questions. A hosted provider bills every question.
+8. Sign in as `lab.analyst@fitcher.test` and pick one of the suggested questions. A hosted provider bills every question.
 
 You can also ask from the command line:
 
@@ -105,7 +105,9 @@ docker compose run --rm api python -m jobs.ask "Top 10 best-selling products in 
 
 `make up`, `make ps`, `make logs`, `make smoke` and `make down` are shortcuts for the Compose commands. Stopping the services keeps the data.
 
-### Demo users
+### Development accounts
+
+Each signs in with its e-mail, `<user>@fitcher.test`, and `DEV_ACCOUNT_PASSWORD`.
 
 | User | What they can see |
 | --- | --- |
@@ -122,7 +124,6 @@ docker compose run --rm api python -m jobs.ask "Top 10 best-selling products in 
 | --- | --- |
 | Web app | [localhost:3000](http://localhost:3000) |
 | API | [localhost:8000](http://localhost:8000/health), with interactive [API docs](http://localhost:8000/docs) |
-| Keycloak | [localhost:8080](http://localhost:8080), realm `finch` |
 | Qdrant | localhost:6333 |
 | ClickHouse | localhost:8123 (HTTP) and localhost:9000 (native) |
 
@@ -130,11 +131,11 @@ All ports listen on the local machine only.
 
 ## Using the API
 
-The API streams each answer as server-sent events and needs a Keycloak access token. On a local setup, the `finch-cli` client issues one for a demo user:
+The API streams each answer as server-sent events. In individual mode a request from the local machine needs no sign-in; in team mode, sign in once to get the session cookie and send it with each request. In individual mode a request that changes something must name the page it comes from in `Origin`, which the example sends in both modes:
 
 ```bash
-TOKEN=$(curl -s -d grant_type=password -d client_id=finch-cli -d username=lab.analyst --data-urlencode "password=$KEYCLOAK_LAB_USER_PASSWORD" http://127.0.0.1:8080/realms/finch/protocol/openid-connect/token | python -c "import sys, json; print(json.load(sys.stdin)['access_token'])")
-curl -N -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" -d '{"question":"Top 10 best-selling products in Q1 2024 compared with Q1 2025","timezone":"Asia/Ho_Chi_Minh"}' http://127.0.0.1:8000/ask
+curl -s -c fitcher.cookies -H "Content-Type: application/json" -H "Origin: http://127.0.0.1:8000" -d "{\"email\":\"lab.analyst@fitcher.test\",\"password\":\"$DEV_ACCOUNT_PASSWORD\"}" http://127.0.0.1:8000/session
+curl -N -b fitcher.cookies -H "Content-Type: application/json" -H "Origin: http://127.0.0.1:8000" -d '{"question":"Top 10 best-selling products in Q1 2024 compared with Q1 2025","timezone":"Asia/Ho_Chi_Minh"}' http://127.0.0.1:8000/ask
 ```
 
 The stream reports each step as it starts and finishes, then sends the SQL, the result, the chart and the summary. A question that cannot be answered ends with a clarifying question, a refusal, a blocked notice or an error instead. The response names the conversation it started; send that id with the next question to ask a follow-up. Closing the connection stops the run and its database query.

@@ -12,6 +12,7 @@ import { Logo } from "@/components/brand/Logo";
 import { AccountMenu } from "@/components/chat/AccountMenu";
 import { Button } from "@/components/ui/controls";
 import { Skeleton, Toast } from "@/components/ui/feedback";
+import { ExposureBanner } from "@/components/ui/ExposureBanner";
 import { useChat } from "@/lib/chat/ChatContext";
 import { allowedSections, type SectionGroup } from "@/lib/console/sections";
 import { useI18n } from "@/lib/i18n/react";
@@ -44,7 +45,7 @@ export function ConsoleLayout({ section, navigate, onChat, onSignOut, children }
   const { identity, pack } = useChat();
   const [drawer, setDrawer] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
-  const allowed = identity ? allowedSections(identity.roles) : [];
+  const allowed = identity ? allowedSections(identity.roles, identity.mode) : [];
   const current = allowed.find((item) => item.key === section);
   const firstAllowed = allowed[0]?.path;
 
@@ -111,7 +112,7 @@ export function ConsoleLayout({ section, navigate, onChat, onSignOut, children }
               <span className="fc-navitem-text">{t("ui.openChat")}</span>
             </a>
           </nav>
-          <main className="fc-panel">{current ? children : <div className="fc-page"><Skeleton variant="page" /></div>}</main>
+          <main className="fc-panel"><ExposureBanner identity={identity} />{current ? children : <div className="fc-page"><Skeleton variant="page" /></div>}</main>
         </div>
         {drawer ? <div className="fc-drawer-scrim" onClick={() => setDrawer(false)} /> : null}
         {message ? (

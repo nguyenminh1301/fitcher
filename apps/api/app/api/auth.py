@@ -1,10 +1,8 @@
 """The principal of every request, plus ``/me`` and ``/pack``.
 
-``current_principal`` reads the session cookie of a signed-in account. While
-the web app still signs in through Keycloak, a request without the cookie may
-send a Keycloak bearer token instead; that path goes when Keycloak is removed.
-It answers 401 for a missing, unknown or expired session or a refused token and
-never says which check failed; ``current_role`` answers 403 when the
+``current_principal`` returns the owner in individual mode and otherwise
+reads the session cookie of a signed-in account. It answers 401 for a
+missing, unknown or expired session and never says which check failed; ``current_role`` answers 403 when the
 principal holds no pack role or the ``X-Active-Role`` header names one it does
 not hold. ``/pack`` is public: the sign-in screen names the active pack.
 """
@@ -15,11 +13,9 @@ from fastapi import APIRouter, Cookie, Depends, Header, HTTPException, status
 from pydantic import BaseModel
 
 from app.api.runtime import (
-    PackIdentity, get_compiled, get_compiled_or_none, get_pack_identity, get_state_db, get_verifier, pack_identity,
-    unavailable,
+    PackIdentity, get_compiled, get_compiled_or_none, get_pack_identity, get_state_db, pack_identity,
 )
 from app.auth import account_sessions, origin
-from app.auth.jwt import AuthError, AuthUnavailable, TokenVerifier
 from app.auth.principal import SESSION_COOKIE, Principal, owner
 from app.auth.roles import RoleError, active_role, known_roles
 from app.packs.compiler import CompiledPack
@@ -27,9 +23,7 @@ from app.state.db import StateDb
 
 router = APIRouter()
 
-UNAUTHORIZED = HTTPException(
-    status.HTTP_401_UNAUTHORIZED, detail="invalid or expired access token", headers={"WWW-Authenticate": "Bearer"},
-)
+UNAUTHORIZED = HTTPException(status.HTTP_401_UNAUTHORIZED, detail="sign in again")
 
 
 def pack_roles(compiled: CompiledPack) -> list[str]:
@@ -46,30 +40,16 @@ def _owner_pack_roles(compiled: Annotated[CompiledPack | None, Depends(get_compi
 
 def current_principal(
     db: Annotated[StateDb, Depends(get_state_db)],
-    verifier: Annotated[TokenVerifier | None, Depends(get_verifier)],
     owner_roles: Annotated[list[str], Depends(_owner_pack_roles)],
     session: Annotated[str | None, Cookie(alias=SESSION_COOKIE)] = None,
-    authorization: Annotated[str | None, Header()] = None,
 ) -> Principal:
     if origin.instance_mode(db) == origin.INDIVIDUAL:
         # The address checks of app/auth/origin.py are the gate; there is no sign-in.
         return owner(owner_roles)
-    if session is not None:
-        principal = account_sessions.principal_for(db, session)
-        if principal is None:
-            raise UNAUTHORIZED
-        return principal
-    scheme, _, credentials = (authorization or "").partition(" ")
-    if scheme.lower() != "bearer" or not credentials.strip():
+    principal = account_sessions.principal_for(db, session) if session else None
+    if principal is None:
         raise UNAUTHORIZED
-    if verifier is None:
-        raise unavailable("KEYCLOAK_ISSUER, KEYCLOAK_AUDIENCE and KEYCLOAK_JWKS_URL must be set")
-    try:
-        return verifier.verify(credentials.strip())
-    except AuthError:
-        raise UNAUTHORIZED from None
-    except AuthUnavailable as error:
-        raise unavailable(str(error)) from None
+    return principal
 
 
 def current_role(

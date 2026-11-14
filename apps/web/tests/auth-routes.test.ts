@@ -1,165 +1,151 @@
 // @vitest-environment node
-import { createHash } from "node:crypto";
-
 import { NextRequest } from "next/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const jar = new Map<string, string>();
-vi.mock("next/headers", () => ({ headers: async () => new Headers({ host: "app.test" }), cookies: async () => ({ get: (name: string) => (jar.has(name) ? { name, value: jar.get(name) } : undefined) }) }));
+vi.mock("next/headers", () => ({
+  headers: async () => new Headers({ host: "app.test", origin: "http://app.test" }),
+  cookies: async () => ({ get: (name: string) => (jar.has(name) ? { name, value: jar.get(name) } : undefined) }),
+}));
 
-import { GET as callback } from "@/app/auth/callback/route";
-import { GET as signIn } from "@/app/auth/sign-in/route";
-import { POST as signOut } from "@/app/auth/sign-out/route";
-import { GET as session } from "@/app/api/session/route";
-import { LOGIN_COOKIE, SESSION_COOKIE, accessToken, authConfig } from "@/lib/server/auth";
+import { DELETE as signOut, GET as session, POST as signIn } from "@/app/api/session/route";
+import { GET as oidcAvailability } from "@/app/api/session/oidc/route";
+import { GET as oidcStart } from "@/app/auth/oidc/start/route";
+import { GET as oidcCallback } from "@/app/auth/oidc/callback/route";
+import { SESSION_COOKIE } from "@/lib/server/api";
 
-const ENV = {
-  KEYCLOAK_ISSUER: "http://sso.test/realms/lab",
-  KEYCLOAK_BACKCHANNEL_URL: "http://keycloak:8080/realms/lab",
-  KEYCLOAK_CLIENT_ID: "lab-web",
-  APP_URL: "http://app.test",
-  API_URL: "http://api:8000",
-};
-
-type Call = { url: string; body: URLSearchParams | null; headers: Headers };
+type Call = { url: string; init: RequestInit; headers: Headers };
 let calls: Call[];
 let replies: Response[];
 
 beforeEach(() => {
-  Object.assign(process.env, ENV);
+  process.env.API_URL = "http://api:8000";
   jar.clear();
   calls = [];
   replies = [];
   vi.stubGlobal("fetch", vi.fn(async (url: string, init: RequestInit = {}) => {
-    calls.push({ url, body: init.body instanceof URLSearchParams ? init.body : null, headers: new Headers(init.headers) });
+    calls.push({ url, init, headers: new Headers(init.headers) });
     return replies.shift() ?? new Response("{}", { status: 500 });
   }));
 });
 
 afterEach(() => {
-  for (const name of Object.keys(ENV)) delete process.env[name];
+  delete process.env.API_URL;
   vi.unstubAllGlobals();
 });
 
-const tokens = (overrides: Record<string, unknown> = {}) =>
-  Response.json({ access_token: "access-1", refresh_token: "refresh-1", id_token: "id-1", expires_in: 300, refresh_expires_in: 1800, ...overrides });
+const ME = { user_id: "ana", display_name: "Ana", roles: ["viewer"], active_role: "viewer", mode: "team", exposed: false };
+const COOKIE = `${SESSION_COOKIE}=s-1; Path=/; HttpOnly; SameSite=strict; Max-Age=2592000`;
 
-function cookie(response: Response, name: string): string | undefined {
-  const line = response.headers.getSetCookie().find((item) => item.startsWith(`${name}=`));
-  return line?.split(";")[0].slice(name.length + 1);
-}
-
-async function signedIn(): Promise<string> {
-  const start = signIn();
-  const state = new URL(start.headers.get("location") as string).searchParams.get("state") as string;
-  replies.push(tokens());
-  const done = await callback(new NextRequest(`http://app.test/auth/callback?state=${state}&code=code-1`, { headers: { cookie: `${LOGIN_COOKIE}=${state}` } }));
-  return cookie(done, SESSION_COOKIE) as string;
-}
-
-describe("sign-in routes", () => {
-  it("sends the browser to the realm with a PKCE challenge and remembers the state in a cookie", () => {
-    const response = signIn();
-
-    const location = new URL(response.headers.get("location") as string);
-    expect(`${location.origin}${location.pathname}`).toBe("http://sso.test/realms/lab/protocol/openid-connect/auth");
-    expect(Object.fromEntries(location.searchParams)).toMatchObject({
-      client_id: "lab-web", response_type: "code", scope: "openid", redirect_uri: "http://app.test/auth/callback", code_challenge_method: "S256",
-    });
-    const line = response.headers.getSetCookie().find((item) => item.startsWith(`${LOGIN_COOKIE}=`)) as string;
-    expect(line).toContain(`${LOGIN_COOKIE}=${location.searchParams.get("state")}`);
-    expect(line.toLowerCase()).toContain("httponly");
-  });
-
-  it("exchanges the code with the verifier of the challenge and starts a session", async () => {
-    const start = new URL(signIn().headers.get("location") as string);
-    const state = start.searchParams.get("state") as string;
-    replies.push(tokens());
-
-    const response = await callback(new NextRequest(`http://app.test/auth/callback?state=${state}&code=code-1`, { headers: { cookie: `${LOGIN_COOKIE}=${state}` } }));
-
-    expect(response.headers.get("location")).toBe("http://app.test/");
-    expect(calls[0].url).toBe("http://keycloak:8080/realms/lab/protocol/openid-connect/token");
-    const form = calls[0].body as URLSearchParams;
-    expect(form.get("grant_type")).toBe("authorization_code");
-    expect(form.get("code")).toBe("code-1");
-    expect(createHash("sha256").update(form.get("code_verifier") as string).digest("base64url")).toBe(start.searchParams.get("code_challenge"));
-    const id = cookie(response, SESSION_COOKIE);
-    expect(id).toBeTruthy();
-    expect(await accessToken(authConfig(), id)).toBe("access-1");
-  });
-
-  it.each([
-    ["a state that is not the browser's", (state: string) => `state=${state}&code=c`, "other-state"],
-    ["a missing code", (state: string) => `state=${state}`, undefined],
-  ])("refuses %s", async (_name, query, cookieState) => {
-    const state = new URL(signIn().headers.get("location") as string).searchParams.get("state") as string;
-
-    const response = await callback(new NextRequest(`http://app.test/auth/callback?${query(state)}`, { headers: { cookie: `${LOGIN_COOKIE}=${cookieState ?? state}` } }));
-
-    expect(response.headers.get("location")).toBe("http://app.test/sign-in?error=sign_in_failed");
-    expect(cookie(response, SESSION_COOKIE)).toBeUndefined();
-    expect(calls).toEqual([]);
-  });
-
-  it("uses a state only once", async () => {
-    const state = new URL(signIn().headers.get("location") as string).searchParams.get("state") as string;
-    const request = () => new NextRequest(`http://app.test/auth/callback?state=${state}&code=c`, { headers: { cookie: `${LOGIN_COOKIE}=${state}` } });
-    replies.push(tokens());
-    await callback(request());
-
-    const again = await callback(request());
-
-    expect(again.headers.get("location")).toContain("error=sign_in_failed");
-  });
-
-  it("refreshes an access token about to expire and signs out when the refresh fails", async () => {
-    const id = await signedIn();
-    const later = Date.now() + 290 * 1000;
-    replies.push(tokens({ access_token: "access-2", refresh_token: "refresh-2" }));
-
-    expect(await accessToken(authConfig(), id, later)).toBe("access-2");
-    expect(calls.at(-1)?.body?.get("refresh_token")).toBe("refresh-1");
-
-    replies.push(new Response("{}", { status: 400 }));
-    expect(await accessToken(authConfig(), id, later + 300 * 1000)).toBeNull();
-    expect(await accessToken(authConfig(), id)).toBeNull();
-  });
-
-  it("signs out with the ID token as hint and returns to the sign-in page", async () => {
-    const id = await signedIn();
-
-    const response = signOut(new NextRequest("http://app.test/auth/sign-out", { method: "POST", headers: { cookie: `${SESSION_COOKIE}=${id}` } }));
-
-    const url = new URL(((await response.json()) as { url: string }).url);
-    expect(`${url.origin}${url.pathname}`).toBe("http://sso.test/realms/lab/protocol/openid-connect/logout");
-    expect(url.searchParams.get("id_token_hint")).toBe("id-1");
-    expect(url.searchParams.get("post_logout_redirect_uri")).toBe("http://app.test/sign-in");
-    expect(await accessToken(authConfig(), id)).toBeNull();
-  });
-});
-
-describe("session route", () => {
-  it("answers who is signed in from the api with the session's access token", async () => {
-    jar.set(SESSION_COOKIE, await signedIn());
-    replies.push(Response.json({ user_id: "lab.viewer", display_name: "Lab Viewer", roles: ["viewer"], active_role: "viewer" }));
+describe("session routes", () => {
+  it("answers who the api says the request acts as, forwarding only the session cookie", async () => {
+    jar.set(SESSION_COOKIE, "s-1");
+    replies.push(Response.json(ME));
 
     const response = await session();
 
-    expect(await response.json()).toEqual({ user_id: "lab.viewer", display_name: "Lab Viewer", roles: ["viewer"] });
-    expect(calls.at(-1)?.url).toBe("http://api:8000/me");
-    expect(calls.at(-1)?.headers.get("authorization")).toBe("Bearer access-1");
-    expect(calls.at(-1)?.headers.get("x-forwarded-host")).toBe("app.test");
+    expect(await response.json()).toEqual({ user_id: "ana", display_name: "Ana", roles: ["viewer"], mode: "team", exposed: false });
+    expect(calls[0].url).toBe("http://api:8000/me");
+    expect(calls[0].headers.get("cookie")).toBe(`${SESSION_COOKIE}=s-1`);
+    expect(calls[0].headers.get("authorization")).toBeNull();
+    expect(calls[0].headers.get("x-forwarded-host")).toBe("app.test");
   });
 
-  it("is a 401 without a session, and signs out when the api refuses the token", async () => {
-    expect((await session()).status).toBe(401);
+  it("asks the api even without a cookie, because individual mode has no sign-in", async () => {
+    replies.push(Response.json({ ...ME, user_id: "owner", mode: "individual" }));
 
-    const id = await signedIn();
-    jar.set(SESSION_COOKIE, id);
+    const response = await session();
+
+    expect((await response.json()).user_id).toBe("owner");
+    expect(calls[0].headers.get("cookie")).toBeNull();
+  });
+
+  it("is a 401 when the api signs the request out", async () => {
     replies.push(Response.json({ detail: "invalid or expired access token" }, { status: 401 }));
 
-    expect((await session()).status).toBe(401);
-    expect(await accessToken(authConfig(), id)).toBeNull();
+    const response = await session();
+
+    expect(response.status).toBe(401);
+    expect(await response.json()).toEqual({ error: "signed_out" });
+  });
+
+  it("signs in through the api and passes its session cookie to the browser", async () => {
+    replies.push(new Response(null, { status: 204, headers: { "set-cookie": COOKIE } }));
+
+    const response = await signIn(new Request("http://app.test/api/session", {
+      method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ email: "ana@example.com", password: "pw" }),
+    }));
+
+    expect(response.status).toBe(204);
+    expect(response.headers.getSetCookie()).toEqual([COOKIE]);
+    expect(calls[0].url).toBe("http://api:8000/session");
+    expect(calls[0].init.method).toBe("POST");
+    expect(JSON.parse(calls[0].init.body as string)).toEqual({ email: "ana@example.com", password: "pw" });
+  });
+
+  it("passes a refused sign-in through with its status and Retry-After", async () => {
+    replies.push(Response.json({ detail: "too many failed sign-ins; try again later" }, { status: 429, headers: { "retry-after": "60" } }));
+
+    const response = await signIn(new Request("http://app.test/api/session", { method: "POST", body: "{}" }));
+
+    expect(response.status).toBe(429);
+    expect(response.headers.get("retry-after")).toBe("60");
+    expect(response.headers.getSetCookie()).toEqual([]);
+  });
+
+  it("signs out through the api, which clears the cookie", async () => {
+    jar.set(SESSION_COOKIE, "s-1");
+    const cleared = `${SESSION_COOKIE}=""; Max-Age=0; Path=/; HttpOnly; SameSite=strict`;
+    replies.push(new Response(null, { status: 204, headers: { "set-cookie": cleared } }));
+
+    const response = await signOut();
+
+    expect(response.status).toBe(204);
+    expect(response.headers.getSetCookie()).toEqual([cleared]);
+    expect(calls[0].init.method).toBe("DELETE");
+    expect(calls[0].headers.get("cookie")).toBe(`${SESSION_COOKIE}=s-1`);
+  });
+});
+
+describe("OIDC routes", () => {
+  it("tells the sign-in page whether a provider is set up", async () => {
+    replies.push(Response.json({ enabled: true }));
+
+    expect(await (await oidcAvailability()).json()).toEqual({ enabled: true });
+    expect(calls[0].url).toBe("http://api:8000/session/oidc");
+  });
+
+  it("sends the browser on to the provider the api names", async () => {
+    replies.push(new Response(null, { status: 302, headers: { location: "https://idp.example.com/auth?state=s" } }));
+
+    const response = await oidcStart();
+
+    expect(response.status).toBe(302);
+    expect(response.headers.get("location")).toBe("https://idp.example.com/auth?state=s");
+    expect(calls[0].url).toBe("http://api:8000/session/oidc/start");
+    expect(calls[0].init.redirect).toBe("manual");
+  });
+
+  it("forwards the provider's callback and passes the api's page and cookie back", async () => {
+    replies.push(new Response("<meta http-equiv=\"refresh\" content=\"0;url=/\">", {
+      status: 200, headers: { "content-type": "text/html", "set-cookie": COOKIE },
+    }));
+
+    const response = await oidcCallback(new NextRequest("http://app.test/auth/oidc/callback?state=s&code=c"));
+
+    expect(response.status).toBe(200);
+    expect(await response.text()).toContain("refresh");
+    expect(response.headers.get("content-type")).toBe("text/html");
+    expect(response.headers.getSetCookie()).toEqual([COOKIE]);
+    expect(calls[0].url).toBe("http://api:8000/session/oidc/callback?state=s&code=c");
+  });
+
+  it("passes a failed callback's redirect to the sign-in page", async () => {
+    replies.push(new Response(null, { status: 303, headers: { location: "/sign-in?error=oidc" } }));
+
+    const response = await oidcCallback(new NextRequest("http://app.test/auth/oidc/callback?error=access_denied"));
+
+    expect(response.status).toBe(303);
+    expect(response.headers.get("location")).toBe("/sign-in?error=oidc");
   });
 });

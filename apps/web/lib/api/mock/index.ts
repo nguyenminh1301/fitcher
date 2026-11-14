@@ -62,6 +62,8 @@ export function createMockApi(options: { latencyMs?: number; identity?: () => Pr
         const { console } = await load();
         return { ...console.pack, roles: console.pack_roles };
       },
+      signIn: async () => wait(undefined),
+      oidcEnabled: async () => false,
       signOut: async () => "/sign-in",
     },
     chat: createMockChat(load, identity),
@@ -141,6 +143,12 @@ export function createMockApi(options: { latencyMs?: number; identity?: () => Pr
       setEnabled: async (id, enabled) => {
         find((await load()).console.users, id).enabled = enabled;
       },
+      create: async (user) => {
+        const row = { id: `demo-${Date.now()}`, email: user.email.toLowerCase(), display_name: user.display_name, roles: user.roles, enabled: true };
+        (await load()).console.users.push(row);
+        return wait(row);
+      },
+      resetPassword: async () => wait(undefined),
     },
     // The Models page has no sample data: providers, keys and tiers live in the instance's app state.
     models: Object.fromEntries([

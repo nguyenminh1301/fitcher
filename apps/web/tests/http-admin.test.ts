@@ -56,4 +56,16 @@ describe("http admin sections", () => {
       { roles: ["analyst"] }, { enabled: false }, { enabled: true },
     ]);
   });
+
+  it("creates an account and resets a password through the admin routes", async () => {
+    const created = { id: "u9", email: "bea@example.com", display_name: "Bea", roles: ["analyst"], enabled: true };
+    const fetch = fetcher(200, created);
+    const users = createHttpUsers(fetch);
+
+    expect(await users.create({ email: "bea@example.com", display_name: "Bea", password: "battery staple", roles: ["analyst"] })).toEqual(created);
+    await users.resetPassword("u9", "new password");
+
+    expect(calls(fetch)).toEqual([["/api/admin/users", "POST"], ["/api/admin/users/u9/password", "POST"]]);
+    expect(JSON.parse(fetch.mock.calls[1][1]?.body as string)).toEqual({ password: "new password" });
+  });
 });

@@ -13,7 +13,7 @@ The design makes one promise visible everywhere: every number comes from a query
 | Density | 16/24 message text, 12px box corners | 14/20 text, 6px box corners, 28px toolbar buttons |
 | Below 768px | the sidebar becomes a drawer | the navigation becomes a drawer, panes stack, tables become cards |
 
-`SignInScreen` comes first: one "Sign in with company account" action (Keycloak), the active pack and a short trust statement.
+`SignInScreen` comes first in team mode: an e-mail and password form, a "Continue with company account" action when an OpenID Connect provider is set up, the active pack and a short trust statement. Individual mode has no sign-in and opens the app at once.
 
 ## Chat app
 

@@ -7,7 +7,7 @@ from fastapi.testclient import TestClient
 import pytest
 
 from agent_fixtures import compiled_fixture
-from auth_fixtures import token, verifier
+from session_fixtures import SessionHeaders
 from test_review_service import NOW, Warehouse, pack_dir, registry  # noqa: F401 - fixtures
 
 from app.api import runtime
@@ -19,8 +19,8 @@ from app.main import app
 from app.onboarding.pack_yaml import ItemNotFound, PackFiles
 from app.onboarding.review import ReviewRefused, ReviewService
 
-REVIEWER = {"Authorization": f"Bearer {token(realm_access={'roles': ['pack_reviewer']})}"}
-ADMIN = {"Authorization": f"Bearer {token(realm_access={'roles': ['admin']})}"}
+REVIEWER = SessionHeaders(['pack_reviewer'])
+ADMIN = SessionHeaders(['admin'])
 TS = datetime(2026, 11, 5, tzinfo=UTC)
 
 
@@ -195,7 +195,6 @@ RUN = RunFacts(trace_id="t9", pack="minimal", question="Revenue for a@b.co", sta
 
 @pytest.fixture
 def client():
-    app.dependency_overrides[runtime.get_verifier] = lambda: verifier()
     app.dependency_overrides[runtime.get_compiled_or_none] = lambda: compiled_fixture()
     with TestClient(app) as test_client:
         yield test_client

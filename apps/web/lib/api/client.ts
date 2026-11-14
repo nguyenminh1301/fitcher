@@ -16,6 +16,7 @@ import type {
   ProposalResult,
   RunRow,
   TraceItem,
+  NewUser,
   UserRow,
   FeedbackInput,
   ClassifierStatus,
@@ -47,6 +48,10 @@ export interface FitcherApi {
     current(): Promise<Identity | null>;
     switchTo(userId: string): Promise<Identity>;
     pack(): Promise<{ name: string; display_name: string; roles: string[] }>;
+    /** Sign in with a local account; throws a SignInError when refused. */
+    signIn(email: string, password: string): Promise<void>;
+    /** Whether the sign-in page offers the OpenID Connect provider. */
+    oidcEnabled(): Promise<boolean>;
     /** End the session; the address to open next. */
     signOut(): Promise<string>;
   };
@@ -108,6 +113,8 @@ export interface FitcherApi {
     list(): Promise<UserRow[]>;
     setRoles(id: string, roles: string[]): Promise<void>;
     setEnabled(id: string, enabled: boolean): Promise<void>;
+    create(user: NewUser): Promise<UserRow>;
+    resetPassword(id: string, password: string): Promise<void>;
   };
   /** Model providers, the tier mapping, the embedding and the optional screening classifier (admin only). */
   models: {
@@ -129,7 +136,8 @@ export interface FitcherApi {
   /** First-run setup (DECISIONS §15); the changes need the admin role. */
   setup: {
     status(): Promise<SetupStatus>;
-    setMode(mode: SetupModeChange["mode"]): Promise<SetupStatus>;
+    /** Choose who uses the instance; moving to team mode without an admin needs the first admin. */
+    setMode(mode: SetupModeChange["mode"], admin?: NonNullable<SetupModeChange["admin"]>): Promise<SetupStatus>;
     skip(id: string): Promise<SetupStatus>;
     complete(): Promise<SetupStatus>;
   };

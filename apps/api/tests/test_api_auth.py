@@ -1,9 +1,10 @@
-"""Bearer authentication and role mapping on the HTTP endpoints."""
+"""The signed-in user and the active role on the HTTP endpoints, and the public pack identity."""
 
 from agent_fixtures import compiled_fixture
-from auth_fixtures import token, verifier
 from fastapi.testclient import TestClient
 import pytest
+
+from session_fixtures import UNKNOWN_SESSION, SessionHeaders
 
 from app.api import runtime
 from app.main import app
@@ -11,7 +12,6 @@ from app.main import app
 
 @pytest.fixture
 def client():
-    app.dependency_overrides[runtime.get_verifier] = lambda: verifier()
     app.dependency_overrides[runtime.get_compiled] = compiled_fixture
     app.dependency_overrides[runtime.get_compiled_or_none] = compiled_fixture
     with TestClient(app) as test_client:
@@ -19,49 +19,34 @@ def client():
     app.dependency_overrides.clear()
 
 
-def bearer(text: str) -> dict:
-    return {"Authorization": f"Bearer {text}"}
-
-
-def test_me_returns_the_verified_user_and_active_role(client):
-    response = client.get("/me", headers=bearer(token()))
+def test_me_returns_the_signed_in_user_and_active_role(client):
+    response = client.get("/me", headers=SessionHeaders(user_id="lab.viewer", display_name="Lab Viewer"))
 
     assert response.status_code == 200
     assert response.json() == {
-        "user_id": "lab.viewer", "display_name": "Lab Viewer", "roles": ["viewer"], "active_role": "viewer", "mode": "team", "exposed": False,
+        "user_id": "lab.viewer", "display_name": "Lab Viewer", "roles": ["viewer"], "active_role": "viewer", "mode": "team",
+        "exposed": False,
     }
 
 
-def test_a_missing_token_is_unauthorized(client):
-    response = client.get("/me")
+@pytest.mark.parametrize("headers", [{}, UNKNOWN_SESSION, {"Authorization": "Bearer something"}])
+def test_a_missing_or_unknown_session_is_unauthorized_without_detail(client, headers):
+    response = client.get("/me", headers=headers)
 
     assert response.status_code == 401
-    assert response.headers["www-authenticate"] == "Bearer"
-
-
-@pytest.mark.parametrize("header", ["Basic abc", "Bearer", "Bearer not-a-token", "token-without-scheme"])
-def test_a_malformed_authorization_header_is_unauthorized(client, header):
-    assert client.get("/me", headers={"Authorization": header}).status_code == 401
-
-
-@pytest.mark.parametrize("overrides", [{"exp": 1_000_000}, {"iss": "http://other.test"}, {"aud": "other"}])
-def test_an_invalid_token_is_unauthorized_without_detail_of_the_check(client, overrides):
-    response = client.get("/me", headers=bearer(token(**overrides)))
-
-    assert response.status_code == 401
-    assert response.json() == {"detail": "invalid or expired access token"}
+    assert response.json() == {"detail": "sign in again"}
 
 
 def test_a_user_without_a_pack_role_has_no_active_role(client):
-    response = client.get("/me", headers=bearer(token(realm_access={"roles": ["admin"]})))
+    response = client.get("/me", headers=SessionHeaders(["admin"], user_id="lab.admin"))
 
     assert response.status_code == 200
     assert response.json()["roles"] == ["admin"]
     assert response.json()["active_role"] is None
 
 
-def test_an_active_role_header_the_token_does_not_hold_is_forbidden(client):
-    response = client.get("/me", headers={**bearer(token()), "X-Active-Role": "auditor"})
+def test_an_active_role_header_the_user_does_not_hold_is_forbidden(client):
+    response = client.get("/me", headers={**SessionHeaders(), "X-Active-Role": "auditor"})
 
     assert response.status_code == 403
 
@@ -87,7 +72,7 @@ def test_a_pack_under_onboarding_signs_in_from_its_pack_files(client, monkeypatc
     monkeypatch.setenv("PACKS_DIR", str(FIXTURE_PACK.parent))
 
     assert client.get("/pack").json() == {"name": "minimal", "display_name": "Minimal widget shop", "roles": ["viewer"]}
-    me = client.get("/me", headers=bearer(token(realm_access={"roles": ["viewer", "pack_reviewer"]}))).json()
+    me = client.get("/me", headers=SessionHeaders(["viewer", "pack_reviewer"])).json()
     assert me["roles"] == ["viewer", "pack_reviewer"] and me["active_role"] == "viewer"
 
 
@@ -103,17 +88,5 @@ def test_an_uncompiled_pack_makes_the_endpoints_unavailable(client, monkeypatch,
 
     assert response.status_code == 503
     assert "compile the pack first" in response.json()["detail"]
-    assert client.get("/me", headers=bearer(token())).status_code == 503
+    assert client.get("/me", headers=SessionHeaders()).status_code == 503
     runtime.get_compiled.cache_clear()
-
-
-def test_unconfigured_token_settings_make_authenticated_endpoints_unavailable(client, monkeypatch):
-    del app.dependency_overrides[runtime.get_verifier]
-    runtime.get_verifier.cache_clear()
-    for name in ("KEYCLOAK_ISSUER", "KEYCLOAK_AUDIENCE", "KEYCLOAK_JWKS_URL"):
-        monkeypatch.delenv(name, raising=False)
-
-    response = client.get("/me", headers=bearer(token()))
-
-    assert response.status_code == 503
-    runtime.get_verifier.cache_clear()

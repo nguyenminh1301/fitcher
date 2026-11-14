@@ -9,7 +9,7 @@ import { useCallback, useEffect, useState } from "react";
 
 import { Logo } from "@/components/brand/Logo";
 import { ProviderForm, ProviderTestButton, TestOutcome } from "@/components/models/ProviderForm";
-import { Button } from "@/components/ui/controls";
+import { Button, TextField } from "@/components/ui/controls";
 import { WarningBanner } from "@/components/ui/feedback";
 import { Preferences } from "@/components/ui/Preferences";
 import type { FitcherApi } from "@/lib/api/client";
@@ -83,6 +83,9 @@ export function SetupScreen({ setup, models, isAdmin, onSignedOut, onOpenChat }:
   const [error, setError] = useState<"load" | "save" | null>(null);
   const [busy, setBusy] = useState(false);
   const [mode, setMode] = useState<Mode>("individual");
+  // The first admin, asked for when the instance moves to team mode (DECISIONS §9); it keeps the owner's
+  // conversations, and the api signs this browser in as that admin.
+  const [admin, setAdmin] = useState({ email: "", display_name: "", password: "" });
 
   const fail = useCallback((kind: "load" | "save", cause: unknown) => {
     if (cause instanceof Error && cause.message.includes("401")) onSignedOut();
@@ -169,8 +172,20 @@ export function SetupScreen({ setup, models, isAdmin, onSignedOut, onOpenChat }:
                         </label>
                       ))}
                     </fieldset>
+                    {mode === "team" && status?.mode !== "team" ? (
+                      <fieldset disabled={!isAdmin || busy} style={{ border: 0, padding: 0, margin: 0 }} className="fc-stack">
+                        <legend className="fc-muted" style={{ padding: 0 }}>{t("setup.firstAdmin")}</legend>
+                        <TextField label={t("setup.adminEmail")} type="email" autoComplete="username" value={admin.email}
+                          onChange={(event) => setAdmin({ ...admin, email: event.target.value })} />
+                        <TextField label={t("setup.adminName")} autoComplete="name" value={admin.display_name}
+                          onChange={(event) => setAdmin({ ...admin, display_name: event.target.value })} />
+                        <TextField label={t("setup.adminPassword")} type="password" autoComplete="new-password" help={t("ui.passwordRule")}
+                          value={admin.password} onChange={(event) => setAdmin({ ...admin, password: event.target.value })} />
+                      </fieldset>
+                    ) : null}
                     <div>
-                      <Button variant="primary" disabled={!isAdmin || busy} onClick={() => void run(() => setup.setMode(mode))}>
+                      <Button variant="primary" disabled={!isAdmin || busy}
+                        onClick={() => void run(() => (mode === "team" && status?.mode !== "team" ? setup.setMode(mode, admin) : setup.setMode(mode)))}>
                         {busy ? t("setup.saving") : t("setup.save")}
                       </Button>
                     </div>
