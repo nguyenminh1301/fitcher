@@ -1,0 +1,26 @@
+# Build context of the release image (Dockerfile); the development images use .dockerignore.
+# Development packs, datasets, dbt and fixtures are not part of the release image (DECISIONS §3).
+.git
+.env
+.env.*
+.workspace
+.agents
+.claude
+.github
+data
+build
+dbt
+docs
+packs
+infra/dev
+infra/sources
+**/node_modules
+**/.next
+**/.venv
+**/__pycache__
+**/.pytest_cache
+**/*.log
+**/*.parquet
+apps/api/tests
+apps/web/tests
+jobs/tests

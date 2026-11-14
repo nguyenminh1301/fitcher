@@ -1,0 +1,25 @@
+<clickhouse>
+    <!--
+        The administrator of the ClickHouse server embedded in the release image
+        (DECISIONS §3). jobs.init_data generates its password on the first start
+        and renders this file with the password's SHA-256 hash; only the migrate
+        service and job modules run with `docker exec` receive the password, never
+        the api. It manages users and roles because compile_pack creates the pack's
+        per-role users. It may connect from loopback only.
+    -->
+    <users>
+        <fitcher_admin>
+            <password from_env="CLICKHOUSE_ADMIN_PASSWORD"/>
+            <profile>default</profile>
+            <quota>default</quota>
+            <access_management>1</access_management>
+            <named_collection_control>1</named_collection_control>
+            <show_named_collections>1</show_named_collections>
+            <show_named_collections_secrets>1</show_named_collections_secrets>
+            <networks>
+                <ip>127.0.0.1</ip>
+                <ip>::1</ip>
+            </networks>
+        </fitcher_admin>
+    </users>
+</clickhouse>

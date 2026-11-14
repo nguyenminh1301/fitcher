@@ -17,6 +17,7 @@ from app.packs.policy_compiler import (
     allowlists,
     apply_policies,
     desired_objects,
+    memory_cap,
     plan_statements,
     read_managed,
 )
@@ -91,6 +92,23 @@ def test_profile_limits_cannot_be_lifted_with_zero(pack):
     assert "readonly = 2 CONST" in profile
     for name, (default, maximum) in PROFILE_LIMITS.items():
         assert f"{name} = {default} MIN 1 MAX {maximum}" in profile
+
+
+def test_a_memory_cap_lowers_the_profile_default_and_maximum(pack):
+    profile = plan_statements(pack, ManagedObjects(), _hash, memory_cap=1_000_000_000)[0]
+
+    assert "max_memory_usage = 1000000000 MIN 1 MAX 1000000000" in profile
+
+
+def test_a_memory_cap_above_the_profile_maximum_changes_nothing(pack):
+    assert plan_statements(pack, ManagedObjects(), _hash, memory_cap=8_000_000_000) == plan_statements(
+        pack, ManagedObjects(), _hash
+    )
+
+
+def test_the_memory_cap_comes_from_the_query_memory_setting():
+    assert memory_cap({"QUERY_MAX_MEMORY_USAGE": "1073741824"}) == 1_073_741_824
+    assert memory_cap({}) is None
 
 
 def test_reapplying_an_unchanged_policy_revokes_and_drops_nothing(pack):

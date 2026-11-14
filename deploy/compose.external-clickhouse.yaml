@@ -1,0 +1,70 @@
+name: fitcher-external-clickhouse
+
+# The release image with an external ClickHouse server instead of the embedded one (DECISIONS §3).
+# CLICKHOUSE_URL makes the image skip its own server; migrate and the api then use this one.
+# The server needs the fitcher users of infra/clickhouse/users.d, so both services read the same
+# passwords from the .env file next to this file:
+#
+#   docker compose -f deploy/compose.external-clickhouse.yaml --env-file deploy/.env up -d --wait
+#
+# An external server outside Compose needs the same users and passwords; set its address in
+# CLICKHOUSE_URL (http://<host>:<port> of the HTTP interface) and pass the passwords below.
+
+x-passwords: &passwords
+  CLICKHOUSE_AGENT_PASSWORD: ${CLICKHOUSE_AGENT_PASSWORD:?set CLICKHOUSE_AGENT_PASSWORD}
+  CLICKHOUSE_LOGS_WRITER_PASSWORD: ${CLICKHOUSE_LOGS_WRITER_PASSWORD:?set CLICKHOUSE_LOGS_WRITER_PASSWORD}
+  CLICKHOUSE_TRACE_READER_PASSWORD: ${CLICKHOUSE_TRACE_READER_PASSWORD:?set CLICKHOUSE_TRACE_READER_PASSWORD}
+  CLICKHOUSE_REVIEW_READER_PASSWORD: ${CLICKHOUSE_REVIEW_READER_PASSWORD:?set CLICKHOUSE_REVIEW_READER_PASSWORD}
+  CLICKHOUSE_QUERY_STOPPER_PASSWORD: ${CLICKHOUSE_QUERY_STOPPER_PASSWORD:?set CLICKHOUSE_QUERY_STOPPER_PASSWORD}
+  CLICKHOUSE_CONVERSATIONS_PASSWORD: ${CLICKHOUSE_CONVERSATIONS_PASSWORD:?set CLICKHOUSE_CONVERSATIONS_PASSWORD}
+  CLICKHOUSE_MODEL_TIERS_PASSWORD: ${CLICKHOUSE_MODEL_TIERS_PASSWORD:?set CLICKHOUSE_MODEL_TIERS_PASSWORD}
+  CLICKHOUSE_PACK_REVIEW_PASSWORD: ${CLICKHOUSE_PACK_REVIEW_PASSWORD:?set CLICKHOUSE_PACK_REVIEW_PASSWORD}
+  CLICKHOUSE_SOURCES_PASSWORD: ${CLICKHOUSE_SOURCES_PASSWORD:?set CLICKHOUSE_SOURCES_PASSWORD}
+
+services:
+  clickhouse:
+    image: clickhouse/clickhouse-server:26.8.36.3
+    environment:
+      <<: *passwords
+      CLICKHOUSE_USER: ${CLICKHOUSE_ADMIN_USER:-fitcher_admin}
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_ADMIN_PASSWORD:?set CLICKHOUSE_ADMIN_PASSWORD}
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: "1"
+    volumes:
+      - clickhouse-data:/var/lib/clickhouse
+      # One file each: the entrypoint writes its admin user into users.d.
+      - ../infra/clickhouse/users.d/users.xml:/etc/clickhouse-server/users.d/users.xml:ro
+      - ../infra/clickhouse/users.d/agent_logs.xml:/etc/clickhouse-server/users.d/agent_logs.xml:ro
+      - ../infra/clickhouse/users.d/agent_query_stopper.xml:/etc/clickhouse-server/users.d/agent_query_stopper.xml:ro
+      - ../infra/clickhouse/users.d/agent_conversations.xml:/etc/clickhouse-server/users.d/agent_conversations.xml:ro
+      - ../infra/clickhouse/users.d/model_tiers.xml:/etc/clickhouse-server/users.d/model_tiers.xml:ro
+      - ../infra/clickhouse/users.d/pack_review.xml:/etc/clickhouse-server/users.d/pack_review.xml:ro
+      - ../infra/clickhouse/users.d/sources.xml:/etc/clickhouse-server/users.d/sources.xml:ro
+    ulimits:
+      nofile:
+        soft: 262144
+        hard: 262144
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://127.0.0.1:8123/ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 20s
+
+  fitcher:
+    image: ${FITCHER_IMAGE:-ghcr.io/nguyenminh1301/fitcher:latest}
+    environment:
+      <<: *passwords
+      CLICKHOUSE_URL: http://clickhouse:8123
+      CLICKHOUSE_ADMIN_USER: ${CLICKHOUSE_ADMIN_USER:-fitcher_admin}
+      CLICKHOUSE_ADMIN_PASSWORD: ${CLICKHOUSE_ADMIN_PASSWORD:?set CLICKHOUSE_ADMIN_PASSWORD}
+    ports:
+      - "127.0.0.1:${FITCHER_PORT:-3000}:3000"
+    volumes:
+      - fitcher-data:/data
+    depends_on:
+      clickhouse:
+        condition: service_healthy
+
+volumes:
+  clickhouse-data:
+  fitcher-data:
