@@ -72,6 +72,8 @@ class MartView:
     slow: bool = False
     # (key column, referenced table) of each join of a wide view.
     joins: tuple[tuple[str, str], ...] = ()
+    # Output names of the primary and foreign key columns, the joined tables' included.
+    keys: tuple[str, ...] = ()
 
     def statement(self) -> str:
         return (f"CREATE OR REPLACE VIEW {quote(MARTS_DATABASE)}.{quote(self.name)} "
@@ -127,10 +129,20 @@ def _render(items: list[tuple[str, str]], qualified: bool) -> str:
     return ", ".join(rendered)
 
 
+def _key_columns(table: MartTable) -> set[str]:
+    return set(table.primary_key) | {column for key in table.foreign_keys for column in key.columns}
+
+
+def _keys(table: MartTable) -> list[str]:
+    keys = _key_columns(table)
+    return [name for column, name in zip(table.columns, _output_names(table), strict=True) if column.name in keys]
+
+
 def _base_view(source: str, table: MartTable) -> MartView:
     items = _select(table, None)
     return MartView(name=mart_name(source, table.name), table=table.name,
-                    sql=f"SELECT {_render(items, False)} FROM {table.relation}", columns=tuple(name for name, _ in items))
+                    sql=f"SELECT {_render(items, False)} FROM {table.relation}", columns=tuple(name for name, _ in items),
+                    keys=tuple(_keys(table)))
 
 
 def _joins(table: MartTable, selected: dict[str, MartTable]) -> list[tuple[ForeignKey, MartTable]]:
@@ -141,6 +153,7 @@ def _joins(table: MartTable, selected: dict[str, MartTable]) -> list[tuple[Forei
 def _wide_view(source: str, table: MartTable, joins: list[tuple[ForeignKey, MartTable]]) -> MartView:
     items = _select(table, "f")
     names = {name for name, _ in items}
+    keys = _keys(table)
     clauses, used = [], set()
     for number, (key, dimension) in enumerate(joins, start=1):
         alias = f"d{number}"
@@ -153,6 +166,8 @@ def _wide_view(source: str, table: MartTable, joins: list[tuple[ForeignKey, Mart
             if output not in names:
                 names.add(output)
                 items.append((output, expression))
+                if column.name in _key_columns(dimension):
+                    keys.append(output)
         clauses.append(f"LEFT JOIN {dimension.relation} AS {alias} "
                        f"ON f.{quote(key.columns[0])} = {alias}.{quote(key.ref_columns[0])}")
     sql = (f"SELECT {_render(items, True)} FROM {table.relation} AS f {' '.join(clauses)} "
@@ -160,7 +175,7 @@ def _wide_view(source: str, table: MartTable, joins: list[tuple[ForeignKey, Mart
     return MartView(
         name=wide_name(source, table.name), table=table.name, sql=sql, columns=tuple(name for name, _ in items),
         wide=True, slow=table.live or any(dimension.live for _, dimension in joins),
-        joins=tuple((key.columns[0], dimension.name) for key, dimension in joins),
+        joins=tuple((key.columns[0], dimension.name) for key, dimension in joins), keys=tuple(keys),
     )
 
 
