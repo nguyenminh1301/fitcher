@@ -34,6 +34,7 @@ from app.feedback.store import ClickHouseProposalStore, review_reader_client
 from app.observability.log_writer import start_log_writer, writer_client
 from app.onboarding.drafter import Drafter
 from app.onboarding.review import ReviewService
+from app.packs.active import active_pack
 from app.packs.compiler import CompileError, CompiledPack, load_compiled
 from app.screening.screen import Screener
 from app.search.client import QdrantSearch
@@ -68,13 +69,19 @@ def get_oidc_http() -> httpx.Client:
     return httpx.Client(follow_redirects=False)
 
 
+def current_pack() -> str:
+    """The active pack: ``ACTIVE_PACK``, else the pack an instant pack made active (app/packs/active.py)."""
+    return active_pack(get_state_db())
+
+
 @cache
 def get_compiled() -> CompiledPack:
     settings = load_settings()
-    if not settings.active_pack:
-        raise unavailable("ACTIVE_PACK must be set")
+    name = current_pack()
+    if not name:
+        raise unavailable("no pack is active: connect a source and build its pack, or set ACTIVE_PACK")
     try:
-        return load_compiled(Path(settings.compiled_pack_dir), settings.active_pack)
+        return load_compiled(Path(settings.compiled_pack_dir), name)
     except CompileError as error:
         raise unavailable(str(error)) from None
 
@@ -111,17 +118,18 @@ def pack_identity(compiled: CompiledPack | None) -> PackIdentity:
             [role.id for role in compiled.pack.policies.roles],
         )
     settings = load_settings()
-    if not settings.active_pack:
-        raise unavailable("ACTIVE_PACK must be set")
-    pack_dir = Path(settings.packs_dir) / settings.active_pack
+    name = current_pack()
+    if not name:
+        raise unavailable("no pack is active: connect a source and build its pack, or set ACTIVE_PACK")
+    pack_dir = Path(settings.packs_dir) / name
     if not (pack_dir / "policies.yaml").is_file():
         raise unavailable(
-            f"pack {settings.active_pack} has no compiled.json and no pack files under {settings.packs_dir}; "
+            f"pack {name} has no compiled.json and no pack files under {settings.packs_dir}; "
             "compile the pack first"
         )
     profile = _read(pack_dir / "business_profile.yaml")
     roles = [role["id"] for role in _read(pack_dir / "policies.yaml").get("roles") or [] if isinstance(role, dict)]
-    return PackIdentity(settings.active_pack, str(profile.get("display_name") or settings.active_pack), roles)
+    return PackIdentity(name, str(profile.get("display_name") or name), roles)
 
 
 def get_pack_identity(compiled: Annotated[CompiledPack | None, Depends(get_compiled_or_none)]) -> PackIdentity:
@@ -343,6 +351,18 @@ def start_source_scheduler() -> None:
         logger.warning("scheduled source copies are off: CLICKHOUSE_SOURCE_ADMIN_PASSWORD is not set or ClickHouse is down")
         return
     _source_scheduler.start()
+
+
+# The objects built for the active pack; ``reload_pack`` drops them when another pack becomes active or is compiled.
+PACK_DEPENDENCIES = (get_compiled, get_agent, get_document_service, get_eval_reports)
+
+
+def reload_pack() -> None:
+    """Forget the active pack's objects, closing the agent's log writer, so the next request reads the new pack."""
+    if get_agent.cache_info().currsize:
+        get_agent().close()
+    for dependency in PACK_DEPENDENCIES:
+        dependency.cache_clear()
 
 
 def close() -> None:
