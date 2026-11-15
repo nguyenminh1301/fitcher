@@ -4,6 +4,7 @@
 
 ### Added
 
+- Add an e-commerce fixture to the `sources` PostgreSQL (`infra/sources/ecommerce_twin/seed.sh`): the seven lab tables with typed columns, primary keys and the ten foreign keys the data implies, streamed from the ClickHouse copy into database `ecommerce_twin` and readable by the Iowa fixture's read-only role, so an instant pack can be measured on a source that declares its joins.
 - Propose tables in the setup's Data step: every table of a source with at most 20 is chosen in advance, none of a larger one, and a source with more than 50 tables shows a warning that every chosen table becomes a mart and lengthens the draft.
 - Show schema drift on the Sources page: a source whose instant pack no longer matches it lists, per table, the columns added, removed and retyped or that the table left the source, with a Rebuild the pack action that builds the pack again from the selected tables after the same estimate and confirmation as the setup.
 - Build the instant pack from the setup: after the Data step's tables are chosen and copied, a Build the pack card shows how many marts the tables become and the paid draft's size, starts the job only when the admin confirms it (or says which model is missing), lists each step as it runs, names the step that failed and says earlier answers still work, warns about wide views over live tables, and ends on the pack's suggested questions and the chat.
