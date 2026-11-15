@@ -8,6 +8,7 @@ keeps working; a failure is not cached, so the next request tries again.
 from dataclasses import dataclass
 from functools import cache
 import logging
+from datetime import UTC, datetime
 import os
 from pathlib import Path
 import threading
@@ -25,17 +26,21 @@ from app.config import load_settings, positive_int
 from app.conversation.store import ConversationStore, conversations_client
 from app.data.clickhouse import ClientWarehouse, QueryLimits
 from app.llm.client import LLMError
-from app.llm.clients import chat_client, embedding_client, index_embeddings
+from app.llm.clients import chat_client, embedding_client, index_embeddings, shared_routes
+from app.llm.routes import RouteError
 from app.llm.model_store import ClickHouseModelStore, model_tiers_client
-from app.onboarding.documents import ClickHouseDocumentRegistry, DocumentService, pack_review_client
+from app.onboarding.documents import ClickHouseDocumentRegistry, DocumentService, compile_lock_path, pack_review_client
 from app.admin.logs import AdminLogs, trace_reader_client
 from app.eval.console import EvalReports, EvalRuns
 from app.feedback.store import ClickHouseProposalStore, review_reader_client
 from app.observability.log_writer import start_log_writer, writer_client
 from app.onboarding.drafter import Drafter
 from app.onboarding.review import ReviewService
-from app.packs.active import active_pack
-from app.packs.compiler import CompileError, CompiledPack, load_compiled
+from app.onboarding.client import pack_admin_client
+from app.onboarding.drafter import TIER as DRAFT_TIER
+from app.onboarding.instant import InstantPipeline, InstantWarehouse
+from app.packs.active import active_pack, set_active_pack
+from app.packs.compiler import CompileError, CompiledPack, compile_pack, load_compiled
 from app.screening.screen import Screener
 from app.search.client import QdrantSearch
 from app.sources.client import source_admin_client
@@ -351,6 +356,53 @@ def start_source_scheduler() -> None:
         logger.warning("scheduled source copies are off: CLICKHOUSE_SOURCE_ADMIN_PASSWORD is not set or ClickHouse is down")
         return
     _source_scheduler.start()
+
+
+def _model_missing() -> str | None:
+    """Why no model can draft a pack yet, in the words the Models page uses, or None."""
+    try:
+        shared_routes().route(DRAFT_TIER)
+    except RouteError as error:
+        return str(error)
+    return None
+
+
+def _compile_instant(pack_dir: Path) -> object:
+    """Compile an instant pack as ``pack_admin``, as ``jobs.compile_pack`` does as the admin user."""
+    settings = load_settings()
+    compiled_dir = Path(settings.compiled_pack_dir)
+    lock = compile_lock_path(compiled_dir, pack_dir.name)
+    lock.parent.mkdir(parents=True, exist_ok=True)
+    lock.write_text(datetime.now(UTC).isoformat(), encoding="utf-8")
+    try:
+        embeddings, label = index_embeddings(call_log=_call_log())
+        warehouse = InstantWarehouse(pack_admin_client())
+        return compile_pack(
+            pack_dir, warehouse=warehouse, access=warehouse, agent_secret=os.environ.get("CLICKHOUSE_AGENT_PASSWORD", ""),
+            top_k=settings.column_values_top_k, search=QdrantSearch(settings.qdrant_url), embeddings=embeddings,
+            output_dir=compiled_dir, schema_dir=pack_dir.parent / "_schema", screener=get_screener(),
+            registry=ClickHouseDocumentRegistry(pack_review_client()), documents_dir=Path(settings.documents_dir),
+            embedding_alias=label,
+        )
+    finally:
+        lock.unlink(missing_ok=True)
+
+
+def _activate_instant(pack: str) -> None:
+    set_active_pack(get_state_db(), pack)
+    reload_pack()
+
+
+@cache
+def get_instant_pipeline() -> InstantPipeline:
+    settings = load_settings()
+    packs_dir = Path(settings.packs_dir)
+    client = pack_admin_client()
+    return InstantPipeline(
+        store=get_source_store(), client=client, packs_dir=packs_dir, schema_dir=packs_dir / "_schema",
+        drafter=lambda: Drafter(chat_client(call_log=_call_log()), InstantWarehouse(client)),
+        compile_pack=_compile_instant, activate=_activate_instant, model_missing=_model_missing,
+    )
 
 
 # The objects built for the active pack; ``reload_pack`` drops them when another pack becomes active or is compiled.

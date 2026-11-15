@@ -1,0 +1,31 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "prompt_tokens": {
+      "title": "Prompt Tokens",
+      "type": "integer"
+    },
+    "datasets": {
+      "title": "Datasets",
+      "type": "integer"
+    },
+    "model_missing": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Model Missing"
+    }
+  },
+  "required": [
+    "prompt_tokens",
+    "datasets"
+  ],
+  "title": "InstantEstimate",
+  "type": "object"
+}

@@ -62,7 +62,7 @@ class InstantJob:
         next(item for item in self.steps if item["id"] == step)["state"] = state
 
 
-class _Warehouse:
+class InstantWarehouse:
     """A clickhouse-connect client as the profiler's and compiler's ``Warehouse`` and ``AccessControl``."""
 
     def __init__(self, client):
@@ -185,7 +185,7 @@ class InstantPipeline:
         state["tables"], state["views"] = tables, views
 
     def _step_profile(self, job: InstantJob, pack: str, building: Path, state: dict) -> None:
-        state["profile"] = profile_marts(_Warehouse(self._client), [view.name for view in state["views"]])
+        state["profile"] = profile_marts(InstantWarehouse(self._client), [view.name for view in state["views"]])
 
     def _step_files(self, job: InstantJob, pack: str, building: Path, state: dict) -> None:
         shutil.rmtree(building, ignore_errors=True)

@@ -32,6 +32,7 @@ from app.contracts.result import Result  # noqa: E402
 from app.contracts.review import DatasetView, ReviewItem, ReviewItemPatch  # noqa: E402
 from app.contracts.screening import ClassifierStatus  # noqa: E402
 from app.contracts.setup import SetupModeChange, SetupStatus  # noqa: E402
+from app.contracts.instant import InstantEstimate, InstantEstimateRequest, InstantJobReply, InstantRequest  # noqa: E402
 from app.contracts.sources import (  # noqa: E402
     FileLoad, FileUploadView, ProbeResult, SourceCreate, SourceDetail, SourcePatch, SourceView, SyncView, TablesChange,
     SourceConnection,
@@ -83,6 +84,10 @@ CONTRACTS = {
     "source_create": (SourceCreate, "validation"),
     "source_patch": (SourcePatch, "validation"),
     "source_view": (SourceView, "serialization"),
+    "instant_estimate_request": (InstantEstimateRequest, "validation"),
+    "instant_request": (InstantRequest, "validation"),
+    "instant_estimate": (InstantEstimate, "serialization"),
+    "instant_job_reply": (InstantJobReply, "serialization"),
     "source_detail": (SourceDetail, "serialization"),
     "probe_result": (ProbeResult, "serialization"),
     "tables_change": (TablesChange, "validation"),
