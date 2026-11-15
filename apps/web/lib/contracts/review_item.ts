@@ -11,7 +11,7 @@ export type Formula = string | null;
 export type Source = string;
 export type Quote = string | null;
 export type Deleted = boolean;
-export type Kind1 = "manual" | "profile" | "doc" | "error" | "trace";
+export type Kind1 = "manual" | "profile" | "doc" | "error" | "trace" | "source";
 export type Ref = string;
 export type EvidenceRefs = EvidenceRef[];
 /**

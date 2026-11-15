@@ -18,7 +18,7 @@ class ReviewEvidence(ContractModel):
 
 
 class EvidenceRef(ContractModel):
-    kind: Literal["manual", "profile", "doc", "error", "trace"]
+    kind: Literal["manual", "profile", "doc", "error", "trace", "source"]
     ref: str
 
 
