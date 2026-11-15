@@ -209,6 +209,24 @@ describe("Sources page", () => {
     expect(screen.getByText("Selection saved.")).toBeTruthy();
   });
 
+  it("shows the columns that changed since the source's pack was built and offers to rebuild it", async () => {
+    const user = userEvent.setup();
+    const sources = fakeSources();
+    (sources.drift as ReturnType<typeof vi.fn>).mockResolvedValue({ pack: "shop", changes: [
+      { table: "orders", added: ["promo_code"], removed: ["note"], retyped: [{ column: "total", before: "integer", after: "numeric" }], missing: false },
+    ] });
+    (sources.syncs as ReturnType<typeof vi.fn>).mockResolvedValue([{ ...SYNC, status: "succeeded" }]);
+    show(sources);
+
+    const row = await screen.findByRole("listitem", { name: "shop" });
+    expect(await within(row).findByText(/orders: added promo_code; removed note; total integer → numeric/)).toBeTruthy();
+    expect(sources.drift).toHaveBeenCalledWith("shop");
+    await user.click(within(row).getByRole("button", { name: "Rebuild the pack of shop" }));
+
+    expect(await screen.findByRole("region", { name: "Build the pack" })).toBeTruthy();
+    expect(sources.instantEstimate).toHaveBeenCalledWith({ source_id: "shop", tables: ["items"] });
+  });
+
   it("flags live tables joined with another live table as slow", async () => {
     const user = userEvent.setup();
     show(fakeSources());

@@ -559,6 +559,13 @@
     "failed": "The change was not saved: {reason}"
   },
   "sources": {
+    "manyTables": "This source has {count} tables. Choose the ones the questions need: every table becomes a mart and makes the pack's draft longer.",
+    "driftTitle": "The pack built from this source no longer matches it:",
+    "driftAdded": "added {columns}",
+    "driftRemoved": "removed {columns}",
+    "driftMissing": "no longer in the source",
+    "rebuild": "Rebuild the pack",
+    "rebuildOf": "Rebuild the pack of {name}",
     "add": "Add source",
     "list": "Sources",
     "empty": "No source yet. Connect a database or upload a file.",

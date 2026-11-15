@@ -559,6 +559,13 @@
     "failed": "Chưa lưu được thay đổi: {reason}"
   },
   "sources": {
+    "manyTables": "Nguồn này có {count} bảng. Hãy chọn các bảng cần cho câu hỏi: mỗi bảng thành một mart và làm bản nháp của gói dài hơn.",
+    "driftTitle": "Gói dựng từ nguồn này không còn khớp với nguồn:",
+    "driftAdded": "thêm {columns}",
+    "driftRemoved": "bỏ {columns}",
+    "driftMissing": "không còn trong nguồn",
+    "rebuild": "Dựng lại gói",
+    "rebuildOf": "Dựng lại gói của {name}",
     "add": "Thêm nguồn",
     "list": "Nguồn dữ liệu",
     "empty": "Chưa có nguồn nào. Hãy nối một cơ sở dữ liệu hoặc tải lên một tệp.",
