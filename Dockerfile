@@ -48,9 +48,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends xz-utils \
     && tar -C /s6 -Jxpf "/tmp/s6-overlay-${arch}.tar.xz"
 
 FROM ${PYTHON_IMAGE} AS runtime
-# libunwind8 is the one library the Qdrant binary needs beyond the base image.
+# libunwind8 is the one library the Qdrant binary needs beyond the base image. tzdata-legacy keeps the old zone
+# names (Asia/Saigon, US/Eastern...) that browsers still send and Debian trixie moved out of tzdata.
 RUN apt-get update && apt-get upgrade -y --no-install-recommends \
-    && apt-get install -y --no-install-recommends libunwind8 \
+    && apt-get install -y --no-install-recommends libunwind8 tzdata-legacy \
     && rm -rf /var/lib/apt/lists/* \
     && python -m pip uninstall -y pip \
     && rm -rf /usr/local/lib/python3.13/ensurepip
