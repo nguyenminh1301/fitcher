@@ -19,6 +19,10 @@ count as evidence, and only for a run of the whole eval set at no less than the
 default threshold without reference errors; any other run is stored with no
 tier evidence.
 
+``--cases-from <pack>`` measures a generated pack on the eval set of a hand-written one: the cases come from
+that pack's ``eval.yaml`` and each reference query runs as that pack's user of the case's role, while the agent
+answers from the compiled ``--pack`` as its first role. Such a run is no evidence for any model.
+
 Exit codes: 0 when no layer regressed against ``--baseline`` and the execution
 match rate meets ``--threshold``; 1 on a regression or below the threshold; 2
 when the run cannot start or a reference query fails.
@@ -72,6 +76,9 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--output-dir", type=Path, help="directory for <pack>-eval.md and <pack>-eval.json")
     parser.add_argument("--timeout", type=float, default=180.0, help="seconds allowed per case; default 180")
     parser.add_argument("--threshold", type=float, default=DEFAULT_THRESHOLD, help="execution match rate the pack must reach; default 0.8")
+    parser.add_argument(
+        "--cases-from", help="pack whose eval set and reference users measure --pack, which answers as its first role",
+    )
     parser.add_argument("--packs-dir", type=Path, default=Path("packs"), help="directory of the source packs; default packs")
     parser.add_argument(
         "--tier", type=tier_override, action="append", default=[], metavar="TIER=PROVIDER/MODEL",
@@ -141,6 +148,8 @@ def evidence(run: EvalRun, args: argparse.Namespace) -> tuple[dict[str, str], st
     """The tier mapping the report proves eligible, or none with the reason the run does not qualify."""
     if args.only:
         return {}, "--only runs part of the eval set"
+    if args.cases_from:
+        return {}, "--cases-from runs the eval set of another pack"
     if args.threshold < DEFAULT_THRESHOLD:
         return {}, f"--threshold is below the default {DEFAULT_THRESHOLD:.0%}"
     if run.reference_errors:
@@ -176,7 +185,7 @@ def main(
 ) -> int:
     args = parse_args(argv)
     try:
-        eval_set = load_eval_set(load_pack(args.packs_dir / args.pack), args.only)
+        eval_set = load_eval_set(load_pack(args.packs_dir / (args.cases_from or args.pack)), args.only)
         baseline = load_baseline(args.baseline, args.pack) if args.baseline else None
         clients.bootstrap()
         routes = clients.shared_routes(dict(args.tier))
@@ -186,9 +195,15 @@ def main(
         return 2
     try:
         runner_for = runners_factory(args.pack) if runners_factory is not None else None
+        measured = {}
+        if args.cases_from:
+            measured = {
+                "agent_role": deps.compiled.pack.policies.roles[0].id,
+                "reference_runner_for": runners_factory(args.cases_from) if runners_factory is not None else None,
+            }
         run = run_eval(
             args.pack, eval_set, deps, timeout=args.timeout, threshold=args.threshold, runner_for=runner_for,
-            tiers=routes.labels(),
+            tiers=routes.labels(), **measured,
         )
     finally:
         if deps.logs is not None:

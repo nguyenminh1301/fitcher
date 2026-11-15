@@ -78,7 +78,8 @@ def _clickhouse_type(values: list[object]) -> str:
     return "String"
 
 
-def reference_result(case: EvalCase, deps: AgentDeps) -> Result:
+def reference_result(case: EvalCase, deps: AgentDeps, runner: QueryRunner | None = None) -> Result:
+    """The case's expected result, from its rows or from ``expected_sql`` run on ``runner`` (``deps.runner`` when None)."""
     pack, dataset = deps.compiled.pack, case.expected.dataset or ""
     if case.expected_rows is not None:
         names = list(case.expected_rows[0])
@@ -89,7 +90,7 @@ def reference_result(case: EvalCase, deps: AgentDeps) -> Result:
         ]
         return Result(columns=columns, rows=rows, row_count=len(rows))
     try:
-        output = deps.runner.run(case.expected_sql, trace_id=f"eval-reference-{case.id}")
+        output = (runner or deps.runner).run(case.expected_sql, trace_id=f"eval-reference-{case.id}")
     except QueryError as error:
         raise ReferenceQueryError(f"{case.id}: {error}") from error
     return to_result(output, pack, dataset)
@@ -135,12 +136,14 @@ def ask_in_conversation(case: EvalCase, deps: AgentDeps) -> AgentState:
     return run_question(case.question, replace(deps, history=(turn,)))
 
 
-def _run_case(case: EvalCase, deps: AgentDeps, timeout: float, reference_errors: list[str]) -> CaseScore:
+def _run_case(
+    case: EvalCase, deps: AgentDeps, timeout: float, reference_errors: list[str], reference_runner: QueryRunner | None,
+) -> CaseScore:
     reference, reference_error = None, None
     try:
         # Only an answered data question has a reference result; denials, clarifications and replies have none.
         if case.expected.intent == "data_query" and case.expected.outcome == "answer":
-            reference = reference_result(case, deps)
+            reference = reference_result(case, deps, reference_runner)
     except ReferenceQueryError as error:
         reference_error = str(error).removeprefix(f"{case.id}: ")
         reference_errors.append(str(error))
@@ -169,10 +172,16 @@ def run_eval(
     clock: Callable[[], float] = time.monotonic,
     runner_for: Callable[[str], QueryRunner] | None = None,
     tiers: dict[str, str] | None = None,
+    agent_role: str | None = None,
+    reference_runner_for: Callable[[str], QueryRunner] | None = None,
 ) -> EvalRun:
     """Run ``eval_set``; ``runner_for(role)`` gives each case's query runner, ``deps.runner`` when None.
 
     ``tiers`` is the tier-to-alias mapping the run uses, recorded with the report.
+
+    The cases of another pack's eval set are run with ``agent_role``, the role the agent answers as instead of each
+    case's role, and ``reference_runner_for(case role)``, which runs each reference query as that pack's role user:
+    a generated pack is measured on the questions and the expected results of the hand-written one.
     """
     scores: list[CaseScore] = []
     reference_errors: list[str] = []
@@ -181,8 +190,10 @@ def run_eval(
             scores.append(score_case(case, {}, None, active=False))
             continue
         started = clock()
-        runner = runner_for(case.role) if runner_for is not None else deps.runner
-        score = _run_case(case, replace(deps, role=case.role, runner=runner), timeout, reference_errors)
+        role = agent_role or case.role
+        runner = runner_for(role) if runner_for is not None else deps.runner
+        reference_runner = reference_runner_for(case.role) if reference_runner_for is not None else None
+        score = _run_case(case, replace(deps, role=role, runner=runner), timeout, reference_errors, reference_runner)
         scores.append(score.model_copy(update={"seconds": round(clock() - started, 3)}))
     return EvalRun(
         pack=pack, reference_date=eval_set.reference_date, threshold=threshold, cases=scores,
