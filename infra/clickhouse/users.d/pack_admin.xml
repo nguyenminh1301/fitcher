@@ -1,0 +1,36 @@
+<clickhouse>
+    <!--
+        pack_admin is the user the api connects as to build an instant pack (DECISIONS §9, §11 step 0):
+        it creates and drops the mart views over a source's selected tables and applies the
+        pack's policies when it compiles the pack, which the jobs do as the admin user.
+
+        It is the definer of the mart views, so it reads raw and src_*, but it can grant only
+        what it holds with the grant option: SELECT on marts. Pack roles, users, row policies
+        and the pack's settings profile are managed by the policy compiler under their
+        fitcher_ name prefixes. It reads no agent_logs table, no app database and no named
+        collection secret. The password comes from CLICKHOUSE_PACK_ADMIN_PASSWORD.
+    -->
+    <users>
+        <pack_admin>
+            <password from_env="CLICKHOUSE_PACK_ADMIN_PASSWORD"/>
+            <networks>
+                <ip>::/0</ip>
+            </networks>
+            <profile>default</profile>
+            <quota>default</quota>
+            <grants>
+                <query>GRANT SELECT, SHOW TABLES, CREATE VIEW, DROP VIEW ON marts.* WITH GRANT OPTION</query>
+                <!-- CREATE OR REPLACE VIEW builds a temporary table and exchanges it with the old view. -->
+                <query>GRANT CREATE TABLE, INSERT, DROP TABLE ON marts.*</query>
+                <query>GRANT SELECT ON raw.*</query>
+                <query>GRANT SELECT ON src_*.*</query>
+                <!-- The policy compiler finds the objects of a pack by their name prefixes. -->
+                <query>GRANT SELECT ON system.roles, SELECT ON system.users, SELECT ON system.grants, SELECT ON system.row_policies</query>
+                <query>GRANT CREATE ROLE, DROP ROLE, ROLE ADMIN, SHOW ROLES ON *.*</query>
+                <query>GRANT CREATE USER, ALTER USER, DROP USER, SHOW USERS ON *.*</query>
+                <query>GRANT CREATE ROW POLICY, ALTER ROW POLICY, DROP ROW POLICY, SHOW ROW POLICIES ON *.*</query>
+                <query>GRANT CREATE SETTINGS PROFILE, ALTER SETTINGS PROFILE, DROP SETTINGS PROFILE, SHOW SETTINGS PROFILES ON *.*</query>
+            </grants>
+        </pack_admin>
+    </users>
+</clickhouse>

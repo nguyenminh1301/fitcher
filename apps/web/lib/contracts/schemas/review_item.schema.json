@@ -66,7 +66,8 @@
             "profile",
             "doc",
             "error",
-            "trace"
+            "trace",
+            "source"
           ],
           "title": "Kind",
           "type": "string"

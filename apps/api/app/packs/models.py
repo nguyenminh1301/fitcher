@@ -17,7 +17,7 @@ class PackModel(BaseModel):
 
 
 class Evidence(PackModel):
-    kind: Literal["manual", "profile", "doc", "error", "trace"]
+    kind: Literal["manual", "profile", "doc", "error", "trace", "source"]
     ref: str
 
 

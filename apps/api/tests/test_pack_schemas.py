@@ -155,3 +155,12 @@ def test_every_problem_is_reported_at_once(pack_dir, edit_pack):
         ("metrics.yaml", "metrics[0].unit"),
         ("glossary.yaml", "terms[1].term"),
     }
+
+
+def test_a_join_path_may_cite_the_source_catalog_as_evidence(pack_dir, edit_pack):
+    evidence = [{"kind": "source", "ref": "foreign key widget_refunds(sale_ref) -> widget_sales(sale_ref)"}]
+    edit_pack("relationships.yaml", _set(("relationships", 0, "evidence"), evidence))
+
+    pack = load_pack(pack_dir, schema_dir=SCHEMA_DIR)
+
+    assert pack.relationships.relationships[0].evidence[0].kind == "source"
