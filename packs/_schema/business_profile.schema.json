@@ -22,6 +22,7 @@
           "description": {"$ref": "common.schema.json#/$defs/text"},
           "metric": {"$ref": "common.schema.json#/$defs/id", "description": "Metric applied when a question using this convention names no measure."},
           "status": {"$ref": "common.schema.json#/$defs/status"},
+          "reviewed": {"$ref": "common.schema.json#/$defs/reviewed"},
           "evidence": {"$ref": "common.schema.json#/$defs/evidence"},
           "confidence": {"$ref": "common.schema.json#/$defs/confidence"}
         }

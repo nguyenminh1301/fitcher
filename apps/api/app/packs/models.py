@@ -27,6 +27,8 @@ class Draftable(PackModel):
     status: Literal["draft", "approved"]
     evidence: list[Evidence]
     confidence: float
+    # False on an item an instant pack approved without a person (DECISIONS §5); absent on reviewed packs.
+    reviewed: bool | None = None
 
 
 class Convention(Draftable):

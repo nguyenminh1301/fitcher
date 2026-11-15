@@ -19,6 +19,10 @@
       "type": "string",
       "enum": ["draft", "approved"]
     },
+    "reviewed": {
+      "description": "False on an item an instant pack approved without a person; true once a reviewer confirms it.",
+      "type": "boolean"
+    },
     "confidence": {"type": "number", "minimum": 0, "maximum": 1},
     "evidence": {
       "description": "Where an item comes from: a manual entry, a profile, a document, an error, a trace or the source catalog.",
