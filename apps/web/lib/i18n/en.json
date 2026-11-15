@@ -436,6 +436,25 @@
     "nav_sources": "Sources",
     "desc_sources": "The databases and files fitcher reads. Connect a source, choose its tables, and keep copies fresh on a schedule."
   },
+  "instant": {
+    "title": "Build the pack",
+    "copying": "Copying the chosen tables before the pack is built…",
+    "syncFailed": "The copy of the chosen tables failed; fix it on the Sources page, then build the pack there.",
+    "estimate": "Your {datasets} tables and views become marts. Drafting their descriptions, metrics and example questions is a paid model call of about {tokens} prompt tokens.",
+    "build": "Build the pack",
+    "modelMissing": "A model is needed before the pack can be drafted: {reason}",
+    "failed": "{step} failed: {error}. Nothing changed for the questions you could ask before.",
+    "ready": "Your pack is ready. Its items are marked unreviewed until someone confirms them on the Review page. Ask one of these questions:",
+    "openChat": "Open the chat",
+    "slow": "These marts read live tables and may be slow; copying the tables makes them faster: {views}",
+    "step_marts": "Create the marts",
+    "step_profile": "Profile the data",
+    "step_files": "Write the pack files",
+    "step_draft": "Draft the descriptions and metrics",
+    "step_approve": "Approve the drafts as unreviewed",
+    "step_compile": "Compile the pack",
+    "step_activate": "Make it the active pack"
+  },
   "setup": {
     "firstAdmin": "You become the first admin. Your conversations stay yours.",
     "adminEmail": "Your e-mail",

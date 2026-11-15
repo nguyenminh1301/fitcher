@@ -4,6 +4,7 @@
 
 ### Added
 
+- Build the instant pack from the setup: after the Data step's tables are chosen and copied, a Build the pack card shows how many marts the tables become and the paid draft's size, starts the job only when the admin confirms it (or says which model is missing), lists each step as it runs, names the step that failed and says earlier answers still work, warns about wide views over live tables, and ends on the pack's suggested questions and the chat.
 - Offer a generated pack's own questions in an empty chat: `GET /pack/suggestions` returns the first three approved example questions of the compiled active pack, and the chat uses them when the pack has no sample suggestions.
 - Reach the instant pack and drift endpoints from the web app: the web server forwards `/api/pack/instant`, `/api/pack/instant/estimate`, `/api/pack/instant/{job}` and `/api/sources/{id}/drift` to the api, and the sources client gains `drift`, `instantEstimate`, `instantStart` and `instantJob`.
 - Report schema drift of an instant pack's source: the instant job keeps the chosen tables' columns in `instant_source.json` beside the pack, `GET /sources/{id}/drift` (optionally reading the catalog again) lists per table the columns added, removed and retyped since and a table the source no longer lists, a successful sync reads the catalog again, and the scheduler reads the catalog of a source with live tables once a day; nothing is re-drafted automatically.
