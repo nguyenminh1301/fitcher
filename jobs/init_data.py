@@ -46,6 +46,8 @@ PASSWORD_SETTINGS = (
     "CLICKHOUSE_SOURCES_PASSWORD",
     # The api creates and drops the named collections of the sources connected on the Sources page.
     "CLICKHOUSE_SOURCE_ADMIN_PASSWORD",
+    # The api builds the marts of an instant pack and applies its policies (infra/clickhouse/users.d/pack_admin.xml).
+    "CLICKHOUSE_PACK_ADMIN_PASSWORD",
 )
 # Needed only by migrate and the jobs that manage ClickHouse users or copy sources.
 ADMIN_ONLY = frozenset({ADMIN_PASSWORD, "CLICKHOUSE_SOURCES_PASSWORD"})
