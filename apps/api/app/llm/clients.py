@@ -26,6 +26,7 @@ from app.llm.local_embeddings import LocalEmbeddings
 from app.llm.gateway import Gateway, GatewayEmbeddings
 from app.llm.providers import ProviderStore
 from app.llm.routes import bootstrap_providers, EmbeddingChoice, SettingsRoutes, TierMapping, TierModel
+from app.packs.active import active_pack
 from app.state.db import shared_state
 from app.state.secrets import shared_vault
 
@@ -107,8 +108,9 @@ def embedding_label() -> str:
 def compiled_embedding() -> tuple[str, int] | None:
     """The embedding label and size the active pack was compiled with, or None without a compiled pack."""
     settings = load_settings()
-    path = Path(settings.compiled_pack_dir) / settings.active_pack / "compiled.json"
-    if not settings.active_pack or not path.is_file():
+    name = active_pack(shared_state())
+    path = Path(settings.compiled_pack_dir) / name / "compiled.json"
+    if not name or not path.is_file():
         return None
     try:
         compiled = json.loads(path.read_text(encoding="utf-8"))

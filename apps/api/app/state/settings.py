@@ -45,6 +45,8 @@ SPECS: dict[tuple[str, str], SettingSpec] = {
     ("oidc", "issuer"): SettingSpec(str),
     ("oidc", "client_id"): SettingSpec(str),
     ("oidc", "roles_claim"): SettingSpec(str, "roles"),
+    # The pack an instant pack made active; ACTIVE_PACK wins when set (app/packs/active.py).
+    ("pack", "active"): SettingSpec(str),
 }
 
 

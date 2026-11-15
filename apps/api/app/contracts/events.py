@@ -93,6 +93,8 @@ class SqlEvent(EventModel):
     event: Literal["sql"] = "sql"
     sql: str
     attempt: int = Field(ge=1)
+    # Metrics of the question an instant pack approved without a person; the answer says so under the SQL (DECISIONS §5).
+    unreviewed_metrics: list[str] = []
 
 
 class ResultEvent(EventModel):

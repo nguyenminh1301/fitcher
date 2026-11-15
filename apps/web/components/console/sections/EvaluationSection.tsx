@@ -65,7 +65,7 @@ function ReportBody({ report }: { report: EvalReport }) {
   return (
     <>
       <div className="fc-stat-grid">
-        {stat(t("ui.execMatch"), execution === null ? "—" : `${formatNumber(execution * 100, { maximumFractionDigits: 0 })}%`, <StatusPill status={report.passed ? "packEnabled" : "belowThreshold"} />)}
+        {stat(t("ui.execMatch"), execution === null ? "—" : `${formatNumber(execution * 100, { maximumFractionDigits: 0 })}%`, <StatusPill status={report.passed ? "meetsThreshold" : "belowThreshold"} />)}
         {stat(t("ui.cases"), `${passed} / ${scored}`, <span className="fc-muted">{t("ui.passed")}</span>)}
         {stat(t("ui.lastRun"), formatDate(report.ts, { dateStyle: "medium", timeStyle: "short" }))}
       </div>
@@ -157,7 +157,7 @@ export function EvaluationSection() {
               const value = rate(report.layers.execution);
               return value === null ? "—" : `${Math.round(value * 100)}%`;
             } },
-            { key: "passed", label: t("ui.status"), render: (report) => <StatusPill status={report.passed ? "packEnabled" : "belowThreshold"} /> },
+            { key: "passed", label: t("ui.status"), render: (report) => <StatusPill status={report.passed ? "meetsThreshold" : "belowThreshold"} /> },
           ]}
         />
       ) : null}
@@ -172,7 +172,7 @@ export function EvaluationReport({ id }: { id: string }) {
   const { data } = useReports();
   const report = data?.find((item) => item.id === id);
   return (
-    <DetailPage feature="evaluation" title={report ? formatDate(report.ts, { dateStyle: "medium", timeStyle: "short" }) : ""} status={report ? (report.passed ? "packEnabled" : "belowThreshold") : undefined}
+    <DetailPage feature="evaluation" title={report ? formatDate(report.ts, { dateStyle: "medium", timeStyle: "short" }) : ""} status={report ? (report.passed ? "meetsThreshold" : "belowThreshold") : undefined}
       onBack={() => navigate("/console/evaluation")} backLabel={t("ui.back")} loading={!data} missing={!report}>
       {report ? <div className="fc-page"><ReportBody report={report} /></div> : null}
     </DetailPage>

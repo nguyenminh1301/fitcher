@@ -58,7 +58,7 @@ function plan(scenario: Scenario | null, question: string, identity: Identity | 
   const attempts: Untraced[] = [];
   const sqls = scenario.kind === "failed" ? [scenario.sql ?? "", scenario.sql ?? "", scenario.sql ?? "", scenario.sql ?? ""] : [...(scenario.repair ? [scenario.repair.sql] : []), scenario.sql ?? ""];
   sqls.forEach((sql, index) => {
-    attempts.push(status("generate_sql", index + 1), { event: "sql", sql, attempt: index + 1 }, ...SQL_ATTEMPT.slice(1).map((node) => status(node)));
+    attempts.push(status("generate_sql", index + 1), { event: "sql", sql, attempt: index + 1, unreviewed_metrics: [] }, ...SQL_ATTEMPT.slice(1).map((node) => status(node)));
   });
   if (scenario.kind === "failed") {
     return [...head, ...attempts, { event: "error", kind: "failed", message: scenario.error ?? "", sql: scenario.sql ?? null, error: scenario.error ?? null }];

@@ -33,6 +33,7 @@ const CONSOLE: Partial<ConsoleFile> = {
     { id: "g1", file: "glossary.yaml", name: "term_one", kind: "item", status: "approved", confidence: 0.95, body: "A plain definition.", evidence: { source: "Old guide.docx", deleted: true } },
     // The api sends a null formula for an item that has none.
     { id: "g2", file: "glossary.yaml", name: "term_two", kind: "item", status: "draft", confidence: 0.7, body: "Second definition.", formula: null },
+    { id: "u1", file: "metrics.yaml", name: "metric_generated", kind: "item", status: "approved", reviewed: false, confidence: 0.5, body: "Drafted with the instant pack.", formula: "sum(c)" },
     { id: "p1", file: "examples.yaml", name: "Proposal one", kind: "proposal", status: "draft", confidence: 0.6, body: "Total for [MASKED_NAME] in 2025?", formula: "SELECT sum(x) FROM marts.t WHERE name = '[MASKED_NAME]'", evidence: { source: "Disliked chat" }, test_result: TEST_RESULT },
   ],
   documents: [
@@ -106,6 +107,19 @@ describe("review", () => {
     expect(screen.queryByText("metric_one")).toBeNull();
     fireEvent.click(screen.getByRole("radio", { name: "Approved" }));
     expect(screen.getByText("metric_one")).toBeTruthy();
+  });
+
+  it("labels an item approved without a person as unreviewed until a reviewer confirms it", async () => {
+    show("review", <ReviewSection />);
+    const row = (await screen.findByText("metric_generated")).closest("li") as HTMLElement;
+    expect(within(row).getByText("Unreviewed")).toBeTruthy();
+    cleanup();
+
+    show("review", <ReviewDetail id="u1" />);
+    const confirm = await screen.findByRole("button", { name: "Confirm" });
+    await act(async () => fireEvent.click(confirm));
+    await screen.findByText("metric_generated approved");
+    expect(screen.queryByRole("button", { name: "Confirm" })).toBeNull();
   });
 
   it("test-runs a metric and shows the sample result", async () => {

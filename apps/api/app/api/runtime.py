@@ -8,6 +8,7 @@ keeps working; a failure is not cached, so the next request tries again.
 from dataclasses import dataclass
 from functools import cache
 import logging
+from datetime import UTC, datetime
 import os
 from pathlib import Path
 import threading
@@ -25,16 +26,21 @@ from app.config import load_settings, positive_int
 from app.conversation.store import ConversationStore, conversations_client
 from app.data.clickhouse import ClientWarehouse, QueryLimits
 from app.llm.client import LLMError
-from app.llm.clients import chat_client, embedding_client, index_embeddings
+from app.llm.clients import chat_client, embedding_client, index_embeddings, shared_routes
+from app.llm.routes import RouteError
 from app.llm.model_store import ClickHouseModelStore, model_tiers_client
-from app.onboarding.documents import ClickHouseDocumentRegistry, DocumentService, pack_review_client
+from app.onboarding.documents import ClickHouseDocumentRegistry, DocumentService, compile_lock_path, pack_review_client
 from app.admin.logs import AdminLogs, trace_reader_client
 from app.eval.console import EvalReports, EvalRuns
 from app.feedback.store import ClickHouseProposalStore, review_reader_client
 from app.observability.log_writer import start_log_writer, writer_client
 from app.onboarding.drafter import Drafter
 from app.onboarding.review import ReviewService
-from app.packs.compiler import CompileError, CompiledPack, load_compiled
+from app.onboarding.client import pack_admin_client
+from app.onboarding.drafter import TIER as DRAFT_TIER
+from app.onboarding.instant import InstantPipeline, InstantWarehouse
+from app.packs.active import active_pack, set_active_pack
+from app.packs.compiler import CompileError, CompiledPack, compile_pack, load_compiled
 from app.screening.screen import Screener
 from app.search.client import QdrantSearch
 from app.sources.client import source_admin_client
@@ -68,13 +74,19 @@ def get_oidc_http() -> httpx.Client:
     return httpx.Client(follow_redirects=False)
 
 
+def current_pack() -> str:
+    """The active pack: ``ACTIVE_PACK``, else the pack an instant pack made active (app/packs/active.py)."""
+    return active_pack(get_state_db())
+
+
 @cache
 def get_compiled() -> CompiledPack:
     settings = load_settings()
-    if not settings.active_pack:
-        raise unavailable("ACTIVE_PACK must be set")
+    name = current_pack()
+    if not name:
+        raise unavailable("no pack is active: connect a source and build its pack, or set ACTIVE_PACK")
     try:
-        return load_compiled(Path(settings.compiled_pack_dir), settings.active_pack)
+        return load_compiled(Path(settings.compiled_pack_dir), name)
     except CompileError as error:
         raise unavailable(str(error)) from None
 
@@ -111,17 +123,18 @@ def pack_identity(compiled: CompiledPack | None) -> PackIdentity:
             [role.id for role in compiled.pack.policies.roles],
         )
     settings = load_settings()
-    if not settings.active_pack:
-        raise unavailable("ACTIVE_PACK must be set")
-    pack_dir = Path(settings.packs_dir) / settings.active_pack
+    name = current_pack()
+    if not name:
+        raise unavailable("no pack is active: connect a source and build its pack, or set ACTIVE_PACK")
+    pack_dir = Path(settings.packs_dir) / name
     if not (pack_dir / "policies.yaml").is_file():
         raise unavailable(
-            f"pack {settings.active_pack} has no compiled.json and no pack files under {settings.packs_dir}; "
+            f"pack {name} has no compiled.json and no pack files under {settings.packs_dir}; "
             "compile the pack first"
         )
     profile = _read(pack_dir / "business_profile.yaml")
     roles = [role["id"] for role in _read(pack_dir / "policies.yaml").get("roles") or [] if isinstance(role, dict)]
-    return PackIdentity(settings.active_pack, str(profile.get("display_name") or settings.active_pack), roles)
+    return PackIdentity(name, str(profile.get("display_name") or name), roles)
 
 
 def get_pack_identity(compiled: Annotated[CompiledPack | None, Depends(get_compiled_or_none)]) -> PackIdentity:
@@ -343,6 +356,65 @@ def start_source_scheduler() -> None:
         logger.warning("scheduled source copies are off: CLICKHOUSE_SOURCE_ADMIN_PASSWORD is not set or ClickHouse is down")
         return
     _source_scheduler.start()
+
+
+def _model_missing() -> str | None:
+    """Why no model can draft a pack yet, in the words the Models page uses, or None."""
+    try:
+        shared_routes().route(DRAFT_TIER)
+    except RouteError as error:
+        return str(error)
+    return None
+
+
+def _compile_instant(pack_dir: Path) -> object:
+    """Compile an instant pack as ``pack_admin``, as ``jobs.compile_pack`` does as the admin user."""
+    settings = load_settings()
+    compiled_dir = Path(settings.compiled_pack_dir)
+    lock = compile_lock_path(compiled_dir, pack_dir.name)
+    lock.parent.mkdir(parents=True, exist_ok=True)
+    lock.write_text(datetime.now(UTC).isoformat(), encoding="utf-8")
+    try:
+        embeddings, label = index_embeddings(call_log=_call_log())
+        warehouse = InstantWarehouse(pack_admin_client())
+        return compile_pack(
+            pack_dir, warehouse=warehouse, access=warehouse, agent_secret=os.environ.get("CLICKHOUSE_AGENT_PASSWORD", ""),
+            top_k=settings.column_values_top_k, search=QdrantSearch(settings.qdrant_url), embeddings=embeddings,
+            output_dir=compiled_dir, schema_dir=pack_dir.parent / "_schema", screener=get_screener(),
+            registry=ClickHouseDocumentRegistry(pack_review_client()), documents_dir=Path(settings.documents_dir),
+            embedding_alias=label,
+        )
+    finally:
+        lock.unlink(missing_ok=True)
+
+
+def _activate_instant(pack: str) -> None:
+    set_active_pack(get_state_db(), pack)
+    reload_pack()
+
+
+@cache
+def get_instant_pipeline() -> InstantPipeline:
+    settings = load_settings()
+    packs_dir = Path(settings.packs_dir)
+    client = pack_admin_client()
+    return InstantPipeline(
+        store=get_source_store(), client=client, packs_dir=packs_dir, schema_dir=packs_dir / "_schema",
+        drafter=lambda: Drafter(chat_client(call_log=_call_log()), InstantWarehouse(client)),
+        compile_pack=_compile_instant, activate=_activate_instant, model_missing=_model_missing,
+    )
+
+
+# The objects built for the active pack; ``reload_pack`` drops them when another pack becomes active or is compiled.
+PACK_DEPENDENCIES = (get_compiled, get_agent, get_document_service, get_eval_reports)
+
+
+def reload_pack() -> None:
+    """Forget the active pack's objects, closing the agent's log writer, so the next request reads the new pack."""
+    if get_agent.cache_info().currsize:
+        get_agent().close()
+    for dependency in PACK_DEPENDENCIES:
+        dependency.cache_clear()
 
 
 def close() -> None:

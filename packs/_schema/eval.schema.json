@@ -80,6 +80,7 @@
           },
           "active_from_phase": {"type": "integer", "minimum": 0, "description": "Delivery phase that builds the feature this case needs; earlier phases skip the case."},
           "status": {"$ref": "common.schema.json#/$defs/status"},
+          "reviewed": {"$ref": "common.schema.json#/$defs/reviewed"},
           "evidence": {"$ref": "common.schema.json#/$defs/evidence"},
           "confidence": {"$ref": "common.schema.json#/$defs/confidence"}
         }

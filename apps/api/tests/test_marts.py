@@ -209,3 +209,11 @@ def test_applying_replaces_the_views_and_drops_the_source_marts_no_longer_planne
     assert dropped == ["shop__refunds", "shop__refunds__wide"]
     assert client.commands[3:] == ["DROP VIEW IF EXISTS `marts`.`shop__refunds`", "DROP VIEW IF EXISTS `marts`.`shop__refunds__wide`"]
     assert "engine = 'View'" in client.queries[0] and "startsWith(name, 'shop__')" in client.queries[0]
+
+
+def test_each_view_knows_its_key_columns_including_the_joined_ones():
+    views = _by_name(plan_marts("shop", [_widgets(), _sales()]))
+
+    assert views["shop__widgets"].keys == ("widget_id",)
+    assert views["shop__sales"].keys == ("sale_id", "widget_id")
+    assert views["shop__sales__wide"].keys == ("sale_id", "widget_id")

@@ -103,7 +103,7 @@ describe("evaluation", () => {
 
     expect(await screen.findByRole("img", { name: /Execution match 85% · Threshold 80%/ })).toBeTruthy();
     expect(screen.getByRole("img", { name: /Retrieval recall 100%/ })).toBeTruthy();
-    expect(screen.getAllByText("Pack enabled").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Meets threshold").length).toBeGreaterThan(0);
     const intent = screen.getByText("Intent routing").closest(".fc-meter-row") as HTMLElement;
     expect(within(intent).getByText("Not scored yet")).toBeTruthy();
   });
@@ -135,7 +135,7 @@ describe("evaluation", () => {
   it("does not let a reviewer run the evaluation set", async () => {
     show("evaluation", <EvaluationSection />, "rev");
 
-    await screen.findAllByText("Pack enabled");
+    await screen.findAllByText("Meets threshold");
     expect(screen.queryByRole("button", { name: /Run evaluation/ })).toBeNull();
   });
 });

@@ -14,7 +14,7 @@ const T = "trace-1";
 const status = (node: string, attempt?: number): AskEvent => ({ event: "status", node, phase: "end", trace_id: T, attempt: attempt ?? null });
 const RESULT: Result = { columns: [{ name: "region", type: "string", role: "dimension" }, { name: "sales", type: "number", role: "measure" }], rows: [["West", 10]], row_count: 1 };
 const ANSWER: AskEvent[] = [
-  status("extract"), status("generate_sql"), { event: "sql", sql: "SELECT region, sum(x) AS sales FROM marts.t GROUP BY region", attempt: 1, trace_id: T },
+  status("extract"), status("generate_sql"), { event: "sql", sql: "SELECT region, sum(x) AS sales FROM marts.t GROUP BY region", attempt: 1, unreviewed_metrics: [], trace_id: T },
   status("execute"), { event: "result", result: RESULT, trace_id: T },
   { event: "chart_spec", spec: { type: "table", x: "region", y: ["sales"], allowed_types: ["bar", "table"] }, trace_id: T },
   { event: "summary", text: "The West led with **10**.", lang: "en", warnings: ["Q1 2026 is only partly covered by the data"], trace_id: T },
@@ -66,6 +66,16 @@ describe("answer", () => {
     expect(screen.getByText("Q1 2026 is only partly covered by the data")).toBeTruthy();
     expect(screen.getByRole("radiogroup", { name: "Chart type" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "SQL" })).toBeTruthy();
+  });
+
+  it("says under the SQL that a metric it used is not reviewed yet", () => {
+    const unreviewed = ANSWER.map((event) => (event.event === "sql" ? { ...event, unreviewed_metrics: ["sales_total"] } : event));
+    show(unreviewed);
+
+    expect(screen.getByText(/not reviewed by a person yet/).textContent).toContain("sales_total");
+    cleanup();
+    show(ANSWER);
+    expect(screen.queryByText(/not reviewed by a person yet/)).toBeNull();
   });
 
   it("switches a grouped bar to a bar and a table without calling the network", () => {

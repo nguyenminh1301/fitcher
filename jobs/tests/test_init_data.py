@@ -349,3 +349,15 @@ def test_an_admin_user_name_applies_only_to_an_external_server(tmp_path):
 
     write_environment(tmp_path, passwords, ("ch", 8123, False), memory_profile(4 * GIB), env=env)
     assert read_env_file(tmp_path / "admin.env")["CLICKHOUSE_ADMIN_USER"] == "ops_admin"
+
+
+def test_every_start_puts_the_image_pack_schemas_next_to_the_packs(tmp_path):
+    data, run = tmp_path / "data", tmp_path / "run"
+    (data / "packs" / "_schema").mkdir(parents=True)
+    (data / "packs" / "_schema" / "stale.schema.json").write_text("{}")
+
+    init_data.initialize(data, run, env={"CLICKHOUSE_URL": "http://ch:8123"}, templates=USER_TEMPLATES,
+                         cgroup=tmp_path, meminfo=tmp_path / "x", pack_schemas=REPO / "packs" / "_schema")
+
+    written = sorted(path.name for path in (data / "packs" / "_schema").iterdir())
+    assert written == sorted(path.name for path in (REPO / "packs" / "_schema").iterdir())

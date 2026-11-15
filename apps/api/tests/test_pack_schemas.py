@@ -121,10 +121,31 @@ def test_yes_and_on_are_not_booleans(pack_dir, edit_pack):
 
 
 def test_missing_file_is_reported(pack_dir: Path):
+    (pack_dir / "metrics.yaml").unlink()
+
+    with pytest.raises(PackValidationError, match="metrics.yaml: file is missing"):
+        load_pack(pack_dir, schema_dir=SCHEMA_DIR)
+
+
+def test_a_pack_without_an_eval_set_loads_with_no_cases(pack_dir: Path):
     (pack_dir / "eval.yaml").unlink()
 
-    with pytest.raises(PackValidationError, match="eval.yaml: file is missing"):
-        load_pack(pack_dir, schema_dir=SCHEMA_DIR)
+    assert load_pack(pack_dir, schema_dir=SCHEMA_DIR).eval.cases == []
+
+
+@pytest.mark.parametrize(("file_name", "path"), [
+    ("datasets.yaml", ("datasets", 0)), ("glossary.yaml", ("terms", 0)), ("metrics.yaml", ("metrics", 0)),
+    ("relationships.yaml", ("relationships", 0)), ("examples.yaml", ("examples", 0)), ("policies.yaml", ("roles", 0)),
+])
+def test_a_generated_item_may_be_marked_unreviewed(pack_dir, edit_pack, file_name, path):
+    edit_pack(file_name, _set((*path, "reviewed"), False))
+
+    pack = load_pack(pack_dir, schema_dir=SCHEMA_DIR)
+
+    items = {"datasets.yaml": pack.datasets.datasets, "glossary.yaml": pack.glossary.terms, "metrics.yaml": pack.metrics.metrics,
+             "relationships.yaml": pack.relationships.relationships, "examples.yaml": pack.examples.examples,
+             "policies.yaml": pack.policies.roles}[file_name]
+    assert items[0].reviewed is False and all(item.reviewed is None for item in items[1:])
 
 
 def test_invalid_yaml_is_reported(pack_dir: Path):

@@ -67,6 +67,8 @@ COPY --from=api-build /app/.venv ./.venv
 COPY apps/api/app ./app
 COPY apps/api/prompts ./prompts
 COPY jobs ./jobs
+# Copied next to the packs of /data by init-data on every start.
+COPY packs/_schema ./packs/_schema
 COPY infra/clickhouse/changes ./infra/clickhouse/changes
 COPY infra/clickhouse/users.d ./infra/clickhouse/users.d
 COPY infra/image/clickhouse ./infra/image/clickhouse

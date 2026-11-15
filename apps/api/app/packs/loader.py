@@ -334,6 +334,10 @@ def check_references(pack: Pack, catalog: Catalog | None = None) -> list[PackIss
     return refs.issues
 
 
+# Files a pack may leave out, with the content they then have: a generated pack has no eval set (DECISIONS §11).
+OPTIONAL_FILES = {"eval.yaml": {"cases": []}}
+
+
 def load_pack(pack_dir: Path, *, schema_dir: Path | None = None, catalog: Catalog | None = None) -> Pack:
     """Load and validate the pack in ``pack_dir``; raise PackValidationError listing every problem.
 
@@ -344,6 +348,9 @@ def load_pack(pack_dir: Path, *, schema_dir: Path | None = None, catalog: Catalo
     issues: list[PackIssue] = []
     for file, validator in validators.items():
         path = pack_dir / file
+        if not path.is_file() and file in OPTIONAL_FILES:
+            contents[file.removesuffix(".yaml")] = OPTIONAL_FILES[file]
+            continue
         if not path.is_file():
             issues.append(PackIssue(file, "", "file is missing"))
             continue

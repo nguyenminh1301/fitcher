@@ -54,11 +54,18 @@ def _language(state: Mapping) -> str:
     return getattr(state.get("extraction"), "language", None) or state.get("language") or "en"
 
 
+def unreviewed_metrics(compiled) -> frozenset[str]:
+    """The compiled pack's metrics an instant pack approved without a person."""
+    return frozenset(metric.id for metric in compiled.pack.metrics.metrics if metric.reviewed is False)
+
+
 class AnswerEvents:
     """The events of one run, from graph progress and the final state."""
 
-    def __init__(self, role: str):
+    def __init__(self, role: str, unreviewed_metrics: frozenset[str] = frozenset()):
         self.role = role
+        # The pack's metrics marked ``reviewed: false``: an instant pack approved them without a person.
+        self.unreviewed_metrics = unreviewed_metrics
         self.trace_id = ""
         # Every event of the answer other than status, in stream order; stored with the answer.
         self.answered: list[EventModel] = []
@@ -77,7 +84,9 @@ class AnswerEvents:
         if name == "guard":
             # The guarded SQL, with its enforced LIMIT, is the one that runs; a rejected one is shown as generated.
             attempts = update.get("attempts", state["attempts"])
-            events.append(SqlEvent(**trace, sql=attempts[-1].sql, attempt=len(attempts)))
+            spec = state.get("spec")
+            unreviewed = [metric for metric in (spec.metric_ids if spec else []) if metric in self.unreviewed_metrics]
+            events.append(SqlEvent(**trace, sql=attempts[-1].sql, attempt=len(attempts), unreviewed_metrics=unreviewed))
         elif name == "shape_result":
             events.append(ResultEvent(**trace, result=update["result"]))
         elif name == "chart_recommender":
@@ -284,7 +293,7 @@ def ask(
         logger.exception("cannot prepare a run as role %s", role)
         raise unavailable("the agent cannot reach its data store") from None
     return StreamingResponse(
-        event_stream(run, turn.question, AnswerEvents(role), record=StoredTurn(store, turn)),
+        event_stream(run, turn.question, AnswerEvents(role, unreviewed_metrics(run.deps.compiled)), record=StoredTurn(store, turn)),
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no", "X-Conversation-Id": turn.conversation_id},
     )
