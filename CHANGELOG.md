@@ -4,6 +4,7 @@
 
 ### Added
 
+- Record the generated packs against the baseline in `docs/eval/instant-pack-report.md`: built by the instant pack job, Iowa matches 17 of 35 cases (49%, above the 46% baseline) and e-commerce 21 of 45 (47%, three cases below the 53% baseline, with the three causes), the hand-written `ecommerce_twin` keeps 42 of 45 (93%), and a fresh release image went from connecting a source to an answered question with a chart in the browser.
 - Add an e-commerce fixture to the `sources` PostgreSQL (`infra/sources/ecommerce_twin/seed.sh`): the seven lab tables with typed columns, primary keys and the ten foreign keys the data implies, streamed from the ClickHouse copy into database `ecommerce_twin` and readable by the Iowa fixture's read-only role, so an instant pack can be measured on a source that declares its joins.
 - Propose tables in the setup's Data step: every table of a source with at most 20 is chosen in advance, none of a larger one, and a source with more than 50 tables shows a warning that every chosen table becomes a mart and lengthens the draft.
 - Show schema drift on the Sources page: a source whose instant pack no longer matches it lists, per table, the columns added, removed and retyped or that the table left the source, with a Rebuild the pack action that builds the pack again from the selected tables after the same estimate and confirmation as the setup.
