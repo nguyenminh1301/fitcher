@@ -250,6 +250,7 @@
 
 ### Fixed
 
+- Profile an instant pack's wide views from the tables they join instead of scanning the join: on the seven e-commerce tables the scan exceeded the 2 GB query memory limit, while the joined columns' facts are already known from the referenced tables.
 - Accept the old time zone names that browsers still send, such as `Asia/Saigon`, in the release image: Debian trixie moved them into `tzdata-legacy`, so every question from a browser set to such a zone was refused with 422 and the chat showed a lost connection.
 - Update `opentelemetry-sdk` to 1.45.2, which brings `opentelemetry-api` 1.45.2 with the fix for CVE-2026-126360.
 - A successful sign-in releases only its own count in the sign-in throttle: it no longer clears the e-mail's other counted attempts, so password checks running in parallel for the same e-mail keep counting toward the limit of five.

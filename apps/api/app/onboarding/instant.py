@@ -25,7 +25,9 @@ from app.observability.tracing import trusted_pack_calls
 from app.onboarding.drafter import DRAFT_FILES
 from app.onboarding.drift import write_snapshot
 from app.onboarding.instant_files import approve_generated, write_pack_files
-from app.onboarding.marts import MARTS_DATABASE, MartTable, SourceColumn, mart_tables, plan_marts, source_marts
+from app.onboarding.marts import (
+    MARTS_DATABASE, MartTable, MartView, SourceColumn, mart_tables, plan_marts, source_marts,
+)
 from app.onboarding.pack_yaml import PackFiles
 from app.onboarding.profiler import profile_marts
 from app.sources.attach import quote
@@ -75,6 +77,26 @@ class InstantWarehouse:
 
     def command(self, sql: str) -> None:
         self._client.command(sql)
+
+
+def wide_profiles(views: Sequence[MartView], profile: dict) -> dict:
+    """``profile`` of the views' own tables with the wide views added, derived from the tables they join.
+
+    A wide view holds its table's rows and columns and, for each joined column, the referenced table's values, so its
+    facts are those of its tables and scanning the join, which can exceed the query memory limit, is not needed.
+    The sample rows are left out: they would need the join.
+    """
+    tables = dict(profile["tables"])
+    for view in views:
+        if not view.wide:
+            continue
+        own = tables[view.origins[0][1]]
+        tables[view.name] = {
+            "rows": own["rows"],
+            "columns": {output: tables[mart]["columns"][column] for output, mart, column in view.origins},
+            "sample_rows": [],
+        }
+    return {**profile, "tables": tables}
 
 
 def _first_line(error: BaseException) -> str:
@@ -184,7 +206,8 @@ class InstantPipeline:
         state["tables"], state["views"] = tables, views
 
     def _step_profile(self, job: InstantJob, pack: str, building: Path, state: dict) -> None:
-        state["profile"] = profile_marts(InstantWarehouse(self._client), [view.name for view in state["views"]])
+        bases = [view.name for view in state["views"] if not view.wide]
+        state["profile"] = wide_profiles(state["views"], profile_marts(InstantWarehouse(self._client), bases))
 
     def _step_files(self, job: InstantJob, pack: str, building: Path, state: dict) -> None:
         shutil.rmtree(building, ignore_errors=True)
