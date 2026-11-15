@@ -23,6 +23,7 @@ from pathlib import Path
 
 from app.observability.tracing import trusted_pack_calls
 from app.onboarding.drafter import DRAFT_FILES
+from app.onboarding.drift import write_snapshot
 from app.onboarding.instant_files import approve_generated, write_pack_files
 from app.onboarding.marts import MARTS_DATABASE, MartTable, SourceColumn, mart_tables, plan_marts, source_marts
 from app.onboarding.pack_yaml import PackFiles
@@ -190,6 +191,7 @@ class InstantPipeline:
         state["summary"] = write_pack_files(
             building, pack=pack, display_name=pack.replace("_", " ").capitalize(), source=job.source_id,
             tables=state["tables"], views=state["views"], profile=state["profile"])
+        write_snapshot(building, job.source_id, self._chosen(job.source_id, job.tables))
 
     def _step_draft(self, job: InstantJob, pack: str, building: Path, state: dict) -> None:
         missing = self._model_missing()

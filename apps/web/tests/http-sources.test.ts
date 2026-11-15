@@ -16,6 +16,21 @@ const CONNECTION = {
 } as const;
 
 describe("http sources", () => {
+  it("reads drift and starts and follows an instant pack through the web server's routes", async () => {
+    const { fetcher, sources } = client(() => respond({}));
+    const body = { source_id: "shop", tables: ["sales"] };
+
+    await sources.drift("shop", true);
+    await sources.instantEstimate(body);
+    await sources.instantStart({ ...body, confirm_billable: true });
+    await sources.instantJob("job 1");
+
+    expect(fetcher.mock.calls.map((call) => call[0])).toEqual([
+      "/api/sources/shop/drift?refresh=true", "/api/pack/instant/estimate", "/api/pack/instant", "/api/pack/instant/job%201",
+    ]);
+    expect(fetcher.mock.calls[2][1]).toMatchObject({ method: "POST", body: JSON.stringify({ ...body, confirm_billable: true }) });
+  });
+
   it("lists sources and tests a connection through the web server's /api/sources routes", async () => {
     const { fetcher, sources } = client(() => respond([]));
 

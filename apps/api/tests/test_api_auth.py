@@ -90,3 +90,12 @@ def test_an_uncompiled_pack_makes_the_endpoints_unavailable(client, monkeypatch,
     assert "compile the pack first" in response.json()["detail"]
     assert client.get("/me", headers=SessionHeaders()).status_code == 503
     runtime.get_compiled.cache_clear()
+
+
+def test_suggestions_are_the_first_approved_example_questions_of_the_active_pack(client):
+    response = client.get("/pack/suggestions", headers=SessionHeaders())
+
+    examples = [example for example in compiled_fixture().pack.examples.examples][:3]
+    assert response.status_code == 200
+    assert response.json() == [{"text": example.question, "lang": example.language} for example in examples]
+    assert client.get("/pack/suggestions").status_code == 401

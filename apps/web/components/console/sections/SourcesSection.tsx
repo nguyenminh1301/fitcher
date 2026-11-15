@@ -10,6 +10,7 @@ import { useCallback, useEffect, useState } from "react";
 
 import { ListPage } from "@/components/console/ListPage";
 import { ConnectionFields, connectionBody, SourceConnect, useFailure, type ConnectionValues } from "@/components/sources/SourceConnect";
+import { InstantPack } from "@/components/setup/InstantPack";
 import { TableChooser } from "@/components/sources/TableChooser";
 import { Button, TextField } from "@/components/ui/controls";
 import { WarningBanner } from "@/components/ui/feedback";
@@ -17,7 +18,7 @@ import { Dialog } from "@/components/ui/overlay";
 import type { FitcherApi } from "@/lib/api/client";
 import { useChat } from "@/lib/chat/ChatContext";
 import { useLoad } from "@/lib/console/useLoad";
-import type { SourcePatch, SourceView, TableView } from "@/lib/contracts";
+import type { SourceDrift, SourcePatch, SourceView, TableDrift, TableView } from "@/lib/contracts";
 import { useI18n } from "@/lib/i18n/react";
 
 const POLL_MS = 3000;
@@ -89,7 +90,28 @@ function SourceRow({ sources, source, syncing, onSyncing, onChanged, onDelete }:
   const [panel, setPanel] = useState<"tables" | "edit" | null>(null);
   const [tables, setTables] = useState<TableView[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [drift, setDrift] = useState<SourceDrift | null>(null);
+  const [rebuild, setRebuild] = useState<string[] | null>(null);
   const running = syncing || source.last_sync?.status === "running";
+
+  // Columns that changed since the source's instant pack was built (DECISIONS §11 step 0); nothing is re-drafted for it.
+  useEffect(() => {
+    sources.drift(source.id).then(setDrift).catch(() => setDrift(null));
+  }, [sources, source.id, source.last_sync?.id]);
+
+  async function startRebuild() {
+    try {
+      setRebuild((await sources.tables(source.id)).filter((table) => table.selected).map((table) => table.name));
+    } catch (cause) {
+      setError(failure(cause));
+    }
+  }
+
+  const changeLine = (change: TableDrift) => change.missing ? `${change.table}: ${t("sources.driftMissing")}` : `${change.table}: ${[
+    change.added.length ? t("sources.driftAdded", { columns: change.added.join(", ") }) : "",
+    change.removed.length ? t("sources.driftRemoved", { columns: change.removed.join(", ") }) : "",
+    ...change.retyped.map((item) => `${item.column} ${item.before} → ${item.after}`),
+  ].filter(Boolean).join("; ")}`;
 
   async function toggleTables() {
     if (panel === "tables") return setPanel(null);
@@ -142,6 +164,16 @@ function SourceRow({ sources, source, syncing, onSyncing, onChanged, onDelete }:
         </span>
       </div>
       {error ? <WarningBanner tone="danger">{error}</WarningBanner> : null}
+      {drift?.changes.length ? (
+        <WarningBanner tone="warning">
+          <span>{t("sources.driftTitle")}</span>
+          <ul style={{ margin: "var(--base-size-4) 0" }}>{drift.changes.map((change) => <li key={change.table}>{changeLine(change)}</li>)}</ul>
+          <Button size="sm" aria-label={t("sources.rebuildOf", { name: source.id })} onClick={() => void startRebuild()}>{t("sources.rebuild")}</Button>
+        </WarningBanner>
+      ) : null}
+      {rebuild?.length ? (
+        <InstantPack sources={sources} sourceId={source.id} tables={rebuild} onAsk={() => { setRebuild(null); void onChanged(); }} />
+      ) : null}
       {panel === "tables" && tables ? (
         <TableChooser sources={sources} id={source.id} tables={tables} copyOnly={source.kind === "sqlserver"} onSaved={() => void onChanged()} />
       ) : null}

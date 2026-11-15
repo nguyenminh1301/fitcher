@@ -429,3 +429,17 @@ def test_a_sql_server_cancel_stops_the_copy_between_batches(mssql):
 
     assert service.cancel("erp") is True
     assert running.id in service._cancelled
+
+
+def test_a_sync_reads_the_catalog_again_so_column_changes_show(parts):
+    store, clickhouse, service = parts
+    service.create("shop", connection())
+    select_for_copy(store)
+    columns = clickhouse.catalog["table = 'columns'"]
+    clickhouse.catalog = {**clickhouse.catalog, "table = 'columns'": [*columns, ("orders", "promo_code", "text", "text", "YES", 3)]}
+
+    service.sync("shop", "manual")
+
+    orders = next(table for table in store.tables("shop") if table.name == "orders")
+    assert [column.name for column in orders.columns] == ["id", "created_at", "promo_code"]
+    assert orders.selected and orders.last_rows == 5

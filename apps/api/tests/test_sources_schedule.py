@@ -118,3 +118,19 @@ def test_stopping_ends_the_loop(tmp_path):
     scheduler.stop()
 
     assert not scheduler.running
+
+
+def test_a_source_read_live_has_its_catalog_read_again_once_a_day(tmp_path):
+    store, clickhouse, service, clock = setup(tmp_path)
+    store.set_tables("shop", [TableChange("orders", selected=True, mode="live")])
+    refreshed = []
+    service.refresh = lambda source_id: refreshed.append((source_id, clock.now))
+    scheduler = SourceScheduler(service, store, clock=clock)
+
+    scheduler.tick()
+    clock.now = NOW + timedelta(hours=23)
+    scheduler.tick()
+    clock.now = NOW + timedelta(days=1)
+    scheduler.tick()
+
+    assert refreshed == [("shop", NOW), ("shop", NOW + timedelta(days=1))]

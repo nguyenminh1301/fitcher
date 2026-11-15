@@ -66,6 +66,10 @@ function fakeSources(initial: SourceView[] = [SHOP]) {
     sync: vi.fn(async () => ({ ...SYNC, id: 2, status: "running" as const, finished_at: null, results: [] })),
     cancel: vi.fn(async () => SYNC),
     syncs: vi.fn(async () => [SYNC]),
+    drift: vi.fn(async () => ({ pack: null, changes: [] })),
+    instantEstimate: vi.fn(async () => ({ prompt_tokens: 3000, datasets: 2, model_missing: null })),
+    instantStart: vi.fn(async () => { throw new Error("not started in this test"); }),
+    instantJob: vi.fn(async () => { throw new Error("no job in this test"); }),
     upload: vi.fn(async () => ({
       id: "up1", file_name: "orders.csv", format: "csv" as const, size_bytes: 40,
       columns: [{ name: "id", type: "Nullable(Int64)" }, { name: "amount", type: "Nullable(Float64)" }], sample: [["1", "2.5"]],
@@ -203,6 +207,24 @@ describe("Sources page", () => {
       selected: true, mode: "copy", interval_seconds: 3600, cursor_column: "created_at",
     });
     expect(screen.getByText("Selection saved.")).toBeTruthy();
+  });
+
+  it("shows the columns that changed since the source's pack was built and offers to rebuild it", async () => {
+    const user = userEvent.setup();
+    const sources = fakeSources();
+    (sources.drift as ReturnType<typeof vi.fn>).mockResolvedValue({ pack: "shop", changes: [
+      { table: "orders", added: ["promo_code"], removed: ["note"], retyped: [{ column: "total", before: "integer", after: "numeric" }], missing: false },
+    ] });
+    (sources.syncs as ReturnType<typeof vi.fn>).mockResolvedValue([{ ...SYNC, status: "succeeded" }]);
+    show(sources);
+
+    const row = await screen.findByRole("listitem", { name: "shop" });
+    expect(await within(row).findByText(/orders: added promo_code; removed note; total integer → numeric/)).toBeTruthy();
+    expect(sources.drift).toHaveBeenCalledWith("shop");
+    await user.click(within(row).getByRole("button", { name: "Rebuild the pack of shop" }));
+
+    expect(await screen.findByRole("region", { name: "Build the pack" })).toBeTruthy();
+    expect(sources.instantEstimate).toHaveBeenCalledWith({ source_id: "shop", tables: ["items"] });
   });
 
   it("flags live tables joined with another live table as slow", async () => {

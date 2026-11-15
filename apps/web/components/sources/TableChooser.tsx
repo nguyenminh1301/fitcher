@@ -83,7 +83,11 @@ export function TableList({ tables, copyOnly }: { tables: TableView[]; copyOnly?
 
 type Choice = { selected: boolean; mode: "live" | "copy"; interval: number; cursor: string };
 
-export function TableChooser({ sources, id, tables, copyOnly, onSaved, onSynced }: {
+// The setup proposes every table of a small source and none of a large one, and warns before a very large choice.
+const PRESELECT_AT_MOST = 20;
+const WARN_ABOVE = 50;
+
+export function TableChooser({ sources, id, tables, copyOnly, onSaved, onSynced, preselect = false }: {
   sources: FitcherApi["sources"];
   id: string;
   tables: TableView[];
@@ -92,10 +96,13 @@ export function TableChooser({ sources, id, tables, copyOnly, onSaved, onSynced 
   onSaved?: (tables: TableView[]) => void;
   /** Called after a sync was started, so the page shows it running. */
   onSynced?: () => void;
+  /** The setup: choose every table when the source has at most 20 and none is chosen yet. */
+  preselect?: boolean;
 }) {
   const { t } = useI18n();
+  const proposeAll = preselect && tables.length <= PRESELECT_AT_MOST && !tables.some((table) => table.selected);
   const [choices, setChoices] = useState<Record<string, Choice>>(() => Object.fromEntries(tables.map((table) => [table.name, {
-    selected: table.selected, mode: table.mode, interval: table.interval_seconds, cursor: table.cursor_column ?? "",
+    selected: table.selected || proposeAll, mode: table.mode, interval: table.interval_seconds, cursor: table.cursor_column ?? "",
   }])));
   const [shown, setShown] = useState(tables);
   const [busy, setBusy] = useState(false);
@@ -143,6 +150,7 @@ export function TableChooser({ sources, id, tables, copyOnly, onSaved, onSynced 
   const chosen = shown.some((table) => choices[table.name]?.selected);
   return (
     <div className="fc-stack" style={{ gap: "var(--base-size-12)" }}>
+      {tables.length > WARN_ABOVE ? <WarningBanner tone="warning">{t("sources.manyTables", { count: tables.length })}</WarningBanner> : null}
       <div className="fc-table-scroll">
         <table className="fc-table" aria-label={t("sources.tables")}>
           <thead>

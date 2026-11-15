@@ -9,6 +9,7 @@ instead of the driver's text. A source is saved only after its connection was te
 from datetime import datetime
 import json
 import logging
+from pathlib import Path
 from typing import Annotated, Protocol
 
 from fastapi import APIRouter, Depends, File, HTTPException, Response, UploadFile, status
@@ -18,8 +19,10 @@ from app.api.runtime import get_admin_action_log, get_file_service, get_source_s
 from app.auth.principal import Principal
 from app.contracts.sources import (
     ColumnView, FileColumn, FileLoad, FileUploadView, ForeignKeyView, ProbeResult, SourceConnection, SourceCreate, SourceDetail, SourcePatch, SourceView,
-    SyncView, TableChangeInput, TablesChange, TableView,
+    SourceDrift, SyncView, TableChangeInput, TableDrift, TablesChange, TableView,
 )
+from app.config import load_settings
+from app.onboarding.drift import read_snapshot, schema_drift
 from app.observability.events import AdminActionRecord, utc_now
 from app.onboarding.docs_parser import DocumentRejected
 from app.sources.attach import valid_name
@@ -265,6 +268,20 @@ def list_tables(source_id: str, _: Admin, store: Store, service: Service, refres
     except Exception as error:  # noqa: BLE001 - each failure maps to its status in _refusal
         raise _refusal(error) from None
     return _table_views(tables)
+
+
+@router.get("/{source_id}/drift")
+def drift(source_id: str, _: Admin, store: Store, service: Service, refresh: bool = False) -> SourceDrift:
+    """The columns added, removed and retyped since the source's instant pack was built (DECISIONS §11 step 0)."""
+    _found(store, source_id)
+    snapshot = read_snapshot(Path(load_settings().packs_dir) / source_id)
+    if snapshot is None or snapshot.get("source") != source_id:
+        return SourceDrift(pack=None, changes=[])
+    try:
+        tables = service.refresh(source_id) if refresh else store.tables(source_id)
+    except Exception as error:  # noqa: BLE001 - each failure maps to its status in _refusal
+        raise _refusal(error) from None
+    return SourceDrift(pack=source_id, changes=[TableDrift(**change) for change in schema_drift(snapshot, tables)])
 
 
 def _change(item: TableChangeInput, sent: set[str]) -> TableChange:

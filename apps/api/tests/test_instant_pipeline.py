@@ -198,3 +198,13 @@ def test_tables_that_the_source_does_not_list_are_refused(packs_dir):
 
     with pytest.raises(InstantRefused, match="unknown table"):
         pipeline.start("shop", ["widgets", "nope"], confirm_billable=True, started_by="owner")
+
+
+def test_a_built_pack_keeps_the_columns_its_tables_had_so_drift_can_be_shown(packs_dir):
+    from app.onboarding.drift import read_snapshot
+    pipeline, _, _ = _pipeline(packs_dir)
+
+    pipeline.run(pipeline.new_job("shop", ["widgets", "sales"], started_by="owner"))
+
+    snapshot = read_snapshot(packs_dir / "shop")
+    assert snapshot["source"] == "shop" and snapshot["tables"]["widgets"] == [["widget_id", "text"], ["widget_name", "text"]]

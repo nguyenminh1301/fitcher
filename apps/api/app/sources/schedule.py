@@ -4,10 +4,13 @@ The scheduler is a thread of the api process. Each tick asks the store which sou
 that is due; the store claims them inside one immediate transaction, so a second api process ticking at the same
 moment finds them already syncing and runs nothing. A claimed sync runs the due tables only; a failure is
 recorded on the sync and never stops the loop.
+
+A source read live is never copied, so its catalog is read again once a day instead: the Sources page then shows
+the columns an instant pack's tables gained, lost or retyped (app/onboarding/drift.py).
 """
 
 from collections.abc import Callable
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 import logging
 import threading
 
@@ -16,6 +19,7 @@ from app.sources.store import SourceStore
 
 logger = logging.getLogger(__name__)
 DEFAULT_INTERVAL_SECONDS = 30.0
+LIVE_CATALOG_EVERY = timedelta(days=1)
 
 
 class SourceScheduler:
@@ -25,6 +29,8 @@ class SourceScheduler:
         self._clock = clock
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
+        # When each source with live tables last had its catalog read; kept in this process only.
+        self._catalog_read: dict[str, datetime] = {}
 
     @property
     def running(self) -> bool:
@@ -40,7 +46,22 @@ class SourceScheduler:
             threads.append(thread)
         for thread in threads:
             thread.join()
+        self._read_live_catalogs()
         return [claim.source_id for claim in claims]
+
+    def _read_live_catalogs(self) -> None:
+        now = self._clock()
+        for source in self._store.list():
+            if not any(table.selected and table.mode == "live" for table in self._store.tables(source.id)):
+                continue
+            last = self._catalog_read.get(source.id)
+            if last is not None and now - last < LIVE_CATALOG_EVERY:
+                continue
+            self._catalog_read[source.id] = now
+            try:
+                self._service.refresh(source.id)
+            except Exception:  # noqa: BLE001 - an unreachable source is read again the next day
+                logger.warning("the catalog of source %s could not be read", source.id)
 
     def _run(self, claim) -> None:
         try:

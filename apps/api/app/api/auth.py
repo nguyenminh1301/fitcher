@@ -106,3 +106,15 @@ def me(
 def pack(identity: Annotated[PackIdentity, Depends(get_pack_identity)]) -> PackInfo:
     """The active pack, from its pack files while it was never compiled."""
     return PackInfo(name=identity.name, display_name=identity.display_name, roles=identity.roles)
+
+
+SUGGESTIONS = 3
+
+
+@router.get("/pack/suggestions")
+def suggestions(
+    principal: Annotated[Principal, Depends(current_principal)],
+    compiled: Annotated[CompiledPack, Depends(get_compiled)],
+) -> list[dict[str, str]]:
+    """The first approved example questions of the compiled pack, offered in an empty chat (DECISIONS §11 step 0)."""
+    return [{"text": example.question, "lang": example.language} for example in compiled.pack.examples.examples[:SUGGESTIONS]]

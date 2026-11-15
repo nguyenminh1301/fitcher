@@ -10,6 +10,7 @@ import { useCallback, useEffect, useState } from "react";
 
 import { Logo } from "@/components/brand/Logo";
 import { ProviderForm, ProviderTestButton, TestOutcome } from "@/components/models/ProviderForm";
+import { InstantPack } from "@/components/setup/InstantPack";
 import { SourceConnect } from "@/components/sources/SourceConnect";
 import { Button, TextField } from "@/components/ui/controls";
 import { WarningBanner } from "@/components/ui/feedback";
@@ -80,23 +81,35 @@ function ModelsStep({ models, disabled, onDone, onSkip }: {
   );
 }
 
-function DataStep({ sources, disabled, onDone, onSkip }: {
-  sources: FitcherApi["sources"]; disabled: boolean; onDone: () => void; onSkip: () => void;
+function DataStep({ sources, disabled, onDone, onSkip, onOpenChat }: {
+  sources: FitcherApi["sources"]; disabled: boolean; onDone: () => void; onSkip: () => void; onOpenChat: () => void;
 }) {
   const { t } = useI18n();
-  const [connected, setConnected] = useState(false);
+  const [connected, setConnected] = useState<string | null>(null);
+  const [chosen, setChosen] = useState<string[]>([]);
+  const [synced, setSynced] = useState(false);
   return (
-    <section className="fc-card" aria-label={t("setup.step_data")}>
-      <div className="fc-card-head"><h2 className="fc-card-title">{t("setup.dataQuestion")}</h2></div>
-      <div className="fc-card-body fc-stack">
-        <p className="fc-muted" style={{ margin: 0 }}>{t("setup.dataHint")}</p>
-        {disabled ? null : <SourceConnect sources={sources} onConnected={() => setConnected(true)} />}
-        <div className="fc-row" style={{ gap: "var(--base-size-8)" }}>
-          {connected ? <Button variant="primary" onClick={onDone}>{t("setup.continue")}</Button> : null}
-          {connected || disabled ? null : <Button onClick={onSkip}>{t("setup.skip")}</Button>}
+    <>
+      <section className="fc-card" aria-label={t("setup.step_data")}>
+        <div className="fc-card-head"><h2 className="fc-card-title">{t("setup.dataQuestion")}</h2></div>
+        <div className="fc-card-body fc-stack">
+          <p className="fc-muted" style={{ margin: 0 }}>{t("setup.dataHint")}</p>
+          {disabled ? null : (
+            <SourceConnect sources={sources} preselect onConnected={(source) => setConnected(source.id)}
+              onChosen={(tables) => { setChosen(tables.filter((table) => table.selected).map((table) => table.name)); setSynced(false); }}
+              onSynced={() => setSynced(true)} />
+          )}
+          <div className="fc-row" style={{ gap: "var(--base-size-8)" }}>
+            {connected ? <Button variant="primary" onClick={onDone}>{t("setup.continue")}</Button> : null}
+            {connected || disabled ? null : <Button onClick={onSkip}>{t("setup.skip")}</Button>}
+          </div>
         </div>
-      </div>
-    </section>
+      </section>
+      {/* The instant pack (DECISIONS §11 step 0): once the chosen tables are copied, the first question is minutes away. */}
+      {connected && synced && chosen.length && !disabled ? (
+        <InstantPack sources={sources} sourceId={connected} tables={chosen} onAsk={() => { onDone(); onOpenChat(); }} />
+      ) : null}
+    </>
   );
 }
 
@@ -183,7 +196,7 @@ export function SetupScreen({ setup, models, sources, isAdmin, onSignedOut, onOp
                   onDone={() => { setModelsOpen(false); void run(() => setup.status()); }}
                   onSkip={() => { setModelsOpen(false); void run(() => setup.skip("models")); }} />
               ) : current?.id === "data" ? (
-                <DataStep sources={sources} disabled={!isAdmin || busy}
+                <DataStep sources={sources} disabled={!isAdmin || busy} onOpenChat={onOpenChat}
                   onDone={() => { setDataOpen(false); void run(() => setup.status()); }}
                   onSkip={() => { setDataOpen(false); void run(() => setup.skip("data")); }} />
               ) : current?.id === "mode" ? (

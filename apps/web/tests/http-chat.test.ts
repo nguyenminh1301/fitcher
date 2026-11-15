@@ -108,3 +108,16 @@ describe("http chat", () => {
     await expect(collect(http.ask({ question: "q" }, new AbortController().signal))).rejects.toThrow("ended before");
   });
 });
+
+describe("http chat suggestions", () => {
+  it("uses the pack's sample suggestions and otherwise asks the api for the pack's example questions", async () => {
+    const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
+    const sample = chat(() => json({ suggestions: [{ text: "From the sample", lang: "en" }], scenarios: [] }));
+    expect(await sample.chat.suggestions()).toEqual([{ text: "From the sample", lang: "en" }]);
+
+    const answers = [json({ detail: "no sample data" }, 404), json([{ text: "Total sales?", lang: "en" }])];
+    const generated = chat(() => answers.shift() as Response);
+    expect(await generated.chat.suggestions()).toEqual([{ text: "Total sales?", lang: "en" }]);
+    expect(generated.fetcher.mock.calls.map((call) => call[0])).toEqual(["/api/sample/scenarios", "/api/pack/suggestions"]);
+  });
+});

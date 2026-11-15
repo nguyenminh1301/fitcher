@@ -249,6 +249,41 @@ describe("setup data step", () => {
     await waitFor(() => expect(setup.status).toHaveBeenCalledTimes(2));
   });
 
+  it("builds the instant pack after the chosen tables are copied and then opens the chat", async () => {
+    const setup = fakeSetup(DATA_PENDING);
+    const ready = {
+      id: "job1", source_id: "erp", tables: ["orders"], status: "succeeded", started_at: "2026-11-15T10:00:00Z", finished_at: null,
+      failed_step: null, error: null, steps: [{ id: "marts", state: "done" }],
+      result: { pack: "erp", datasets: 1, relationships: 0, skipped: [], dropped: [], slow: [], suggested_questions: ["Orders per month?"] },
+    };
+    const sources = {
+      ...fakeSources(),
+      syncs: vi.fn(async () => [{ id: 1, status: "succeeded" }]),
+      instantEstimate: vi.fn(async () => ({ prompt_tokens: 1200, datasets: 1, model_missing: null })),
+      instantStart: vi.fn(async () => ({ job: ready })),
+    } as unknown as FitcherApi["sources"];
+    const onOpenChat = vi.fn();
+    wrap(<SetupScreen sources={sources} models={fakeModels()} setup={setup} isAdmin onSignedOut={() => {}} onOpenChat={onOpenChat} />);
+    await screen.findByText("Which data should fitcher read?");
+    await userEvent.type(screen.getByLabelText("Name"), "erp");
+    await userEvent.type(screen.getByLabelText("Host"), "db");
+    await userEvent.type(screen.getByLabelText("Database"), "erp");
+    await userEvent.type(screen.getByLabelText("User"), "reader");
+    await userEvent.type(screen.getByLabelText("Password"), "pw");
+    await userEvent.click(screen.getByRole("button", { name: "Test connection" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Connect" }));
+    expect(((await screen.findByRole("checkbox", { name: "Use orders" })) as HTMLInputElement).checked).toBe(true);
+    await userEvent.click(screen.getByRole("button", { name: "Save selection" }));
+    expect(screen.queryByRole("region", { name: "Build the pack" })).toBeNull();
+    await userEvent.click(await screen.findByRole("button", { name: "Sync now" }));
+
+    await userEvent.click(await screen.findByRole("button", { name: "Build the pack" }));
+    expect(sources.instantStart).toHaveBeenCalledWith({ source_id: "erp", tables: ["orders"], confirm_billable: true });
+    await userEvent.click(await screen.findByRole("button", { name: "Orders per month?" }));
+
+    expect(onOpenChat).toHaveBeenCalled();
+  });
+
   it("does not let a user who is not an admin connect a source", async () => {
     wrap(<SetupScreen sources={fakeSources()} models={fakeModels()} setup={fakeSetup(DATA_PENDING)} isAdmin={false} onSignedOut={() => {}} onOpenChat={() => {}} />);
 

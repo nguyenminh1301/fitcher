@@ -2,14 +2,13 @@
 
 from typing import Literal
 
-from pydantic import Field
-
 from app.contracts.query_spec import ContractModel
 
 
 class InstantEstimateRequest(ContractModel):
     source_id: str
-    tables: list[str] = Field(min_length=1)
+    # An empty list is refused by the pipeline with its reason.
+    tables: list[str]
 
 
 class InstantRequest(InstantEstimateRequest):

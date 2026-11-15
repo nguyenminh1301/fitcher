@@ -260,13 +260,15 @@ function FileForm({ sources, onConnected }: { sources: FitcherApi["sources"]; on
 }
 
 /** Connect a database or upload a file; a connected source then shows its tables to choose from. */
-export function SourceConnect({ sources, onConnected, onChosen, onSynced }: {
+export function SourceConnect({ sources, onConnected, onChosen, onSynced, preselect = false }: {
   sources: FitcherApi["sources"];
   /** A source was saved; the page reloads its list. */
   onConnected?: (source: SourceDetail) => void;
   /** The table selection was saved. */
   onChosen?: (tables: TableView[]) => void;
   onSynced?: () => void;
+  /** The setup: propose every table of a small source (TableChooser). */
+  preselect?: boolean;
 }) {
   const { t } = useI18n();
   const [tab, setTab] = useState<"database" | "file">("database");
@@ -277,7 +279,7 @@ export function SourceConnect({ sources, onConnected, onChosen, onSynced }: {
       <div className="fc-stack" style={{ gap: "var(--base-size-12)" }}>
         <WarningBanner tone="success">{t("sources.connected", { name: connected.id })}</WarningBanner>
         <p className="fc-muted" style={{ margin: 0 }}>{t("sources.chooseHint")}</p>
-        <TableChooser sources={sources} id={connected.id} tables={connected.tables} copyOnly={connected.kind === "sqlserver"}
+        <TableChooser sources={sources} id={connected.id} tables={connected.tables} copyOnly={connected.kind === "sqlserver"} preselect={preselect}
           onSaved={onChosen} onSynced={onSynced} />
       </div>
     );

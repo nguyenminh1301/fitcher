@@ -436,6 +436,25 @@
     "nav_sources": "Nguồn dữ liệu",
     "desc_sources": "Các cơ sở dữ liệu và tệp mà fitcher đọc. Nối một nguồn, chọn bảng và giữ các bản sao luôn mới theo lịch."
   },
+  "instant": {
+    "title": "Dựng gói dữ liệu",
+    "copying": "Đang sao chép các bảng đã chọn trước khi dựng gói…",
+    "syncFailed": "Sao chép các bảng đã chọn thất bại; hãy sửa ở trang Nguồn dữ liệu rồi dựng gói tại đó.",
+    "estimate": "{datasets} bảng và view của bạn trở thành mart. Soạn mô tả, chỉ số và câu hỏi mẫu là một lần gọi mô hình có tính phí, khoảng {tokens} token prompt.",
+    "build": "Dựng gói",
+    "modelMissing": "Cần có mô hình trước khi soạn gói: {reason}",
+    "failed": "{step} thất bại: {error}. Các câu hỏi trước đây vẫn trả lời như cũ.",
+    "ready": "Gói đã sẵn sàng. Các mục được đánh dấu chưa xác nhận cho đến khi có người xác nhận ở trang Duyệt. Hãy hỏi một trong các câu sau:",
+    "openChat": "Mở khung chat",
+    "slow": "Các mart này đọc bảng trực tiếp nên có thể chậm; sao chép bảng sẽ nhanh hơn: {views}",
+    "step_marts": "Tạo mart",
+    "step_profile": "Lập hồ sơ dữ liệu",
+    "step_files": "Ghi các tệp của gói",
+    "step_draft": "Soạn mô tả và chỉ số",
+    "step_approve": "Duyệt bản nháp là chưa xác nhận",
+    "step_compile": "Biên dịch gói",
+    "step_activate": "Đặt làm gói đang dùng"
+  },
   "setup": {
     "firstAdmin": "Bạn trở thành quản trị viên đầu tiên. Các cuộc trò chuyện của bạn vẫn là của bạn.",
     "adminEmail": "E-mail của bạn",
@@ -540,6 +559,13 @@
     "failed": "Chưa lưu được thay đổi: {reason}"
   },
   "sources": {
+    "manyTables": "Nguồn này có {count} bảng. Hãy chọn các bảng cần cho câu hỏi: mỗi bảng thành một mart và làm bản nháp của gói dài hơn.",
+    "driftTitle": "Gói dựng từ nguồn này không còn khớp với nguồn:",
+    "driftAdded": "thêm {columns}",
+    "driftRemoved": "bỏ {columns}",
+    "driftMissing": "không còn trong nguồn",
+    "rebuild": "Dựng lại gói",
+    "rebuildOf": "Dựng lại gói của {name}",
     "add": "Thêm nguồn",
     "list": "Nguồn dữ liệu",
     "empty": "Chưa có nguồn nào. Hãy nối một cơ sở dữ liệu hoặc tải lên một tệp.",
