@@ -147,3 +147,28 @@ def test_changes_wait_while_the_pack_compiles(pack_dir, registry):
     with pytest.raises(ReviewRefused, match="compiling") as raised:
         service(pack_dir, registry).approve("metrics.widget_revenue")
     assert raised.value.status == 409
+
+
+def _mark_unreviewed(pack_dir, file: str, item_id: str) -> None:
+    files = PackFiles(pack_dir)
+    files.find(file, item_id)["reviewed"] = False
+    files._changed.add(file)  # noqa: SLF001 - the test writes the flag the instant pack writes
+    files.save(file)
+
+
+def test_unreviewed_items_are_listed_first_and_carry_the_flag(pack_dir, registry):
+    _mark_unreviewed(pack_dir, "metrics.yaml", "refunded_value")
+
+    items = service(pack_dir, registry).items()
+
+    assert items[0].id == "metrics.refunded_value" and items[0].reviewed is False
+    assert all(item.reviewed is None for item in items[1:])
+
+
+def test_confirming_an_unreviewed_item_marks_it_reviewed(pack_dir, registry):
+    _mark_unreviewed(pack_dir, "metrics.yaml", "refunded_value")
+
+    approved = service(pack_dir, registry).approve("metrics.refunded_value")
+
+    assert approved.reviewed is True and approved.status == "approved"
+    assert PackFiles(pack_dir).find("metrics.yaml", "refunded_value")["reviewed"] is True

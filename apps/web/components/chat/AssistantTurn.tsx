@@ -9,6 +9,7 @@ import { WarningBanner } from "@/components/ui/feedback";
 import type { AskEvent } from "@/lib/api/events";
 import type { Turn } from "@/lib/api/conversations";
 import type { ChartSpec, ChartType, FeedbackInput } from "@/lib/contracts";
+import { useI18n } from "@/lib/i18n/react";
 import { stepFor, type StepId } from "@/lib/steps";
 
 import { ChartCard } from "./ChartCard";
@@ -49,11 +50,14 @@ export function stepsOf(events: AskEvent[], streaming: boolean, failed: boolean,
 }
 
 export function AssistantTurn({ turn, streaming, onStop, onRetry, onFollowUp, onFeedback }: Props) {
+  const { t } = useI18n();
   const events = turn.events;
   const result = only(events, "result")?.result;
   const spec = only(events, "chart_spec")?.spec;
   const summary = only(events, "summary");
-  const sql = only(events, "sql")?.sql;
+  const sqlEvent = only(events, "sql");
+  const sql = sqlEvent?.sql;
+  const unreviewed = sqlEvent?.unreviewed_metrics ?? [];
   const deny = only(events, "deny");
   const blocked = only(events, "blocked");
   const clarify = only(events, "clarify");
@@ -95,6 +99,10 @@ export function AssistantTurn({ turn, streaming, onStop, onRetry, onFollowUp, on
       ) : null}
       {result && result.row_count > 0 && type !== "table" ? <DataTable result={result} /> : null}
       {sql && result && result.row_count > 0 ? <SqlView sql={sql} /> : null}
+      {sql && result && unreviewed.length ? (
+        // Metrics an instant pack approved without a person (DECISIONS §5); confirmed on the Review page.
+        <p className="fc-muted fc-unreviewed" style={{ margin: 0 }}>{t("ui.unreviewedMetrics", { metrics: unreviewed.join(", ") })}</p>
+      ) : null}
       {summary || result ? <FeedbackBar onSubmit={feedback} onCopy={() => summary?.text.replace(/\*\*/g, "") ?? ""} onRetry={onRetry} /> : null}
     </article>
   );

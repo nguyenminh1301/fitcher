@@ -65,7 +65,7 @@ export function ReviewSection() {
                 <ul className="fc-list">
                   {group.map((item) => (
                     <ListRow key={item.id} mono title={item.name} sub={item.body} subLang={langOf(item.body)} onOpen={() => open(item)}
-                      side={<><StatusPill status={item.status} /><span className="fc-hide-sm"><ConfidenceMeter value={item.confidence} /></span></>} />
+                      side={<><StatusPill status={item.reviewed === false ? "unreviewed" : item.status} /><span className="fc-hide-sm"><ConfidenceMeter value={item.confidence} /></span></>} />
                   ))}
                 </ul>
               </section>
@@ -154,12 +154,13 @@ function ItemDetail({ item, loading, reload }: { item?: ReviewItem; loading: boo
             </Button>
           ) : null}
           <Button icon="pencil" onClick={() => setEditing(true)}>{t("ui.edit")}</Button>
-          {item.status !== "approved" ? (
+          {item.status !== "approved" || item.reviewed === false ? (
+            // An item an instant pack approved without a person is confirmed with the same action (DECISIONS §5).
             <Button variant="primary" icon="check" onClick={async () => {
               await api.review.approve(item.id);
               toast(t("ui.approvedName", { name: item.name }));
               await reload();
-            }}>{t("ui.approve")}</Button>
+            }}>{item.reviewed === false ? t("ui.confirm") : t("ui.approve")}</Button>
           ) : null}
           <Button variant="danger" iconOnly icon="trash" label={`${t("ui.del")} ${item.name}`} onClick={async () => {
             await api.review.remove(item.id);

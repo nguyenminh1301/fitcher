@@ -144,7 +144,7 @@ class ReviewService:
             body=str(item.get(body_field) or ""),
             formula=item.get(formula_field) if formula_field else None,
             evidence=self._evidence(refs), evidence_refs=[EvidenceRef(**ref) for ref in refs],
-            test_result=test_result,
+            test_result=test_result, reviewed=item.get("reviewed"),
         )
 
     def items(self, file: str | None = None, status: str | None = None) -> list[ReviewItem]:
@@ -157,6 +157,8 @@ class ReviewService:
             views.extend(self._view(name, _plain(item)) for item in files.items(name))
         if self.proposals is not None and file in (None, "examples.yaml"):
             views.extend(self._proposal_view(proposal) for proposal in self.proposals.proposals(self.pack))
+        # Items an instant pack approved without a person come first, so a reviewer confirms them before the rest.
+        views.sort(key=lambda view: view.reviewed is not False)
         return [view for view in views if status is None or view.status == status]
 
     # proposals
@@ -327,6 +329,8 @@ class ReviewService:
             except ReviewRefused as error:
                 raise ReviewRefused(f"approve after a clean test-run; the test-run failed: {error}") from None
         approved = files.approve(file, item_id)
+        if approved.get("reviewed") is False:
+            approved["reviewed"] = True
         files.save(file)
         return self._view(file, _plain(approved))
 

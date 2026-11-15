@@ -368,6 +368,18 @@
       ],
       "default": null
     },
+    "reviewed": {
+      "anyOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Reviewed"
+    },
     "spec": {
       "anyOf": [
         {

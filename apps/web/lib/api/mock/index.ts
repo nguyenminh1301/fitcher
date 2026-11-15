@@ -76,7 +76,9 @@ export function createMockApi(options: { latencyMs?: number; identity?: () => Pr
         Object.assign(find((await load()).console.review_items, id), patch);
       },
       approve: async (id) => {
-        find((await load()).console.review_items, id).status = "approved";
+        const approved = find((await load()).console.review_items, id);
+        approved.status = "approved";
+        if (approved.reviewed === false) approved.reviewed = true;
       },
       remove: async (id) => {
         const state = (await load()).console;

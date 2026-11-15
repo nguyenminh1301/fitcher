@@ -521,13 +521,22 @@
           "minimum": 1,
           "title": "Attempt",
           "type": "integer"
+        },
+        "unreviewed_metrics": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Unreviewed Metrics",
+          "type": "array"
         }
       },
       "required": [
         "trace_id",
         "event",
         "sql",
-        "attempt"
+        "attempt",
+        "unreviewed_metrics"
       ],
       "title": "SqlEvent",
       "type": "object"

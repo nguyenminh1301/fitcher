@@ -34,6 +34,7 @@ export type TraceId4 = string;
 export type Event4 = "sql";
 export type Sql = string;
 export type Attempt1 = number;
+export type UnreviewedMetrics = string[];
 export type TraceId5 = string;
 export type Event5 = "result";
 /**
@@ -147,6 +148,7 @@ export interface SqlEvent {
   event: Event4;
   sql: Sql;
   attempt: Attempt1;
+  unreviewed_metrics: UnreviewedMetrics;
 }
 export interface ResultEvent {
   trace_id: TraceId5;

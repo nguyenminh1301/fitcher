@@ -543,3 +543,15 @@ def test_a_gateway_rejection_ends_with_the_blocked_reply_and_keeps_the_question(
     assert "failed the safety check" in events[-2]["message"]
     assert [row["role"] for row in client.tables["chat_messages"]] == ["user", "assistant"]
     assert client.tables["chat_messages"][-1]["content"] == events[-2]["message"]
+
+
+def test_the_sql_event_names_the_unreviewed_metrics_the_answer_uses():
+    from types import SimpleNamespace
+
+    events = AnswerEvents("viewer", unreviewed_metrics=frozenset({"refunded_value"}))
+    state = {"trace_id": "t1", "attempts": [], "spec": SimpleNamespace(metric_ids=["widget_revenue", "refunded_value"])}
+
+    [_, sql] = events.node("guard", "end", state, {"attempts": [SimpleNamespace(sql="SELECT 1")]})
+
+    assert sql.event == "sql" and sql.unreviewed_metrics == ["refunded_value"]
+    assert AnswerEvents("viewer").node("guard", "end", state, {"attempts": [SimpleNamespace(sql="SELECT 1")]})[1].unreviewed_metrics == []

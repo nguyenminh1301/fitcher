@@ -28,6 +28,7 @@ export type Format = ("currency" | "count" | "ratio" | "percent" | "days" | "num
 export type Rows = (string | number | boolean | null)[][];
 export type RowCount = number;
 export type Truncated = boolean;
+export type Reviewed = boolean | null;
 /**
  * @minItems 1
  */
@@ -57,6 +58,7 @@ export interface ReviewItem {
   evidence?: ReviewEvidence | null;
   evidence_refs?: EvidenceRefs;
   test_result?: Result | null;
+  reviewed?: Reviewed;
   spec?: ReviewedSpec | null;
   spec_reviewed?: SpecReviewed;
 }
