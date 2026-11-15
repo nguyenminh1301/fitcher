@@ -34,7 +34,8 @@ from app.contracts.screening import ClassifierStatus  # noqa: E402
 from app.contracts.setup import SetupModeChange, SetupStatus  # noqa: E402
 from app.contracts.instant import InstantEstimate, InstantEstimateRequest, InstantJobReply, InstantRequest  # noqa: E402
 from app.contracts.sources import (  # noqa: E402
-    FileLoad, FileUploadView, ProbeResult, SourceCreate, SourceDetail, SourcePatch, SourceView, SyncView, TablesChange,
+    FileLoad, FileUploadView, ProbeResult, SourceCreate, SourceDetail, SourceDrift, SourcePatch, SourceView, SyncView,
+    TablesChange,
     SourceConnection,
 )
 from app.contracts.users import NewUser, PasswordReset, UserChange, UserView  # noqa: E402
@@ -89,6 +90,7 @@ CONTRACTS = {
     "instant_estimate": (InstantEstimate, "serialization"),
     "instant_job_reply": (InstantJobReply, "serialization"),
     "source_detail": (SourceDetail, "serialization"),
+    "source_drift": (SourceDrift, "serialization"),
     "probe_result": (ProbeResult, "serialization"),
     "tables_change": (TablesChange, "validation"),
     "sync_view": (SyncView, "serialization"),

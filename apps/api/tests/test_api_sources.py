@@ -394,3 +394,23 @@ def test_a_failed_sql_server_test_answers_with_one_fixed_reason(client, parts):
     response = client.post("/sources/test", headers=ADMIN, json=MSSQL)
 
     assert response.status_code == 422 and response.json() == {"detail": {"reason": "tls"}}
+
+
+def test_drift_compares_the_catalog_with_the_columns_the_instant_pack_was_built_from(client, parts, tmp_path, monkeypatch):
+    from app.onboarding.drift import write_snapshot
+    from app.sources.inspect import CatalogColumn
+
+    store = parts[1]
+    connect(client)
+    monkeypatch.setenv("PACKS_DIR", str(tmp_path / "packs"))
+    assert client.get("/sources/shop/drift", headers=ADMIN).json() == {"pack": None, "changes": []}
+    built = next(table for table in store.tables("shop") if table.name == "orders")
+    (tmp_path / "packs" / "shop").mkdir(parents=True)
+    write_snapshot(tmp_path / "packs" / "shop", "shop", [type(built)(**{**built.__dict__, "columns": (
+        CatalogColumn("id", "integer", False, 1), CatalogColumn("gone", "text", True, 2))})])
+
+    body = client.get("/sources/shop/drift?refresh=true", headers=ADMIN).json()
+
+    assert body["pack"] == "shop"
+    assert body["changes"] == [{"table": built.name, "added": ["created_at"], "removed": ["gone"], "retyped": [], "missing": False}]
+    assert client.get("/sources/shop/drift", headers=VIEWER).status_code == 403

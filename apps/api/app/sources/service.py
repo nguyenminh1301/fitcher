@@ -317,6 +317,13 @@ class SourceService:
             self._cancelled.discard(record.id)
             self._store.set_query_id(record.id, None)
         self._store.finish_sync(record.id, status, results=results, error=error, finished_at=self._clock())
+        if status == "succeeded" and stored.kind != "file":
+            # The catalog is read again after each sync, so the Sources page shows the columns an instant pack's
+            # tables gained, lost or retyped since it was built (app/onboarding/drift.py).
+            try:
+                self.refresh(stored.id)
+            except Exception:  # noqa: BLE001 - the sync itself succeeded; the next one reads the catalog again
+                pass
         return self._store.sync(record.id)
 
     def _copy(self, client, stored: StoredSource, table: StoredTable, record_id: int) -> dict:

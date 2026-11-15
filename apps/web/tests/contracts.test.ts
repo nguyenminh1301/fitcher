@@ -26,7 +26,8 @@ describe("generated contract types", () => {
       "query_spec.schema.json", "result.schema.json", "review_item.schema.json", "review_item_patch.schema.json",
       "run_row.schema.json", "run_trace.schema.json", "setup_mode_change.schema.json", "setup_status.schema.json",
       "source_connection.schema.json", "source_create.schema.json", "source_detail.schema.json",
-      "source_patch.schema.json", "source_view.schema.json", "sync_view.schema.json", "tables_change.schema.json",
+      "source_drift.schema.json", "source_patch.schema.json", "source_view.schema.json", "sync_view.schema.json",
+      "tables_change.schema.json",
       "tier_change.schema.json", "tier_view.schema.json", "user_change.schema.json", "user_view.schema.json",
     ]);
   });

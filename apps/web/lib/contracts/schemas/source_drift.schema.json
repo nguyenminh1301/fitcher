@@ -1,0 +1,98 @@
+{
+  "$defs": {
+    "ColumnRetype": {
+      "additionalProperties": false,
+      "properties": {
+        "column": {
+          "title": "Column",
+          "type": "string"
+        },
+        "before": {
+          "title": "Before",
+          "type": "string"
+        },
+        "after": {
+          "title": "After",
+          "type": "string"
+        }
+      },
+      "required": [
+        "column",
+        "before",
+        "after"
+      ],
+      "title": "ColumnRetype",
+      "type": "object"
+    },
+    "TableDrift": {
+      "additionalProperties": false,
+      "properties": {
+        "table": {
+          "title": "Table",
+          "type": "string"
+        },
+        "added": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Added",
+          "type": "array"
+        },
+        "removed": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Removed",
+          "type": "array"
+        },
+        "retyped": {
+          "items": {
+            "$ref": "#/$defs/ColumnRetype"
+          },
+          "title": "Retyped",
+          "type": "array"
+        },
+        "missing": {
+          "title": "Missing",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "table",
+        "added",
+        "removed",
+        "retyped",
+        "missing"
+      ],
+      "title": "TableDrift",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "pack": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Pack"
+    },
+    "changes": {
+      "items": {
+        "$ref": "#/$defs/TableDrift"
+      },
+      "title": "Changes",
+      "type": "array"
+    }
+  },
+  "required": [
+    "pack",
+    "changes"
+  ],
+  "title": "SourceDrift",
+  "type": "object"
+}

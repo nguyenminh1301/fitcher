@@ -160,3 +160,25 @@ class FileLoad(ContractModel):
     # The source (and its table) is named after the file unless a name is given.
     name: str | None = Field(default=None, max_length=40)
     columns: list[FileColumn]
+
+
+class ColumnRetype(ContractModel):
+    column: str
+    before: str
+    after: str
+
+
+class TableDrift(ContractModel):
+    table: str
+    added: list[str]
+    removed: list[str]
+    retyped: list[ColumnRetype]
+    # The source no longer lists the table.
+    missing: bool
+
+
+class SourceDrift(ContractModel):
+    # The instant pack built from this source, or None when it has none.
+    pack: str | None
+    # The tables whose columns changed since the pack was built.
+    changes: list[TableDrift]
