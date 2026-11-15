@@ -137,6 +137,7 @@ Execution match of the generated packs by category:
 
 - **Iowa passes**: 49% against the 46% of the baseline.
 - **Ecommerce does not**: 47% against 53%, three cases fewer. Each of the three differs in a way a person fixes on the Review page rather than in the generator: `top_brands_by_units_2025` sums the drafted units metric, which excludes cancelled orders, and its totals do not match the reference; `monthly_email_sessions_2025` answers with the drafted average-pages metric instead of a session count; `best_region_last_year_without_measure` failed when the `fast` model returned JSON that did not match the extraction schema. The other failures have the baseline's causes: no convention for "sales" or "best-selling" in a neutral business profile, several overlapping drafted metrics, and base marts that compete with their wide view.
+- One more round was tried on 2026-11-15: a `count()` metric added to every generated dataset, so that counting questions always find a metric. The rebuilt e-commerce pack matched 18/45 (40%), lower than without it, so the change was not kept; the drafted metrics and the run-to-run variance of the models weigh more than a missing count.
 - The gap to the hand-written packs stays at 40 points for Iowa and 46 points for ecommerce. The instant pack is a starting point that the Review and Feedback pages improve, as the plan's default for answer quality says.
 
 ## A fresh instance without a terminal
