@@ -188,6 +188,7 @@
 
 ### Changed
 
+- Ship the pack schemas in the release image (`/app/packs/_schema`); `init-data` copies them next to the packs of `/data` on every start, so a pack generated in the instance is validated with the schemas of the running image.
 - Keep the active pack in the app state (`pack.active`, `app/packs/active.py`) so an instance without `ACTIVE_PACK`, such as the release image, answers from the pack an instant pack made active; `ACTIVE_PACK` still wins when it is set, and `runtime.reload_pack()` drops the agent, compiled pack, documents and eval reports built for the previous pack.
 - Let a pack leave out `eval.yaml`, which then has no cases (a generated pack has no eval set and shows no eval result), and add the optional `reviewed` flag to every reviewable pack item: an instant pack writes `reviewed: false` on the items it approves without a person.
 - Move the source engine definitions and the copy and attach code of the source manifests into `apps/api/app/sources/attach.py`, which the jobs (`jobs.sync_sources`, `jobs.load_data`, `jobs/lib/source_engines.py`) now import: the SQL of every manifest in copy and live mode is unchanged, and the api can reach a source's tables with the same code. Add the incremental copy it needs (a staging table, a read of the rows above the last cursor value and one local append) and the removal of a source's live database and copies.

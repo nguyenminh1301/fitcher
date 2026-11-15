@@ -12,6 +12,8 @@ build
 dbt
 docs
 packs
+# The pack schemas validate the packs of the data volume.
+!packs/_schema
 infra/dev
 infra/sources
 **/node_modules

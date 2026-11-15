@@ -263,10 +263,16 @@ def write_environment(secrets_dir: Path, passwords: Mapping[str, str], endpoint:
 
 def initialize(data_dir: Path, run_dir: Path, env: Mapping[str, str], templates: Iterable[Path],
                cgroup: Path = Path("/sys/fs/cgroup"), meminfo: Path = Path("/proc/meminfo"),
-               stock_config: Path | None = None) -> None:
+               stock_config: Path | None = None, pack_schemas: Path | None = None) -> None:
     data_dir, run_dir = Path(data_dir), Path(run_dir)
     for name in DATA_DIRS:
         (data_dir / name).mkdir(parents=True, exist_ok=True)
+    if pack_schemas is not None:
+        # The packs of the data volume are validated with the schemas of the running image (DECISIONS §5).
+        schemas = data_dir / "packs" / "_schema"
+        if schemas.exists():
+            shutil.rmtree(schemas)
+        shutil.copytree(pack_schemas, schemas)
     os.chmod(data_dir / "secrets", 0o700)
     instance_key = load_key(data_dir, dict(env))
     secrets_dir = data_dir / "secrets"
@@ -295,6 +301,7 @@ def main() -> int:
             os.environ,
             templates,
             stock_config=Path(os.environ.get("CLICKHOUSE_STOCK_CONFIG") or "/etc/clickhouse-server"),
+            pack_schemas=root / "packs" / "_schema",
         )
     except (InitError, OSError, RuntimeError) as error:
         print(f"init-data: {error}", file=sys.stderr)
