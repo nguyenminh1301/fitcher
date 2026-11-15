@@ -17,6 +17,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 import secrets
 import shutil
+import tempfile
 import threading
 from pathlib import Path
 
@@ -118,12 +119,9 @@ class InstantPipeline:
         profile = {"tables": {view.name: {"rows": 0, "columns": {name: {"type": "string", "distinct": 0}
                                                                  for name in view.columns}} for view in views},
                    "join_candidates": []}
-        empty = self._packs_dir / f"{source_id}{BUILDING_SUFFIX}-estimate"
-        try:
-            empty.mkdir(parents=True, exist_ok=True)
-            characters = sum(self._drafter().estimate(PackFiles(empty, schema_dir=self._schema_dir), profile, []).values())
-        finally:
-            shutil.rmtree(empty, ignore_errors=True)
+        with tempfile.TemporaryDirectory() as empty:
+            files = PackFiles(Path(empty), schema_dir=self._schema_dir)
+            characters = sum(self._drafter().estimate(files, profile, []).values())
         return {"prompt_tokens": characters // CHARS_PER_TOKEN, "datasets": len(views), "model_missing": self._model_missing()}
 
     def new_job(self, source_id: str, tables: Sequence[str], started_by: str) -> InstantJob:
