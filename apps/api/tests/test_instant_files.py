@@ -17,7 +17,7 @@ SALES = MartTable(name="sales", relation="`raw`.`shop__sales`", live=False, prim
                            SourceColumn("paid", "Bool")),
                   foreign_keys=(ForeignKey(("widget_id",), "widgets", ("widget_id",)),), text_kinds={"sold_on": "date"})
 REFUNDS = MartTable(name="refunds", relation="`raw`.`shop__refunds`", live=False,
-                    columns=(SourceColumn("refund_amount", "Float64"),))
+                    columns=(SourceColumn("refunded_sum", "Float64"),))
 
 
 def _column(kind: str, distinct: int) -> dict:
@@ -35,7 +35,7 @@ PROFILE = {
             "sale_id": _column("number", 9), "sold_on": _column("date", 4), "widget_id": _column("number", 3),
             "sale_amount": _column("number", 9), "paid": _column("boolean", 2),
             "widgets_widget_name": _column("string", 3), "widgets_launched_on": _column("date", 2)}},
-        "shop__refunds": {"rows": 2, "columns": {"refund_amount": _column("number", 2)}},
+        "shop__refunds": {"rows": 2, "columns": {"refunded_sum": _column("number", 2)}},
     },
     "join_candidates": [],
 }
