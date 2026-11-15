@@ -88,3 +88,58 @@ The run status of each failed case, read from `agent_logs.runs`:
 - The text typing is needed for both sources.
 - The largest remaining losses come from the business profile without conventions and from base marts that compete with their wide view. The generator therefore lists the wide view first and says in each base mart's description that the wide view holds its joined columns; conventions stay a Review task, as the plan's default for answer quality says.
 - The generator passes when each generated pack reaches at least the baseline: **46% for Iowa and 53% for ecommerce**.
+
+## The generator on the two development sources
+
+Measured on 2026-11-15 with the same model tiers as the baseline, reference date 2026-01-15, on the code of this phase.
+
+### How the packs were built
+
+Both sources were connected as PostgreSQL sources of the `sources` profile and built through the instant pack job (`POST /pack/instant`), with no file written by hand and every generated item approved as unreviewed:
+
+- `iowa_src`: database `iowa_liquor` of the fixture (one text table, copied: 2,490,620 rows). Estimate 3,080 prompt tokens; one dataset; 1 min 20 s from the copy to the active pack.
+- `ecom_src`: database `ecommerce_twin`, which `infra/sources/ecommerce_twin/seed.sh` fills from the lab tables with typed columns, primary keys and the ten foreign keys of the baseline, all seven tables copied. Estimate 13,727 prompt tokens; twelve marts (five wide), eleven datasets (`order_items` alone has no time column), seven approved join paths; 2 min 10 s.
+
+The first run of `ecom_src` stopped at the profile step: scanning the wide views' joins exceeded the 2 GB query memory limit. The generator now profiles each wide view from the tables it joins instead, and the job is otherwise unchanged.
+
+```bash
+docker compose run --rm -v ./build/eval:/app/build/eval api python -m jobs.eval --pack iowa_src --cases-from iowa_liquor --output-dir build/eval
+docker compose run --rm -v ./build/eval:/app/build/eval api python -m jobs.eval --pack ecom_src --cases-from ecommerce_twin --output-dir build/eval
+docker compose run --rm -v ./build/eval:/app/build/eval api python -m jobs.eval --pack ecommerce_twin --baseline packs/ecommerce_twin/eval_baseline.json --output-dir build/eval
+```
+
+### Result
+
+| Layer | Iowa, hand-written | Iowa, baseline | Iowa, generated | Ecommerce, hand-written | Ecommerce, baseline | Ecommerce, generated |
+| --- | --- | --- | --- | --- | --- | --- |
+| Intent | 33/35 | 35/35 | 35/35 | 45/45 | 45/45 | 45/45 |
+| Extraction | 22/24 | 16/24 | 16/24 | 26/28 | 21/28 | 18/28 |
+| **Execution match** | **31/35 (89%)** | **16/35 (46%)** | **17/35 (49%)** | **42/45 (93%)** | **24/45 (53%)** | **21/45 (47%)** |
+
+The hand-written columns are the runs of 2026-11-14; `ecommerce_twin` measured again on 2026-11-15 also matches 42/45 (93%) with no regression against its baseline.
+
+Execution match of the generated packs by category:
+
+| Category | Iowa | Ecommerce |
+| --- | --- | --- |
+| two_period_compare | 2/4 | 1/5 |
+| top_n | 0/5 | 2/6 |
+| string_filter | 2/5 | 1/6 |
+| monthly_trend | 2/4 | 2/5 |
+| follow_up | 1/3 | 0/3 |
+| definition | 4/4 | 8/8 |
+| ambiguous | 3/3 | 2/3 |
+| out_of_scope | 2/2 | 3/3 |
+| chart_edit | 1/2 | 2/3 |
+| unauthorized | 0/3 | 0/3 |
+
+### Against the bar
+
+- **Iowa passes**: 49% against the 46% of the baseline.
+- **Ecommerce does not**: 47% against 53%, three cases fewer. Each of the three differs in a way a person fixes on the Review page rather than in the generator: `top_brands_by_units_2025` sums the drafted units metric, which excludes cancelled orders, and its totals do not match the reference; `monthly_email_sessions_2025` answers with the drafted average-pages metric instead of a session count; `best_region_last_year_without_measure` failed when the `fast` model returned JSON that did not match the extraction schema. The other failures have the baseline's causes: no convention for "sales" or "best-selling" in a neutral business profile, several overlapping drafted metrics, and base marts that compete with their wide view.
+- The gap to the hand-written packs stays at 40 points for Iowa and 46 points for ecommerce. The instant pack is a starting point that the Review and Feedback pages improve, as the plan's default for answer quality says.
+
+## A fresh instance without a terminal
+
+On 2026-11-15 the release image built from this phase was started with a new volume on the development network, and the whole path ran in a browser: choose individual mode, connect the fixture's PostgreSQL database from the Data step, keep the proposed table, save, sync, read the estimate (3,076 prompt tokens, labelled as a paid model call), confirm, watch the seven steps succeed and pick a suggested question.
+Two exceptions to "without a terminal": the model provider came from `OPENAI_API_KEY` passed to the container rather than typed on the Models step, and the run found three defects that are fixed in this phase or beside it: `/me` answered 503 before any pack was active, which sent the owner to the sign-in page; picking a suggested question left the setup on its last step; and the release image refused the browser's time zone `Asia/Saigon`, which Debian trixie moved into `tzdata-legacy`, so the first answer in the browser was a lost connection. With that fixed, the same question in the browser answered with a line chart and the table of 2025's twelve months (USD 31.1 million in January to 41.7 million in December), its SQL, and the note that it uses a metric no person has reviewed yet.

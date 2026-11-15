@@ -99,3 +99,16 @@ def test_suggestions_are_the_first_approved_example_questions_of_the_active_pack
     assert response.status_code == 200
     assert response.json() == [{"text": example.question, "lang": example.language} for example in examples]
     assert client.get("/pack/suggestions").status_code == 401
+
+
+def test_a_new_instance_without_any_pack_still_knows_who_is_signed_in(client, monkeypatch):
+    del app.dependency_overrides[runtime.get_compiled]
+    del app.dependency_overrides[runtime.get_compiled_or_none]
+    runtime.get_compiled.cache_clear()
+    monkeypatch.setattr(runtime, "current_pack", lambda: "")
+
+    response = client.get("/me", headers=SessionHeaders(["admin"], user_id="owner"))
+
+    assert response.status_code == 200
+    assert response.json()["active_role"] is None and response.json()["roles"] == ["admin"]
+    runtime.get_compiled.cache_clear()

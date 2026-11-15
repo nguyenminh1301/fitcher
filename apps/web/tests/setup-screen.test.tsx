@@ -281,7 +281,8 @@ describe("setup data step", () => {
     expect(sources.instantStart).toHaveBeenCalledWith({ source_id: "erp", tables: ["orders"], confirm_billable: true });
     await userEvent.click(await screen.findByRole("button", { name: "Orders per month?" }));
 
-    expect(onOpenChat).toHaveBeenCalled();
+    await waitFor(() => expect(onOpenChat).toHaveBeenCalled());
+    expect(setup.complete).toHaveBeenCalled();
   });
 
   it("does not let a user who is not an admin connect a source", async () => {

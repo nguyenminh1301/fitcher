@@ -13,7 +13,8 @@ from fastapi import APIRouter, Cookie, Depends, Header, HTTPException, status
 from pydantic import BaseModel
 
 from app.api.runtime import (
-    PackIdentity, get_compiled, get_compiled_or_none, get_pack_identity, get_state_db, pack_identity,
+    PackIdentity, get_compiled, get_compiled_or_none, get_pack_identity, get_pack_identity_or_none, get_state_db,
+    pack_identity,
 )
 from app.auth import account_sessions, origin
 from app.auth.principal import SESSION_COOKIE, Principal, owner
@@ -82,12 +83,13 @@ class PackInfo(BaseModel):
 @router.get("/me")
 def me(
     principal: Annotated[Principal, Depends(current_principal)],
-    identity: Annotated[PackIdentity, Depends(get_pack_identity)],
+    identity: Annotated[PackIdentity | None, Depends(get_pack_identity_or_none)],
     db: Annotated[StateDb, Depends(get_state_db)],
     x_active_role: Annotated[str | None, Header()] = None,
 ) -> Me:
-    """The user a request acts as; ``active_role`` is null for a user who holds console roles only."""
-    roles = identity.roles
+    """The user a request acts as; ``active_role`` is null for a user who holds console roles only, as on a new
+    instance where no pack is active yet."""
+    roles = identity.roles if identity is not None else []
     try:
         role = active_role(principal.roles, roles, x_active_role)
     except RoleError as error:

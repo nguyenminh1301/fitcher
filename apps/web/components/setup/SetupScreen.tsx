@@ -81,8 +81,10 @@ function ModelsStep({ models, disabled, onDone, onSkip }: {
   );
 }
 
-function DataStep({ sources, disabled, onDone, onSkip, onOpenChat }: {
-  sources: FitcherApi["sources"]; disabled: boolean; onDone: () => void; onSkip: () => void; onOpenChat: () => void;
+function DataStep({ sources, disabled, onDone, onSkip, onAsk }: {
+  sources: FitcherApi["sources"]; disabled: boolean; onDone: () => void; onSkip: () => void;
+  /** The pack is ready: finish the setup and open the chat. */
+  onAsk: () => void;
 }) {
   const { t } = useI18n();
   const [connected, setConnected] = useState<string | null>(null);
@@ -107,7 +109,7 @@ function DataStep({ sources, disabled, onDone, onSkip, onOpenChat }: {
       </section>
       {/* The instant pack (DECISIONS §11 step 0): once the chosen tables are copied, the first question is minutes away. */}
       {connected && synced && chosen.length && !disabled ? (
-        <InstantPack sources={sources} sourceId={connected} tables={chosen} onAsk={() => { onDone(); onOpenChat(); }} />
+        <InstantPack sources={sources} sourceId={connected} tables={chosen} onAsk={onAsk} />
       ) : null}
     </>
   );
@@ -196,7 +198,8 @@ export function SetupScreen({ setup, models, sources, isAdmin, onSignedOut, onOp
                   onDone={() => { setModelsOpen(false); void run(() => setup.status()); }}
                   onSkip={() => { setModelsOpen(false); void run(() => setup.skip("models")); }} />
               ) : current?.id === "data" ? (
-                <DataStep sources={sources} disabled={!isAdmin || busy} onOpenChat={onOpenChat}
+                <DataStep sources={sources} disabled={!isAdmin || busy}
+                  onAsk={() => { setDataOpen(false); void run(() => setup.complete()).then(onOpenChat); }}
                   onDone={() => { setDataOpen(false); void run(() => setup.status()); }}
                   onSkip={() => { setDataOpen(false); void run(() => setup.skip("data")); }} />
               ) : current?.id === "mode" ? (

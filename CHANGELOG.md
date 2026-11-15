@@ -4,6 +4,8 @@
 
 ### Added
 
+- Record the generated packs against the baseline in `docs/eval/instant-pack-report.md`: built by the instant pack job, Iowa matches 17 of 35 cases (49%, above the 46% baseline) and e-commerce 21 of 45 (47%, three cases below the 53% baseline, with the three causes), the hand-written `ecommerce_twin` keeps 42 of 45 (93%), and a fresh release image went from connecting a source to an answered question with a chart in the browser.
+- Add an e-commerce fixture to the `sources` PostgreSQL (`infra/sources/ecommerce_twin/seed.sh`): the seven lab tables with typed columns, primary keys and the ten foreign keys the data implies, streamed from the ClickHouse copy into database `ecommerce_twin` and readable by the Iowa fixture's read-only role, so an instant pack can be measured on a source that declares its joins.
 - Propose tables in the setup's Data step: every table of a source with at most 20 is chosen in advance, none of a larger one, and a source with more than 50 tables shows a warning that every chosen table becomes a mart and lengthens the draft.
 - Show schema drift on the Sources page: a source whose instant pack no longer matches it lists, per table, the columns added, removed and retyped or that the table left the source, with a Rebuild the pack action that builds the pack again from the selected tables after the same estimate and confirmation as the setup.
 - Build the instant pack from the setup: after the Data step's tables are chosen and copied, a Build the pack card shows how many marts the tables become and the paid draft's size, starts the job only when the admin confirms it (or says which model is missing), lists each step as it runs, names the step that failed and says earlier answers still work, warns about wide views over live tables, and ends on the pack's suggested questions and the chat.
@@ -250,6 +252,9 @@
 
 ### Fixed
 
+- Finish the setup when one of the instant pack's questions is chosen, so the chat opens instead of the setup's last step, and label the instant pack's waiting steps "Waiting" instead of showing the untranslated key.
+- Answer `/me` on a new instance where no pack is active yet, with no pack role, instead of 503: the web app sent the owner of a fresh release image to the sign-in page, so the setup that builds the first pack could not start.
+- Profile an instant pack's wide views from the tables they join instead of scanning the join: on the seven e-commerce tables the scan exceeded the 2 GB query memory limit, while the joined columns' facts are already known from the referenced tables.
 - Accept the old time zone names that browsers still send, such as `Asia/Saigon`, in the release image: Debian trixie moved them into `tzdata-legacy`, so every question from a browser set to such a zone was refused with 422 and the chat showed a lost connection.
 - Update `opentelemetry-sdk` to 1.45.2, which brings `opentelemetry-api` 1.45.2 with the fix for CVE-2026-126360.
 - A successful sign-in releases only its own count in the sign-in throttle: it no longer clears the e-mail's other counted attempts, so password checks running in parallel for the same e-mail keep counting toward the limit of five.

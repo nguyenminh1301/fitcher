@@ -141,6 +141,15 @@ def get_pack_identity(compiled: Annotated[CompiledPack | None, Depends(get_compi
     return pack_identity(compiled)
 
 
+def get_pack_identity_or_none(
+    compiled: Annotated[CompiledPack | None, Depends(get_compiled_or_none)],
+) -> PackIdentity | None:
+    """The active pack, or None on an instance where no pack is active yet: its setup still needs the signed-in user."""
+    if compiled is None and not current_pack():
+        return None
+    return pack_identity(compiled)
+
+
 _screener: Screener | None = None
 _screener_lock = threading.Lock()
 

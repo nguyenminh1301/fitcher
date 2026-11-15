@@ -74,6 +74,8 @@ class MartView:
     joins: tuple[tuple[str, str], ...] = ()
     # Output names of the primary and foreign key columns, the joined tables' included.
     keys: tuple[str, ...] = ()
+    # A wide view's (output column, mart view, column there): where each of its columns comes from.
+    origins: tuple[tuple[str, str, str], ...] = ()
 
     def statement(self) -> str:
         return (f"CREATE OR REPLACE VIEW {quote(MARTS_DATABASE)}.{quote(self.name)} "
@@ -154,6 +156,7 @@ def _wide_view(source: str, table: MartTable, joins: list[tuple[ForeignKey, Mart
     items = _select(table, "f")
     names = {name for name, _ in items}
     keys = _keys(table)
+    origins = [(name, mart_name(source, table.name), name) for name, _ in items]
     clauses, used = [], set()
     for number, (key, dimension) in enumerate(joins, start=1):
         alias = f"d{number}"
@@ -166,6 +169,7 @@ def _wide_view(source: str, table: MartTable, joins: list[tuple[ForeignKey, Mart
             if output not in names:
                 names.add(output)
                 items.append((output, expression))
+                origins.append((output, mart_name(source, dimension.name), name))
                 if column.name in _key_columns(dimension):
                     keys.append(output)
         clauses.append(f"LEFT JOIN {dimension.relation} AS {alias} "
@@ -176,6 +180,7 @@ def _wide_view(source: str, table: MartTable, joins: list[tuple[ForeignKey, Mart
         name=wide_name(source, table.name), table=table.name, sql=sql, columns=tuple(name for name, _ in items),
         wide=True, slow=table.live or any(dimension.live for _, dimension in joins),
         joins=tuple((key.columns[0], dimension.name) for key, dimension in joins), keys=tuple(keys),
+        origins=tuple(origins),
     )
 
 

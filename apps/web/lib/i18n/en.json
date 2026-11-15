@@ -176,6 +176,7 @@
     "cancel": "Cancel",
     "testRun": "Test run",
     "running": "Running…",
+    "pending": "Waiting",
     "evidence": "Evidence",
     "confidence": "Confidence",
     "deletedSource": "Evidence cites a deleted document",

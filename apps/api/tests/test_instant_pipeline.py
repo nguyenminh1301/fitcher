@@ -208,3 +208,31 @@ def test_a_built_pack_keeps_the_columns_its_tables_had_so_drift_can_be_shown(pac
 
     snapshot = read_snapshot(packs_dir / "shop")
     assert snapshot["source"] == "shop" and snapshot["tables"]["widgets"] == [["widget_id", "text"], ["widget_name", "text"]]
+
+
+def test_wide_views_are_profiled_from_their_tables_without_scanning_a_join():
+    from app.onboarding.instant import wide_profiles
+    from app.onboarding.marts import MartTable, SourceColumn, plan_marts
+
+    widgets = MartTable(name="widgets", relation="`raw`.`shop__widgets`", live=False, primary_key=("widget_id",),
+                        columns=(SourceColumn("widget_id", "Int64"), SourceColumn("widget_name", "String")))
+    sales = MartTable(name="sales", relation="`raw`.`shop__sales`", live=False,
+                      columns=(SourceColumn("sale_id", "Int64"), SourceColumn("widget_id", "Int64")),
+                      foreign_keys=(ForeignKey(("widget_id",), "widgets", ("widget_id",)),))
+    views = plan_marts("shop", [widgets, sales])
+    profile = {"tables": {
+        "shop__widgets": {"rows": 3, "columns": {"widget_id": {"type": "number", "distinct": 3},
+                                                 "widget_name": {"type": "string", "distinct": 3, "top_values": [["A", 1]]}},
+                          "sample_rows": []},
+        "shop__sales": {"rows": 9, "columns": {"sale_id": {"type": "number", "distinct": 9}, "widget_id": {"type": "number", "distinct": 3}},
+                        "sample_rows": [[1, 2]]},
+    }, "join_candidates": []}
+
+    profiled = wide_profiles(views, profile)
+
+    wide = profiled["tables"]["shop__sales__wide"]
+    assert wide["rows"] == 9
+    assert wide["columns"] == {"sale_id": {"type": "number", "distinct": 9}, "widget_id": {"type": "number", "distinct": 3},
+                               "widgets_widget_name": {"type": "string", "distinct": 3, "top_values": [["A", 1]]}}
+    assert wide["sample_rows"] == []
+    assert set(profiled["tables"]) == {"shop__widgets", "shop__sales", "shop__sales__wide"}

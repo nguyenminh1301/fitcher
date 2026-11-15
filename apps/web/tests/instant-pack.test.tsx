@@ -52,6 +52,7 @@ describe("instant pack", () => {
     await userEvent.click(await screen.findByRole("button", { name: "Total sales?" }));
     expect(onAsk).toHaveBeenCalledWith("Total sales?");
     expect(screen.getAllByRole("listitem").length).toBeGreaterThanOrEqual(STEPS.length);
+    expect(screen.queryByText(/^ui\./)).toBeNull();
   });
 
   it("says which model is missing instead of offering the paid call", async () => {
@@ -71,6 +72,7 @@ describe("instant pack", () => {
 
     expect(await screen.findByText(/the provider refused the request/)).toBeTruthy();
     expect(screen.getByText(/Draft the descriptions and metrics failed/)).toBeTruthy();
+    expect(screen.getAllByText("Waiting").length).toBe(3);
   });
 
   it("waits for the copy of the chosen tables before estimating", async () => {
