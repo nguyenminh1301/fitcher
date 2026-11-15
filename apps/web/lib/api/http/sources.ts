@@ -65,6 +65,10 @@ export function createHttpSources(fetcher: Fetcher = (...args) => fetch(...args)
       return json("/api/sources/files", { method: "POST", body: form });
     },
     loadFile: (id, body) => json(`/api/sources/files/${encodeURIComponent(id)}/load`, send("POST", body)),
+    drift: (id, refresh = false) => json(`${source(id)}/drift${refresh ? "?refresh=true" : ""}`, { cache: "no-store" }),
+    instantEstimate: (body) => json("/api/pack/instant/estimate", send("POST", body)),
+    instantStart: (body) => json("/api/pack/instant", send("POST", body)),
+    instantJob: (id) => json(`/api/pack/instant/${encodeURIComponent(id)}`, { cache: "no-store" }),
   };
 }
 

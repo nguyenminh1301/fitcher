@@ -66,6 +66,10 @@ function fakeSources(initial: SourceView[] = [SHOP]) {
     sync: vi.fn(async () => ({ ...SYNC, id: 2, status: "running" as const, finished_at: null, results: [] })),
     cancel: vi.fn(async () => SYNC),
     syncs: vi.fn(async () => [SYNC]),
+    drift: vi.fn(async () => ({ pack: null, changes: [] })),
+    instantEstimate: vi.fn(async () => ({ prompt_tokens: 3000, datasets: 2, model_missing: null })),
+    instantStart: vi.fn(async () => { throw new Error("not started in this test"); }),
+    instantJob: vi.fn(async () => { throw new Error("no job in this test"); }),
     upload: vi.fn(async () => ({
       id: "up1", file_name: "orders.csv", format: "csv" as const, size_bytes: 40,
       columns: [{ name: "id", type: "Nullable(Int64)" }, { name: "amount", type: "Nullable(Float64)" }], sample: [["1", "2.5"]],

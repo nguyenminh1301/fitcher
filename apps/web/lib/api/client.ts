@@ -14,6 +14,10 @@ import type {
   EvalRunStarted,
   FeedbackRow,
   FileLoad,
+  InstantEstimate,
+  InstantEstimateRequest,
+  InstantJobReply,
+  InstantRequest,
   FileUploadView,
   ProbeResult,
   ProposalResult,
@@ -40,6 +44,7 @@ import type {
   SourceConnection,
   SourceCreate,
   SourceDetail,
+  SourceDrift,
   SourcePatch,
   SourceView,
   SyncView,
@@ -160,6 +165,13 @@ export interface FitcherApi {
     syncs(id: string): Promise<SyncView[]>;
     upload(file: File): Promise<FileUploadView>;
     loadFile(id: string, body: FileLoad): Promise<SourceDetail>;
+    /** Columns added, removed or retyped since the source's instant pack was built; refresh reads the catalog again. */
+    drift(id: string, refresh?: boolean): Promise<SourceDrift>;
+    /** The draft's prompt size and whether a model can draft, before anything runs (DECISIONS §11 step 0). */
+    instantEstimate(body: InstantEstimateRequest): Promise<InstantEstimate>;
+    /** Build a pack from the chosen tables; the draft is a paid call, so ``confirm_billable`` must be set. */
+    instantStart(body: InstantRequest): Promise<InstantJobReply>;
+    instantJob(id: string): Promise<InstantJobReply>;
   };
   /** First-run setup (DECISIONS §15); the changes need the admin role. */
   setup: {
