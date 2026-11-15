@@ -99,3 +99,49 @@ def test_writing_again_replaces_the_files(tmp_path):
                      profile=PROFILE)
 
     assert yaml.safe_load((pack_dir / "metrics.yaml").read_text(encoding="utf-8")) == {"metrics": []}
+
+
+def _draft_pack(tmp_path):
+    pack_dir = tmp_path / "shop"
+    profile = {**PROFILE, "join_candidates": [{"left": "shop__sales.widget_id", "right": "shop__widgets.widget_id", "overlap": 1.0}]}
+    write_pack_files(pack_dir, pack="shop", display_name="Shop", source="shop", tables=[WIDGETS, SALES], views=VIEWS[:3],
+                     profile=profile)
+    (pack_dir / "relationships.yaml").write_text(yaml.safe_dump({"relationships": [{
+        "id": "sales_widget_candidate", "description": "May reference widgets.", "from_dataset": "shop__sales",
+        "to_dataset": "shop__widgets", "on": [{"from_column": "widget_id", "to_column": "widget_id"}],
+        "cardinality": "many_to_one", "status": "draft", "evidence": [{"kind": "profile", "ref": "shop__sales.widget_id"}],
+        "confidence": 1.0}]}), encoding="utf-8")
+    evidence = [{"kind": "profile", "ref": "shop__sales"}]
+    metric = {"name": "Sales", "description": "Total.", "dataset": "shop__sales", "grain": "day", "unit": "currency",
+              "owner": "finance", "status": "draft", "evidence": evidence, "confidence": 0.8}
+    (pack_dir / "metrics.yaml").write_text(yaml.safe_dump({"metrics": [
+        {"id": "sales_total", "sql_expr": "sum(sale_amount)", **metric},
+        {"id": "broken", "sql_expr": "sum(nope)", **metric, "evidence": [*evidence, {"kind": "error", "ref": "unknown nope"}]},
+    ]}), encoding="utf-8")
+    term = {"definition": "Sales.", "aliases": {"vi": ["doanh số"], "en": ["sales"]}, "status": "draft", "evidence": evidence,
+            "confidence": 0.7}
+    (pack_dir / "glossary.yaml").write_text(yaml.safe_dump({"terms": [
+        {"id": "sales", "term": "sales", "targets": [{"kind": "metric", "metric": "sales_total"}], **term},
+        {"id": "broken_term", "term": "broken", "targets": [{"kind": "metric", "metric": "broken"}], **term},
+    ]}, allow_unicode=True), encoding="utf-8")
+    example = {"language": "en", "datasets": ["shop__sales"], "status": "draft", "evidence": evidence, "confidence": 0.6}
+    (pack_dir / "examples.yaml").write_text(yaml.safe_dump({"examples": [
+        {"id": "total", "question": "Total sales?", "sql": "SELECT sum(sale_amount) FROM marts.shop__sales", "metrics": ["sales_total"], **example},
+        {"id": "uses_broken", "question": "Broken?", "sql": "SELECT 1", "metrics": ["broken"], **example},
+    ]}), encoding="utf-8")
+    return pack_dir
+
+
+def test_generated_items_are_approved_as_unreviewed_and_failed_ones_dropped_with_what_cites_them(tmp_path):
+    from app.onboarding.instant_files import approve_generated
+    pack_dir = _draft_pack(tmp_path)
+
+    summary = approve_generated(pack_dir, schema_dir=SCHEMA_DIR)
+
+    pack = load_pack(pack_dir, schema_dir=SCHEMA_DIR)
+    assert [(item.id, item.status, item.reviewed) for item in pack.metrics.metrics] == [("sales_total", "approved", False)]
+    assert [item.id for item in pack.glossary.terms] == ["sales"] and [item.id for item in pack.examples.examples] == ["total"]
+    assert all(item.status == "approved" and item.reviewed is False for item in pack.datasets.datasets)
+    assert pack.policies.roles[0].reviewed is False
+    assert [(item.status, item.reviewed) for item in pack.relationships.relationships] == [("draft", None)]
+    assert summary["dropped"] == ["metrics.broken", "glossary.broken_term", "examples.uses_broken"]

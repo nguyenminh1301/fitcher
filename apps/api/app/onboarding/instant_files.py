@@ -20,6 +20,7 @@ from pathlib import Path
 import yaml
 
 from app.onboarding.marts import MartTable, MartView
+from app.onboarding.pack_yaml import PackFiles
 from app.onboarding.relationships import candidate_relationships, source_relationships
 
 READER_ROLE = "reader"
@@ -98,3 +99,40 @@ def write_pack_files(pack_dir: Path, *, pack: str, display_name: str, source: st
     (pack_dir / "eval.yaml").unlink(missing_ok=True)
     return {"datasets": len(datasets), "relationships": len(relationships),
             "skipped": [view.name for view in views if view.name not in listed]}
+
+
+# Files whose drafts an instant pack approves, in an order where an item comes after those it may cite.
+APPROVED_FILES = ("datasets.yaml", "metrics.yaml", "glossary.yaml", "examples.yaml", "policies.yaml", "relationships.yaml")
+
+
+def _cites(file: str, item: dict, dropped_metrics: set[str]) -> bool:
+    if file == "glossary.yaml":
+        return any(target.get("metric") in dropped_metrics for target in item.get("targets") or [])
+    if file == "examples.yaml":
+        return any(metric in dropped_metrics for metric in item.get("metrics") or [])
+    return False
+
+
+def approve_generated(pack_dir: Path, schema_dir: Path | None = None) -> dict:
+    """Approve the pack's generated items as unreviewed (``reviewed: false``), as an instant pack does.
+
+    A draft whose test-run failed (an ``error`` evidence) is dropped, and so is a glossary term or an example that
+    cites a dropped metric. Draft join paths stay drafts: a join the source does not declare needs a person.
+    """
+    files = PackFiles(pack_dir, schema_dir=schema_dir)
+    dropped: list[str] = []
+    dropped_metrics: set[str] = set()
+    for file in APPROVED_FILES:
+        for item in list(files.items(file)):
+            failed = any(evidence.get("kind") == "error" for evidence in item.get("evidence") or [])
+            if failed or _cites(file, item, dropped_metrics):
+                files.delete(file, item["id"])
+                dropped.append(f"{file.removesuffix('.yaml')}.{item['id']}")
+                if file == "metrics.yaml":
+                    dropped_metrics.add(item["id"])
+                continue
+            if file == "relationships.yaml" and item.get("status") != "approved":
+                continue
+            files.approve(file, item["id"])["reviewed"] = False
+        files.save(file)
+    return {"dropped": dropped}
