@@ -4,6 +4,7 @@
 
 ### Added
 
+- Offer a generated pack's own questions in an empty chat: `GET /pack/suggestions` returns the first three approved example questions of the compiled active pack, and the chat uses them when the pack has no sample suggestions.
 - Reach the instant pack and drift endpoints from the web app: the web server forwards `/api/pack/instant`, `/api/pack/instant/estimate`, `/api/pack/instant/{job}` and `/api/sources/{id}/drift` to the api, and the sources client gains `drift`, `instantEstimate`, `instantStart` and `instantJob`.
 - Report schema drift of an instant pack's source: the instant job keeps the chosen tables' columns in `instant_source.json` beside the pack, `GET /sources/{id}/drift` (optionally reading the catalog again) lists per table the columns added, removed and retyped since and a table the source no longer lists, a successful sync reads the catalog again, and the scheduler reads the catalog of a source with live tables once a day; nothing is re-drafted automatically.
 - Start an instant pack from the api for an `admin`: `POST /pack/instant/estimate` returns the draft's prompt tokens, the number of marts and why no model can draft yet; `POST /pack/instant` with `{source_id, tables, confirm_billable}` starts the job (422 without the confirmation, 409 while one runs) and records `pack.instant` in `agent_logs.admin_actions`; `GET /pack/instant/{job}` reports each step, the failed step and reason, or the result with the suggested questions. The api compiles the pack as `pack_admin` and makes it the active pack.

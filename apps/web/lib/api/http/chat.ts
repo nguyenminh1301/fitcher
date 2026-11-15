@@ -55,10 +55,14 @@ export function createHttpChat(fetcher: typeof fetch = (...args) => fetch(...arg
       }
       throw new Error("The answer stream ended before the answer was complete.");
     },
-    // The pack's suggested questions are pack content kept with its sample data; the answers come from the api.
+    // A hand-written pack keeps its suggested questions with its sample data; a pack built from a source has none,
+    // so the api offers its first example questions (DECISIONS §11 step 0). The answers always come from the api.
     suggestions: async () => {
       const response = await fetcher("/api/sample/scenarios");
-      return response.ok ? ((await response.json()) as ScenarioFile).suggestions : [];
+      const sample = response.ok ? ((await response.json()) as ScenarioFile).suggestions : [];
+      if (sample.length) return sample;
+      const generated = await fetcher("/api/pack/suggestions", { cache: "no-store" });
+      return generated.ok ? ((await generated.json()) as { text: string; lang: string }[]) : [];
     },
   };
 }
