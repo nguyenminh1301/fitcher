@@ -370,7 +370,7 @@
     "expected": "Expected",
     "got": "Got",
     "lastRun": "Last run",
-    "packEnabled": "Pack enabled",
+    "meetsThreshold": "Meets threshold",
     "belowThreshold": "Below threshold",
     "category": "Category",
     "evalRunning": "Running the evaluation set…",

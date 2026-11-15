@@ -370,7 +370,7 @@
     "expected": "Mong đợi",
     "got": "Thực tế",
     "lastRun": "Lần chạy gần nhất",
-    "packEnabled": "Gói đang bật",
+    "meetsThreshold": "Đạt ngưỡng",
     "belowThreshold": "Dưới ngưỡng",
     "category": "Nhóm câu hỏi",
     "evalRunning": "Đang chạy bộ câu hỏi đánh giá…",
