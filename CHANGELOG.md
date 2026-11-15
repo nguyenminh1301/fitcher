@@ -190,6 +190,7 @@
 
 ### Changed
 
+- Mount the compiled packs writable for the api in the development Compose stack, because the api now compiles the instant pack it builds.
 - Ship the pack schemas in the release image (`/app/packs/_schema`); `init-data` copies them next to the packs of `/data` on every start, so a pack generated in the instance is validated with the schemas of the running image.
 - Keep the active pack in the app state (`pack.active`, `app/packs/active.py`) so an instance without `ACTIVE_PACK`, such as the release image, answers from the pack an instant pack made active; `ACTIVE_PACK` still wins when it is set, and `runtime.reload_pack()` drops the agent, compiled pack, documents and eval reports built for the previous pack.
 - Let a pack leave out `eval.yaml`, which then has no cases (a generated pack has no eval set and shows no eval result), and add the optional `reviewed` flag to every reviewable pack item: an instant pack writes `reviewed: false` on the items it approves without a person.

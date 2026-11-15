@@ -170,7 +170,8 @@ services:
       - "127.0.0.1:8000:8000"
     volumes:
       - fitcher-data:/data
-      - compiled-packs:/app/build/packs:ro
+      # Writable: the api compiles the instant pack it builds from a connected source (DECISIONS §11 step 0).
+      - compiled-packs:/app/build/packs
       - guard-models:/app/build/guard_model:ro
       - documents:/app/build/documents
       - ./packs:/app/packs
