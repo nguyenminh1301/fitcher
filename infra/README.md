@@ -70,6 +70,11 @@ The api connects as `source_admin` (`CLICKHOUSE_SOURCE_ADMIN_PASSWORD`), which m
 `source_admin` also creates the `src_*` databases, writes `raw` and sees the definitions of `marts` (`SHOW TABLES`, never data) so that a source read by a mart is not deleted.
 An existing ClickHouse server needs `source_admin.xml` and `named_collections_storage.xml` mounted and a restart; nothing else changes, because no collection created with SQL existed before.
 
+The instant pack (DECISIONS §11 step 0) is built by the api as `pack_admin` (`users.d/pack_admin.xml`, `CLICKHOUSE_PACK_ADMIN_PASSWORD`): the definer of the views `marts.<source>__<table>` and `marts.<source>__<table>__wide`, it reads `raw` and `src_*`, creates and replaces views in `marts` and applies the pack's policies when it compiles the pack, as the jobs do with the admin user.
+It can grant only `SELECT` on `marts`, so no pack role it manages ever reads `raw` or `src_*`; it reads no log, app or named collection secret.
+Its privileges come from `<grants>` only: ClickHouse refuses to start when such a user also sets `access_management`.
+An existing server needs `pack_admin.xml` mounted, the password set and a restart.
+
 The SQL Server fixture (`sqlserver-fixture` in the `sources` profile) is the vendor's `mcr.microsoft.com/mssql/server` image: amd64 only, about 2 GB of memory, and starting it accepts Microsoft's licence terms (`ACCEPT_EULA`). It is seeded by `infra/sources/sqlserver/init.sh` and is never part of the release image. A SQL Server source connected in the application is not a named collection: the api reads it with `pymssql` and keeps its password in the app state's encrypted secrets (DECISIONS §4).
 
 Source credentials of the development manifests reach ClickHouse only: `config.d/sources.xml` defines one named collection per source manifest whose values come from the clickhouse service's environment, and `system.named_collections` hides them.
