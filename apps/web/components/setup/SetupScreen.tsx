@@ -95,7 +95,7 @@ function DataStep({ sources, disabled, onDone, onSkip, onOpenChat }: {
         <div className="fc-card-body fc-stack">
           <p className="fc-muted" style={{ margin: 0 }}>{t("setup.dataHint")}</p>
           {disabled ? null : (
-            <SourceConnect sources={sources} onConnected={(source) => setConnected(source.id)}
+            <SourceConnect sources={sources} preselect onConnected={(source) => setConnected(source.id)}
               onChosen={(tables) => { setChosen(tables.filter((table) => table.selected).map((table) => table.name)); setSynced(false); }}
               onSynced={() => setSynced(true)} />
           )}

@@ -272,7 +272,7 @@ describe("setup data step", () => {
     await userEvent.type(screen.getByLabelText("Password"), "pw");
     await userEvent.click(screen.getByRole("button", { name: "Test connection" }));
     await userEvent.click(await screen.findByRole("button", { name: "Connect" }));
-    await userEvent.click(await screen.findByRole("checkbox", { name: "Use orders" }));
+    expect(((await screen.findByRole("checkbox", { name: "Use orders" })) as HTMLInputElement).checked).toBe(true);
     await userEvent.click(screen.getByRole("button", { name: "Save selection" }));
     expect(screen.queryByRole("region", { name: "Build the pack" })).toBeNull();
     await userEvent.click(await screen.findByRole("button", { name: "Sync now" }));
