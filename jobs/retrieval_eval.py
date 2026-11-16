@@ -175,7 +175,7 @@ def main(argv: list[str] | None = None) -> int:
         settings = load_settings()
         compiled = load_compiled(Path(settings.compiled_pack_dir), args.pack)
         cases = load_eval_set(approved_pack(load_pack(args.packs_dir / args.pack))).cases
-        backend = "qdrant"
+        backend = settings.search_engine
         search = open_search(settings)
         clients.bootstrap()
         # Query vectors must match the indexed ones, so the compiled size wins over the setting.

@@ -21,6 +21,8 @@ services:
       CLICKHOUSE_MODEL_TIERS_PASSWORD: ${CLICKHOUSE_MODEL_TIERS_PASSWORD:?set CLICKHOUSE_MODEL_TIERS_PASSWORD in .env}
       # Read by users.d/pack_review.xml.
       CLICKHOUSE_PACK_REVIEW_PASSWORD: ${CLICKHOUSE_PACK_REVIEW_PASSWORD:?set CLICKHOUSE_PACK_REVIEW_PASSWORD in .env}
+      # Read by users.d/search.xml.
+      CLICKHOUSE_SEARCH_PASSWORD: ${CLICKHOUSE_SEARCH_PASSWORD:?set CLICKHOUSE_SEARCH_PASSWORD in .env}
       # Read by users.d/sources.xml for source_loader, the only user of the source named collections.
       CLICKHOUSE_SOURCES_PASSWORD: ${CLICKHOUSE_SOURCES_PASSWORD:?set CLICKHOUSE_SOURCES_PASSWORD in .env}
       # Read by users.d/source_admin.xml: the user the api connects as to connect sources in the application.
@@ -67,6 +69,7 @@ services:
       - ./infra/clickhouse/users.d/agent_conversations.xml:/etc/clickhouse-server/users.d/agent_conversations.xml:ro
       - ./infra/clickhouse/users.d/model_tiers.xml:/etc/clickhouse-server/users.d/model_tiers.xml:ro
       - ./infra/clickhouse/users.d/pack_review.xml:/etc/clickhouse-server/users.d/pack_review.xml:ro
+      - ./infra/clickhouse/users.d/search.xml:/etc/clickhouse-server/users.d/search.xml:ro
       - ./infra/clickhouse/users.d/sources.xml:/etc/clickhouse-server/users.d/sources.xml:ro
       - ./infra/clickhouse/users.d/source_admin.xml:/etc/clickhouse-server/users.d/source_admin.xml:ro
       - ./infra/clickhouse/users.d/pack_admin.xml:/etc/clickhouse-server/users.d/pack_admin.xml:ro
@@ -142,6 +145,7 @@ services:
       CLICKHOUSE_REVIEW_READER_PASSWORD: ${CLICKHOUSE_REVIEW_READER_PASSWORD:?set CLICKHOUSE_REVIEW_READER_PASSWORD in .env}
       # Writes the document registry and test-runs reviewed metrics (users.d/pack_review.xml).
       CLICKHOUSE_PACK_REVIEW_PASSWORD: ${CLICKHOUSE_PACK_REVIEW_PASSWORD:?set CLICKHOUSE_PACK_REVIEW_PASSWORD in .env}
+      CLICKHOUSE_SEARCH_PASSWORD: ${CLICKHOUSE_SEARCH_PASSWORD:?set CLICKHOUSE_SEARCH_PASSWORD in .env}
       # Connects, attaches and copies the sources of the Sources page; it holds no source credential (users.d/source_admin.xml).
       CLICKHOUSE_SOURCE_ADMIN_PASSWORD: ${CLICKHOUSE_SOURCE_ADMIN_PASSWORD:?set CLICKHOUSE_SOURCE_ADMIN_PASSWORD in .env}
       # Builds the marts of an instant pack and applies the pack's policies when it compiles (users.d/pack_admin.xml).
@@ -158,6 +162,8 @@ services:
       QUERY_MAX_MEMORY_USAGE: ${QUERY_MAX_MEMORY_USAGE:-2000000000}
       ACTIVE_PACK: ${ACTIVE_PACK:?set ACTIVE_PACK in .env}
       QDRANT_URL: http://qdrant:6333
+      # qdrant or clickhouse (apps/api/app/search/engine.py).
+      SEARCH_ENGINE: ${SEARCH_ENGINE:-qdrant}
       # Access tokens /ask accepts (apps/api/app/auth/jwt.py).
       # Questions per user per minute on /ask; the single api worker keeps the counts.
       RATE_LIMIT_PER_MINUTE: ${RATE_LIMIT_PER_MINUTE:-10}
@@ -208,11 +214,15 @@ services:
       CLICKHOUSE_SOURCES_PASSWORD: ${CLICKHOUSE_SOURCES_PASSWORD:?set CLICKHOUSE_SOURCES_PASSWORD in .env}
       # compile_pack derives the pack's per-role ClickHouse user passwords from it.
       CLICKHOUSE_AGENT_PASSWORD: ${CLICKHOUSE_AGENT_PASSWORD:?set CLICKHOUSE_AGENT_PASSWORD in .env}
+      # compile_pack and retrieval_eval write and query the search tables as search_index.
+      CLICKHOUSE_SEARCH_PASSWORD: ${CLICKHOUSE_SEARCH_PASSWORD:?set CLICKHOUSE_SEARCH_PASSWORD in .env}
       HF_HUB_DISABLE_TELEMETRY: "1"
       # /app/dbt in the image is read-only for the app user.
       DBT_TARGET_PATH: /tmp/dbt/target
       DBT_LOG_PATH: /tmp/dbt/logs
       QDRANT_URL: http://qdrant:6333
+      # qdrant or clickhouse (apps/api/app/search/engine.py).
+      SEARCH_ENGINE: ${SEARCH_ENGINE:-qdrant}
       COLUMN_VALUES_TOP_K: ${COLUMN_VALUES_TOP_K:-10000}
       # seed_dev_accounts gives every development account of infra/dev/accounts.yaml this password.
       DEV_ACCOUNT_PASSWORD: ${DEV_ACCOUNT_PASSWORD:-}

@@ -29,6 +29,8 @@ if TYPE_CHECKING:
 DENSE = "dense"
 BM25 = "bm25"
 TRIGRAM = "trigram"
+# Each ranked list keeps this many candidates per requested hit before fusion.
+PREFETCH_FACTOR = 4
 # Point ids are UUIDs derived from the pack document id, which stays in the payload.
 _POINT_NAMESPACE = uuid.UUID("0b8f5a52-7c1d-4b4e-9a3f-6f1d2c9e8a10")
 
@@ -39,6 +41,11 @@ class SearchError(RuntimeError):
 
 def point_id(document_id: str) -> str:
     return str(uuid.uuid5(_POINT_NAMESPACE, document_id))
+
+
+def prefetch_limit(size: int) -> int:
+    """Candidates each ranked list keeps before RRF fusion for ``size`` hits."""
+    return max(size * PREFETCH_FACTOR, 20)
 
 
 def uses_trigrams(collection: str) -> bool:
@@ -82,7 +89,12 @@ class SearchEngine(Protocol):
 
 
 def open_search(settings: "Settings") -> SearchEngine:
-    """The configured search engine."""
-    from app.search.client import QdrantSearch  # noqa: PLC0415 - the engine module stays free of engine imports
+    """The configured search engine: ``SEARCH_ENGINE`` is ``qdrant`` or ``clickhouse``."""
+    # Imported here so this module stays free of either engine's dependencies.
+    if settings.search_engine == "clickhouse":
+        from app.search.clickhouse_index import ClickHouseSearch, search_client  # noqa: PLC0415
+
+        return ClickHouseSearch(search_client())
+    from app.search.client import QdrantSearch  # noqa: PLC0415
 
     return QdrantSearch(settings.qdrant_url)

@@ -45,3 +45,10 @@ def test_invalid_screening_settings_are_rejected(env, message):
     with pytest.raises(SettingsError, match=message):
         load_settings(env)
 
+
+
+def test_the_search_engine_defaults_to_qdrant_and_accepts_only_known_engines():
+    assert load_settings({}).search_engine == "qdrant"
+    assert load_settings({"SEARCH_ENGINE": " ClickHouse "}).search_engine == "clickhouse"
+    with pytest.raises(SettingsError, match="SEARCH_ENGINE"):
+        load_settings({"SEARCH_ENGINE": "elastic"})

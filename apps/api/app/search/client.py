@@ -18,12 +18,10 @@ from typing import Any
 import httpx
 
 from app.search import sparse
-from app.search.engine import BM25, DENSE, TRIGRAM, SearchError, uses_trigrams
+from app.search.engine import BM25, DENSE, TRIGRAM, SearchError, prefetch_limit, uses_trigrams
 
 TIMEOUT_SECONDS = 60
 UPSERT_BATCH = 256
-# Each prefetch keeps this many candidates per requested hit before fusion.
-PREFETCH_FACTOR = 4
 def role_filter(roles: Sequence[str]) -> dict:
     return {"must": [{"key": "allowed_roles", "match": {"any": list(roles)}}]}
 
@@ -35,7 +33,7 @@ def document_filter(document_id: str) -> dict:
 
 def hybrid_request(alias: str, text: str, vector: Sequence[float], roles: Sequence[str], size: int) -> dict:
     """The query body: role-filtered prefetches on every vector of the collection, fused with RRF."""
-    limit = max(size * PREFETCH_FACTOR, 20)
+    limit = prefetch_limit(size)
     flt = role_filter(roles)
     prefetch: list[dict] = [{"query": list(vector), "using": DENSE, "filter": flt, "limit": limit}]
     words = sparse.query_vector(sparse.terms(text))

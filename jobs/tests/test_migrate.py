@@ -31,7 +31,8 @@ def shipped():
 
 def test_shipped_clickhouse_changes_keep_the_original_files_in_order():
     names = [c.label for c in migrate.discover(migrate.CLICKHOUSE_CHANGES_DIR)]
-    assert names == ["0001_databases", "0002_agent_logs", "0003_model_tiers", "0004_documents", "0005_llm_calls_provider"]
+    assert names == ["0001_databases", "0002_agent_logs", "0003_model_tiers", "0004_documents", "0005_llm_calls_provider",
+                     "0006_search"]
 
 
 def test_fresh_volume_applies_and_records_every_change_then_nothing():
