@@ -434,6 +434,22 @@ def test_recompile_copies_live_chunks_of_indexed_documents_without_embedding_the
     assert load_compiled(tmp_path / "build", PACK).embedding_alias == "embed-a"
 
 
+def test_documents_turned_off_and_on_again_are_indexed_again_from_their_stored_files(pack_dir, tmp_path):
+    search, embeddings = FakeSearch(), FakeEmbeddings()
+    run(pack_dir, tmp_path, search, embeddings, embedding_alias="embed-a")
+    documents = _documents(tmp_path, search, embeddings)
+    kept = documents.upload("kept.md", b"# Kept\n\nRefunds are counted when approved.", ["viewer"], "u")
+
+    # With documents off the compile reads no registry, so kb_docs holds no chunk.
+    off = run(pack_dir, tmp_path, search, embeddings, embedding_alias="embed-a")
+    assert off.documents["kb_docs"] == 0 and _kb_docs(search) == []
+
+    on = run(pack_dir, tmp_path, search, embeddings, embedding_alias="embed-a",
+             registry=documents.registry, documents_dir=tmp_path / "documents")
+    assert on.documents["kb_docs"] == 1
+    assert [point["payload"]["document_id"] for point in _kb_docs(search)] == [kept.id]
+
+
 def test_a_new_embedding_model_reembeds_the_stored_files(pack_dir, tmp_path):
     search, embeddings = FakeSearch(), FakeEmbeddings()
     run(pack_dir, tmp_path, search, embeddings, embedding_alias="embed-a")

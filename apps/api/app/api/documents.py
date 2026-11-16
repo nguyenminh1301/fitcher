@@ -7,6 +7,10 @@ while the pack compiles, and an upload whose content is already registered
 for the pack is 409 as well. ``POST /documents/{id}/draft`` drafts pack items
 from one indexed document's chunks and the pack's profile; it sends billable
 ``sql-gen`` calls, so the page asks for confirmation first.
+
+While an admin has turned documents off (``/settings/documents``), every
+``/documents`` endpoint answers 404; the stored files and the registry are
+kept, and turning documents on again indexes them at the next compile.
 """
 
 import logging
@@ -15,10 +19,15 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Response, UploadFile, status
 
-from app.api.console import require_reviewer
-from app.api.runtime import get_document_service, get_drafter, get_pack_dir, unavailable
+from app.api.auth import current_principal
+from app.api.console import require_admin, require_reviewer
+from app.api.runtime import (
+    get_document_service, get_document_service_or_none, get_drafter, get_pack_dir, get_state_db, unavailable,
+)
 from app.auth.principal import Principal
-from app.contracts.documents import DocumentList, DocumentRolesChange, DocumentView, DraftResult
+from app.contracts.documents import (
+    DocumentList, DocumentRolesChange, DocumentSettings, DocumentSettingsChange, DocumentView, DraftResult,
+)
 from app.llm.client import LLMError
 from app.observability.tracing import trusted_pack_calls
 from app.onboarding.docs_parser import DocumentRejected
@@ -29,9 +38,21 @@ from app.onboarding.drafter import Drafter, DraftError, draft_files
 from app.onboarding.pack_yaml import PackFiles
 from app.onboarding.profiler import read_profile
 from app.packs.loader import PackValidationError
+from app.state import setup
+from app.state.db import StateDb
+from app.state.settings import Settings, documents_enabled
 
 logger = logging.getLogger(__name__)
-router = APIRouter(prefix="/documents")
+State = Annotated[StateDb, Depends(get_state_db)]
+
+
+def require_documents_on(db: State) -> None:
+    if not documents_enabled(db):
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="company documents are turned off")
+
+
+router = APIRouter(prefix="/documents", dependencies=[Depends(require_documents_on)])
+settings_router = APIRouter(prefix="/settings/documents")
 Reviewer = Annotated[Principal, Depends(require_reviewer)]
 Service = Annotated[DocumentService, Depends(get_document_service)]
 
@@ -124,3 +145,41 @@ def delete_document(document_id: str, _: Reviewer, service: Service) -> Response
     except Exception as error:  # noqa: BLE001 - each failure maps to its status in refusal
         raise refusal(error) from None
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+OptionalService = Annotated[DocumentService | None, Depends(get_document_service_or_none)]
+
+
+def _kept_documents(service: DocumentService | None) -> int | None:
+    """The active pack's kept documents, 0 without an active pack, or None when the registry cannot be read."""
+    if service is None:
+        return 0
+    try:
+        return len(service.list())
+    except Exception:  # noqa: BLE001 - the registry is unreachable
+        logger.warning("the document registry could not be read", exc_info=True)
+        return None
+
+
+@settings_router.get("")
+def get_document_settings(
+    _: Annotated[Principal, Depends(current_principal)], db: State, service: OptionalService,
+) -> DocumentSettings:
+    return DocumentSettings(enabled=documents_enabled(db), documents=_kept_documents(service) or 0)
+
+
+@settings_router.put("")
+def put_document_settings(
+    change: DocumentSettingsChange, _: Annotated[Principal, Depends(require_admin)], db: State, service: OptionalService,
+) -> DocumentSettings:
+    """Turn documents on or off and answer the setup's Documents step; off with documents kept needs ``confirm``."""
+    kept = _kept_documents(service)
+    if not change.enabled and documents_enabled(db) and not change.confirm and kept != 0:
+        held = "the documents" if kept is None else f"{kept} document{'s' if kept != 1 else ''}"
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            detail=f"{held} stay stored but are no longer searched; confirm to turn company documents off",
+        )
+    Settings(db).set("documents", "enabled", change.enabled)
+    setup.mark_done(db, "documents")
+    return DocumentSettings(enabled=change.enabled, documents=kept or 0)

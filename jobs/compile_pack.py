@@ -44,6 +44,8 @@ from app.packs.loader import PackValidationError
 from app.packs.search_indices import search_pack
 from app.screening.screen import Screener
 from app.search.engine import SearchEngine, SearchError, open_search
+from app.state.db import shared_state
+from app.state.settings import documents_enabled
 from jobs.lib.clickhouse import admin_client
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -172,7 +174,8 @@ def _compile(
     args: argparse.Namespace, settings, warehouse: ClickHouseWarehouse, search, embeddings, embedding_label: str,
 ) -> CompileSummary:
     registry = None
-    if not args.skip_index:
+    # With company documents off (the app state's documents.enabled) kb_docs holds no chunk.
+    if not args.skip_index and documents_enabled(shared_state()):
         registry = ClickHouseDocumentRegistry(admin_client())
         wait_for_uploads(registry, args.pack)
     return compile_pack(

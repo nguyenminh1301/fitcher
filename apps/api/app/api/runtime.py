@@ -42,6 +42,7 @@ from app.onboarding.instant import InstantPipeline, InstantWarehouse
 from app.packs.active import active_pack, set_active_pack
 from app.packs.compiler import CompileError, CompiledPack, compile_pack, load_compiled
 from app.packs.search_indices import INDEX_NAMES, alias_name
+from app.state.settings import documents_enabled
 from app.screening.screen import Screener
 from app.search.engine import open_search
 from app.sources.client import source_admin_client
@@ -211,7 +212,7 @@ def _call_log():
 @cache
 def get_agent() -> Agent:
     try:
-        return Agent(load_settings(), get_compiled(), get_screener())
+        return Agent(load_settings(), get_compiled(), get_screener(), lambda: documents_enabled(get_state_db()))
     except LLMError as error:
         raise unavailable(str(error)) from None
 
@@ -240,6 +241,14 @@ def get_document_service() -> DocumentService:
         store_dir=Path(settings.documents_dir), compiled_dir=Path(settings.compiled_pack_dir),
         max_bytes=settings.document_max_bytes,
     )
+
+
+def get_document_service_or_none() -> DocumentService | None:
+    """The active pack's documents, or None without an active pack or document store."""
+    try:
+        return get_document_service()
+    except HTTPException:
+        return None
 
 
 def get_pack_dir() -> Path:
@@ -391,7 +400,9 @@ def _compile_instant(pack_dir: Path) -> object:
             pack_dir, warehouse=warehouse, access=warehouse, agent_secret=os.environ.get("CLICKHOUSE_AGENT_PASSWORD", ""),
             top_k=settings.column_values_top_k, search=open_search(), embeddings=embeddings,
             output_dir=compiled_dir, schema_dir=pack_dir.parent / "_schema", screener=get_screener(),
-            registry=ClickHouseDocumentRegistry(pack_review_client()), documents_dir=Path(settings.documents_dir),
+            # With company documents off no chunk is indexed; turning them on again indexes them at the next compile.
+            registry=ClickHouseDocumentRegistry(pack_review_client()) if documents_enabled(get_state_db()) else None,
+            documents_dir=Path(settings.documents_dir),
             embedding_alias=label,
         )
     finally:

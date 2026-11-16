@@ -36,7 +36,7 @@ def test_status_of_a_new_instance(client):
     body = client.get("/setup/status").json()
 
     assert body == {"mode": None, "steps": [{"id": "mode", "state": "pending"}, {"id": "models", "state": "pending"},
-                                               {"id": "data", "state": "pending"}],
+                                               {"id": "data", "state": "pending"}, {"id": "documents", "state": "pending"}],
                     "complete": False}
 
 
@@ -74,6 +74,7 @@ def test_complete_needs_every_step_answered(client):
     client.put("/setup/mode", headers=SAME_ORIGIN, json={"mode": "individual"})
     client.post("/setup/steps/models/skip", headers=SAME_ORIGIN)
     client.post("/setup/steps/data/skip", headers=SAME_ORIGIN)
+    client.post("/setup/steps/documents/skip", headers=SAME_ORIGIN)
     done = client.post("/setup/complete", headers=SAME_ORIGIN)
 
     assert done.status_code == 200 and done.json()["complete"] is True

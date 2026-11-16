@@ -14,6 +14,7 @@ describe("generated contract types", () => {
       "classifier_status.schema.json", "conversation.schema.json", "conversation_group.schema.json",
       "conversation_patch.schema.json", "conversation_thread.schema.json", "cost_row.schema.json",
       "dataset_view.schema.json", "document_list.schema.json", "document_roles_change.schema.json",
+      "document_settings.schema.json", "document_settings_change.schema.json",
       "document_view.schema.json", "draft_result.schema.json", "embedding_change.schema.json",
       "embedding_view.schema.json", "eval_report_view.schema.json", "eval_run_started.schema.json",
       "feedback_input.schema.json", "feedback_row.schema.json", "file_load.schema.json",

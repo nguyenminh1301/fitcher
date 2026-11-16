@@ -45,6 +45,9 @@ SPECS: dict[tuple[str, str], SettingSpec] = {
     ("oidc", "issuer"): SettingSpec(str),
     ("oidc", "client_id"): SettingSpec(str),
     ("oidc", "roles_claim"): SettingSpec(str, "roles"),
+    # Company documents (DECISIONS §5, §15): off hides the Documents page and its endpoints, and the compiler
+    # indexes no chunks; the stored files and the registry are kept.
+    ("documents", "enabled"): SettingSpec(bool, True),
     # The pack an instant pack made active; ACTIVE_PACK wins when set (app/packs/active.py).
     ("pack", "active"): SettingSpec(str),
 }
@@ -86,3 +89,8 @@ class Settings:
         self._spec(group, key)
         with self._db.write() as conn:
             conn.execute("DELETE FROM settings WHERE group_name = ? AND key = ?", (group, key))
+
+
+def documents_enabled(db: StateDb) -> bool:
+    """Whether company documents are on (DECISIONS §15); they are unless an admin turned them off."""
+    return Settings(db).get("documents", "enabled")

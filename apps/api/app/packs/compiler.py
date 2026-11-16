@@ -13,7 +13,10 @@ leaves the live generation untouched.
 ``kb_docs`` is rebuilt from the document registry: the chunks of every
 ``indexed`` document are copied with their vectors from the live generation
 when ``compiled.json`` names the same embedding alias and dimensions, and
-otherwise each stored file is parsed, chunked, screened and embedded again.
+otherwise, or for a document with no live chunk (company documents were
+turned off and on again), its stored file is parsed, chunked, screened and
+embedded again. With documents off the caller passes no registry and
+``kb_docs`` holds no chunk.
 
 Screening drops a ``kb_docs`` chunk whose verdict is ``block`` or, without
 the classifier, ``unavailable``, and lists it in the summary; a column value
@@ -299,14 +302,16 @@ def registry_chunks(
         live is not None and live.embedding_alias == embedding_alias and live.embedding_dimensions == dimensions
         and alias in search.live()
     )
+    copied: list[dict] = []
     if same_model:
-        live_points = search.live_points(alias, with_vectors=True)
-        return [
+        copied = [
             {"id": point["id"], "vector": point["vector"], "payload": point["payload"]}
-            for point in live_points if point["payload"].get("document_id") in indexed
-        ], []
+            for point in search.live_points(alias, with_vectors=True) if point["payload"].get("document_id") in indexed
+        ]
+    # A document without live chunks, as after documents were turned off and on again, is read from its file.
+    present = {point["payload"]["document_id"] for point in copied}
     fresh: list[dict] = []
-    for record in indexed.values():
+    for record in (record for record in indexed.values() if record.id not in present):
         path = documents_dir / pack / record.id
         if not path.is_file():
             summary.warnings.append(f"document {record.id} ({record.file_name}) has no stored file and was not indexed")
@@ -317,7 +322,7 @@ def registry_chunks(
             summary.warnings.append(f"document {record.id} ({record.file_name}) cannot be parsed again: {error}")
             continue
         fresh.extend(chunk_payloads(record, chunks))
-    return [], fresh
+    return copied, fresh
 
 
 def build_generation(
