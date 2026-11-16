@@ -72,8 +72,13 @@ class GraphRun:
 
 
 class Agent:
-    def __init__(self, settings: Settings, compiled: CompiledPack, screener: Screener):
+    def __init__(
+        self, settings: Settings, compiled: CompiledPack, screener: Screener,
+        documents_enabled: Callable[[], bool] = lambda: True,
+    ):
         self.compiled = compiled
+        # Read for every question, so turning documents off applies without rebuilding the agent.
+        self._documents_enabled = documents_enabled
         self._screener = screener
         self._screen_mode = settings.screen_mode
         self._logs = start_log_writer(settings)
@@ -105,7 +110,7 @@ class Agent:
         deps = AgentDeps(
             llm=self._llm, search=self._search, embeddings=self._embeddings, runner=runner,
             compiled=self.compiled, today=today, logs=self._logs, user_id=user_id, role=role, history=tuple(history),
-            screener=self._screener, screen_mode=self._screen_mode,
+            screener=self._screener, screen_mode=self._screen_mode, documents_enabled=self._documents_enabled(),
         )
         return GraphRun(deps, query_ids, partial(self._stopper_for, role))
 

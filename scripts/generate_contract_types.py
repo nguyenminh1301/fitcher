@@ -19,7 +19,9 @@ from app.contracts.chart_spec import ChartSpec  # noqa: E402
 from app.contracts.conversations import (  # noqa: E402
     Conversation, ConversationGroup, ConversationPatch, ConversationThread, GroupInput,
 )
-from app.contracts.documents import DocumentList, DocumentRolesChange, DocumentView, DraftResult  # noqa: E402
+from app.contracts.documents import (  # noqa: E402
+    DocumentList, DocumentRolesChange, DocumentSettings, DocumentSettingsChange, DocumentView, DraftResult,
+)
 from app.contracts.evaluation import EvalReportView, EvalRunStarted  # noqa: E402
 from app.contracts.events import AskEvent, AskRequest  # noqa: E402
 from app.contracts.feedback import FeedbackInput  # noqa: E402
@@ -73,6 +75,8 @@ CONTRACTS = {
     "document_list": (DocumentList, "serialization"),
     "document_roles_change": (DocumentRolesChange, "validation"),
     "draft_result": (DraftResult, "serialization"),
+    "document_settings": (DocumentSettings, "serialization"),
+    "document_settings_change": (DocumentSettingsChange, "validation"),
     "run_row": (RunRow, "serialization"),
     "run_trace": (RunTrace, "serialization"),
     "audit_row": (AuditRow, "serialization"),

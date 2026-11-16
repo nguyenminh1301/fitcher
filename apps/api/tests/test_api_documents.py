@@ -36,6 +36,7 @@ def service(tmp_path):
 def client(service):
     app.dependency_overrides[runtime.get_compiled] = lambda: compiled_fixture()
     app.dependency_overrides[runtime.get_document_service] = lambda: service
+    app.dependency_overrides[runtime.get_document_service_or_none] = lambda: service
     with TestClient(app) as test_client:
         yield test_client
     app.dependency_overrides.clear()
@@ -159,3 +160,41 @@ def test_draft_from_one_document_writes_drafts_and_reports_review_ids(client, dr
 def test_draft_needs_an_indexed_document(client, drafting):
     assert client.post("/documents/nope/draft", headers=REVIEWER).status_code == 404
     assert client.post("/documents/nope/draft", headers=VIEWER).status_code == 403
+
+
+# Turning company documents off (DECISIONS §15)
+
+ADMIN = SessionHeaders(["admin"])
+
+
+def test_documents_are_on_by_default_and_off_needs_confirmation_while_documents_exist(client):
+    upload(client)
+    assert client.get("/settings/documents", headers=REVIEWER).json() == {"enabled": True, "documents": 1}
+
+    refused = client.put("/settings/documents", headers=ADMIN, json={"enabled": False})
+    assert refused.status_code == 409 and "1 document" in refused.json()["detail"]
+    assert client.get("/settings/documents", headers=REVIEWER).json()["enabled"] is True
+
+    turned_off = client.put("/settings/documents", headers=ADMIN, json={"enabled": False, "confirm": True})
+    assert turned_off.json() == {"enabled": False, "documents": 1}
+
+
+def test_with_documents_off_no_document_endpoint_answers_and_the_files_are_kept(client):
+    record = upload(client).json()
+    client.put("/settings/documents", headers=ADMIN, json={"enabled": False, "confirm": True})
+
+    assert client.get("/documents", headers=REVIEWER).status_code == 404
+    assert upload(client, name="other.md").status_code == 404
+    assert client.delete(f"/documents/{record['id']}", headers=REVIEWER).status_code == 404
+
+    client.put("/settings/documents", headers=ADMIN, json={"enabled": True})
+    assert [item["id"] for item in client.get("/documents", headers=REVIEWER).json()["documents"]] == [record["id"]]
+
+
+def test_only_an_admin_turns_documents_off_and_answering_marks_the_setup_step_done(client):
+    assert client.put("/settings/documents", headers=REVIEWER, json={"enabled": False}).status_code == 403
+
+    client.put("/settings/documents", headers=ADMIN, json={"enabled": False})
+
+    steps = {step["id"]: step["state"] for step in client.get("/setup/status", headers=ADMIN).json()["steps"]}
+    assert steps["documents"] == "done"

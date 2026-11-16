@@ -75,6 +75,8 @@ class AgentDeps:
     screener: Screener | None = None
     # log lets a blocked question continue and records it; enforce stops it.
     screen_mode: ScreenMode = "log"
+    # Company documents are on (DECISIONS §15); off, metadata_qa answers without searching kb_docs.
+    documents_enabled: bool = True
 
 
 class Attempt(BaseModel):

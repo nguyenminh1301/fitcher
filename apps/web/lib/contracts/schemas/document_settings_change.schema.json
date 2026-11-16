@@ -1,0 +1,19 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "enabled": {
+      "title": "Enabled",
+      "type": "boolean"
+    },
+    "confirm": {
+      "default": false,
+      "title": "Confirm",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "enabled"
+  ],
+  "title": "DocumentSettingsChange",
+  "type": "object"
+}

@@ -26,6 +26,8 @@ export type { ReviewItemPatch } from "./review_item_patch";
 export type { DocumentView } from "./document_view";
 export type { DocumentList } from "./document_list";
 export type { DocumentRolesChange } from "./document_roles_change";
+export type { DocumentSettings } from "./document_settings";
+export type { DocumentSettingsChange } from "./document_settings_change";
 export type { DraftResult } from "./draft_result";
 export type { RunRow } from "./run_row";
 export type { RunTrace, TraceItem } from "./run_trace";

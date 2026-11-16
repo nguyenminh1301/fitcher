@@ -151,7 +151,7 @@ Each index below holds a dense vector (`embed`) and a BM25 sparse vector per ite
 - `datasets` (including columns)
 - `column_values`: real values of low-cardinality string columns (top-K), with aliases
 - `examples`
-- `kb_docs`: company document chunks, with tags and allowed_roles; absent when documents are turned off (§15)
+- `kb_docs`: company document chunks, with tags and allowed_roles; empty when documents are turned off (§15), and `metadata_qa` then answers from the other collections
 
 Every query filters by `allowed_roles` and fuses the dense and sparse results with RRF.
 

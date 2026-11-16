@@ -56,6 +56,7 @@ describe("console sections", () => {
     expect(allowedSections(["pack_reviewer"]).map((section) => section.key)).toEqual(["review", "documents", "datasets", "feedback", "evaluation"]);
     expect(allowedSections(["admin"]).map((section) => section.key)).toEqual(["runs", "audit", "costs", "evaluation", "users", "sources", "models"]);
     expect(allowedSections(["analyst", "marketing"])).toEqual([]);
+    expect(allowedSections(["pack_reviewer"], "team", ["documents"]).map((section) => section.key)).not.toContain("documents");
   });
 
   it("hides the Users section in individual mode, which has no accounts", () => {

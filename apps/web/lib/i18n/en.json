@@ -491,7 +491,17 @@
     "skip": "Skip for now",
     "step_data": "Data",
     "dataQuestion": "Which data should fitcher read?",
-    "dataHint": "Connect a PostgreSQL or MySQL database, or upload a CSV, XLSX or Parquet file. You can do this later on the Sources page."
+    "dataHint": "Connect a PostgreSQL or MySQL database, or upload a CSV, XLSX or Parquet file. You can do this later on the Sources page.",
+    "step_documents": "Documents",
+    "documentsQuestion": "Should fitcher read company documents?",
+    "documentsHint": "Policies, handbooks and glossaries help answer what a term means. Numbers always come from your data, never from documents.",
+    "documentsOn": "Yes, use company documents",
+    "documentsOff": "No documents",
+    "documentsUpload": "Upload documents now, or later on the Documents page. Every role of the pack may read them until you narrow it there.",
+    "documentsUploaded": "Uploaded documents",
+    "documentsNoPack": "Upload documents on the Documents page once your data is connected.",
+    "documentsKept": "{count} kept documents stay stored but are no longer searched.",
+    "documentsConfirmOff": "Turn documents off"
   },
   "models": {
     "providers": "Providers",

@@ -35,10 +35,13 @@ export const SECTIONS: Section[] = [
   { key: "models", group: "administration", path: "/console/models", icon: "compass", roles: [ADMIN], feature: "models" },
 ];
 
-/** The sections these roles may open, in navigation order; empty for a role without console access. */
-export function allowedSections(roles: string[], mode?: "individual" | "team"): Section[] {
+/**
+ * The sections these roles may open, in navigation order; empty for a role without console access.
+ * ``hidden`` leaves out sections the instance turned off, such as Documents when company documents are off.
+ */
+export function allowedSections(roles: string[], mode?: "individual" | "team", hidden: string[] = []): Section[] {
   return SECTIONS.filter((section) => section.roles.some((role) => roles.includes(role))
-    && !(section.teamOnly && mode === "individual"));
+    && !(section.teamOnly && mode === "individual") && !hidden.includes(section.key));
 }
 
 /** The section key of a console path such as ``/console/runs/abc``, or null for ``/console``. */

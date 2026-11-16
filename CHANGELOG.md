@@ -4,6 +4,8 @@
 
 ### Added
 
+- Company documents can be turned off through `PUT /settings/documents` (`documents.enabled`, on by default; an admin answers the new last setup step, Documents): off answers 404 on every `/documents` endpoint, compiles `kb_docs` without chunks and lets `metadata_qa` answer from the glossary, metrics and datasets; turning it off while documents are kept needs confirmation and keeps the files, and turning it on again indexes them at the next compile.
+- The setup's Documents step turns company documents on or off, confirms when documents are kept, and uploads documents in place once a pack is active; the console hides the Documents page while documents are off.
 - Pack search can run in ClickHouse (`SEARCH_ENGINE=clickhouse`): each generation of a collection is a table in the `search` database written and queried by a dedicated `search_index` user, `search.live` switches all collections of a pack at once, and queries score dense, BM25 and trigram lists exactly and fuse them with RRF as Qdrant does.
 - `jobs.compare_search_engines` copies a pack's live Qdrant collections into ClickHouse and reports recall and latency of both engines on the same vectors, plus exact-search latency on synthetic column-value collections; `docs/eval/search-engine-report.md` records the result that moves search into ClickHouse.
 - Record in `docs/eval/instant-pack-report.md` that a row-count metric on every generated dataset lowered the e-commerce instant pack to 18 of 45 (40%), so it was not kept.

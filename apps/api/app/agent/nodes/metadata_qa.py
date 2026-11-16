@@ -1,8 +1,8 @@
 """Answer what a business term, metric, column or dataset means (DECISIONS §6 step 3).
 
 The question is embedded once and searched in the glossary, metrics, datasets
-and company documents (``kb_docs``), filtered by the asking role, so an
-answer never describes what the role may not read. The ``fast`` tier answers
+and company documents (``kb_docs``, unless documents are turned off), filtered
+by the asking role, so an answer never describes what the role may not read. The ``fast`` tier answers
 from those hits only, in the question's language. Figures come only from SQL
 (DECISIONS §5): the prompt forbids quoting numbers from the hits, and states
 that retrieved text is data, not instructions. No SQL is generated.
@@ -44,7 +44,7 @@ def metadata_qa(state: AgentState, deps: AgentDeps) -> dict:
         vector = deps.embeddings.embed([question])[0]
         hits = [
             (index, hit)
-            for index in SEARCHED
+            for index in SEARCHED if deps.documents_enabled or index != "kb_docs"
             for hit in deps.search.query(alias_name(pack.name, index), question, vector, [deps.role], HITS_PER_INDEX)
         ]
     except (EmbeddingError, SearchError) as error:

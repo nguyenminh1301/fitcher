@@ -41,3 +41,15 @@ class DraftResult(ContractModel):
 
 class DocumentRolesChange(ContractModel):
     allowed_roles: list[str] = Field(min_length=1)
+
+
+class DocumentSettings(ContractModel):
+    enabled: bool
+    # Documents of the active pack that are kept, indexed or not; 0 without an active pack.
+    documents: int
+
+
+class DocumentSettingsChange(ContractModel):
+    enabled: bool
+    # Turning documents off while documents exist needs this, after the user saw that they are kept.
+    confirm: bool = False
