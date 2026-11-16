@@ -9,7 +9,8 @@ from dataclasses import dataclass
 from datetime import date
 import re
 
-from app.search.client import SearchError
+from app.search.client import QdrantCollections
+from app.search.engine import SearchError
 
 
 class FakeWarehouse:
@@ -97,7 +98,7 @@ def matches(payload: dict, flt: dict | None) -> bool:
     return True
 
 
-class FakeSearch:
+class FakeSearch(QdrantCollections):
     """In-memory Qdrant: collections, points, aliases and a call log.
 
     ``fail_upsert_into`` makes writing points into any collection whose name

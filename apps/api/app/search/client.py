@@ -11,33 +11,19 @@ on the server. Hits are ``{id, score, source}`` with the pack document id and
 its payload.
 """
 
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable, Mapping, Sequence
+import re
 from typing import Any
-import uuid
 
 import httpx
 
 from app.search import sparse
+from app.search.engine import BM25, DENSE, TRIGRAM, SearchError, uses_trigrams
 
 TIMEOUT_SECONDS = 60
 UPSERT_BATCH = 256
 # Each prefetch keeps this many candidates per requested hit before fusion.
 PREFETCH_FACTOR = 4
-DENSE = "dense"
-BM25 = "bm25"
-TRIGRAM = "trigram"
-# Point ids are UUIDs derived from the pack document id, which stays in the payload.
-_POINT_NAMESPACE = uuid.UUID("0b8f5a52-7c1d-4b4e-9a3f-6f1d2c9e8a10")
-
-
-class SearchError(RuntimeError):
-    """A Qdrant request failed."""
-
-
-def point_id(document_id: str) -> str:
-    return str(uuid.uuid5(_POINT_NAMESPACE, document_id))
-
-
 def role_filter(roles: Sequence[str]) -> dict:
     return {"must": [{"key": "allowed_roles", "match": {"any": list(roles)}}]}
 
@@ -45,11 +31,6 @@ def role_filter(roles: Sequence[str]) -> dict:
 def document_filter(document_id: str) -> dict:
     """Every ``kb_docs`` chunk of one company document."""
     return {"must": [{"key": "document_id", "match": {"value": document_id}}]}
-
-
-def uses_trigrams(name: str) -> bool:
-    """Column value collections, and their aliases, also carry character trigrams."""
-    return "_column_values" in name
 
 
 def hybrid_request(alias: str, text: str, vector: Sequence[float], roles: Sequence[str], size: int) -> dict:
@@ -66,7 +47,68 @@ def hybrid_request(alias: str, text: str, vector: Sequence[float], roles: Sequen
     return {"prefetch": prefetch, "query": {"fusion": "rrf"}, "limit": size, "with_payload": True}
 
 
-class QdrantSearch:
+def physical_name(collection: str, generation: int) -> str:
+    """The Qdrant collection of one generation; the logical collection name is its alias."""
+    return f"{collection}_v{generation}"
+
+
+def _generation(collection: str, name: str) -> int | None:
+    match = re.fullmatch(rf"{re.escape(collection)}_v(\d+)", name)
+    return int(match.group(1)) if match else None
+
+
+class QdrantCollections:
+    """The ``SearchEngine`` operations over Qdrant collections and aliases.
+
+    Each generation is a collection ``<collection>_v<N>`` and the live one is
+    the target of the alias ``<collection>``. Subclasses provide the REST
+    calls, so the in-memory test double shares this mapping.
+    """
+
+    def generations(self, collection: str) -> list[int]:
+        found = (_generation(collection, name) for name in self.list_collections())
+        return sorted(generation for generation in found if generation is not None)
+
+    def live(self) -> dict[str, int]:
+        live: dict[str, int] = {}
+        for alias, target in self.alias_targets().items():
+            generation = _generation(alias, target)
+            if generation is not None:
+                live[alias] = generation
+        return live
+
+    def create(self, collection: str, generation: int, dimensions: int) -> None:
+        self.create_collection(physical_name(collection, generation), dimensions)
+
+    def drop(self, collection: str, generation: int) -> None:
+        self.delete_collection(physical_name(collection, generation))
+
+    def write(self, collection: str, points: Iterable[dict], generation: int | None = None) -> int:
+        return self.upsert(collection if generation is None else physical_name(collection, generation), points)
+
+    def size(self, collection: str, generation: int) -> int:
+        return self.count(physical_name(collection, generation))
+
+    def switch_live(self, generations: Mapping[str, int]) -> None:
+        current = self.alias_targets()
+        actions: list[dict] = []
+        for collection, generation in generations.items():
+            if collection in current:
+                actions.append({"delete_alias": {"alias_name": collection}})
+            actions.append({"create_alias": {"collection_name": physical_name(collection, generation), "alias_name": collection}})
+        self.update_aliases(actions)
+
+    def live_points(self, collection: str, document_id: str | None = None, with_vectors: bool = False) -> list[dict]:
+        return self.scroll(collection, document_filter(document_id) if document_id else None, with_vectors)
+
+    def delete_document(self, collection: str, document_id: str) -> None:
+        self.delete_points(collection, document_filter(document_id))
+
+    def set_document_roles(self, collection: str, document_id: str, roles: Sequence[str]) -> None:
+        self.set_payload(collection, {"allowed_roles": list(roles)}, document_filter(document_id))
+
+
+class QdrantSearch(QdrantCollections):
     def __init__(self, base_url: str, http: httpx.Client | None = None):
         self._base = base_url.rstrip("/")
         self._http = http or httpx.Client(timeout=TIMEOUT_SECONDS)

@@ -7,7 +7,9 @@ import uuid
 import httpx
 import pytest
 
-from app.search.client import QdrantSearch, SearchError, document_filter, point_id
+from app.search.client import QdrantSearch, document_filter
+from app.search.engine import SearchError, point_id
+from tests.fakes import FakeSearch
 
 
 def client(handler) -> tuple[QdrantSearch, list[tuple[str, str, dict | None]]]:
@@ -142,3 +144,13 @@ def test_points_are_deleted_and_payload_set_by_filter_and_wait():
     assert sent[0][2] == {"filter": {"must": [{"key": "document_id", "match": {"value": "d"}}]}}
     assert sent[1][:2] == ("POST", "/collections/shop_kb_docs/points/payload")
     assert sent[1][2] == {"payload": {"allowed_roles": ["analyst"]}, "filter": document_filter("d")}
+
+
+def test_generations_are_the_numbered_collections_of_exactly_that_collection():
+    search = FakeSearch()
+    for name in ("shop_metrics_v3", "shop_metrics_v12", "shop_extra_metrics_v1", "other_metrics_v1"):
+        search.create_collection(name, 4)
+    search.update_aliases([{"create_alias": {"collection_name": "shop_metrics_v12", "alias_name": "shop_metrics"}}])
+
+    assert search.generations("shop_metrics") == [3, 12]
+    assert search.live() == {"shop_metrics": 12}

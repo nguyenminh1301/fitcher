@@ -5,10 +5,10 @@ references and the warehouse catalog; keep approved items only; test-run every
 metric; reconcile the ClickHouse roles, grants, row policies, views and users
 of the pack's policies; read each dataset's date coverage and the top values of
 indexable columns; screen document chunks and column values (DECISIONS §9);
-write a new generation of the six Qdrant collections; move all six
-aliases in one request; write ``compiled.json``; and only then delete older
-generations. A failure before the alias move deletes the partial generation
-and leaves the live aliases untouched.
+write a new generation of the six search collections; make it live for all
+six in one step; write ``compiled.json``; and only then delete older
+generations. A failure before the switch deletes the partial generation and
+leaves the live generation untouched.
 
 ``kb_docs`` is rebuilt from the document registry: the chunks of every
 ``indexed`` document are copied with their vectors from the live generation
@@ -41,9 +41,9 @@ from app.llm.embeddings import EmbeddingClient
 from app.packs.loader import check_references, load_pack
 from app.packs.models import Pack
 from app.packs.policy_compiler import AccessControl, apply_policies, memory_cap
-from app.packs.search_indices import INDEX_NAMES, ColumnValue, alias_name, build_documents, generation_of, physical_name, points
+from app.packs.search_indices import INDEX_NAMES, ColumnValue, alias_name, build_documents, points
 from app.screening.screen import Screener
-from app.search.client import QdrantSearch
+from app.search.engine import SearchEngine
 
 MARTS_DATABASE = "marts"
 # readonly=2 allows only reads while still letting the query carry its own settings.
@@ -266,16 +266,16 @@ def screen_documents(documents: dict[str, list[dict]], screener: Screener, summa
         )
 
 
-def _delete_quietly(search: QdrantSearch, names: Sequence[str]) -> None:
-    for name in names:
+def _drop_quietly(search: SearchEngine, pack: str, generation: int) -> None:
+    for index in INDEX_NAMES:
         try:
-            search.delete_collection(name)
+            search.drop(alias_name(pack, index), generation)
         except Exception:  # noqa: BLE001, S110 - cleanup must not hide the original failure
             pass
 
 
-def next_generation(search: QdrantSearch, pack: str) -> int:
-    generations = [parsed[1] for name in search.list_collections() if (parsed := generation_of(pack, name))]
+def next_generation(search: SearchEngine, pack: str) -> int:
+    generations = [generation for index in INDEX_NAMES for generation in search.generations(alias_name(pack, index))]
     return max(generations, default=0) + 1
 
 
@@ -287,7 +287,7 @@ def _live_compiled(output_dir: Path, pack: str) -> CompiledPack | None:
 
 
 def registry_chunks(
-    search: QdrantSearch, pack: str, registry: DocumentRegistry, documents_dir: Path, live: CompiledPack | None,
+    search: SearchEngine, pack: str, registry: DocumentRegistry, documents_dir: Path, live: CompiledPack | None,
     embedding_alias: str, dimensions: int, summary: "CompileSummary",
 ) -> tuple[list[dict], list[dict]]:
     """``(points copied from the live kb_docs, chunk documents to screen and embed)`` of the indexed documents."""
@@ -297,10 +297,10 @@ def registry_chunks(
     alias = alias_name(pack, KB_DOCS)
     same_model = (
         live is not None and live.embedding_alias == embedding_alias and live.embedding_dimensions == dimensions
-        and alias in search.alias_targets()
+        and alias in search.live()
     )
     if same_model:
-        live_points = search.scroll(alias, with_vectors=True)
+        live_points = search.live_points(alias, with_vectors=True)
         return [
             {"id": point["id"], "vector": point["vector"], "payload": point["payload"]}
             for point in live_points if point["payload"].get("document_id") in indexed
@@ -321,7 +321,7 @@ def registry_chunks(
 
 
 def build_generation(
-    search: QdrantSearch, embeddings: EmbeddingClient, pack: str, documents: dict[str, list[dict]],
+    search: SearchEngine, embeddings: EmbeddingClient, pack: str, documents: dict[str, list[dict]],
     carried: dict[str, list[dict]] | None = None,
 ) -> tuple[int, dict[str, int]]:
     """Create and fill generation N+1 of every collection; delete it again on any failure.
@@ -330,42 +330,36 @@ def build_generation(
     """
     carried = carried or {}
     generation = next_generation(search, pack)
-    created: list[str] = []
     counts: dict[str, int] = {}
     try:
         for index in INDEX_NAMES:
-            name = physical_name(pack, index, generation)
-            search.create_collection(name, embeddings.dimensions)
-            created.append(name)
+            name = alias_name(pack, index)
+            search.create(name, generation, embeddings.dimensions)
             docs = documents[index]
             vectors = embeddings.embed([document["embedding_text"] for document in docs]) if docs else []
-            search.upsert(name, [*points(name, docs, vectors), *carried.get(index, [])])
-            counts[index] = search.count(name)
+            search.write(name, [*points(name, docs, vectors), *carried.get(index, [])], generation)
+            counts[index] = search.size(name, generation)
             expected = len(docs) + len(carried.get(index, []))
             if counts[index] != expected:
-                raise CompileError(f"{name} holds {counts[index]} points, expected {expected}")
+                raise CompileError(f"{name} generation {generation} holds {counts[index]} points, expected {expected}")
     except Exception as error:
-        _delete_quietly(search, created)
+        _drop_quietly(search, pack, generation)
         raise CompileError(f"building index generation {generation} failed: {_first_line(error)}") from error
     return generation, counts
 
 
-def swap_aliases(search: QdrantSearch, pack: str, generation: int) -> None:
-    """Point all six aliases at ``generation`` in one atomic request, so a reader never sees a mixed generation."""
-    current = search.alias_targets()
-    actions: list[dict] = []
-    for index in INDEX_NAMES:
-        alias = alias_name(pack, index)
-        if alias in current:
-            actions.append({"delete_alias": {"alias_name": alias}})
-        actions.append({"create_alias": {"collection_name": physical_name(pack, index, generation), "alias_name": alias}})
-    search.update_aliases(actions)
+def make_live(search: SearchEngine, pack: str, generation: int) -> None:
+    """Make ``generation`` of all six collections live in one step, so a reader never sees a mixed generation."""
+    search.switch_live({alias_name(pack, index): generation for index in INDEX_NAMES})
 
 
-def delete_older_generations(search: QdrantSearch, pack: str, generation: int) -> list[str]:
-    old = [name for name in search.list_collections() if (parsed := generation_of(pack, name)) and parsed[1] < generation]
-    for name in old:
-        search.delete_collection(name)
+def delete_older_generations(search: SearchEngine, pack: str, generation: int) -> list[str]:
+    old: list[str] = []
+    for collection in sorted(alias_name(pack, index) for index in INDEX_NAMES):
+        for older in search.generations(collection):
+            if older < generation:
+                search.drop(collection, older)
+                old.append(f"{collection} generation {older}")
     return old
 
 
@@ -385,7 +379,7 @@ def compile_pack(
     *,
     warehouse: Warehouse,
     top_k: int,
-    search: QdrantSearch | None = None,
+    search: SearchEngine | None = None,
     embeddings: EmbeddingClient | None = None,
     output_dir: Path | None = None,
     schema_dir: Path | None = None,
@@ -441,10 +435,10 @@ def compile_pack(
     try:
         target.parent.mkdir(parents=True, exist_ok=True)
         staged.write_text(compiled.model_dump_json(indent=2), encoding="utf-8")
-        swap_aliases(search, pack.name, generation)
+        make_live(search, pack.name, generation)
     except Exception as error:
         staged.unlink(missing_ok=True)
-        _delete_quietly(search, [physical_name(pack.name, index, generation) for index in INDEX_NAMES])
+        _drop_quietly(search, pack.name, generation)
         raise CompileError(f"publishing index generation {generation} failed: {_first_line(error)}") from error
     os.replace(staged, target)
     try:

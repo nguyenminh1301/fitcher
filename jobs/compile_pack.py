@@ -43,7 +43,7 @@ from app.onboarding.documents import ClickHouseDocumentRegistry, DocumentRegistr
 from app.packs.loader import PackValidationError
 from app.packs.search_indices import search_pack
 from app.screening.screen import Screener
-from app.search.client import QdrantSearch, SearchError
+from app.search.engine import SearchEngine, SearchError, open_search
 from jobs.lib.clickhouse import admin_client
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -98,7 +98,7 @@ def print_summary(summary: CompileSummary) -> None:
         print(f"  warning: {warning}")
 
 
-def check_search(args: argparse.Namespace, settings, search: QdrantSearch, embeddings) -> int:
+def check_search(args: argparse.Namespace, settings, search: SearchEngine, embeddings) -> int:
     compiled = load_compiled(Path(settings.compiled_pack_dir), args.pack)
     roles = args.role or [role.id for role in compiled.pack.policies.roles]
     results = search_pack(search, embeddings, args.pack, args.check_search, roles, CHECK_SEARCH_SIZE)
@@ -149,7 +149,7 @@ def _main(argv: list[str] | None, call_log=None) -> int:
     args = parse_args(argv)
     try:
         settings = load_settings()
-        search = QdrantSearch(settings.qdrant_url)
+        search = open_search(settings)
         if args.check_search is not None:
             embeddings, _ = clients.index_embeddings(call_log=call_log)
             return check_search(args, settings, search, embeddings)

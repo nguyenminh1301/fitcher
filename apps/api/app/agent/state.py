@@ -4,7 +4,7 @@ Each node is a function of ``(state, deps)`` that returns the state fields it
 changes, so it can be tested alone with fake dependencies (DECISIONS §13).
 """
 
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from datetime import date
 from typing import Literal, Protocol, TypedDict
@@ -23,13 +23,9 @@ from app.observability.log_writer import FlushResult
 from app.packs.compiler import CompiledPack
 from app.packs.models import BusinessProfile
 from app.screening.screen import ScreenMode, Screener, Verdict
+from app.search.engine import SearchEngine
 
 TimeGrain = Literal["day", "week", "month", "quarter", "year"]
-
-
-class SearchClient(Protocol):
-    def query(self, alias: str, text: str, vector: Sequence[float], roles: Sequence[str], size: int) -> list[dict]:
-        """Hybrid keyword and semantic hits of ``alias`` readable by ``roles``, as ``{id, score, source}``."""
 
 
 class LogWriter(Protocol):
@@ -59,7 +55,7 @@ Progress = Callable[[str, Literal["start", "end"], "AgentState", Mapping | None]
 @dataclass(frozen=True)
 class AgentDeps:
     llm: LLMClient
-    search: SearchClient
+    search: SearchEngine
     embeddings: EmbeddingClient
     runner: QueryRunner
     compiled: CompiledPack

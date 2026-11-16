@@ -5,6 +5,7 @@ from types import SimpleNamespace
 import pytest
 
 from app.onboarding.documents import DocumentService, InMemoryDocumentRegistry
+from app.search.client import QdrantCollections
 from jobs import ingest_docs as job
 
 NOW = datetime(2026, 11, 5, tzinfo=UTC)
@@ -24,7 +25,7 @@ class Embeddings:
         return [[1.0, 0.0] for _ in texts]
 
 
-class Search:
+class Search(QdrantCollections):
     def __init__(self):
         self.points = []
         self.aliases = {}

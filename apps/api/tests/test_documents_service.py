@@ -9,7 +9,7 @@ from app.onboarding.documents import (
     DocumentNotFound, DocumentService, DuplicateDocument, InMemoryDocumentRegistry, PackCompiling, compile_lock_path,
     is_compiling,
 )
-from app.search.client import SearchError
+from app.search.engine import SearchError
 from document_fixtures import MARKDOWN, pdf_bytes
 from fakes import FakeEmbeddings, FakeSearch
 

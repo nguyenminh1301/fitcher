@@ -35,7 +35,7 @@ def services(monkeypatch, tmp_path):
     monkeypatch.setenv("CLICKHOUSE_AGENT_PASSWORD", "lab-secret")
     monkeypatch.setattr(cli, "admin_client", lambda: object())
     monkeypatch.setattr(cli, "ClickHouseWarehouse", lambda client: fake_warehouse)
-    monkeypatch.setattr(cli, "QdrantSearch", lambda url: search)
+    monkeypatch.setattr(cli, "open_search", lambda settings: search)
     monkeypatch.setattr(cli.clients, "index_embeddings", lambda **kwargs: (FakeEmbeddings(), "fake/embedding-model"))
     monkeypatch.setattr(cli, "ClickHouseDocumentRegistry", lambda client: registry)
     return search

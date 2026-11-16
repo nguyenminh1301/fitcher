@@ -1,43 +1,30 @@
-"""Qdrant collections, documents and points for a compiled pack (DECISIONS §5).
+"""Search collections, documents and points for a compiled pack (DECISIONS §5).
 
-Each pack owns six logical collections. A compile writes generation ``N`` of
-every collection under the name ``<pack>_<index>_v<N>``; retrieval reads the
-alias ``<pack>_<index>``, so packs never overwrite each other and a new
-generation goes live with one atomic alias move.
+Each pack owns six logical collections named ``<pack>_<index>``, so packs
+never overwrite each other. A compile writes a new generation of every
+collection and makes it live in one step (``app.search.engine``).
 
 Every document is ``{id, type, pack, allowed_roles, title, text, ...}`` and
 becomes one point whose payload is the document. A point carries a dense
 ``embed`` vector and a BM25 sparse vector of its title (counted twice) and
 text; column values also carry character trigrams, so a misspelled value
-still matches. ``allowed_roles`` and ``type`` have payload indexes.
+still matches.
 """
 
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 import hashlib
-import re
 
 from app.llm.embeddings import EmbeddingClient
 from app.packs.models import Pack
 from app.search import sparse
-from app.search.client import BM25, DENSE, TRIGRAM, point_id, uses_trigrams
+from app.search.engine import BM25, DENSE, TRIGRAM, point_id, uses_trigrams
 
 INDEX_NAMES = ("glossary_terms", "metrics", "datasets", "column_values", "examples", "kb_docs")
 
 
 def alias_name(pack: str, index: str) -> str:
     return f"{pack}_{index}"
-
-
-def physical_name(pack: str, index: str, generation: int) -> str:
-    return f"{pack}_{index}_v{generation}"
-
-
-def generation_of(pack: str, name: str) -> tuple[str, int] | None:
-    """Return ``(index, generation)`` when ``name`` is a physical index of ``pack``."""
-    pattern = rf"{re.escape(pack)}_({'|'.join(INDEX_NAMES)})_v(\d+)"
-    match = re.fullmatch(pattern, name)
-    return (match.group(1), int(match.group(2))) if match else None
 
 
 @dataclass(frozen=True)
@@ -183,7 +170,7 @@ def bm25_tokens(document: dict) -> list[str]:
 
 
 def points(name: str, documents: Sequence[dict], vectors: Sequence[Sequence[float]]) -> list[dict]:
-    """The Qdrant points of one collection's documents, with their dense vectors in order."""
+    """The search points of one collection's documents, with their dense vectors in order."""
     tokens = [bm25_tokens(document) for document in documents]
     average = sparse.average_length(tokens)
     result = []
