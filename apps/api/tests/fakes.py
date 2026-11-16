@@ -1,4 +1,4 @@
-"""In-memory stand-ins for ClickHouse, Qdrant and the embedding alias.
+"""In-memory stand-ins for ClickHouse, the search engine and the embedding alias.
 
 They record every call so tests can assert ordering, and each can be told to
 fail at a chosen point.
@@ -9,7 +9,6 @@ from dataclasses import dataclass
 from datetime import date
 import re
 
-from app.search.client import QdrantCollections
 from app.search.engine import SearchError
 
 
@@ -78,108 +77,99 @@ class FakeEmbeddings:
 
 @dataclass(frozen=True)
 class SearchRequest:
-    alias: str
+    collection: str
     text: str
     vector: list[float]
     roles: list[str]
     size: int
 
 
-def matches(payload: dict, flt: dict | None) -> bool:
-    """Whether a payload passes a Qdrant ``must`` filter of ``match.value`` or ``match.any`` conditions."""
-    for condition in (flt or {}).get("must", []):
-        value = payload.get(condition["key"])
-        expected = condition["match"]
-        values = value if isinstance(value, list) else [value]
-        if "value" in expected and expected["value"] not in values:
-            return False
-        if "any" in expected and not set(values) & set(expected["any"]):
-            return False
-    return True
+class FakeSearch:
+    """In-memory search engine: generation tables, the live generations and a call log.
 
-
-class FakeSearch(QdrantCollections):
-    """In-memory Qdrant: collections, points, aliases and a call log.
-
-    ``fail_upsert_into`` makes writing points into any collection whose name
-    contains that substring fail; ``search_results`` maps an alias to the hits
-    ``query`` returns, or is called with the alias and the request.
+    A generation's table is named ``<collection>__<N>`` as in ClickHouse.
+    ``fail_write_into`` makes writing into any table whose name contains that
+    substring fail; ``search_results`` maps a collection to the hits ``query``
+    returns, or is called with the collection and the request.
     """
 
-    def __init__(self, fail_upsert_into: str | None = None, search_results=None):
-        self.collections: dict[str, int] = {}
+    def __init__(self, fail_write_into: str | None = None, search_results=None):
+        self.tables: dict[str, int] = {}
         self.points: dict[str, list[dict]] = {}
-        self.aliases: dict[str, str] = {}
-        self.alias_updates: list[list[dict]] = []
+        self.live_generations: dict[str, int] = {}
+        self.switches: list[dict[str, int]] = []
         self.queries: list[SearchRequest] = []
-        self.fail_upsert_into = fail_upsert_into
+        self.fail_write_into = fail_write_into
         self.search_results = search_results or {}
 
-    def create_collection(self, name: str, dimensions: int) -> None:
-        if name in self.collections:
-            raise SearchError(f"collection {name} already exists")
-        self.collections[name] = dimensions
+    @staticmethod
+    def table(collection: str, generation: int) -> str:
+        return f"{collection}__{generation}"
+
+    def generations(self, collection: str) -> list[int]:
+        prefix = f"{collection}__"
+        return sorted(int(name[len(prefix):]) for name in self.tables if name.startswith(prefix) and name[len(prefix):].isdigit())
+
+    def live(self) -> dict[str, int]:
+        return dict(self.live_generations)
+
+    def create(self, collection: str, generation: int, dimensions: int) -> None:
+        name = self.table(collection, generation)
+        if name in self.tables:
+            raise SearchError(f"table {name} already exists")
+        self.tables[name] = dimensions
         self.points[name] = []
 
-    def delete_collection(self, name: str) -> None:
-        self.collections.pop(name, None)
+    def drop(self, collection: str, generation: int) -> None:
+        name = self.table(collection, generation)
+        self.tables.pop(name, None)
         self.points.pop(name, None)
-        self.aliases = {alias: target for alias, target in self.aliases.items() if target != name}
 
-    def list_collections(self) -> list[str]:
-        return sorted(self.collections)
+    def _live_table(self, collection: str) -> str:
+        if collection not in self.live_generations:
+            raise SearchError(f"collection {collection} has no live generation")
+        return self.table(collection, self.live_generations[collection])
 
-    def alias_targets(self) -> dict[str, str]:
-        return dict(self.aliases)
-
-    def update_aliases(self, actions: list[dict]) -> None:
-        self.alias_updates.append(actions)
-        for action in actions:
-            if "delete_alias" in action:
-                self.aliases.pop(action["delete_alias"]["alias_name"], None)
-            else:
-                self.aliases[action["create_alias"]["alias_name"]] = action["create_alias"]["collection_name"]
-
-    def _resolve(self, name: str) -> str:
-        """The collection a name or alias points at."""
-        name = self.aliases.get(name, name)
-        if name not in self.points:
-            raise SearchError(f"collection {name} does not exist")
-        return name
-
-    def upsert(self, name: str, points: Iterable[dict]) -> int:
-        if self.fail_upsert_into and self.fail_upsert_into in name:
-            raise SearchError(f"PUT /collections/{name}/points returned HTTP 500")
+    def write(self, collection: str, points: Iterable[dict], generation: int | None = None) -> int:
+        name = self._live_table(collection) if generation is None else self.table(collection, generation)
+        if self.fail_write_into and self.fail_write_into in name:
+            raise SearchError(f"write into {name} failed")
         points = list(points)
-        stored = self.points[self._resolve(name)]
+        stored = self.points[name]
         ids = {point["id"] for point in points}
         stored[:] = [point for point in stored if point["id"] not in ids] + points
         return len(points)
 
-    def count(self, name: str) -> int:
-        return len(self.points[self._resolve(name)])
+    def size(self, collection: str, generation: int) -> int:
+        return len(self.points[self.table(collection, generation)])
 
-    def scroll(self, name: str, flt: dict | None = None, with_vectors: bool = False) -> list[dict]:
-        found = [point for point in self.points[self._resolve(name)] if matches(point["payload"], flt)]
+    def switch_live(self, generations) -> None:
+        self.switches.append(dict(generations))
+        self.live_generations.update(generations)
+
+    def _document(self, collection: str, document_id: str | None) -> list[dict]:
+        return [point for point in self.points[self._live_table(collection)]
+                if document_id is None or point["payload"].get("document_id") == document_id]
+
+    def live_points(self, collection: str, document_id: str | None = None, with_vectors: bool = False) -> list[dict]:
         return [{"id": point["id"], "payload": dict(point["payload"]),
-                 **({"vector": point["vector"]} if with_vectors else {})} for point in found]
+                 **({"vector": point["vector"]} if with_vectors else {})} for point in self._document(collection, document_id)]
 
-    def delete_points(self, name: str, flt: dict) -> None:
-        collection = self._resolve(name)
-        self.points[collection] = [point for point in self.points[collection] if not matches(point["payload"], flt)]
+    def delete_document(self, collection: str, document_id: str) -> None:
+        name = self._live_table(collection)
+        self.points[name] = [point for point in self.points[name] if point["payload"].get("document_id") != document_id]
 
-    def set_payload(self, name: str, payload: dict, flt: dict) -> None:
-        for point in self.points[self._resolve(name)]:
-            if matches(point["payload"], flt):
-                point["payload"].update(payload)
+    def set_document_roles(self, collection: str, document_id: str, roles) -> None:
+        for point in self._document(collection, document_id):
+            point["payload"]["allowed_roles"] = list(roles)
 
-    def query(self, alias: str, text: str, vector, roles, size: int) -> list[dict]:
-        """The agent's search interface; ``search_results`` is called with the alias and the request."""
-        request = SearchRequest(alias, text, list(vector), list(roles), size)
+    def query(self, collection: str, text: str, vector, roles, size: int) -> list[dict]:
+        """The agent's search interface; ``search_results`` is called with the collection and the request."""
+        request = SearchRequest(collection, text, list(vector), list(roles), size)
         self.queries.append(request)
         if callable(self.search_results):
-            return self.search_results(alias, request)
-        return self.search_results.get(alias, [])
+            return self.search_results(collection, request)
+        return self.search_results.get(collection, [])
 
 
 class FakeRunner:

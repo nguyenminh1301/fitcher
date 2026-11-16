@@ -5,8 +5,8 @@ from types import SimpleNamespace
 import pytest
 
 from app.onboarding.documents import DocumentService, InMemoryDocumentRegistry
-from app.search.client import QdrantCollections
 from jobs import ingest_docs as job
+from tests.fakes import FakeSearch
 
 NOW = datetime(2026, 11, 5, tzinfo=UTC)
 
@@ -25,30 +25,6 @@ class Embeddings:
         return [[1.0, 0.0] for _ in texts]
 
 
-class Search(QdrantCollections):
-    def __init__(self):
-        self.points = []
-        self.aliases = {}
-
-    def alias_targets(self):
-        return self.aliases
-
-    def list_collections(self):
-        return []
-
-    def create_collection(self, name, dimensions):
-        pass
-
-    def update_aliases(self, actions):
-        self.aliases.update({a["create_alias"]["alias_name"]: a["create_alias"]["collection_name"] for a in actions})
-
-    def upsert(self, name, points):
-        self.points.extend(points)
-
-    def delete_points(self, name, flt):
-        pass
-
-
 @pytest.fixture
 def folder(tmp_path: Path) -> Path:
     (tmp_path / "notes.md").write_bytes(b"# Notes\n\nReturns are counted on the return date.")
@@ -64,7 +40,7 @@ def folder(tmp_path: Path) -> Path:
 @pytest.fixture
 def service(tmp_path):
     return DocumentService(
-        pack="lab", pack_roles=["analyst", "sales"], registry=InMemoryDocumentRegistry(), search=Search(),
+        pack="lab", pack_roles=["analyst", "sales"], registry=InMemoryDocumentRegistry(), search=FakeSearch(),
         embeddings=Embeddings(), screener=AllowAll(), store_dir=tmp_path / "store", compiled_dir=tmp_path / "build",
         max_bytes=1000, clock=lambda: NOW,
     )

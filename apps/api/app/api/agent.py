@@ -79,7 +79,7 @@ class Agent:
         self._logs = start_log_writer(settings)
         # Each provider call writes its llm_calls row through the run's log writer.
         self._llm = chat_client(call_log=self._logs.enqueue)
-        self._search = open_search(settings)
+        self._search = open_search()
         # Query vectors must match the indexed ones, so the compiled size wins over the setting.
         self._embeddings = embedding_client(compiled.embedding_dimensions, call_log=self._logs.enqueue)
         self._limits = QueryLimits.from_env()

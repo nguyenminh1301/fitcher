@@ -20,11 +20,8 @@ Callers import this module only; ``open_search`` returns the configured engine.
 """
 
 from collections.abc import Iterable, Mapping, Sequence
-from typing import TYPE_CHECKING, Protocol
+from typing import Protocol
 import uuid
-
-if TYPE_CHECKING:
-    from app.config import Settings
 
 DENSE = "dense"
 BM25 = "bm25"
@@ -88,13 +85,9 @@ class SearchEngine(Protocol):
         """Hybrid keyword and semantic hits of the live ``collection`` readable by ``roles``."""
 
 
-def open_search(settings: "Settings") -> SearchEngine:
-    """The configured search engine: ``SEARCH_ENGINE`` is ``qdrant`` or ``clickhouse``."""
-    # Imported here so this module stays free of either engine's dependencies.
-    if settings.search_engine == "clickhouse":
-        from app.search.clickhouse_index import ClickHouseSearch, search_client  # noqa: PLC0415
+def open_search() -> SearchEngine:
+    """The search engine: the pack's search tables in ClickHouse (``app.search.clickhouse_index``)."""
+    # Imported here so callers and test doubles of the interface do not load the ClickHouse driver.
+    from app.search.clickhouse_index import ClickHouseSearch  # noqa: PLC0415
 
-        return ClickHouseSearch(search_client())
-    from app.search.client import QdrantSearch  # noqa: PLC0415
-
-    return QdrantSearch(settings.qdrant_url)
+    return ClickHouseSearch()

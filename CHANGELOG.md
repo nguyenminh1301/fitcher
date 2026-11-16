@@ -201,6 +201,7 @@
 
 ### Changed
 
+- Pack search runs only in ClickHouse: the compiler, company documents, the agent and the jobs use the `search` database, and at start the api compiles again every compiled pack whose search collections are missing, which rebuilds the index after an upgrade from Qdrant (every item is embedded again).
 - The pack compiler, company documents, the agent and the jobs reach search only through `app/search/engine.py`, an interface of logical collections and live generations that the Qdrant client implements unchanged, so another search engine can replace it.
 - Label an eval run that reaches the threshold "Meets threshold" on the Evaluation page instead of "Pack enabled": the threshold is a report, not a gate (DECISIONS §14), and no check keeps a pack, instant or hand-written, disabled below it.
 - Mount the compiled packs writable for the api in the development Compose stack, because the api now compiles the instant pack it builds.

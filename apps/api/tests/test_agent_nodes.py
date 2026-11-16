@@ -95,7 +95,7 @@ def test_retrieve_embeds_once_and_searches_each_term():
     assert set(retrieval.dimension_terms) == {"widgets", "widget"}
     assert set(retrieval.values) == {"Blue Widget"}
     assert retrieval.examples[0].id == "revenue_by_widget"
-    searched = {request.alias for request in agent.search.queries}
+    searched = {request.collection for request in agent.search.queries}
     assert searched == {f"minimal_{name}" for name in ("glossary_terms", "metrics", "datasets", "column_values", "examples")}
     assert all(request.roles == ["viewer"] and len(request.vector) == embeddings.dimensions for request in agent.search.queries)
 
@@ -113,7 +113,7 @@ def test_term_candidates_come_from_the_whole_pack_and_context_from_the_asking_ro
 
     roles_by_index = {}
     for request in agent.search.queries:
-        roles_by_index.setdefault(request.alias, set()).update(request.roles)
+        roles_by_index.setdefault(request.collection, set()).update(request.roles)
     assert roles_by_index["minimal_metrics"] == {"viewer", "refunds_clerk"}
     assert roles_by_index["minimal_column_values"] == {"viewer", "refunds_clerk"}
     assert roles_by_index["minimal_examples"] == {"refunds_clerk"}

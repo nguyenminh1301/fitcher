@@ -79,6 +79,15 @@ def test_column_values_also_rank_by_character_trigrams():
     assert "trigram" in client.calls[-1][1]
 
 
+def test_a_query_without_words_ranks_by_the_dense_vector_only():
+    client = RecordingClient([])
+
+    ClickHouseSearch(client).query("shop_metrics", "?!", [1.0], ["analyst"], 5)
+
+    sql, parameters = client.calls[-1]
+    assert "UNION ALL" not in sql and set(parameters) == {"vector", "roles", "limit"}
+
+
 def test_a_collection_without_a_live_generation_is_a_search_error():
     class NoLive(RecordingClient):
         def query(self, sql, parameters=None):

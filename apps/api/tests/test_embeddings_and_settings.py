@@ -8,7 +8,6 @@ from app.config import SettingsError, load_settings
 def test_settings_defaults():
     settings = load_settings({})
 
-    assert settings.qdrant_url == "http://qdrant:6333"
     assert settings.column_values_top_k == 10_000
     assert settings.compiled_pack_dir == "build/packs"
     assert settings.documents_dir == "build/documents"
@@ -46,9 +45,3 @@ def test_invalid_screening_settings_are_rejected(env, message):
         load_settings(env)
 
 
-
-def test_the_search_engine_defaults_to_qdrant_and_accepts_only_known_engines():
-    assert load_settings({}).search_engine == "qdrant"
-    assert load_settings({"SEARCH_ENGINE": " ClickHouse "}).search_engine == "clickhouse"
-    with pytest.raises(SettingsError, match="SEARCH_ENGINE"):
-        load_settings({"SEARCH_ENGINE": "elastic"})

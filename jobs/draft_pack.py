@@ -61,7 +61,7 @@ def main(argv: list[str] | None = None) -> int:
         settings = load_settings()
         compiled_dir = Path(settings.compiled_pack_dir)
         profile = read_profile(compiled_dir, args.pack)
-        chunks = read_chunks(open_search(settings), args.pack, args.document)
+        chunks = read_chunks(open_search(), args.pack, args.document)
         files = PackFiles(args.packs_dir / args.pack)
         clients.bootstrap()
         drafter = Drafter(clients.chat_client(), ClientWarehouse(admin_client()))

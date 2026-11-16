@@ -7,7 +7,7 @@ through the ``embed`` alias, which is a billable request sent with
 screened first with the classifier in ``GUARD_MODEL_DIR`` and the report lists
 what screening kept out or flagged; ``--skip-index``
 stops after validation, the metric test-run and the access policies and calls
-neither LiteLLM nor Qdrant.
+neither a model nor the search engine.
 
 The pack's policies are applied to ClickHouse as the admin user after the
 metric test-run: roles, column grants, row policies, aggregate-only views and
@@ -149,7 +149,7 @@ def _main(argv: list[str] | None, call_log=None) -> int:
     args = parse_args(argv)
     try:
         settings = load_settings()
-        search = open_search(settings)
+        search = open_search()
         if args.check_search is not None:
             embeddings, _ = clients.index_embeddings(call_log=call_log)
             return check_search(args, settings, search, embeddings)
