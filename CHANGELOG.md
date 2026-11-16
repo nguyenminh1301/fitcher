@@ -199,6 +199,7 @@
 
 ### Changed
 
+- The pack compiler, company documents, the agent and the jobs reach search only through `app/search/engine.py`, an interface of logical collections and live generations that the Qdrant client implements unchanged, so another search engine can replace it.
 - Label an eval run that reaches the threshold "Meets threshold" on the Evaluation page instead of "Pack enabled": the threshold is a report, not a gate (DECISIONS §14), and no check keeps a pack, instant or hand-written, disabled below it.
 - Mount the compiled packs writable for the api in the development Compose stack, because the api now compiles the instant pack it builds.
 - Ship the pack schemas in the release image (`/app/packs/_schema`); `init-data` copies them next to the packs of `/data` on every start, so a pack generated in the instance is validated with the schemas of the running image.

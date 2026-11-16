@@ -38,7 +38,7 @@ from app.observability.log_writer import start_log_writer
 from app.packs.compiler import CompileError, load_compiled
 from app.packs.models import Pack
 from app.screening.screen import Screener
-from app.search.client import QdrantSearch
+from app.search.engine import open_search
 
 TABLE_ROWS = 50
 _CONTROL = re.compile(r"[\x00-\x1f\x7f]")
@@ -162,7 +162,7 @@ def main(argv: list[str] | None = None) -> int:
         embeddings = clients.embedding_client(compiled.embedding_dimensions, call_log=logs.enqueue)
         deps = AgentDeps(
             llm=FaultInjectingLLM(llm) if args.inject_sql_fault else llm,
-            search=QdrantSearch(settings.qdrant_url),
+            search=open_search(settings),
             embeddings=embeddings,
             runner=ClickHouseRunner(agent_client(compiled.pack.name, role), QueryLimits.from_env()),
             compiled=compiled,

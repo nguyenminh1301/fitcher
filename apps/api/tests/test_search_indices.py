@@ -5,8 +5,9 @@ from fakes import FakeEmbeddings, FakeSearch
 import pytest
 
 from app.packs.loader import load_pack
-from app.packs.search_indices import INDEX_NAMES, ColumnValue, bm25_tokens, build_documents, generation_of, points, search_pack
-from app.search.client import hybrid_request, point_id, role_filter
+from app.packs.search_indices import INDEX_NAMES, ColumnValue, bm25_tokens, build_documents, points, search_pack
+from app.search.client import hybrid_request, role_filter
+from app.search.engine import point_id
 
 
 def _add_refunds_only_role(edit_pack):
@@ -15,17 +16,6 @@ def _add_refunds_only_role(edit_pack):
         **data["roles"][0], "id": "refunds_clerk", "datasets": [data["roles"][0]["datasets"][1]],
     }))
     edit_pack("datasets.yaml", lambda data: data["datasets"][1]["allowed_roles"].append("refunds_clerk"))
-
-
-@pytest.mark.parametrize(("name", "expected"), [
-    ("shop_metrics_v3", ("metrics", 3)),
-    ("shop_column_values_v12", ("column_values", 12)),
-    ("shop_metrics", None),
-    ("shop_extra_metrics_v1", None),
-    ("other_metrics_v1", None),
-])
-def test_generation_of_matches_only_the_packs_physical_indices(name, expected):
-    assert generation_of("shop", name) == expected
 
 
 def test_documents_carry_the_roles_granted_their_dataset_or_column(pack_dir, edit_pack):

@@ -28,7 +28,7 @@ from app.observability.log_writer import start_log_writer
 from app.packs.compiler import CompiledPack
 from app.packs.policy_compiler import Names
 from app.screening.screen import Screener
-from app.search.client import QdrantSearch
+from app.search.engine import open_search
 
 logger = logging.getLogger(__name__)
 
@@ -79,7 +79,7 @@ class Agent:
         self._logs = start_log_writer(settings)
         # Each provider call writes its llm_calls row through the run's log writer.
         self._llm = chat_client(call_log=self._logs.enqueue)
-        self._search = QdrantSearch(settings.qdrant_url)
+        self._search = open_search(settings)
         # Query vectors must match the indexed ones, so the compiled size wins over the setting.
         self._embeddings = embedding_client(compiled.embedding_dimensions, call_log=self._logs.enqueue)
         self._limits = QueryLimits.from_env()

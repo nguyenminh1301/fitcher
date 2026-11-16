@@ -42,7 +42,7 @@ from app.onboarding.instant import InstantPipeline, InstantWarehouse
 from app.packs.active import active_pack, set_active_pack
 from app.packs.compiler import CompileError, CompiledPack, compile_pack, load_compiled
 from app.screening.screen import Screener
-from app.search.client import QdrantSearch
+from app.search.engine import open_search
 from app.sources.client import source_admin_client
 from app.sources.files import FileService
 from app.sources.schedule import SourceScheduler
@@ -235,7 +235,7 @@ def get_document_service() -> DocumentService:
         raise unavailable(f"the document store is unavailable: {error}") from None
     return DocumentService(
         pack=identity.name, pack_roles=identity.roles, registry=registry,
-        search=QdrantSearch(settings.qdrant_url), embeddings=embeddings, screener=get_screener(),
+        search=open_search(settings), embeddings=embeddings, screener=get_screener(),
         store_dir=Path(settings.documents_dir), compiled_dir=Path(settings.compiled_pack_dir),
         max_bytes=settings.document_max_bytes,
     )
@@ -388,7 +388,7 @@ def _compile_instant(pack_dir: Path) -> object:
         warehouse = InstantWarehouse(pack_admin_client())
         return compile_pack(
             pack_dir, warehouse=warehouse, access=warehouse, agent_secret=os.environ.get("CLICKHOUSE_AGENT_PASSWORD", ""),
-            top_k=settings.column_values_top_k, search=QdrantSearch(settings.qdrant_url), embeddings=embeddings,
+            top_k=settings.column_values_top_k, search=open_search(settings), embeddings=embeddings,
             output_dir=compiled_dir, schema_dir=pack_dir.parent / "_schema", screener=get_screener(),
             registry=ClickHouseDocumentRegistry(pack_review_client()), documents_dir=Path(settings.documents_dir),
             embedding_alias=label,

@@ -18,9 +18,9 @@ from app.packs.compiler import (
     read_coverage,
 )
 from app.packs.loader import PackValidationError, load_pack
-from app.packs.search_indices import INDEX_NAMES, generation_of
+from app.packs.search_indices import INDEX_NAMES
 from app.screening.screen import Screener
-from app.search.client import SearchError, point_id
+from app.search.engine import SearchError, point_id
 
 PACK = "minimal"
 
@@ -385,7 +385,7 @@ def test_queries_during_a_recompile_never_see_a_mixed_generation(pack_dir, tmp_p
 
     def snapshot() -> None:
         # What a reader resolving every alias at this moment would get.
-        seen.append({generation_of(PACK, target)[1] for target in search.aliases.values()})
+        seen.append({generation for collection, generation in search.live().items() if collection.startswith(PACK)})
 
     def upsert_while_reading(name, points):
         snapshot()

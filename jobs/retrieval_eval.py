@@ -32,7 +32,7 @@ from app.packs.compiler import CompileError, approved_pack, load_compiled
 from app.packs.loader import PackValidationError, load_pack
 from app.packs.models import EvalCase
 from app.packs.search_indices import INDEX_NAMES, alias_name, source_id
-from app.search.client import QdrantSearch, SearchError
+from app.search.engine import SearchError, open_search
 
 ROOT = Path(__file__).resolve().parents[1]
 TOP_K = 10
@@ -176,7 +176,7 @@ def main(argv: list[str] | None = None) -> int:
         compiled = load_compiled(Path(settings.compiled_pack_dir), args.pack)
         cases = load_eval_set(approved_pack(load_pack(args.packs_dir / args.pack))).cases
         backend = "qdrant"
-        search = QdrantSearch(settings.qdrant_url)
+        search = open_search(settings)
         clients.bootstrap()
         # Query vectors must match the indexed ones, so the compiled size wins over the setting.
         embeddings = clients.embedding_client(compiled.embedding_dimensions)

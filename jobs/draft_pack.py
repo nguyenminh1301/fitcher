@@ -29,7 +29,7 @@ from app.onboarding.drafter import DRAFT_FILES, Drafter, DraftError, draft_files
 from app.onboarding.pack_yaml import PackFiles
 from app.onboarding.profiler import read_profile
 from app.packs.loader import PackValidationError
-from app.search.client import QdrantSearch, SearchError
+from app.search.engine import SearchEngine, SearchError, open_search
 from jobs.lib.clickhouse import admin_client
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -47,7 +47,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
-def read_chunks(search: QdrantSearch, pack: str, document_id: str | None) -> list[dict]:
+def read_chunks(search: SearchEngine, pack: str, document_id: str | None) -> list[dict]:
     try:
         return live_chunks(search, pack, document_id)
     except SearchError:
@@ -61,7 +61,7 @@ def main(argv: list[str] | None = None) -> int:
         settings = load_settings()
         compiled_dir = Path(settings.compiled_pack_dir)
         profile = read_profile(compiled_dir, args.pack)
-        chunks = read_chunks(QdrantSearch(settings.qdrant_url), args.pack, args.document)
+        chunks = read_chunks(open_search(settings), args.pack, args.document)
         files = PackFiles(args.packs_dir / args.pack)
         clients.bootstrap()
         drafter = Drafter(clients.chat_client(), ClientWarehouse(admin_client()))

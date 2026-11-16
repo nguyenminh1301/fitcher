@@ -28,7 +28,7 @@ from app.llm import clients
 from app.onboarding.docs_parser import DocumentRejected
 from app.onboarding.documents import ClickHouseDocumentRegistry, DocumentService, DuplicateDocument
 from app.screening.screen import Screener
-from app.search.client import QdrantSearch
+from app.search.engine import open_search
 from jobs.lib.clickhouse import admin_client
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -76,7 +76,7 @@ def build_service(pack: str, roles: list[str]) -> DocumentService:
     settings = load_settings()
     return DocumentService(
         pack=pack, pack_roles=roles, registry=ClickHouseDocumentRegistry(admin_client()),
-        search=QdrantSearch(settings.qdrant_url),
+        search=open_search(settings),
         embeddings=clients.index_embeddings()[0],
         screener=Screener.from_settings(settings), store_dir=Path(settings.documents_dir),
         compiled_dir=Path(settings.compiled_pack_dir), max_bytes=settings.document_max_bytes,
