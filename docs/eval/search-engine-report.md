@@ -83,3 +83,22 @@ A vector index is the later change if a pack needs far more values.
 - Recall is identical except column values, where ClickHouse finds one more value in the top five for a Vietnamese question of `ecommerce_twin`: exact dense search cannot miss a neighbour that Qdrant's approximate index can.
 - nDCG@10 differs by at most 0.02 on metrics and datasets, from ties and BM25 scores in a different floating-point order; on English column values the found value sits lower in the top five.
 - The decision rule was recall on every set at least Qdrant's and a 95th percentile under one second; both hold.
+
+## Pack eval after the switch
+
+Run on 2026-11-17 with search in ClickHouse and Qdrant removed, the same chat and embedding models as before:
+
+```bash
+docker compose --profile jobs run --rm jobs python -m jobs.eval --pack ecommerce_twin --baseline packs/ecommerce_twin/eval_baseline.json
+```
+
+| Layer | Passed | Failed | Not scored | Rate | Against the baseline |
+| --- | --- | --- | --- | --- | --- |
+| extraction | 25 | 3 | 17 | 89% | 0 |
+| retrieval | 33 | 0 | 12 | 100% (mean recall 1.00) | 0 |
+| execution | 41 | 4 | 0 | 91% | +1 |
+
+No layer regressed and the execution match meets the 80% threshold.
+The last run on Qdrant, on 2026-11-15, matched 42 of 45 cases.
+Two Vietnamese cases failed this time and passed then: `best_region_last_year_without_measure` (no extraction) and `net_sales_by_category_follow_up` (no result); `monthly_orders_next_year_follow_up` passed this time and failed then.
+Every scored retrieval found its expected sources, so these differences point to the chat model's answers rather than to search; the run was not repeated to confirm it.
