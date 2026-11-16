@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1.7
-# The release image (DECISIONS §3): web, api, an embedded ClickHouse and Qdrant supervised by s6-overlay
+# The release image (DECISIONS §3): web, api and an embedded ClickHouse supervised by s6-overlay
 # in one container, one data volume (/data) and one published port (3000). compose.yaml keeps the
 # development layout of separate services. Versions match compose.yaml; base images are pinned by digest.
 
@@ -7,12 +7,10 @@ ARG PYTHON_IMAGE=python:3.13.18-slim-trixie@sha256:e48f59cdba69a3cbd9ed2cf0f348d
 ARG NODE_BUILD_IMAGE=node:24.21.0-bookworm-slim@sha256:d6aa754f16b3197301076f047b5def2f02ea1dbbc2ca920407d46d7ec7f87b20
 ARG NODE_IMAGE=node:24.21.0-trixie-slim@sha256:173f125896c3b47ddf056734c7ea789d04595a6a08769a8f78e0df642781fb66
 ARG CLICKHOUSE_IMAGE=clickhouse/clickhouse-server:26.8.36.3@sha256:d426d2f612e1e189c90f9a3f8dcd85a03c6851273833817a296bb327e63aa7a7
-ARG QDRANT_IMAGE=qdrant/qdrant:v1.20.0@sha256:9bfc89f9914fc14876a88c05270685921a55b8877b254a98bcc1cc2f0a424cd2
 ARG UV_IMAGE=ghcr.io/astral-sh/uv:0.13.6@sha256:af22a52f5eafef3d78e551599d405c02df61919d18028f0cea8eda93bc9986d0
 
 FROM ${UV_IMAGE} AS uv
 FROM ${CLICKHOUSE_IMAGE} AS clickhouse
-FROM ${QDRANT_IMAGE} AS qdrant
 FROM ${NODE_IMAGE} AS node
 
 FROM ${NODE_BUILD_IMAGE} AS web-build
@@ -48,18 +46,16 @@ RUN apt-get update && apt-get install -y --no-install-recommends xz-utils \
     && tar -C /s6 -Jxpf "/tmp/s6-overlay-${arch}.tar.xz"
 
 FROM ${PYTHON_IMAGE} AS runtime
-# libunwind8 is the one library the Qdrant binary needs beyond the base image. tzdata-legacy keeps the old zone
+# tzdata-legacy keeps the old zone
 # names (Asia/Saigon, US/Eastern...) that browsers still send and Debian trixie moved out of tzdata.
 RUN apt-get update && apt-get upgrade -y --no-install-recommends \
-    && apt-get install -y --no-install-recommends libunwind8 tzdata-legacy \
+    && apt-get install -y --no-install-recommends tzdata-legacy \
     && rm -rf /var/lib/apt/lists/* \
     && python -m pip uninstall -y pip \
     && rm -rf /usr/local/lib/python3.13/ensurepip
 COPY --from=s6 /s6/ /
 COPY --from=clickhouse /usr/bin/clickhouse /usr/bin/clickhouse
 COPY --from=clickhouse /etc/clickhouse-server/config.xml /etc/clickhouse-server/users.xml /etc/clickhouse-server/
-COPY --from=qdrant /qdrant/qdrant /opt/qdrant/qdrant
-COPY --from=qdrant /qdrant/config /opt/qdrant/config
 COPY --from=node /usr/local/bin/node /usr/local/bin/node
 RUN ln -s /usr/bin/clickhouse /usr/bin/clickhouse-server && ln -s /usr/bin/clickhouse /usr/bin/clickhouse-client
 
@@ -100,7 +96,6 @@ ENV PATH="/app/.venv/bin:/command:$PATH" \
     COMPILED_PACK_DIR=/data/compiled \
     DOCUMENTS_DIR=/data/documents \
     GUARD_MODEL_DIR=/data/models/guard \
-    QDRANT_URL=http://127.0.0.1:6333 \
     HF_HUB_DISABLE_TELEMETRY=1 \
     NEXT_TELEMETRY_DISABLED=1 \
     S6_BEHAVIOUR_IF_STAGE2_FAILS=2 \

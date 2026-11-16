@@ -315,6 +315,7 @@
 
 ### Removed
 
+- Remove Qdrant: the `qdrant` Compose service and volume, its process, binary and data directory in the release image, `infra/qdrant/`, `QDRANT_URL`, its image audit and its scan exceptions; the image shrinks by 0.13 GB and idles at about 308 MiB.
 - Remove Keycloak: the `keycloak` Compose service and the web service's dependency on it, `infra/keycloak/realm-finch.json`, `jobs.set_lab_passwords` and its tests, the Keycloak image audit and its Trivy exceptions, and the `KEYCLOAK_*` settings of `.env.example` and Compose. README (quick start, development accounts, the API example), `infra/README.md`, `jobs/README.md`, `packs/README.md`, `SECURITY.md` and the agent rules describe sign-in built into the api.
 - Remove Keycloak sign-in from the api: requests no longer carry a Keycloak bearer token, `app/auth/jwt.py` keeps only the JWKS cache that OIDC sign-in uses, and the `KEYCLOAK_ISSUER`, `KEYCLOAK_AUDIENCE` and `KEYCLOAK_JWKS_URL` settings are gone; a request in team mode without a valid session cookie answers 401 `sign in again`. Tests sign in with session cookies of test accounts.
 - Remove the api's Keycloak Admin API client (`app/auth/keycloak_admin.py`) and the endpoints `PUT /admin/users/{id}/roles`, `POST /admin/users/{id}/disable` and `/enable`; the api no longer reads `KEYCLOAK_URL` or `KEYCLOAK_ADMIN_API_SECRET`.

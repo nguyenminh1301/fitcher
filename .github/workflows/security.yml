@@ -59,7 +59,7 @@ jobs:
       fail-fast: false
       matrix:
         # release is the one-container image of the root Dockerfile; the others are the Compose services.
-        service: [api, web, clickhouse, qdrant, release]
+        service: [api, web, clickhouse, release]
     env:
       SERVICE: ${{ matrix.service }}
     steps:

@@ -137,7 +137,7 @@ def system():
     W, H = 200, 120
     c = grid(5, W, 70)
     r = [60, 250, 440]
-    s.box("search", c[2], r[0], W, H, "search", "Search index", "Finds terms, metrics\nand examples (Qdrant)", "pink")
+    s.box("search", c[2], r[0], W, H, "search", "Search index", "Finds terms, metrics\nand examples (ClickHouse)", "pink")
     s.box("pack", c[3], r[0], W, H, "file", "Domain Pack", "A company's terms,\nmetrics and access rules", "yellow")
     s.box("user", c[0], r[1], W, H, "user", "User", "Asks in English\nor Vietnamese", "yellow")
     s.box("web", c[1], r[1], W, H, "monitor", "Web app", "Chat and\nworkspace console", "blue")

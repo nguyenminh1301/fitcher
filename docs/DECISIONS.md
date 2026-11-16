@@ -44,7 +44,7 @@ This document states the target. §16 lists each decision that differs from the 
 | Input screening | EN/VI rules always; Llama Prompt Guard 2 86M (local ONNX) as an option | a security classifier, not an answering model (§9) |
 | Data database | ClickHouse | databases `raw`, `marts`; sources attached through engines or copied (§4) |
 | Logs / audit | ClickHouse | database `agent_logs`, dedicated user, 90-day TTL |
-| Semantic search | ClickHouse | hybrid dense + BM25 sparse scoring fused with RRF; Qdrant is used until Phase 20 proves no loss of recall (§16) |
+| Semantic search | ClickHouse | database `search`: exact dense + BM25 sparse scoring fused with RRF, one table per collection generation, dedicated user; measured against Qdrant before it was removed (§14, §16) |
 | Transform | dbt-clickhouse | raw -> wide marts |
 | SQL parsing | sqlglot (clickhouse dialect) | |
 | Charts | Own ChartSpec + adapter -> **Apache ECharts** (`echarts-for-react`) | changing library only requires rewriting the adapter |

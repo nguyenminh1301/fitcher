@@ -15,6 +15,8 @@ docker compose --profile jobs run --rm jobs python -m jobs.compare_search_engine
 docker compose --profile jobs run --rm jobs python -m jobs.compare_search_engines --synthetic 20000 --synthetic 50000 --synthetic 100000 --repeat 3
 ```
 
+`jobs.compare_search_engines` was removed together with Qdrant once the switch was made; it remains in the repository history.
+
 ClickHouse scores exactly, without a vector index (`app/search/clickhouse_index.py`): cosine similarity for the dense vector, and for BM25 and trigrams the document's term weights times the inverse document frequency `ln(1 + (N - n + 0.5) / (n + 0.5))`, Qdrant's `idf` modifier formula, computed over the generation at query time.
 The ranked lists are fused with reciprocal rank fusion with Qdrant's constant, `1 / (2 + position)` from position 0; on a hand-computed three-point corpus both engines returned the same fused scores (Qdrant 1.20.0).
 

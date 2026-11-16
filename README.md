@@ -49,7 +49,7 @@ Each company's access rules live in one policy file. Publishing the pack turns i
 | API and agent | FastAPI with streamed responses, LangGraph, sqlglot |
 | AI models | OpenAI, Anthropic, Gemini, a local Ollama model or any OpenAI-compatible endpoint, called in process through the LiteLLM SDK; the provider's embedding model, or a local multilingual one with fastembed |
 | Data and run logs | ClickHouse |
-| Search index | Qdrant, combining meaning-based and keyword search |
+| Search index | ClickHouse, combining meaning-based and keyword search |
 | Data modelling | dbt |
 | Domain Packs | YAML checked against JSON Schema |
 
