@@ -491,7 +491,17 @@
     "skip": "Bỏ qua lúc này",
     "step_data": "Dữ liệu",
     "dataQuestion": "fitcher nên đọc dữ liệu nào?",
-    "dataHint": "Nối một cơ sở dữ liệu PostgreSQL hoặc MySQL, hoặc tải lên một tệp CSV, XLSX hoặc Parquet. Bạn cũng có thể làm việc này sau ở trang Nguồn dữ liệu."
+    "dataHint": "Nối một cơ sở dữ liệu PostgreSQL hoặc MySQL, hoặc tải lên một tệp CSV, XLSX hoặc Parquet. Bạn cũng có thể làm việc này sau ở trang Nguồn dữ liệu.",
+    "step_documents": "Tài liệu",
+    "documentsQuestion": "fitcher có đọc tài liệu của công ty không?",
+    "documentsHint": "Chính sách, sổ tay và bảng thuật ngữ giúp trả lời một thuật ngữ nghĩa là gì. Số liệu luôn lấy từ dữ liệu của bạn, không bao giờ từ tài liệu.",
+    "documentsOn": "Có, dùng tài liệu của công ty",
+    "documentsOff": "Không dùng tài liệu",
+    "documentsUpload": "Tải tài liệu lên ngay, hoặc sau này ở trang Tài liệu. Mọi vai trò của gói đều đọc được cho đến khi bạn thu hẹp ở đó.",
+    "documentsUploaded": "Tài liệu đã tải lên",
+    "documentsNoPack": "Tải tài liệu lên ở trang Tài liệu sau khi đã kết nối dữ liệu.",
+    "documentsKept": "{count} tài liệu đang lưu vẫn được giữ nhưng không còn được tìm kiếm.",
+    "documentsConfirmOff": "Tắt tài liệu"
   },
   "models": {
     "providers": "Nhà cung cấp",

@@ -30,6 +30,7 @@ export function createMockApi(options: { latencyMs?: number; identity?: () => Pr
   const load = sampleLoader();
   const wait = <T>(value: T) => delay(value, options.latencyMs ?? 0);
   let current: Identity | null = null;
+  let documentsEnabled = true;
 
   async function identity(): Promise<Identity | null> {
     if (options.identity) return options.identity();
@@ -106,6 +107,11 @@ export function createMockApi(options: { latencyMs?: number; identity?: () => Pr
         find((await load()).console.documents, id).roles = roles;
       },
       draft: async () => delay({ added: [], updated: [], skipped_approved: [] }, 1200),
+      settings: async () => wait({ enabled: documentsEnabled, documents: (await load()).console.documents.length }),
+      setEnabled: async (enabled) => {
+        documentsEnabled = enabled;
+        return { enabled, documents: (await load()).console.documents.length };
+      },
     },
     feedbackReview: {
       list: async () => wait((await load()).console.feedback),

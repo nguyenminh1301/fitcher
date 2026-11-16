@@ -6,6 +6,8 @@ import { useEffect, useState } from "react";
 import { SetupScreen } from "@/components/setup/SetupScreen";
 import { api } from "@/lib/api";
 
+const packRoles = async () => (await api.auth.pack()).roles;
+
 // The first-run setup. A user who is not signed in is sent to the sign-in page.
 export default function SetupPage() {
   const router = useRouter();
@@ -17,5 +19,6 @@ export default function SetupPage() {
     }).catch(() => router.replace("/sign-in"));
   }, [router]);
   if (isAdmin === null) return null;
-  return <SetupScreen setup={api.setup} models={api.models} sources={api.sources} isAdmin={isAdmin} onSignedOut={() => router.replace("/sign-in")} onOpenChat={() => router.push("/")} />;
+  return <SetupScreen setup={api.setup} models={api.models} sources={api.sources} documents={api.documents} packRoles={packRoles}
+    isAdmin={isAdmin} onSignedOut={() => router.replace("/sign-in")} onOpenChat={() => router.push("/")} />;
 }

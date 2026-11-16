@@ -4,12 +4,14 @@
 // implementation yet is not listed (the api lists the steps it knows). Only an admin can answer a step.
 // The Models step adds a provider, tests it and shows the models proposed for each tier; adding the
 // provider answers the step, and the setup can be left after it. The Data step connects a database or a
-// file and chooses its tables; it can be skipped and repeated later on the Sources page.
+// file and chooses its tables; it can be skipped and repeated later on the Sources page. The Documents step
+// that follows turns company documents on or off and uploads them in place once a pack is active.
 
 import { useCallback, useEffect, useState } from "react";
 
 import { Logo } from "@/components/brand/Logo";
 import { ProviderForm, ProviderTestButton, TestOutcome } from "@/components/models/ProviderForm";
+import { DocumentsStep } from "@/components/setup/DocumentsStep";
 import { InstantPack } from "@/components/setup/InstantPack";
 import { SourceConnect } from "@/components/sources/SourceConnect";
 import { Button, TextField } from "@/components/ui/controls";
@@ -26,6 +28,9 @@ export type SetupScreenProps = {
   setup: FitcherApi["setup"];
   models: FitcherApi["models"];
   sources: FitcherApi["sources"];
+  documents: FitcherApi["documents"];
+  /** The active pack's roles, for documents uploaded in the Documents step; rejects without an active pack. */
+  packRoles: () => Promise<string[]>;
   /** Whether the signed-in user may answer the steps. */
   isAdmin: boolean;
   onSignedOut: () => void;
@@ -115,7 +120,7 @@ function DataStep({ sources, disabled, onDone, onSkip, onAsk }: {
   );
 }
 
-export function SetupScreen({ setup, models, sources, isAdmin, onSignedOut, onOpenChat }: SetupScreenProps) {
+export function SetupScreen({ setup, models, sources, documents, packRoles, isAdmin, onSignedOut, onOpenChat }: SetupScreenProps) {
   const { t } = useI18n();
   const [status, setStatus] = useState<SetupStatus | null>(null);
   const [error, setError] = useState<"load" | "save" | null>(null);
@@ -197,9 +202,14 @@ export function SetupScreen({ setup, models, sources, isAdmin, onSignedOut, onOp
                 <ModelsStep models={models} disabled={!isAdmin || busy}
                   onDone={() => { setModelsOpen(false); void run(() => setup.status()); }}
                   onSkip={() => { setModelsOpen(false); void run(() => setup.skip("models")); }} />
+              ) : current?.id === "documents" ? (
+                <DocumentsStep documents={documents} packRoles={packRoles} disabled={!isAdmin || busy}
+                  onDone={() => void run(() => setup.status())}
+                  onSkip={() => void run(() => setup.skip("documents"))} />
               ) : current?.id === "data" ? (
                 <DataStep sources={sources} disabled={!isAdmin || busy}
-                  onAsk={() => { setDataOpen(false); void run(() => setup.complete()).then(onOpenChat); }}
+                  // Asking at once leaves company documents on, their default, and answers that step as skipped.
+                  onAsk={() => { setDataOpen(false); void run(async () => { await setup.skip("documents"); return setup.complete(); }).then(onOpenChat); }}
                   onDone={() => { setDataOpen(false); void run(() => setup.status()); }}
                   onSkip={() => { setDataOpen(false); void run(() => setup.skip("data")); }} />
               ) : current?.id === "mode" ? (

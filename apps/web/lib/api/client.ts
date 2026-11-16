@@ -6,6 +6,7 @@ import type {
   ConversationPatch,
   DatasetView,
   DocumentList,
+  DocumentSettings,
   DocumentView,
   DraftResult,
   AuditRow,
@@ -107,6 +108,10 @@ export interface FitcherApi {
     setRoles(id: string, roles: string[]): Promise<void>;
     /** Draft pack items from one indexed document; it uses paid AI. */
     draft(id: string): Promise<DraftResult>;
+    /** Whether company documents are on, and how many the active pack keeps. */
+    settings(): Promise<DocumentSettings>;
+    /** Turn documents on or off (admin); off while documents are kept is refused without ``confirm``. */
+    setEnabled(enabled: boolean, confirm?: boolean): Promise<DocumentSettings>;
   };
   feedbackReview: {
     list(): Promise<FeedbackRow[]>;

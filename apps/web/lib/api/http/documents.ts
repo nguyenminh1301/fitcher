@@ -28,6 +28,10 @@ export function createHttpDocuments(fetcher: typeof fetch = (...args) => fetch(.
       });
     },
     draft: async (id) => (await call(`${document(id)}/draft`, { method: "POST" })).json(),
+    settings: async () => (await call("/api/settings/documents")).json(),
+    setEnabled: async (enabled, confirm = false) => (await call("/api/settings/documents", {
+      method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ enabled, confirm }),
+    })).json(),
   };
 }
 
