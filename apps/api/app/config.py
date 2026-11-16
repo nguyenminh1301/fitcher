@@ -19,9 +19,6 @@ class SettingsError(RuntimeError):
 @dataclass(frozen=True)
 class Settings:
     active_pack: str
-    qdrant_url: str
-    # qdrant or clickhouse (app/search/engine.py).
-    search_engine: str
     column_values_top_k: int
     compiled_pack_dir: str
     # agent_logs writer: records per batch, flush interval and queue bound.
@@ -75,23 +72,11 @@ def screen_settings(env: Mapping[str, str]) -> tuple[str, float, float]:
     return mode, flag_at, block_at
 
 
-SEARCH_ENGINES = ("qdrant", "clickhouse")
-
-
-def search_engine(env: Mapping[str, str]) -> str:
-    value = env.get("SEARCH_ENGINE", "qdrant").strip().lower() or "qdrant"
-    if value not in SEARCH_ENGINES:
-        raise SettingsError(f"SEARCH_ENGINE must be one of {', '.join(SEARCH_ENGINES)}, not {value!r}")
-    return value
-
-
 def load_settings(env: Mapping[str, str] | None = None) -> Settings:
     env = os.environ if env is None else env
     screen_mode, screen_flag_at, screen_block_at = screen_settings(env)
     return Settings(
         active_pack=env.get("ACTIVE_PACK", ""),
-        qdrant_url=env.get("QDRANT_URL", "http://qdrant:6333").rstrip("/"),
-        search_engine=search_engine(env),
         column_values_top_k=positive_int(env, "COLUMN_VALUES_TOP_K", 10_000),
         compiled_pack_dir=env.get("COMPILED_PACK_DIR", "build/packs"),
         log_batch_size=positive_int(env, "LOG_BATCH_SIZE", 100),

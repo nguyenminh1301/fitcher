@@ -37,7 +37,7 @@ def test_the_answer_comes_from_role_filtered_pack_hits_with_the_data_rules():
         "sources": ["glossary_terms:revenue", "metrics:widget_revenue", "kb_docs:policy#1"],
     }
     assert SEARCHED == ("glossary_terms", "metrics", "datasets", "kb_docs")
-    searched = [request.alias for request in agent.search.queries]
+    searched = [request.collection for request in agent.search.queries]
     assert searched == [f"minimal_{index}" for index in SEARCHED]
     assert all(request.roles == ["viewer"] for request in agent.search.queries)
     [call] = agent.llm.calls

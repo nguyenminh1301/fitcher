@@ -26,7 +26,6 @@ The command publishes the app on the local machine only. To use another host por
 | `secret.key` | The key that encrypts the stored secrets, generated on the first start |
 | `secrets/` | Generated ClickHouse passwords and the environment of the services (mode 0700) |
 | `clickhouse/` | ClickHouse data, including conversations and run logs |
-| `qdrant/` | The search index |
 | `packs/`, `compiled/` | Domain Packs and their compiled form |
 | `documents/` | Uploaded company documents |
 | `models/` | Downloaded local models |
@@ -99,15 +98,15 @@ Only `http://` is accepted for now.
 
 ## Measurements
 
-Measured on 2026-11-14 on a linux/amd64 machine with 16 CPUs and 15 GB of memory, Docker 29.9.3, with the image built from commit `3fab159`:
+Measured on 2026-11-16 on a linux/amd64 machine with 16 CPUs and 15 GB of memory, Docker 29.9.3, with the image built after search moved into ClickHouse and Qdrant was removed (Phase 20); the container runs ClickHouse, the api and the web server only:
 
 | Measure | Value |
 | --- | --- |
-| Image, unpacked | 2.20 GB (the ClickHouse binary alone is about 0.8 GB) |
-| Image, compressed (`docker save` with gzip) | 0.52 GB |
-| Memory at idle, no limit | 357 MiB |
-| Memory at idle, `--memory 4g` | 356 MiB (ClickHouse capped at 2 GiB, one query at 1 GiB) |
-| `docker run` to the setup page answering | 2.8 s |
+| Image, unpacked | 2.35 GB (the ClickHouse binary alone is about 0.8 GB); 2.48 GB with Qdrant before Phase 20 |
+| Image, compressed (`docker save` with gzip) | 0.54 GB |
+| Memory at idle, no limit | 308 MiB |
+| Memory at idle, `--memory 4g` | 356 MiB with Qdrant (Phase 16); ClickHouse capped at 2 GiB, one query at 1 GiB |
+| `docker run` to the setup page answering | 3.3 s |
 | `docker run` to `healthy` | 11 s (healthcheck every 10 s) |
 | `docker stop` | 2 s |
 

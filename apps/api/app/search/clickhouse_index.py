@@ -15,11 +15,12 @@ any of the roles:
 - BM25 and character trigrams: the sum over the query's distinct terms of the
   document's term weight (``app.search.sparse``) times the term's inverse
   document frequency ``ln(1 + (N - n + 0.5) / (n + 0.5))`` over the whole
-  generation, the formula of Qdrant's ``idf`` modifier, read at query time so
+  generation, the formula of Qdrant's ``idf`` modifier that this replaced
+  (docs/eval/search-engine-report.md), read at query time so
   documents uploaded after the compile count too;
 
 and fuses the ranked lists with reciprocal rank fusion, each hit scoring
-``1 / (RRF_K + position)`` per list from position 0, as Qdrant does. Ties keep
+``1 / (RRF_K + position)`` per list from position 0, as Qdrant did. Ties keep
 the lower point id first, so the order is deterministic.
 """
 
@@ -36,7 +37,7 @@ from app.search.engine import BM25, DENSE, TRIGRAM, SearchError, prefetch_limit,
 
 DATABASE = "search"
 LIVE_TABLE = f"{DATABASE}.live"
-# Qdrant's reciprocal rank fusion constant, so both engines rank alike.
+# Qdrant's reciprocal rank fusion constant, kept so ranking did not change with the engine.
 RRF_K = 2
 INSERT_BATCH = 1000
 COLUMNS = (
@@ -130,8 +131,16 @@ def _payload(text: str, roles: Sequence[str]) -> dict:
 
 
 class ClickHouseSearch:
-    def __init__(self, client):
-        self._client = client
+    """Connects as ``search_index`` on first use unless given a client, so building it needs no server."""
+
+    def __init__(self, client=None):
+        self._connection = client
+
+    @property
+    def _client(self):
+        if self._connection is None:
+            self._connection = self._run(search_client)
+        return self._connection
 
     def _run(self, call, *args, **kwargs):
         try:

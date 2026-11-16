@@ -87,32 +87,6 @@ services:
       retries: 20
       start_period: 20s
 
-  # Search collections of every pack: dense and BM25 sparse vectors fused with RRF (DECISIONS §5).
-  qdrant:
-    # qdrant/qdrant:v1.20.0 with patched Debian packages (infra/qdrant/Dockerfile).
-    build:
-      context: ./infra/qdrant
-    environment:
-      QDRANT__TELEMETRY_DISABLED: "true"
-    ports:
-      - "127.0.0.1:6333:6333"
-    volumes:
-      - qdrant-data:/qdrant/storage
-    healthcheck:
-      # The image has no curl or wget, and its sh has no /dev/tcp; bash opens the readiness endpoint.
-      test:
-        - CMD
-        - bash
-        - -c
-        - >-
-          exec 3<>/dev/tcp/127.0.0.1/6333 &&
-          printf 'GET /readyz HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n' >&3 &&
-          grep -q 'HTTP/1.1 200' <&3
-      interval: 5s
-      timeout: 3s
-      retries: 20
-      start_period: 10s
-
   api:
     build:
       context: .
@@ -161,9 +135,6 @@ services:
       QUERY_MAX_RESULT_ROWS: ${QUERY_MAX_RESULT_ROWS:-10000}
       QUERY_MAX_MEMORY_USAGE: ${QUERY_MAX_MEMORY_USAGE:-2000000000}
       ACTIVE_PACK: ${ACTIVE_PACK:?set ACTIVE_PACK in .env}
-      QDRANT_URL: http://qdrant:6333
-      # qdrant or clickhouse (apps/api/app/search/engine.py).
-      SEARCH_ENGINE: ${SEARCH_ENGINE:-qdrant}
       # Access tokens /ask accepts (apps/api/app/auth/jwt.py).
       # Questions per user per minute on /ask; the single api worker keeps the counts.
       RATE_LIMIT_PER_MINUTE: ${RATE_LIMIT_PER_MINUTE:-10}
@@ -183,8 +154,6 @@ services:
       - ./packs:/app/packs
     depends_on:
       clickhouse:
-        condition: service_healthy
-      qdrant:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=2)"]
@@ -220,9 +189,6 @@ services:
       # /app/dbt in the image is read-only for the app user.
       DBT_TARGET_PATH: /tmp/dbt/target
       DBT_LOG_PATH: /tmp/dbt/logs
-      QDRANT_URL: http://qdrant:6333
-      # qdrant or clickhouse (apps/api/app/search/engine.py).
-      SEARCH_ENGINE: ${SEARCH_ENGINE:-qdrant}
       COLUMN_VALUES_TOP_K: ${COLUMN_VALUES_TOP_K:-10000}
       # seed_dev_accounts gives every development account of infra/dev/accounts.yaml this password.
       DEV_ACCOUNT_PASSWORD: ${DEV_ACCOUNT_PASSWORD:-}
@@ -243,8 +209,6 @@ services:
       - ./packs:/app/packs
     depends_on:
       clickhouse:
-        condition: service_healthy
-      qdrant:
         condition: service_healthy
 
   # Downloads the gated classifier with HF_TOKEN, exports it to ONNX and writes
@@ -412,7 +376,6 @@ volumes:
   clickhouse-data:
   # The app state (app.db) and the instance secret key; the api and jobs services share it (DECISIONS §3).
   fitcher-data:
-  qdrant-data:
   # compiled.json of each pack, written by compile_pack in jobs and read by api.
   compiled-packs:
   # The screening classifier, written by guard-model and read by api and jobs.

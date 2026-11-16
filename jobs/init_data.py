@@ -54,7 +54,7 @@ PASSWORD_SETTINGS = (
 ADMIN_ONLY = frozenset({ADMIN_PASSWORD, "CLICKHOUSE_SOURCES_PASSWORD"})
 # ClickHouse stores the named collections of connected sources encrypted with a key derived from the instance key.
 COLLECTIONS_KEY_PURPOSE = "clickhouse named collections"
-DATA_DIRS = ("clickhouse", "clickhouse/tmp", "packs", "compiled", "documents", "models", "models/guard", "qdrant", "secrets")
+DATA_DIRS = ("clickhouse", "clickhouse/tmp", "packs", "compiled", "documents", "models", "models/guard", "secrets")
 PASSWORDS_FILE = "clickhouse.env"
 EMBEDDED_HOST = "127.0.0.1"
 HTTP_PORT = 8123

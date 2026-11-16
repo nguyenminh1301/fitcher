@@ -162,7 +162,7 @@ def main(argv: list[str] | None = None) -> int:
         embeddings = clients.embedding_client(compiled.embedding_dimensions, call_log=logs.enqueue)
         deps = AgentDeps(
             llm=FaultInjectingLLM(llm) if args.inject_sql_fault else llm,
-            search=open_search(settings),
+            search=open_search(),
             embeddings=embeddings,
             runner=ClickHouseRunner(agent_client(compiled.pack.name, role), QueryLimits.from_env()),
             compiled=compiled,

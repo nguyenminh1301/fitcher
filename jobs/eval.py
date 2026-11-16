@@ -93,7 +93,7 @@ def build_deps(pack: str, reference: date, routes: SettingsRoutes) -> AgentDeps:
     logs = start_log_writer(settings)
     return AgentDeps(
         llm=Gateway(routes, call_log=logs.enqueue, temperature=0),
-        search=open_search(settings),
+        search=open_search(),
         # Query vectors must match the indexed ones, so the compiled size wins over the setting.
         embeddings=clients.embedding_client(compiled.embedding_dimensions, call_log=logs.enqueue),
         # Each case replaces it with its role's runner (role_runners).

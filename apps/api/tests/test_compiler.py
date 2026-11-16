@@ -59,9 +59,9 @@ def test_first_compile_publishes_generation_one(pack_dir, tmp_path):
 
     assert summary.generation == 1
     assert summary.metrics_tested == ["widget_revenue", "refunded_value"]
-    assert set(search.collections) == {f"{PACK}_{index}_v1" for index in INDEX_NAMES}
-    assert search.aliases == {f"{PACK}_{index}": f"{PACK}_{index}_v1" for index in INDEX_NAMES}
-    assert len(search.alias_updates) == 1
+    assert set(search.tables) == {f"{PACK}_{index}__1" for index in INDEX_NAMES}
+    assert search.live() == {f"{PACK}_{index}": 1 for index in INDEX_NAMES}
+    assert len(search.switches) == 1
     assert summary.documents == {
         "glossary_terms": 2, "metrics": 2, "datasets": 10, "column_values": 2, "examples": 1, "kb_docs": 0,
     }
@@ -72,13 +72,13 @@ def test_every_point_carries_a_dense_and_a_bm25_vector_and_values_also_trigrams(
 
     run(pack_dir, tmp_path, search, embeddings=FakeEmbeddings(dimensions=4))
 
-    metric = search.points[f"{PACK}_metrics_v1"][0]
-    value = search.points[f"{PACK}_column_values_v1"][0]
+    metric = search.points[f"{PACK}_metrics__1"][0]
+    value = search.points[f"{PACK}_column_values__1"][0]
     assert set(metric["vector"]) == {"dense", "bm25"} and len(metric["vector"]["dense"]) == 4
     assert set(value["vector"]) == {"dense", "bm25", "trigram"}
     assert "embedding_text" not in metric["payload"] and value["payload"]["title"] == "Blue Widget"
     assert metric["id"] == point_id(metric["payload"]["id"])
-    assert search.collections[f"{PACK}_metrics_v1"] == 4
+    assert search.tables[f"{PACK}_metrics__1"] == 4
 
 
 def test_compiled_artifact_records_generation_and_coverage(pack_dir, tmp_path):
@@ -94,36 +94,30 @@ def test_compiled_artifact_records_generation_and_coverage(pack_dir, tmp_path):
     assert compiled.pack.name == PACK
 
 
-def test_recompile_moves_every_alias_in_one_request_then_deletes_the_old_generation(pack_dir, tmp_path):
+def test_recompile_switches_every_collection_in_one_step_then_deletes_the_old_generation(pack_dir, tmp_path):
     search = FakeSearch()
     run(pack_dir, tmp_path, search)
 
     summary = run(pack_dir, tmp_path, search)
 
     assert summary.generation == 2
-    swap = search.alias_updates[-1]
-    assert {action["delete_alias"]["alias_name"] for action in swap if "delete_alias" in action} == {
-        f"{PACK}_{index}" for index in INDEX_NAMES
-    }
-    assert {action["create_alias"]["collection_name"] for action in swap if "create_alias" in action} == {
-        f"{PACK}_{index}_v2" for index in INDEX_NAMES
-    }
-    assert set(search.collections) == {f"{PACK}_{index}_v2" for index in INDEX_NAMES}
+    assert search.switches[-1] == {f"{PACK}_{index}": 2 for index in INDEX_NAMES}
+    assert set(search.tables) == {f"{PACK}_{index}__2" for index in INDEX_NAMES}
     assert load_compiled(tmp_path / "build", PACK).generation == 2
 
 
-def test_failure_midway_deletes_the_partial_generation_and_keeps_live_aliases(pack_dir, tmp_path):
+def test_failure_midway_deletes_the_partial_generation_and_keeps_the_live_one(pack_dir, tmp_path):
     search = FakeSearch()
     run(pack_dir, tmp_path, search)
-    live = dict(search.aliases)
-    search.fail_upsert_into = "_examples_v2"
+    live = search.live()
+    search.fail_write_into = "_examples__2"
 
-    with pytest.raises(CompileError, match="building index generation 2 failed: PUT /collections/"):
+    with pytest.raises(CompileError, match="building index generation 2 failed: write into"):
         run(pack_dir, tmp_path, search)
 
-    assert search.aliases == live
-    assert set(search.collections) == {f"{PACK}_{index}_v1" for index in INDEX_NAMES}
-    assert len(search.alias_updates) == 1
+    assert search.live() == live
+    assert set(search.tables) == {f"{PACK}_{index}__1" for index in INDEX_NAMES}
+    assert len(search.switches) == 1
     assert load_compiled(tmp_path / "build", PACK).generation == 1
     assert not list((tmp_path / "build" / PACK).glob("*.tmp"))
 
@@ -134,8 +128,8 @@ def test_embedding_failure_deletes_the_partial_generation(pack_dir, tmp_path):
     with pytest.raises(CompileError, match="embedding service unavailable"):
         run(pack_dir, tmp_path, search, embeddings=FakeEmbeddings(fail_after=3))
 
-    assert search.collections == {}
-    assert search.aliases == {}
+    assert search.tables == {}
+    assert search.live() == {}
     assert not (tmp_path / "build" / PACK / "compiled.json").exists()
 
 
@@ -143,17 +137,17 @@ def test_failed_cleanup_of_the_old_generation_keeps_the_compile_successful(pack_
     search = FakeSearch()
     run(pack_dir, tmp_path, search)
 
-    def refuse(name):
-        raise SearchError(f"DELETE /collections/{name} returned HTTP 500")
+    def refuse(collection, generation):
+        raise SearchError(f"DROP TABLE {collection}__{generation} failed")
 
-    monkeypatch.setattr(search, "delete_collection", refuse)
+    monkeypatch.setattr(search, "drop", refuse)
     summary = run(pack_dir, tmp_path, search)
 
     assert summary.generation == 2
     assert summary.warnings == [
-        f"older index generations were not deleted: DELETE /collections/{PACK}_column_values_v1 returned HTTP 500"
+        f"older index generations were not deleted: DROP TABLE {PACK}_column_values__1 failed"
     ]
-    assert search.aliases == {f"{PACK}_{index}": f"{PACK}_{index}_v2" for index in INDEX_NAMES}
+    assert search.live() == {f"{PACK}_{index}": 2 for index in INDEX_NAMES}
 
 
 def test_scans_are_read_only_with_time_and_memory_limits(pack_dir, tmp_path):
@@ -175,7 +169,7 @@ def test_failing_metric_aborts_with_its_id_and_the_clickhouse_error(pack_dir, tm
 
     assert "metric 'refunded_value': ClickHouse rejected sql_expr: Code: 47. DB::Exception" in str(raised.value)
     assert "widget_revenue" not in str(raised.value)
-    assert search.collections == {}
+    assert search.tables == {}
 
 
 def test_metric_test_run_is_read_only_with_a_time_limit(pack_dir, tmp_path):
@@ -237,7 +231,7 @@ def test_invalid_schema_is_rejected_with_file_and_path(pack_dir, edit_pack, tmp_
     with pytest.raises(PackValidationError, match=r"metrics\.yaml: metrics\[0\]\.unit"):
         run(pack_dir, tmp_path, search)
 
-    assert search.collections == {}
+    assert search.tables == {}
 
 
 def test_column_missing_from_the_warehouse_is_rejected(pack_dir, tmp_path):
@@ -256,7 +250,7 @@ def test_skip_index_stops_after_the_metric_test_run(pack_dir, tmp_path):
 
     assert summary.generation is None
     assert summary.metrics_tested == ["widget_revenue", "refunded_value"]
-    assert search.collections == {} and embeddings.calls == []
+    assert search.tables == {} and embeddings.calls == []
 
 
 def test_policies_are_applied_after_the_metric_test_run(pack_dir, tmp_path):
@@ -381,27 +375,27 @@ def test_queries_during_a_recompile_never_see_a_mixed_generation(pack_dir, tmp_p
     search = FakeSearch()
     run(pack_dir, tmp_path, search)
     seen: list[set[int]] = []
-    upsert, update = search.upsert, search.update_aliases
+    write, switch = search.write, search.switch_live
 
     def snapshot() -> None:
-        # What a reader resolving every alias at this moment would get.
+        # What a reader resolving every live collection at this moment would get.
         seen.append({generation for collection, generation in search.live().items() if collection.startswith(PACK)})
 
-    def upsert_while_reading(name, points):
+    def write_while_reading(collection, points, generation=None):
         snapshot()
-        return upsert(name, points)
+        return write(collection, points, generation)
 
-    def update_while_reading(actions):
+    def switch_while_reading(generations):
         snapshot()
-        update(actions)
+        switch(generations)
         snapshot()
 
-    search.upsert, search.update_aliases = upsert_while_reading, update_while_reading
+    search.write, search.switch_live = write_while_reading, switch_while_reading
     run(pack_dir, tmp_path, search)
 
     assert seen[0] == {1} and seen[-1] == {2}
     assert all(len(generations) == 1 for generations in seen)
-    assert len(search.alias_updates) == 2
+    assert len(search.switches) == 2
 
 
 # kb_docs from the document registry (DECISIONS §5 Compile)
@@ -417,7 +411,7 @@ def _documents(tmp_path, search, embeddings):
 
 
 def _kb_docs(search) -> list[dict]:
-    return search.points[search.aliases[f"{PACK}_kb_docs"]]
+    return search.points[search.table(f"{PACK}_kb_docs", search.live()[f"{PACK}_kb_docs"])]
 
 
 def test_recompile_copies_live_chunks_of_indexed_documents_without_embedding_them(pack_dir, tmp_path):

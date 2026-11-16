@@ -16,6 +16,8 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     bootstrap()
     runtime.build_screener_in_background()
     runtime.start_source_scheduler()
+    # A pack whose search index is missing (an upgrade from Qdrant) is compiled again; it embeds every item.
+    runtime.rebuild_missing_indices_in_background()
     yield
     runtime.close()
 

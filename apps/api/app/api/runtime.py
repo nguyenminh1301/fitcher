@@ -41,6 +41,7 @@ from app.onboarding.drafter import TIER as DRAFT_TIER
 from app.onboarding.instant import InstantPipeline, InstantWarehouse
 from app.packs.active import active_pack, set_active_pack
 from app.packs.compiler import CompileError, CompiledPack, compile_pack, load_compiled
+from app.packs.search_indices import INDEX_NAMES, alias_name
 from app.screening.screen import Screener
 from app.search.engine import open_search
 from app.sources.client import source_admin_client
@@ -235,7 +236,7 @@ def get_document_service() -> DocumentService:
         raise unavailable(f"the document store is unavailable: {error}") from None
     return DocumentService(
         pack=identity.name, pack_roles=identity.roles, registry=registry,
-        search=open_search(settings), embeddings=embeddings, screener=get_screener(),
+        search=open_search(), embeddings=embeddings, screener=get_screener(),
         store_dir=Path(settings.documents_dir), compiled_dir=Path(settings.compiled_pack_dir),
         max_bytes=settings.document_max_bytes,
     )
@@ -388,13 +389,47 @@ def _compile_instant(pack_dir: Path) -> object:
         warehouse = InstantWarehouse(pack_admin_client())
         return compile_pack(
             pack_dir, warehouse=warehouse, access=warehouse, agent_secret=os.environ.get("CLICKHOUSE_AGENT_PASSWORD", ""),
-            top_k=settings.column_values_top_k, search=open_search(settings), embeddings=embeddings,
+            top_k=settings.column_values_top_k, search=open_search(), embeddings=embeddings,
             output_dir=compiled_dir, schema_dir=pack_dir.parent / "_schema", screener=get_screener(),
             registry=ClickHouseDocumentRegistry(pack_review_client()), documents_dir=Path(settings.documents_dir),
             embedding_alias=label,
         )
     finally:
         lock.unlink(missing_ok=True)
+
+
+def packs_missing_their_index(compiled_dir: Path, packs_dir: Path, live: set[str], active: str) -> list[str]:
+    """Compiled packs, the active one first, whose search collections are not all live but whose files are present."""
+    found = sorted(path.parent.name for path in compiled_dir.glob("*/compiled.json"))
+    missing = [
+        pack for pack in found
+        if (packs_dir / pack).is_dir() and not compile_lock_path(compiled_dir, pack).exists()
+        and not all(alias_name(pack, index) in live for index in INDEX_NAMES)
+    ]
+    return sorted(missing, key=lambda pack: pack != active)
+
+
+def _rebuild_missing_indices() -> None:
+    settings = load_settings()
+    try:
+        live = set(open_search().live())
+    except Exception as error:  # noqa: BLE001 - a missing index is rebuilt at the next start
+        logger.warning("search index check skipped: %s", error)
+        return
+    for pack in packs_missing_their_index(Path(settings.compiled_pack_dir), Path(settings.packs_dir), live, current_pack()):
+        logger.info("compiling pack %s: its search index is missing, as after an upgrade of the search engine", pack)
+        try:
+            _compile_instant(Path(settings.packs_dir) / pack)
+        except Exception:  # noqa: BLE001 - one pack's failure must not stop the others or the api
+            logger.exception("compiling pack %s to rebuild its search index failed", pack)
+            continue
+        if pack == current_pack():
+            reload_pack()
+
+
+def rebuild_missing_indices_in_background() -> None:
+    """Compile every compiled pack whose search index is missing, as after an upgrade that moved search to a new engine."""
+    threading.Thread(target=_rebuild_missing_indices, name="search-index", daemon=True).start()
 
 
 def _activate_instant(pack: str) -> None:

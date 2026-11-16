@@ -201,6 +201,7 @@
 
 ### Changed
 
+- Pack search runs only in ClickHouse: the compiler, company documents, the agent and the jobs use the `search` database, and at start the api compiles again every compiled pack whose search collections are missing, which rebuilds the index after an upgrade from Qdrant (every item is embedded again).
 - The pack compiler, company documents, the agent and the jobs reach search only through `app/search/engine.py`, an interface of logical collections and live generations that the Qdrant client implements unchanged, so another search engine can replace it.
 - Label an eval run that reaches the threshold "Meets threshold" on the Evaluation page instead of "Pack enabled": the threshold is a report, not a gate (DECISIONS §14), and no check keeps a pack, instant or hand-written, disabled below it.
 - Mount the compiled packs writable for the api in the development Compose stack, because the api now compiles the instant pack it builds.
@@ -314,6 +315,7 @@
 
 ### Removed
 
+- Remove Qdrant: the `qdrant` Compose service and volume, its process, binary and data directory in the release image, `infra/qdrant/`, `QDRANT_URL`, its image audit and its scan exceptions; the image shrinks by 0.13 GB and idles at about 308 MiB.
 - Remove Keycloak: the `keycloak` Compose service and the web service's dependency on it, `infra/keycloak/realm-finch.json`, `jobs.set_lab_passwords` and its tests, the Keycloak image audit and its Trivy exceptions, and the `KEYCLOAK_*` settings of `.env.example` and Compose. README (quick start, development accounts, the API example), `infra/README.md`, `jobs/README.md`, `packs/README.md`, `SECURITY.md` and the agent rules describe sign-in built into the api.
 - Remove Keycloak sign-in from the api: requests no longer carry a Keycloak bearer token, `app/auth/jwt.py` keeps only the JWKS cache that OIDC sign-in uses, and the `KEYCLOAK_ISSUER`, `KEYCLOAK_AUDIENCE` and `KEYCLOAK_JWKS_URL` settings are gone; a request in team mode without a valid session cookie answers 401 `sign in again`. Tests sign in with session cookies of test accounts.
 - Remove the api's Keycloak Admin API client (`app/auth/keycloak_admin.py`) and the endpoints `PUT /admin/users/{id}/roles`, `POST /admin/users/{id}/disable` and `/enable`; the api no longer reads `KEYCLOAK_URL` or `KEYCLOAK_ADMIN_API_SECRET`.

@@ -17,7 +17,7 @@ Keep secrets, local datasets, database files and scratch material out of Git.
 
 ## Development setup
 
-The development stack runs `api`, `web`, ClickHouse and Qdrant as separate Compose services, with the development datasets, sample packs, dbt models and the optional `sources` and `local-models` profiles, none of which are in the released image.
+The development stack runs `api`, `web` and ClickHouse as separate Compose services, with the development datasets, sample packs, dbt models and the optional `sources` and `local-models` profiles, none of which are in the released image.
 
 You need Docker with Compose v2 and about 8 GB of memory for Docker. Run the commands from the repository root, in Bash or PowerShell.
 
@@ -84,7 +84,6 @@ Each signs in with its e-mail, `<user>@fitcher.test`, and `DEV_ACCOUNT_PASSWORD`
 | --- | --- |
 | Web app | [localhost:3000](http://localhost:3000) |
 | API | [localhost:8000](http://localhost:8000/health), with interactive [API docs](http://localhost:8000/docs) |
-| Qdrant | localhost:6333 |
 | ClickHouse | localhost:8123 (HTTP) and localhost:9000 (native) |
 
 All ports listen on the local machine only.

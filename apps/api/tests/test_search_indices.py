@@ -2,11 +2,9 @@
 
 from conftest import SCHEMA_DIR
 from fakes import FakeEmbeddings, FakeSearch
-import pytest
 
 from app.packs.loader import load_pack
 from app.packs.search_indices import INDEX_NAMES, ColumnValue, bm25_tokens, build_documents, points, search_pack
-from app.search.client import hybrid_request, role_filter
 from app.search.engine import point_id
 
 
@@ -83,25 +81,6 @@ def test_value_document_ids_are_unique_per_value(pack_dir):
     assert all(doc_id.startswith("widget_sales.widget_name.") for doc_id in ids)
 
 
-def test_the_hybrid_query_filters_every_prefetch_by_role_and_fuses_with_rrf():
-    body = hybrid_request("shop_metrics", "doanh thu", [0.1, 0.2], ["viewer"], 5)
-
-    assert body["query"] == {"fusion": "rrf"} and body["limit"] == 5 and body["with_payload"] is True
-    assert [prefetch["using"] for prefetch in body["prefetch"]] == ["dense", "bm25"]
-    assert all(prefetch["filter"] == role_filter(["viewer"]) for prefetch in body["prefetch"])
-    assert role_filter(["viewer"]) == {"must": [{"key": "allowed_roles", "match": {"any": ["viewer"]}}]}
-    assert body["prefetch"][0]["query"] == [0.1, 0.2]
-
-
-def test_column_values_are_also_searched_by_trigrams():
-    body = hybrid_request("shop_column_values", "Electornics", [0.1], ["viewer"], 5)
-    assert [prefetch["using"] for prefetch in body["prefetch"]] == ["dense", "bm25", "trigram"]
-
-
-def test_a_query_without_words_searches_the_dense_vector_only():
-    assert [prefetch["using"] for prefetch in hybrid_request("shop_metrics", "?!", [0.1], ["viewer"], 5)["prefetch"]] == ["dense"]
-
-
 def test_points_keep_the_document_as_payload_and_weigh_the_title_twice():
     documents = [{"id": "widget_revenue", "title": "widget revenue", "text": "Money", "embedding_text": "widget revenue. Money", "allowed_roles": ["viewer"]}]
 
@@ -121,7 +100,7 @@ def test_search_pack_reads_every_alias_with_one_embedding():
 
     assert results["metrics"] == [{"id": "m1", "score": 1.0, "source": {}}]
     assert embeddings.calls == [["revenue"]]
-    assert [request.alias for request in search.queries] == [f"shop_{index}" for index in INDEX_NAMES]
+    assert [request.collection for request in search.queries] == [f"shop_{index}" for index in INDEX_NAMES]
 
 
 

@@ -23,8 +23,8 @@ VIEWER = SessionHeaders()
 @pytest.fixture
 def service(tmp_path):
     search = FakeSearch()
-    search.create_collection("minimal_kb_docs_v1", 4)
-    search.aliases["minimal_kb_docs"] = "minimal_kb_docs_v1"
+    search.create("minimal_kb_docs", 1, 4)
+    search.switch_live({"minimal_kb_docs": 1})
     return DocumentService(
         pack="minimal", pack_roles=["viewer"], registry=InMemoryDocumentRegistry(), search=search,
         embeddings=FakeEmbeddings(), screener=WordScreener(), store_dir=tmp_path / "documents",
