@@ -20,7 +20,7 @@ the turns after it out of the thread and of the context.
 Conversations and groups change by new ``ReplacingMergeTree`` rows read with
 ``FINAL``; each new row's ``updated_at`` is after the previous one, so two
 changes within one millisecond keep their order. Delete only hides: the rows
-stay until the 90-day TTL. Search folds case and diacritics over the user's
+stay, since conversations have no expiry. Search folds case and diacritics over the user's
 titles and own questions, read by the ``(user_id, ...)`` key.
 """
 

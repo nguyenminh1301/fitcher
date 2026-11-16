@@ -75,7 +75,7 @@ class AdminConversation(ContractModel):
     conversation_id: str
     user_id: str
     title: str
-    # Deleted by its owner: hidden from them, still readable here until the 90-day TTL.
+    # Deleted by its owner: hidden from them, still readable here; conversations have no expiry.
     deleted: bool
     updated_at: datetime
 

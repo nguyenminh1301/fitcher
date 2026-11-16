@@ -32,7 +32,13 @@ def shipped():
 def test_shipped_clickhouse_changes_keep_the_original_files_in_order():
     names = [c.label for c in migrate.discover(migrate.CLICKHOUSE_CHANGES_DIR)]
     assert names == ["0001_databases", "0002_agent_logs", "0003_model_tiers", "0004_documents", "0005_llm_calls_provider",
-                     "0006_search"]
+                     "0006_search", "0007_keep_conversations"]
+
+
+def test_conversation_tables_lose_the_log_expiry_and_run_logs_keep_it():
+    statements = [s for c in migrate.discover(migrate.CLICKHOUSE_CHANGES_DIR) if c.number == 7 for s in c.statements()]
+    kept = {"conversations", "conversation_groups", "chat_messages", "feedback"}
+    assert sorted(statements) == sorted(f"ALTER TABLE agent_logs.{t} REMOVE TTL" for t in kept)
 
 
 def test_fresh_volume_applies_and_records_every_change_then_nothing():
@@ -51,9 +57,11 @@ def test_existing_volume_is_brought_up_to_date_with_the_same_statements():
     assert fresh.commands == existing.commands
     # Each statement is idempotent: it creates what is missing, adds a missing column, or sets a column's
     # type, which ClickHouse leaves alone without a new mutation when the column already has that type.
+    # REMOVE TTL is the exception: it runs once, on a table 0002 created with the expiry.
     assert all(
         statement.startswith(("CREATE ", "ALTER TABLE ", "SYSTEM FLUSH LOGS"))
-        and ("IF NOT EXISTS" in statement or " MODIFY COLUMN " in statement or statement.startswith("SYSTEM"))
+        and ("IF NOT EXISTS" in statement or " MODIFY COLUMN " in statement or statement.startswith("SYSTEM")
+             or statement.endswith(" REMOVE TTL"))
         for statement in fresh.commands
     )
 
