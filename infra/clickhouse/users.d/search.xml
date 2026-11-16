@@ -1,0 +1,22 @@
+<clickhouse>
+    <!--
+        Pack search in ClickHouse (DECISIONS §5 Search collections). The pack
+        compiler, the Documents page and the agent's retrieval create, fill,
+        switch, query and drop the generation tables of the search database
+        and nothing else. The password comes from the clickhouse container
+        environment.
+    -->
+    <users>
+        <search_index>
+            <password from_env="CLICKHOUSE_SEARCH_PASSWORD"/>
+            <profile>default</profile>
+            <quota>default</quota>
+            <networks>
+                <ip>::/0</ip>
+            </networks>
+            <grants>
+                <query>GRANT SELECT, INSERT, CREATE TABLE, DROP TABLE, ALTER UPDATE, ALTER DELETE ON search.*</query>
+            </grants>
+        </search_index>
+    </users>
+</clickhouse>
