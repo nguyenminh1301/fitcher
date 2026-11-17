@@ -149,7 +149,10 @@ class ProviderStore:
         url = _base_url(current.kind, base_url) if base_url is not None else current.base_url
         if api_key and current.kind == "ollama":
             raise ProviderError("an ollama provider takes no API key")
-        # A new base URL and its new key change together, so no call sends the old key to the new address.
+        # The stored key belongs to the address it was entered for: a new address needs its key entered again,
+        # so changing the address alone never sends the stored key to it.
+        if current.key_set and url != current.base_url and not api_key:
+            raise ProviderError("a new base URL needs the provider's API key entered again")
         with self._db.write() as conn:
             conn.execute(
                 "UPDATE providers SET name = ?, base_url = ? WHERE id = ?",

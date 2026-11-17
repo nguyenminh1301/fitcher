@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Security
+
+- Changing a provider's base URL now requires its API key in the same change when a key is stored, so a changed address never receives the key that was entered for the old one.
+
 ## 0.0.1 - 2026-11-17
 
 The first release of the one-image product.

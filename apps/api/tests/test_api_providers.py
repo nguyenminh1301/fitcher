@@ -128,6 +128,16 @@ def test_a_provider_is_renamed_and_its_key_replaced(client):
     assert client.patch("/providers/nope", headers=ADMIN, json={"name": "x"}).status_code == 404
 
 
+def test_moving_a_keyed_provider_to_a_new_address_without_its_key_is_refused(client):
+    client.post("/providers", headers=ADMIN, json={"kind": "openai_compatible", "name": "Lab",
+                                                   "base_url": "https://models.example/v1", "api_key": KEY})
+
+    refused = client.patch("/providers/openai-compatible", headers=ADMIN, json={"base_url": "http://attacker.example/v1"})
+
+    assert refused.status_code == 422 and "key" in refused.json()["detail"]
+    assert client.get("/providers", headers=ADMIN).json()[0]["base_url"] == "https://models.example/v1"
+
+
 def test_a_provider_in_use_cannot_be_removed(client):
     add_openai(client)
     assert client.post("/providers", headers=ADMIN, json={"kind": "gemini", "api_key": KEY}).json()["in_use"] is False
