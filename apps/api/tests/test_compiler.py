@@ -258,7 +258,7 @@ def test_policies_are_applied_after_the_metric_test_run(pack_dir, tmp_path):
 
     summary = run(pack_dir, tmp_path, FakeSearch(), warehouse=fake, access=fake, agent_secret="dev-secret", skip_index=True)
 
-    assert summary.roles_applied == ["viewer"]
+    assert summary.roles_applied == ["reader"]
     assert fake.commands[0].startswith("CREATE SETTINGS PROFILE OR REPLACE `fitcher_agent__minimal`")
     last_metric_run = max(index for index, sql in enumerate(fake.log) if sql.endswith("LIMIT 1"))
     assert fake.log.index(fake.commands[0]) > last_metric_run
@@ -321,7 +321,7 @@ def _with_chunks(monkeypatch, *texts: str) -> None:
     def build(pack, values):
         documents = original(pack, values)
         documents["kb_docs"] = [
-            {"id": f"doc1#{number}", "type": "kb_chunk", "pack": pack.name, "allowed_roles": ["viewer"], "title": "Doc",
+            {"id": f"doc1#{number}", "type": "kb_chunk", "pack": pack.name, "allowed_roles": ["reader"], "title": "Doc",
              "text": text, "embedding_text": text}
             for number, text in enumerate(texts)
         ]
@@ -404,7 +404,7 @@ def _documents(tmp_path, search, embeddings):
     from app.onboarding.documents import DocumentService, InMemoryDocumentRegistry
 
     return DocumentService(
-        pack=PACK, pack_roles=["viewer"], registry=InMemoryDocumentRegistry(), search=search, embeddings=embeddings,
+        pack=PACK, pack_roles=["reader"], registry=InMemoryDocumentRegistry(), search=search, embeddings=embeddings,
         screener=Screener(FakeClassifier()), store_dir=tmp_path / "documents", compiled_dir=tmp_path / "build",
         max_bytes=10_000, clock=lambda: datetime(2026, 1, 1, tzinfo=UTC),
     )
@@ -418,8 +418,8 @@ def test_recompile_copies_live_chunks_of_indexed_documents_without_embedding_the
     search, embeddings = FakeSearch(), FakeEmbeddings()
     run(pack_dir, tmp_path, search, embeddings, embedding_alias="embed-a")
     documents = _documents(tmp_path, search, embeddings)
-    kept = documents.upload("kept.md", b"# Kept\n\nRefunds are counted when approved.", ["viewer"], "u")
-    gone = documents.upload("gone.md", b"# Gone\n\nAn older policy.", ["viewer"], "u")
+    kept = documents.upload("kept.md", b"# Kept\n\nRefunds are counted when approved.", ["reader"], "u")
+    gone = documents.upload("gone.md", b"# Gone\n\nAn older policy.", ["reader"], "u")
     documents.delete(gone.id)
     live_vectors = {point["id"]: point["vector"] for point in _kb_docs(search)}
     embeddings.calls.clear()
@@ -438,7 +438,7 @@ def test_documents_turned_off_and_on_again_are_indexed_again_from_their_stored_f
     search, embeddings = FakeSearch(), FakeEmbeddings()
     run(pack_dir, tmp_path, search, embeddings, embedding_alias="embed-a")
     documents = _documents(tmp_path, search, embeddings)
-    kept = documents.upload("kept.md", b"# Kept\n\nRefunds are counted when approved.", ["viewer"], "u")
+    kept = documents.upload("kept.md", b"# Kept\n\nRefunds are counted when approved.", ["reader"], "u")
 
     # With documents off the compile reads no registry, so kb_docs holds no chunk.
     off = run(pack_dir, tmp_path, search, embeddings, embedding_alias="embed-a")
@@ -454,7 +454,7 @@ def test_a_new_embedding_model_reembeds_the_stored_files(pack_dir, tmp_path):
     search, embeddings = FakeSearch(), FakeEmbeddings()
     run(pack_dir, tmp_path, search, embeddings, embedding_alias="embed-a")
     documents = _documents(tmp_path, search, embeddings)
-    kept = documents.upload("kept.md", b"# Kept\n\nRefunds are counted when approved.", ["viewer"], "u")
+    kept = documents.upload("kept.md", b"# Kept\n\nRefunds are counted when approved.", ["reader"], "u")
     embeddings.calls.clear()
 
     summary = run(pack_dir, tmp_path, search, embeddings, embedding_alias="embed-b",
@@ -462,14 +462,14 @@ def test_a_new_embedding_model_reembeds_the_stored_files(pack_dir, tmp_path):
 
     assert summary.documents["kb_docs"] == 1
     [point] = _kb_docs(search)
-    assert point["payload"]["id"] == f"{kept.id}#0" and point["payload"]["allowed_roles"] == ["viewer"]
+    assert point["payload"]["id"] == f"{kept.id}#0" and point["payload"]["allowed_roles"] == ["reader"]
     assert any("Refunds are counted" in text for call in embeddings.calls for text in call)
 
 
 def test_a_missing_stored_file_is_reported_and_left_out(pack_dir, tmp_path):
     search, embeddings = FakeSearch(), FakeEmbeddings()
     documents = _documents(tmp_path, search, embeddings)
-    record = documents.upload("kept.md", b"# Kept\n\nText.", ["viewer"], "u")
+    record = documents.upload("kept.md", b"# Kept\n\nText.", ["reader"], "u")
     documents.stored_path(record.id).unlink()
 
     summary = run(pack_dir, tmp_path, search, embeddings, embedding_alias="embed-a",

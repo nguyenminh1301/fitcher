@@ -8,6 +8,7 @@
 
 ### Removed
 
+- A Domain Pack has no access rules of its own: `policies.yaml`, `datasets[].allowed_roles` and eval-case `role` are gone from the pack format and the sample packs (an older pack's are ignored), the loader grants every approved dataset to the pack's one `reader` role, which the compiler still turns into a read-only ClickHouse role and login user, and the role-refusal eval cases are dropped.
 - fitcher is a personal app without accounts: team mode, local accounts and their sessions and sign-in throttle, OpenID Connect sign-in, the sign-in page, the Users page, the setup's "Who uses this instance" step and the development accounts are removed; app-state change 0008 drops their tables, settings and secret, every request acts as the owner, and deleting a conversation always removes it for good.
 
 ### Fixed

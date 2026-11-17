@@ -30,7 +30,7 @@ class Warehouse:
 def document(document_id: str, deleted: bool = False) -> DocumentRecord:
     return DocumentRecord(
         id=document_id, pack="minimal", file_name=f"{document_id}.pdf", media_type="application/pdf", size_bytes=1,
-        sha256=document_id, uploaded_by="u", allowed_roles=["viewer"], status="indexed", uploaded_at=NOW,
+        sha256=document_id, uploaded_by="u", allowed_roles=["reader"], status="indexed", uploaded_at=NOW,
         updated_at=NOW, deleted_at=NOW if deleted else None,
     )
 

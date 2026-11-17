@@ -239,7 +239,7 @@ def test_cases_run_through_the_role_runners(packs_dir):
     code = main(["--pack", "minimal", "--packs-dir", str(packs_dir)], deps_factory=_factory(FakeRunner()), runners_factory=runners)
 
     assert code == 0
-    assert requested and all(item == ("minimal", "viewer") for item in requested)
+    assert requested and all(item == ("minimal", "reader") for item in requested)
 
 
 def test_cases_from_another_pack_answer_as_the_first_role_and_check_as_the_case_role(packs_dir, tmp_path):
@@ -259,10 +259,9 @@ def test_cases_from_another_pack_answer_as_the_first_role_and_check_as_the_case_
         deps_factory=_factory(FakeRunner(), seen=seen), runners_factory=runners_factory,
     )
 
-    case_role = yaml.safe_load((packs_dir / "minimal" / "eval.yaml").read_text(encoding="utf-8"))["cases"][0]["role"]
-    first_role = yaml.safe_load((packs_dir / "generated" / "policies.yaml").read_text(encoding="utf-8"))["roles"][0]["id"]
     assert code == 0
     assert seen[0][0] == "generated"
-    assert ("generated", first_role) in asked and ("minimal", case_role) in asked
+    # Every pack has one reader role, so both packs run as it.
+    assert ("generated", "reader") in asked and ("minimal", "reader") in asked
     run = EvalRun.model_validate_json((tmp_path / "generated-eval.json").read_text(encoding="utf-8"))
     assert run.pack == "generated" and [case.case_id for case in run.cases] == [CASE_ID]

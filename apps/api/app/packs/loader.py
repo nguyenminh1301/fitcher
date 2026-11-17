@@ -19,7 +19,7 @@ from referencing import Registry, Resource
 import yaml
 from yaml.constructor import ConstructorError
 
-from app.packs.models import PACK_FILES, Example, Pack
+from app.packs.models import PACK_FILES, READER_ROLE, DatasetsFile, Example, Pack, reader_policies
 from app.packs.policy_compiler import ROW_COUNT_COLUMN, adds_up, check_row_filter
 
 
@@ -338,6 +338,20 @@ def check_references(pack: Pack, catalog: Catalog | None = None) -> list[PackIss
 OPTIONAL_FILES = {"eval.yaml": {"cases": []}}
 
 
+def with_reader_role(pack: Pack) -> Pack:
+    """The pack read through its one reader role (DECISIONS §9).
+
+    A ``policies.yaml``, ``allowed_roles`` or an eval case's ``role`` left by an older pack is ignored: every
+    dataset is granted in full to the reader role, and every question runs as it.
+    """
+    datasets = [dataset.model_copy(update={"allowed_roles": [READER_ROLE]}) for dataset in pack.datasets.datasets]
+    cases = [case.model_copy(update={"role": READER_ROLE}) for case in pack.eval.cases]
+    return pack.model_copy(update={
+        "datasets": DatasetsFile(datasets=datasets), "policies": reader_policies(datasets),
+        "eval": pack.eval.model_copy(update={"cases": cases}),
+    })
+
+
 def load_pack(pack_dir: Path, *, schema_dir: Path | None = None, catalog: Catalog | None = None) -> Pack:
     """Load and validate the pack in ``pack_dir``; raise PackValidationError listing every problem.
 
@@ -363,7 +377,7 @@ def load_pack(pack_dir: Path, *, schema_dir: Path | None = None, catalog: Catalo
         contents[file.removesuffix(".yaml")] = data
     if issues:
         raise PackValidationError(pack_dir, issues)
-    pack = Pack(name=pack_dir.name, **contents)
+    pack = with_reader_role(Pack(name=pack_dir.name, policies={"roles": []}, **contents))
     issues = check_references(pack, catalog)
     if issues:
         raise PackValidationError(pack_dir, issues)

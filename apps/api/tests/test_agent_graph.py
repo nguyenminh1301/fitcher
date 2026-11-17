@@ -219,7 +219,7 @@ def test_permitted_sql_attempt_writes_an_allow_audit_row():
     run_question(QUESTION, agent)
 
     assert [(a.decision, a.role, a.dataset, a.blocked_tables) for a in _audits(logs)] == [
-        ("ALLOW", "viewer", "widget_sales", []),
+        ("ALLOW", "reader", "widget_sales", []),
     ]
 
 
@@ -246,7 +246,7 @@ def test_clickhouse_access_denied_writes_a_deny_audit_row_after_the_allow():
 
 def _roles_in(body: dict) -> set[str]:
     text = str(body)
-    return {role for role in ("viewer", "refunds_clerk") if f"'{role}'" in text}
+    return {role for role in ("reader", "refunds_clerk") if f"'{role}'" in text}
 
 
 def test_term_the_role_may_not_read_is_denied_not_replaced_by_a_visible_metric():
@@ -256,7 +256,7 @@ def test_term_the_role_may_not_read_is_denied_not_replaced_by_a_visible_metric()
         if not index.endswith("_metrics"):
             return []
         hits = [{"id": "refunded_value", "score": 0.4, "source": {"type": "metric", "dataset": "widget_refunds"}}]
-        if "viewer" in _roles_in(body):
+        if "reader" in _roles_in(body):
             hits.insert(0, {"id": "widget_revenue", "score": 0.9, "source": {"type": "metric", "dataset": "widget_sales"}})
         return hits
 

@@ -105,20 +105,6 @@ def test_a_draft_item_is_filled_without_changing_its_structure(files):
     assert item["allowed_roles"] == []
 
 
-def test_a_new_dataset_gets_the_roles_its_policies_grant(files):
-    llm = FakeLLMClient([{"items": [{
-        "id": "widget_sales", "description": "x", "grain": "x", "time_column": "sold_on", "evidence": [],
-        "confidence": 0.5, "columns": [{"name": "sold_on", "type": "date", "role": "time", "description": "d", "indexable": False}],
-    }, {
-        "id": "widget_stock", "description": "Stock per day.", "grain": "one row per widget and day", "time_column": "day",
-        "evidence": [], "confidence": 0.5,
-        "columns": [{"name": "day", "type": "date", "role": "time", "description": "Day.", "indexable": False}],
-    }]}])
-    [item] = Drafter(llm, Warehouse()).draft("datasets.yaml", files, PROFILE, [])
-    assert item["id"] == "widget_stock" and item["allowed_roles"] == []
-    assert item["evidence"] == [{"kind": "profile", "ref": "widget_sales"}]
-
-
 def test_examples_are_explained_before_they_are_saved(files):
     llm = FakeLLMClient([{"items": [{
         "id": "count_sales", "question": "How many sales?", "language": "en", "sql": "SELECT count() FROM marts.widget_sales",

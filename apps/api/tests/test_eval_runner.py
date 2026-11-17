@@ -21,7 +21,7 @@ REFERENCE_SQL = "SELECT widget_name, sum(sale_amount) AS widget_revenue FROM mar
 def _case(case_id: str, **updates) -> EvalCase:
     case = EvalCase(
         id=case_id, question="Top 10 widgets in Q1 2024 vs Q1 2025", language="en", category="two_period_compare",
-        role="viewer",
+        role="reader",
         expected=EvalExpected(
             intent="data_query", outcome="answer", periods=[Q1_2024, Q1_2025], top_n=10, rank_by="widget_revenue",
             dataset="widget_sales", columns=["widget_name"],
@@ -167,14 +167,14 @@ def test_each_case_runs_as_its_role_with_that_roles_runner():
         return runners.setdefault(role, FakeRunner(runs=[good_output(), good_output()]))
 
     run = run_eval(
-        "minimal", _set(_case("first", role="viewer"), _case("second", role="auditor")), agent,
+        "minimal", _set(_case("first", role="reader"), _case("second", role="auditor")), agent,
         timeout=5.0, threshold=0.8, runner_for=runner_for,
     )
 
-    assert set(runners) == {"viewer", "auditor"}
+    assert set(runners) == {"reader", "auditor"}
     assert all(len(runner.calls) >= 2 for runner in runners.values())
     roles_searched = {role for request in agent.search.queries for role in request.roles}
-    assert roles_searched == {"viewer", "auditor"}
+    assert roles_searched == {"reader", "auditor"}
     assert len(run.cases) == 2
 
 
@@ -264,11 +264,11 @@ def test_cases_of_another_pack_run_as_one_role_and_their_references_as_the_case_
 
     run = run_eval(
         "minimal", _set(_case("first", role="auditor")), agent, timeout=5.0, threshold=0.8,
-        runner_for=runner_for, agent_role="viewer", reference_runner_for=reference_runner_for,
+        runner_for=runner_for, agent_role="reader", reference_runner_for=reference_runner_for,
     )
 
-    assert set(runners) == {"viewer"}
+    assert set(runners) == {"reader"}
     assert set(references) == {"auditor"}
     assert [call[0] for call in references["auditor"].calls] == ["run"]
-    assert {role for request in agent.search.queries for role in request.roles} == {"viewer"}
+    assert {role for request in agent.search.queries for role in request.roles} == {"reader"}
     assert run.cases[0].layers["execution"].status == "pass"

@@ -121,7 +121,7 @@ def test_a_data_question_streams_status_sql_result_chart_summary_and_done(ask_cl
     assert chart["type"] == "bar" and chart["allowed_types"] == ["bar", "table"]
     summary = next(event for event in events if event["event"] == "summary")
     assert (summary["text"], summary["lang"]) == ("Widget 0 led.", "en")
-    assert ask_client.agent.started[0][:2] == ("viewer", "owner")
+    assert ask_client.agent.started[0][:2] == ("reader", "owner")
 
 
 def test_every_node_streams_a_start_and_an_end_status_in_graph_order(ask_client):
@@ -242,7 +242,7 @@ async def drain(stream) -> list[str]:
 def test_an_internal_error_is_the_last_event_and_hides_its_detail():
     run = ScriptedRun(error=ValueError("secret detail"))
 
-    chunks = asyncio.run(drain(event_stream(run, QUESTION, AnswerEvents("viewer"))))
+    chunks = asyncio.run(drain(event_stream(run, QUESTION, AnswerEvents("reader"))))
 
     events = parse("".join(chunks))
     assert kinds(events) == ["error"]
@@ -253,7 +253,7 @@ def test_an_internal_error_is_the_last_event_and_hides_its_detail():
 def test_nothing_follows_done():
     run = ScriptedRun(state={"result": object()})
 
-    events = parse("".join(asyncio.run(drain(event_stream(run, QUESTION, AnswerEvents("viewer"))))))
+    events = parse("".join(asyncio.run(drain(event_stream(run, QUESTION, AnswerEvents("reader"))))))
 
     assert kinds(events) == ["done"] and events[-1]["event"] == "done"
 
@@ -261,7 +261,7 @@ def test_nothing_follows_done():
 def test_a_slow_node_sends_heartbeat_comments():
     run = ScriptedRun(nodes=("execute",), state={"result": object()}, pause=0.25)
 
-    chunks = asyncio.run(drain(event_stream(run, QUESTION, AnswerEvents("viewer"), heartbeat_seconds=0.05)))
+    chunks = asyncio.run(drain(event_stream(run, QUESTION, AnswerEvents("reader"), heartbeat_seconds=0.05)))
 
     assert ": keep-alive\n\n" in chunks
     assert kinds(parse("".join(chunks))) == ["done"]
@@ -271,7 +271,7 @@ def test_a_client_disconnect_stops_the_run_and_kills_its_query():
     run = ScriptedRun(nodes=("execute", "check", "shape_result"), state={"result": object()}, pause=0.2)
 
     async def first_event_then_disconnect():
-        stream = event_stream(run, QUESTION, AnswerEvents("viewer"))
+        stream = event_stream(run, QUESTION, AnswerEvents("reader"))
         first = await anext(stream)
         await stream.aclose()
         return first
@@ -286,7 +286,7 @@ def test_a_client_disconnect_stops_the_run_and_kills_its_query():
     assert isinstance(run.stopped_by, RunCancelled)
 
 
-def collect(agent: FakeAgent, role="viewer") -> list[dict]:
+def collect(agent: FakeAgent, role="reader") -> list[dict]:
     run = agent.start(role=role, user_id="owner", today=None)
     return parse("".join(asyncio.run(drain(event_stream(run, QUESTION, AnswerEvents(role))))))
 
@@ -521,13 +521,13 @@ def test_a_gateway_rejection_ends_with_the_blocked_reply_and_keeps_the_question(
 def test_the_sql_event_names_the_unreviewed_metrics_the_answer_uses():
     from types import SimpleNamespace
 
-    events = AnswerEvents("viewer", unreviewed_metrics=frozenset({"refunded_value"}))
+    events = AnswerEvents("reader", unreviewed_metrics=frozenset({"refunded_value"}))
     state = {"trace_id": "t1", "attempts": [], "spec": SimpleNamespace(metric_ids=["widget_revenue", "refunded_value"])}
 
     [_, sql] = events.node("guard", "end", state, {"attempts": [SimpleNamespace(sql="SELECT 1")]})
 
     assert sql.event == "sql" and sql.unreviewed_metrics == ["refunded_value"]
-    assert AnswerEvents("viewer").node("guard", "end", state, {"attempts": [SimpleNamespace(sql="SELECT 1")]})[1].unreviewed_metrics == []
+    assert AnswerEvents("reader").node("guard", "end", state, {"attempts": [SimpleNamespace(sql="SELECT 1")]})[1].unreviewed_metrics == []
 
 
 def test_a_question_beyond_the_limit_streams_a_queue_status_until_it_gets_a_place():
@@ -537,7 +537,7 @@ def test_a_question_beyond_the_limit_streams_a_queue_status_until_it_gets_a_plac
     gate.enter(lambda: None, lambda: False)
     threading.Timer(0.1, gate.leave).start()
 
-    events = parse("".join(asyncio.run(drain(event_stream(ScriptedRun(), QUESTION, AnswerEvents("viewer"), gate=gate)))))
+    events = parse("".join(asyncio.run(drain(event_stream(ScriptedRun(), QUESTION, AnswerEvents("reader"), gate=gate)))))
 
     queue = [(e["node"], e["phase"]) for e in events if e.get("event") == "status" and e["node"] == "queue"]
     assert queue == [("queue", "start"), ("queue", "end")] and events[0]["node"] == "queue"

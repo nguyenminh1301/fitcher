@@ -59,7 +59,7 @@ def test_compile_reconciles_clickhouse_access_for_every_role(packs_dir, services
     code = cli.main(["--pack", "minimal", "--packs-dir", str(packs_dir), "--skip-index"])
 
     assert code == 0
-    assert "access: 1 role reconciled (viewer)" in capsys.readouterr().out
+    assert "access: 1 role reconciled (reader)" in capsys.readouterr().out
 
 
 def test_missing_agent_password_secret_fails_before_touching_access(packs_dir, services, capsys, monkeypatch):
@@ -98,7 +98,7 @@ def test_check_search_prints_hits_per_index(packs_dir, services, capsys):
 
     out = capsys.readouterr().out
     assert code == 0
-    assert "Search 'doanh thu' in minimal as viewer:" in out
+    assert "Search 'doanh thu' in minimal as reader:" in out
     assert "glossary_terms: revenue (0.900)" in out
     assert "column_values: widget_sales.widget_name='Blue Widget' (7.500)" in out
     assert "kb_docs: no hits" in out
@@ -132,7 +132,7 @@ def test_compile_waits_for_documents_still_processing(packs_dir, services, tmp_p
     now = datetime(2026, 11, 5, tzinfo=UTC)
     registry.write(DocumentRecord(
         id="d1", pack="minimal", file_name="a.md", media_type="text/markdown", size_bytes=1, sha256="x",
-        uploaded_by="u", allowed_roles=["viewer"], status="processing", uploaded_at=now, updated_at=now,
+        uploaded_by="u", allowed_roles=["reader"], status="processing", uploaded_at=now, updated_at=now,
     ))
     monkeypatch.setattr(cli, "UPLOAD_WAIT_SECONDS", 0)
     try:

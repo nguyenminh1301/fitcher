@@ -11,7 +11,6 @@ cases:
     question: Top 10 sản phẩm bán chạy nhất quý 1 năm 2024 so với quý 1 năm 2025
     language: vi
     category: two_period_compare
-    role: analyst
     expected:
       intent: data_query
       outcome: answer
@@ -43,7 +42,6 @@ cases:
     question: Top 5 brands by units sold in 2025
     language: en
     category: top_n
-    role: analyst
     expected:
       intent: data_query
       outcome: answer
@@ -69,7 +67,6 @@ cases:
     question: Doanh thu ngành hàng Electronics ở khu vực West năm 2024 là bao nhiêu?
     language: vi
     category: string_filter
-    role: analyst
     expected:
       intent: data_query
       outcome: answer
@@ -95,7 +92,6 @@ cases:
     question: Monthly conversion rate in 2025
     language: en
     category: monthly_trend
-    role: analyst
     expected:
       intent: data_query
       outcome: answer
@@ -119,7 +115,6 @@ cases:
     question: Sản phẩm nào tốt nhất năm 2025?
     language: vi
     category: ambiguous
-    role: analyst
     expected:
       intent: data_query
       outcome: clarify
@@ -129,26 +124,10 @@ cases:
     evidence: *cases
     confidence: 1.0
 
-  - id: marketing_asks_for_refunds
-    question: Tổng tiền hoàn trả năm 2025 là bao nhiêu?
-    language: vi
-    category: unauthorized
-    role: marketing
-    expected:
-      intent: data_query
-      outcome: deny
-      metrics: [refund_total]
-      dataset: returns_fact
-    active_from_phase: 6
-    status: approved
-    evidence: *cases
-    confidence: 1.0
-
   - id: weather_question
     question: Thời tiết Hà Nội hôm nay thế nào?
     language: vi
     category: out_of_scope
-    role: analyst
     expected:
       intent: out_of_scope
       outcome: answer
@@ -162,7 +141,6 @@ cases:
     question: Net sales by region in 2024 compared with 2025
     language: en
     category: two_period_compare
-    role: analyst
     expected:
       intent: data_query
       outcome: answer
@@ -189,7 +167,6 @@ cases:
     question: Số đơn hàng quý 4 năm 2025 so với quý 4 năm 2024
     language: vi
     category: two_period_compare
-    role: analyst
     expected:
       intent: data_query
       outcome: answer
@@ -212,7 +189,6 @@ cases:
     question: Conversion rate by device in December 2025 versus December 2024
     language: en
     category: two_period_compare
-    role: analyst
     expected:
       intent: data_query
       outcome: answer
@@ -241,7 +217,6 @@ cases:
     question: Tiền hoàn trả quý trước so với cùng kỳ năm ngoái
     language: vi
     category: two_period_compare
-    role: analyst
     expected:
       intent: data_query
       outcome: answer
@@ -266,7 +241,6 @@ cases:
     question: Top 3 ngành hàng có doanh thu cao nhất năm 2025
     language: vi
     category: top_n
-    role: analyst
     expected:
       intent: data_query
       outcome: answer
@@ -292,7 +266,6 @@ cases:
     question: Top 5 subcategories by units sold last month
     language: en
     category: top_n
-    role: analyst
     expected:
       intent: data_query
       outcome: answer
@@ -318,7 +291,6 @@ cases:
     question: Top 3 traffic channels by sessions in 2025
     language: en
     category: top_n
-    role: analyst
     expected:
       intent: data_query
       outcome: answer
@@ -344,7 +316,6 @@ cases:
     question: Top 3 lý do trả hàng có tổng tiền hoàn trả lớn nhất năm 2025
     language: vi
     category: top_n
-    role: analyst
     expected:
       intent: data_query
       outcome: answer
@@ -370,7 +341,6 @@ cases:
     question: Top 10 customers by net sales in Q2 2025
     language: en
     category: top_n
-    role: analyst
     expected:
       intent: data_query
       outcome: answer
@@ -398,7 +368,6 @@ cases:
     question: Net sales from VIP customers in 2025
     language: en
     category: string_filter
-    role: analyst
     expected:
       intent: data_query
       outcome: answer
@@ -422,7 +391,6 @@ cases:
     question: Số đơn hàng thanh toán bằng PayPal trong quý 3 năm 2025
     language: vi
     category: string_filter
-    role: analyst
     expected:
       intent: data_query
       outcome: answer
@@ -446,7 +414,6 @@ cases:
     question: Sessions on mobile last month
     language: en
     category: string_filter
-    role: analyst
     expected:
       intent: data_query
       outcome: answer
@@ -470,7 +437,6 @@ cases:
     question: Có bao nhiêu lượt trả hàng với lý do defective trong năm 2025?
     language: vi
     category: string_filter
-    role: analyst
     expected:
       intent: data_query
       outcome: answer
@@ -494,7 +460,6 @@ cases:
     question: Average order value for Apparel in the Northeast region in 2024
     language: en
     category: string_filter
-    role: analyst
     expected:
       intent: data_query
       outcome: answer
@@ -524,7 +489,6 @@ cases:
     question: Số đơn hàng theo tháng năm 2024
     language: vi
     category: monthly_trend
-    role: analyst
     expected:
       intent: data_query
       outcome: answer
@@ -546,7 +510,6 @@ cases:
     question: Monthly refunds in 2025
     language: en
     category: monthly_trend
-    role: analyst
     expected:
       intent: data_query
       outcome: answer
@@ -568,7 +531,6 @@ cases:
     question: Line return rate per month from January to June 2025
     language: en
     category: monthly_trend
-    role: analyst
     expected:
       intent: data_query
       outcome: answer
@@ -592,7 +554,6 @@ cases:
     question: Số phiên truy cập theo tháng từ kênh email năm 2025
     language: vi
     category: monthly_trend
-    role: analyst
     expected:
       intent: data_query
       outcome: answer
@@ -618,7 +579,6 @@ cases:
     question: How did we do last quarter?
     language: en
     category: ambiguous
-    role: analyst
     expected:
       intent: data_query
       outcome: clarify
@@ -632,7 +592,6 @@ cases:
     question: Khu vực nào tốt nhất năm ngoái?
     language: vi
     category: ambiguous
-    role: analyst
     expected:
       intent: data_query
       outcome: clarify
@@ -644,43 +603,10 @@ cases:
 
   # unauthorized: scored once roles are enforced (Phase 6)
 
-  - id: marketing_asks_for_net_sales_by_category
-    question: Net sales by category in 2025
-    language: en
-    category: unauthorized
-    role: marketing
-    expected:
-      intent: data_query
-      outcome: deny
-      metrics: [net_sales]
-      dataset: sales_lines
-    active_from_phase: 6
-    status: approved
-    evidence: *cases
-    confidence: 1.0
-
-  - id: marketing_asks_for_top_customers
-    question: Top 10 khách hàng mua nhiều nhất năm 2025
-    language: vi
-    category: unauthorized
-    role: marketing
-    expected:
-      intent: data_query
-      outcome: deny
-      metrics: [net_sales]
-      dataset: sales_lines
-    active_from_phase: 6
-    status: approved
-    evidence: *cases
-    confidence: 1.0
-
-  # out_of_scope: a short reply without SQL
-
   - id: poem_request
     question: Write a short poem about our store
     language: en
     category: out_of_scope
-    role: analyst
     expected:
       intent: out_of_scope
       outcome: answer
@@ -692,7 +618,6 @@ cases:
     question: Giá cổ phiếu Apple hôm nay là bao nhiêu?
     language: vi
     category: out_of_scope
-    role: analyst
     expected:
       intent: out_of_scope
       outcome: answer
@@ -707,7 +632,6 @@ cases:
     question: What about last year?
     language: en
     category: follow_up
-    role: analyst
     expected:
       intent: data_query
       outcome: answer
@@ -740,7 +664,6 @@ cases:
     question: Còn theo danh mục sản phẩm thì sao?
     language: vi
     category: follow_up
-    role: analyst
     expected:
       intent: data_query
       outcome: answer
@@ -768,7 +691,6 @@ cases:
     question: Và năm 2025?
     language: vi
     category: follow_up
-    role: analyst
     expected:
       intent: data_query
       outcome: answer
@@ -793,7 +715,6 @@ cases:
     question: Vẽ thành biểu đồ đường
     language: vi
     category: chart_edit
-    role: analyst
     expected:
       intent: chart_edit
       outcome: answer
@@ -806,7 +727,6 @@ cases:
     question: Show that as a bar chart
     language: en
     category: chart_edit
-    role: analyst
     expected:
       intent: chart_edit
       outcome: answer
@@ -819,7 +739,6 @@ cases:
     question: Draw it as a pie chart
     language: en
     category: chart_edit
-    role: analyst
     expected:
       intent: chart_edit
       outcome: answer
@@ -833,7 +752,6 @@ cases:
     question: "What does net sales mean?"
     language: en
     category: definition
-    role: analyst
     expected:
       intent: metadata_qa
       outcome: answer
@@ -848,7 +766,6 @@ cases:
     question: "How is the conversion rate calculated?"
     language: en
     category: definition
-    role: analyst
     expected:
       intent: metadata_qa
       outcome: answer
@@ -863,7 +780,6 @@ cases:
     question: "What is the return rate?"
     language: en
     category: definition
-    role: analyst
     expected:
       intent: metadata_qa
       outcome: answer
@@ -878,7 +794,6 @@ cases:
     question: "What does customer segment mean?"
     language: en
     category: definition
-    role: analyst
     expected:
       intent: metadata_qa
       outcome: answer
@@ -893,7 +808,6 @@ cases:
     question: "Doanh thu thuần là gì?"
     language: vi
     category: definition
-    role: analyst
     expected:
       intent: metadata_qa
       outcome: answer
@@ -908,7 +822,6 @@ cases:
     question: "Giá trị đơn hàng trung bình được tính thế nào?"
     language: vi
     category: definition
-    role: analyst
     expected:
       intent: metadata_qa
       outcome: answer
@@ -923,7 +836,6 @@ cases:
     question: "Tiền hoàn trả nghĩa là gì?"
     language: vi
     category: definition
-    role: analyst
     expected:
       intent: metadata_qa
       outcome: answer
@@ -938,7 +850,6 @@ cases:
     question: "Phiên truy cập là gì?"
     language: vi
     category: definition
-    role: analyst
     expected:
       intent: metadata_qa
       outcome: answer

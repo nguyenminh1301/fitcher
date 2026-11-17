@@ -40,6 +40,7 @@ from app.onboarding.client import pack_admin_client
 from app.onboarding.drafter import TIER as DRAFT_TIER
 from app.onboarding.instant import InstantPipeline, InstantWarehouse
 from app.packs.active import active_pack, set_active_pack
+from app.packs.models import READER_ROLE
 from app.packs.compiler import CompileError, CompiledPack, compile_pack, load_compiled
 from app.packs.search_indices import INDEX_NAMES, alias_name
 from app.state.settings import Settings, documents_enabled
@@ -99,7 +100,7 @@ def get_compiled_or_none() -> CompiledPack | None:
 class PackIdentity:
     name: str
     display_name: str
-    # The pack's policy roles, in policies.yaml order.
+    # The pack's roles: its one reader role, or the roles an older compiled pack still lists.
     roles: list[str]
 
 
@@ -123,14 +124,13 @@ def pack_identity(compiled: CompiledPack | None) -> PackIdentity:
     if not name:
         raise unavailable("no pack is active: connect a source and build its pack, or set ACTIVE_PACK")
     pack_dir = Path(settings.packs_dir) / name
-    if not (pack_dir / "policies.yaml").is_file():
+    if not (pack_dir / "datasets.yaml").is_file():
         raise unavailable(
             f"pack {name} has no compiled.json and no pack files under {settings.packs_dir}; "
             "compile the pack first"
         )
     profile = _read(pack_dir / "business_profile.yaml")
-    roles = [role["id"] for role in _read(pack_dir / "policies.yaml").get("roles") or [] if isinstance(role, dict)]
-    return PackIdentity(name, str(profile.get("display_name") or name), roles)
+    return PackIdentity(name, str(profile.get("display_name") or name), [READER_ROLE])
 
 
 def get_pack_identity(compiled: Annotated[CompiledPack | None, Depends(get_compiled_or_none)]) -> PackIdentity:

@@ -7,6 +7,7 @@ from conftest import SCHEMA_DIR
 import pytest
 
 from app.packs.loader import load_pack
+from app.packs.models import AggregateOnly, DatasetGrant, PoliciesFile
 from app.packs.policy_compiler import (
     PROFILE_LIMITS,
     Grant,
@@ -30,21 +31,21 @@ def _hash(user: str) -> str:
 
 
 @pytest.fixture
-def pack(pack_dir, edit_pack):
-    """The fixture pack with a row-filtered role and an aggregate-only role next to its plain viewer."""
-    def add_roles(data):
-        base = data["roles"][0]
-        data["roles"].append({**base, "id": "blue_viewer", "datasets": [
-            {**base["datasets"][0], "row_filter": "widget_name = 'Blue Widget'"},
-        ]})
-        data["roles"].append({**base, "id": "summary_reader", "datasets": [{
-            "dataset": "widget_sales", "columns": ["sold_on", "widget_name"],
-            "aggregate_only": {"metrics": ["widget_revenue"], "min_group_size": 5},
-        }]})
+def pack(pack_dir):
+    """The fixture pack's reader role, plus a row-filtered role and an aggregate-only one.
 
-    edit_pack("policies.yaml", add_roles)
-    edit_pack("datasets.yaml", lambda data: data["datasets"][0]["allowed_roles"].extend(["blue_viewer", "summary_reader"]))
-    return load_pack(pack_dir, schema_dir=SCHEMA_DIR)
+    A pack no longer declares roles (DECISIONS §9); the compiler still supports them, so its tests add them here.
+    """
+    pack = load_pack(pack_dir, schema_dir=SCHEMA_DIR)
+    reader = pack.policies.roles[0]
+    blue = reader.model_copy(update={"id": "blue_viewer", "datasets": [
+        reader.datasets[0].model_copy(update={"row_filter": "widget_name = 'Blue Widget'"}),
+    ]})
+    summary = reader.model_copy(update={"id": "summary_reader", "datasets": [DatasetGrant(
+        dataset="widget_sales", columns=["sold_on", "widget_name"],
+        aggregate_only=AggregateOnly(metrics=["widget_revenue"], min_group_size=5),
+    )]})
+    return pack.model_copy(update={"policies": PoliciesFile(roles=[reader, blue, summary])})
 
 
 def test_names_are_scoped_by_pack():
@@ -69,7 +70,7 @@ def test_agent_password_is_derived_per_user_and_needs_a_secret():
 
 def test_allowlists_name_tables_for_column_grants_and_views_for_aggregate_grants(pack):
     assert allowlists(pack) == {
-        "viewer": {
+        "reader": {
             "widget_sales": ["sale_ref", "sold_on", "widget_name", "sale_amount"],
             "widget_refunds": ["refund_ref", "refunded_on", "sale_ref", "refund_total"],
         },
@@ -128,21 +129,21 @@ def _without_column(role, column):
 
 
 def test_removed_column_is_revoked(pack):
-    smaller = _shrunk(pack, "viewer", lambda role: _without_column(role, "sale_amount"))
+    smaller = _shrunk(pack, "reader", lambda role: _without_column(role, "sale_amount"))
 
     statements = plan_statements(smaller, desired_objects(pack), _hash)
 
-    assert "REVOKE SELECT(`sale_amount`) ON `marts`.`widget_sales` FROM `fitcher_role__minimal__viewer`" in statements
+    assert "REVOKE SELECT(`sale_amount`) ON `marts`.`widget_sales` FROM `fitcher_role__minimal__reader`" in statements
 
 
 def test_removed_dataset_is_revoked_column_by_column(pack):
-    smaller = _shrunk(pack, "viewer", lambda role: role.model_copy(update={"datasets": role.datasets[:1]}))
+    smaller = _shrunk(pack, "reader", lambda role: role.model_copy(update={"datasets": role.datasets[:1]}))
 
     statements = plan_statements(smaller, desired_objects(pack), _hash)
 
     assert (
         "REVOKE SELECT(`refund_ref`, `refund_total`, `refunded_on`, `sale_ref`) ON `marts`.`widget_refunds` "
-        "FROM `fitcher_role__minimal__viewer`"
+        "FROM `fitcher_role__minimal__reader`"
     ) in statements
 
 
@@ -159,7 +160,7 @@ def test_removed_role_drops_its_user_role_row_policy_and_nothing_else(pack):
 
 
 def test_removed_aggregate_grant_drops_its_view_and_revokes_its_grant(pack):
-    viewer = next(role for role in pack.policies.roles if role.id == "viewer")
+    viewer = next(role for role in pack.policies.roles if role.id == "reader")
     smaller = _shrunk(pack, "summary_reader", lambda role: role.model_copy(update={"datasets": viewer.datasets[1:]}))
 
     statements = plan_statements(smaller, desired_objects(pack), _hash)
@@ -182,13 +183,13 @@ def test_removed_row_filter_drops_the_row_policy(pack):
 
 def test_grants_beyond_the_policy_are_revoked_even_when_not_select(pack):
     current = desired_objects(pack)
-    current.grants.add(Grant("fitcher_role__minimal__viewer", None, None, "INSERT", "marts"))
-    current.grants.add(Grant("fitcher_role__minimal__viewer", None, None, "SELECT", None))
+    current.grants.add(Grant("fitcher_role__minimal__reader", None, None, "INSERT", "marts"))
+    current.grants.add(Grant("fitcher_role__minimal__reader", None, None, "SELECT", None))
 
     statements = plan_statements(pack, current, _hash)
 
-    assert "REVOKE INSERT ON `marts`.* FROM `fitcher_role__minimal__viewer`" in statements
-    assert "REVOKE SELECT ON *.* FROM `fitcher_role__minimal__viewer`" in statements
+    assert "REVOKE INSERT ON `marts`.* FROM `fitcher_role__minimal__reader`" in statements
+    assert "REVOKE SELECT ON *.* FROM `fitcher_role__minimal__reader`" in statements
 
 
 class FakeAccess:
@@ -218,11 +219,11 @@ class FakeAccess:
 
 
 def test_read_managed_finds_objects_by_the_pack_prefixes_only():
-    access = FakeAccess(ManagedObjects(roles={"fitcher_role__minimal__viewer"}))
+    access = FakeAccess(ManagedObjects(roles={"fitcher_role__minimal__reader"}))
 
     found = read_managed(access, "minimal")
 
-    assert found.roles == {"fitcher_role__minimal__viewer"}
+    assert found.roles == {"fitcher_role__minimal__reader"}
     assert all("'fitcher_" in sql and "__minimal__" in sql for sql in access.queries)
     users = next(sql for sql in access.queries if "system.users" in sql)
     assert "storage = 'local_directory'" in users
@@ -234,7 +235,7 @@ def test_apply_runs_the_plan_and_sends_only_password_hashes(pack):
     statements = apply_policies(pack, access, "dev-secret")
 
     assert access.commands == statements
-    password = agent_password("dev-secret", "fitcher_agent__minimal__viewer")
+    password = agent_password("dev-secret", "fitcher_agent__minimal__reader")
     assert not any(password in command for command in access.commands)
     assert any(hashlib.sha256(password.encode()).hexdigest() in command for command in access.commands)
     assert "DROP ROW POLICY IF EXISTS `fitcher_row__minimal__gone` ON `marts`.`widget_sales`" in statements

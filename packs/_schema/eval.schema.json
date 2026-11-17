@@ -16,7 +16,7 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["id", "question", "language", "category", "role", "expected", "status", "evidence", "confidence"],
+        "required": ["id", "question", "language", "category", "expected", "status", "evidence", "confidence"],
         "properties": {
           "id": {"$ref": "common.schema.json#/$defs/id"},
           "question": {"$ref": "common.schema.json#/$defs/text"},
@@ -34,7 +34,7 @@
             "uniqueItems": true,
             "items": {"type": "string", "pattern": "^(glossary_terms|metrics|datasets|column_values|examples|kb_docs):.+$"}
           },
-          "role": {"$ref": "common.schema.json#/$defs/id", "description": "Role the question is asked as."},
+          "role": {"$ref": "common.schema.json#/$defs/id", "description": "Ignored: every question runs as the pack's one reader role. Kept so older eval sets still load."},
           "previous_question": {
             "$ref": "common.schema.json#/$defs/text",
             "description": "Asked first in the same conversation; the case's question follows it up. Required for follow_up and chart_edit cases."

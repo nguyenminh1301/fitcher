@@ -56,9 +56,9 @@ def test_a_pack_under_onboarding_is_named_from_its_pack_files(client, monkeypatc
     monkeypatch.setenv("COMPILED_PACK_DIR", str(tmp_path / "build"))
     monkeypatch.setenv("PACKS_DIR", str(FIXTURE_PACK.parent))
 
-    assert client.get("/pack").json() == {"name": "minimal", "display_name": "Minimal widget shop", "roles": ["viewer"]}
+    assert client.get("/pack").json() == {"name": "minimal", "display_name": "Minimal widget shop", "roles": ["reader"]}
     me = client.get("/me").json()
-    assert me["roles"] == ["viewer", "pack_reviewer", "admin"] and me["active_role"] == "viewer"
+    assert me["roles"] == ["reader", "pack_reviewer", "admin"] and me["active_role"] == "reader"
 
 
 def test_an_uncompiled_pack_makes_the_endpoints_unavailable(client, monkeypatch, tmp_path):

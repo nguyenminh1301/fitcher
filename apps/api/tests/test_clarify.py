@@ -148,7 +148,7 @@ def test_without_readable_candidates_every_readable_metric_is_offered():
 
 
 @pytest.mark.parametrize(("role", "metric_id", "expected"), [
-    ("viewer", "widget_revenue", True), ("refunds_clerk", "widget_revenue", False), ("refunds_clerk", "refunded_value", True),
+    ("reader", "widget_revenue", True), ("refunds_clerk", "widget_revenue", False), ("refunds_clerk", "refunded_value", True),
 ])
 def test_may_read_metric_follows_the_role_grants(role, metric_id, expected):
     assert may_read_metric(refunds_clerk(compiled_fixture()).pack, role, metric_id) is expected

@@ -31,7 +31,6 @@ ITEM_LISTS: dict[str, tuple[str, ...]] = {
     "metrics.yaml": ("metrics",),
     "relationships.yaml": ("relationships",),
     "examples.yaml": ("examples",),
-    "policies.yaml": ("roles",),
     "eval.yaml": ("cases",),
 }
 

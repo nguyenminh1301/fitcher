@@ -246,8 +246,9 @@ class DocumentService:
         return self.store_dir / self.pack / document_id
 
     def _check_roles(self, roles: Sequence[str]) -> list[str]:
+        # A pack has one reader role (DECISIONS §9): a document uploaded without roles is read by every role.
         if not roles:
-            raise DocumentRejected("choose at least one role that may read the document")
+            return list(self.pack_roles)
         unknown = sorted(set(roles) - set(self.pack_roles))
         if unknown:
             raise DocumentRejected(f"not roles of this pack: {', '.join(unknown)}")
