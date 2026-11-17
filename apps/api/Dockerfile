@@ -1,5 +1,5 @@
-FROM ghcr.io/astral-sh/uv:0.13.6 AS uv
-FROM python:3.13.18-slim-bookworm AS build
+FROM ghcr.io/astral-sh/uv:0.13.6@sha256:af22a52f5eafef3d78e551599d405c02df61919d18028f0cea8eda93bc9986d0 AS uv
+FROM python:3.13.18-slim-bookworm@sha256:a5a7017efc5969e00ae2b91c8eb0631049a569652aa4ffc4501769049ae45c72 AS build
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
@@ -11,7 +11,7 @@ WORKDIR /app
 COPY apps/api/pyproject.toml apps/api/uv.lock ./
 RUN uv sync --frozen --no-dev --no-install-project --no-managed-python
 
-FROM python:3.13.18-slim-bookworm AS runtime
+FROM python:3.13.18-slim-bookworm@sha256:a5a7017efc5969e00ae2b91c8eb0631049a569652aa4ffc4501769049ae45c72 AS runtime
 RUN apt-get update && apt-get upgrade -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/* \
     && python -m pip uninstall -y pip \

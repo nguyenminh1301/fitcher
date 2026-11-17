@@ -4,7 +4,7 @@ name: fitcher
 
 services:
   clickhouse:
-    image: clickhouse/clickhouse-server:26.8.36.3
+    image: clickhouse/clickhouse-server:26.8.36.3@sha256:d426d2f612e1e189c90f9a3f8dcd85a03c6851273833817a296bb327e63aa7a7
     environment:
       CLICKHOUSE_USER: ${CLICKHOUSE_ADMIN_USER:?set CLICKHOUSE_ADMIN_USER in .env}
       CLICKHOUSE_PASSWORD: ${CLICKHOUSE_ADMIN_PASSWORD:?set CLICKHOUSE_ADMIN_PASSWORD in .env}
