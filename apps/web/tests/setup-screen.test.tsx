@@ -124,7 +124,7 @@ describe("setup models step", () => {
     await waitFor(() => expect(setup.status).toHaveBeenCalledTimes(2));
   });
 
-  it("asks a model server for its base URL with the host hint", async () => {
+  it("suggests a model server's usual address with the host hint, and takes no key", async () => {
     const models = fakeModels();
     wrap(<SetupScreen {...documentProps()} sources={noSources} setup={fakeSetup(MODELS_PENDING)} models={models} isAdmin onOpenChat={() => {}} />);
 
@@ -132,9 +132,75 @@ describe("setup models step", () => {
 
     expect(screen.queryByLabelText("API key")).toBeNull();
     expect(screen.getByText(/host\.docker\.internal:<port>/)).toBeTruthy();
-    await userEvent.type(screen.getByLabelText("Base URL"), "http://host.docker.internal:11434");
+    const address = screen.getByLabelText("Base URL");
+    expect((address as HTMLInputElement).value).toBe("http://host.docker.internal:11434");
+    await userEvent.clear(address);
+    await userEvent.type(address, "http://192.168.1.20:11434");
     await userEvent.click(screen.getByRole("button", { name: "Add provider" }));
-    expect(models.addProvider).toHaveBeenCalledWith({ kind: "ollama", base_url: "http://host.docker.internal:11434" });
+    expect(models.addProvider).toHaveBeenCalledWith({ kind: "ollama", base_url: "http://192.168.1.20:11434" });
+  });
+
+  it("adds an OpenAI-compatible service from its preset, with a link to its key page and no address to type", async () => {
+    const models = fakeModels();
+    wrap(<SetupScreen {...documentProps()} sources={noSources} setup={fakeSetup(MODELS_PENDING)} models={models} isAdmin onOpenChat={() => {}} />);
+
+    await userEvent.selectOptions(await screen.findByLabelText("Provider"), "groq");
+
+    expect(screen.queryByLabelText("Base URL")).toBeNull();
+    expect(screen.getByRole("link", { name: /Get a key from Groq/ }).getAttribute("href")).toBe("https://console.groq.com/keys");
+    expect(screen.queryByRole("region", { name: "How to get an OpenRouter key" })).toBeNull();
+    await userEvent.type(screen.getByLabelText("API key"), "gsk-test-1234");
+    await userEvent.click(screen.getByRole("button", { name: "Add provider" }));
+    expect(models.addProvider).toHaveBeenCalledWith({
+      kind: "openai_compatible", name: "Groq", api_key: "gsk-test-1234", base_url: "https://api.groq.com/openai/v1",
+    });
+  });
+
+  it("walks through creating an OpenRouter key, then maps every tier to the chosen free model", async () => {
+    const OPENROUTER: ProviderView = {
+      id: "openai-compatible", name: "OpenRouter", kind: "openai_compatible", base_url: "https://openrouter.ai/api/v1",
+      key_set: true, key_last4: "abcd", hosted: false, in_use: false,
+    };
+    const unmapped: ModelTiersView = {
+      tiers: ["fast", "sql-small", "sql-gen", "sql-gen-hard"].map((tier) => ({ tier, provider_id: null, model: null, eval: null })),
+      embedding: PROPOSED.embedding,
+    };
+    const models = {
+      addProvider: vi.fn(async () => OPENROUTER),
+      tiers: vi.fn(async () => unmapped),
+      providerModels: vi.fn(async () => ({
+        provider_id: OPENROUTER.id, models: ["openai/gpt-5.4", "nvidia/nemotron-3-ultra-550b-a55b:free", "qwen/qwen3-coder:free"],
+      })),
+      setTier: vi.fn(async () => unmapped),
+      testProvider: vi.fn(),
+    } as unknown as FitcherApi["models"];
+    wrap(<SetupScreen {...documentProps()} sources={noSources} setup={fakeSetup(MODELS_PENDING)} models={models} isAdmin onOpenChat={() => {}} />);
+
+    await userEvent.selectOptions(await screen.findByLabelText("Provider"), "openrouter");
+    const guide = screen.getByRole("region", { name: "How to get an OpenRouter key" });
+    expect(guide.textContent).toContain("Create a key named fitcher");
+    await userEvent.click(screen.getByRole("button", { name: /Copy the key/ }));
+    expect(screen.getByRole("button", { name: /Copy the key/ }).getAttribute("aria-current")).toBe("step");
+    expect(screen.getByRole("button", { name: "Play" })).toBeTruthy();
+
+    await userEvent.type(screen.getByLabelText("API key"), "sk-or-v1-test");
+    await userEvent.click(screen.getByRole("button", { name: "Add provider" }));
+    expect(models.addProvider).toHaveBeenCalledWith({
+      kind: "openai_compatible", name: "OpenRouter", api_key: "sk-or-v1-test", base_url: "https://openrouter.ai/api/v1",
+    });
+
+    const chosen = await screen.findByLabelText("Model");
+    expect(screen.getByText("2 of 3 models shown")).toBeTruthy();
+    expect(chosen.textContent).not.toContain("openai/gpt-5.4");
+    await userEvent.click(screen.getByRole("button", { name: /Free models only/ }));
+    expect(screen.getByText("3 of 3 models shown")).toBeTruthy();
+    await userEvent.selectOptions(chosen, "qwen/qwen3-coder:free");
+    await userEvent.click(screen.getByRole("button", { name: "Use this model" }));
+
+    await waitFor(() => expect(models.setTier).toHaveBeenCalledTimes(4));
+    expect(models.setTier).toHaveBeenCalledWith("sql-gen-hard", { provider_id: OPENROUTER.id, model: "qwen/qwen3-coder:free" });
+    await userEvent.click(await screen.findByRole("button", { name: "Test" }));
+    expect(models.testProvider).toHaveBeenCalledWith(OPENROUTER.id, "qwen/qwen3-coder:free");
   });
 
   it("can be skipped", async () => {
