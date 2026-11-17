@@ -54,7 +54,7 @@ afterEach(() => {
 describe("console sections", () => {
   it("gives each console role exactly its sections (DECISIONS §15)", () => {
     expect(allowedSections(["pack_reviewer"]).map((section) => section.key)).toEqual(["review", "documents", "datasets", "feedback", "evaluation"]);
-    expect(allowedSections(["admin"]).map((section) => section.key)).toEqual(["runs", "audit", "costs", "evaluation", "sources", "models"]);
+    expect(allowedSections(["admin"]).map((section) => section.key)).toEqual(["runs", "audit", "costs", "evaluation", "sources", "models", "security"]);
     expect(allowedSections(["analyst", "marketing"])).toEqual([]);
     expect(allowedSections(["pack_reviewer"], ["documents"]).map((section) => section.key)).not.toContain("documents");
   });
@@ -62,7 +62,7 @@ describe("console sections", () => {
   it("lists a section once for a user with both console roles", () => {
     const keys = allowedSections(["admin", "pack_reviewer"]).map((section) => section.key);
     expect(keys.filter((key) => key === "evaluation")).toHaveLength(1);
-    expect(keys).toHaveLength(10);
+    expect(keys).toHaveLength(11);
   });
 });
 
@@ -99,7 +99,7 @@ describe("console layout", () => {
     await act(async () => fireEvent.click(screen.getByRole("menuitem", { name: /Ada Admin/ })));
 
     await waitFor(() => expect(navigate).toHaveBeenCalledWith("/console/runs", { replace: true }));
-    expect(links()).toEqual(["Runs", "Audit", "Costs", "Evaluation", "Sources", "Models", "Back to chat"]);
+    expect(links()).toEqual(["Runs", "Audit", "Costs", "Evaluation", "Sources", "Models", "Security", "Back to chat"]);
   });
 
   it("opens the navigation as a drawer and closes it after a section is picked", async () => {

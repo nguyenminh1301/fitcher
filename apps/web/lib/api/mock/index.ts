@@ -149,6 +149,14 @@ export function createMockApi(options: { latencyMs?: number; identity?: () => Pr
       "list", "test", "create", "update", "remove", "tables", "changeTables", "sync", "cancel", "syncs", "upload", "loadFile",
       "drift", "instantEstimate", "instantStart", "instantJob",
     ].map((name) => [name, () => Promise.reject(new Error("The Sources page needs the api; it has no sample data."))])) as unknown as FitcherApi["sources"],
+    // The demo has no owner password, so it never asks to sign in.
+    owner: {
+      status: async () => ({ password_set: false, signed_in: false, exposed: false }),
+      signIn: () => Promise.reject(new Error("The owner password needs the api; it has no sample data.")),
+      signOut: async () => undefined,
+      setPassword: () => Promise.reject(new Error("The owner password needs the api; it has no sample data.")),
+      removePassword: () => Promise.reject(new Error("The owner password needs the api; it has no sample data.")),
+    },
     // The demo is an instance that was set up already, so it never redirects to the setup.
     setup: {
       status: async () => ({

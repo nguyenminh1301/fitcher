@@ -1,0 +1,24 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "password_set": {
+      "title": "Password Set",
+      "type": "boolean"
+    },
+    "signed_in": {
+      "title": "Signed In",
+      "type": "boolean"
+    },
+    "exposed": {
+      "title": "Exposed",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "password_set",
+    "signed_in",
+    "exposed"
+  ],
+  "title": "OwnerStatus",
+  "type": "object"
+}

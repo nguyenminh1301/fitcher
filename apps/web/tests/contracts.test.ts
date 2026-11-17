@@ -21,6 +21,8 @@ describe("generated contract types", () => {
       "file_upload_view.schema.json", "group_input.schema.json", "instant_estimate.schema.json",
       "instant_estimate_request.schema.json", "instant_job_reply.schema.json", "instant_request.schema.json",
       "model_tiers_view.schema.json",
+      "owner_password_change.schema.json", "owner_password_removal.schema.json", "owner_sign_in.schema.json",
+      "owner_status.schema.json",
       "probe_result.schema.json", "proposal_result.schema.json",
       "provider_create.schema.json", "provider_models.schema.json", "provider_test_request.schema.json",
       "provider_test_result.schema.json", "provider_update.schema.json", "provider_view.schema.json",

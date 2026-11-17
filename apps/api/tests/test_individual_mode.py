@@ -8,12 +8,13 @@ import pytest
 from agent_fixtures import compiled_fixture
 
 from app.api import runtime
-from app.auth import origin
+from app.auth import origin, owner
 from app.main import app
 from app.state.db import shared_state
 
 PACK_ROLES = [role.id for role in compiled_fixture().pack.policies.roles]
 pytestmark = pytest.mark.address_checks
+PASSWORD = "correct horse battery"
 
 
 @pytest.fixture
@@ -52,8 +53,10 @@ def test_a_foreign_host_is_refused(client, host):
     assert "FITCHER_ALLOWED_HOSTS" in response.json()["detail"]
 
 
-def test_an_allowed_host_is_accepted_and_reported_as_exposed(client, monkeypatch):
+def test_an_allowed_host_passes_the_address_check_and_is_reported_as_exposed(client, monkeypatch):
     monkeypatch.setenv("FITCHER_ALLOWED_HOSTS", "fitcher.lan, 192.168.1.20")
+    owner.set_password(shared_state(), PASSWORD)
+    client.post("/owner/session", json={"password": PASSWORD}, headers={"Origin": "http://localhost:3000"})
 
     response = client.get("/me", headers={"Host": "fitcher.lan:3000"})
 
@@ -143,10 +146,15 @@ def test_a_trusted_peer_network_is_accepted(client, monkeypatch):
     assert client.get("/me", headers={"X-Fitcher-Peer": "10.0.3.1"}).status_code == 403
 
 
-def test_an_allowed_host_is_reached_from_other_machines(client, monkeypatch):
+def test_an_allowed_host_is_reached_from_other_machines_only_with_the_owner_password(client, monkeypatch):
     monkeypatch.setenv("FITCHER_ALLOWED_HOSTS", "fitcher.lan")
+    remote = {"Host": "fitcher.lan", "X-Fitcher-Peer": "192.168.1.50"}
 
-    assert client.get("/me", headers={"Host": "fitcher.lan", "X-Fitcher-Peer": "192.168.1.50"}).status_code == 200
+    assert client.get("/me", headers=remote).status_code == 403
+    owner.set_password(shared_state(), PASSWORD)
+    assert client.get("/me", headers=remote).status_code == 401
+    client.post("/owner/session", json={"password": PASSWORD}, headers={**remote, "Origin": "http://fitcher.lan"})
+    assert client.get("/me", headers=remote).status_code == 200
 
 
 def test_the_default_gateway_is_read_from_the_route_table(tmp_path):

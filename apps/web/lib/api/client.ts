@@ -39,6 +39,7 @@ import type {
   ReviewItem,
   ReviewItemPatch,
   SetupStatus,
+  OwnerStatus,
   SourceConnection,
   SourceCreate,
   SourceDetail,
@@ -162,6 +163,16 @@ export interface FitcherApi {
     /** Build a pack from the chosen tables; the draft is a paid call, so ``confirm_billable`` must be set. */
     instantStart(body: InstantRequest): Promise<InstantJobReply>;
     instantJob(id: string): Promise<InstantJobReply>;
+  };
+  /** The optional owner password (DECISIONS §9): its status, signing in and out, setting and removing it. */
+  owner: {
+    status(): Promise<OwnerStatus>;
+    /** Throws an OwnerSignInError when the password is wrong or too many attempts failed. */
+    signIn(password: string): Promise<void>;
+    signOut(): Promise<void>;
+    /** Set the password, or change it with the current one; signs this browser in. */
+    setPassword(newPassword: string, currentPassword?: string): Promise<void>;
+    removePassword(currentPassword: string): Promise<void>;
   };
   /** First-run setup (DECISIONS §15); the changes need the admin role. */
   setup: {

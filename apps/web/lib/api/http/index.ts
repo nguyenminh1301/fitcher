@@ -10,6 +10,7 @@ import { httpDocuments } from "./documents";
 import { httpFeedback } from "./feedback";
 import { httpModels } from "./models";
 import { httpReview } from "./review";
+import { httpOwner } from "./owner";
 import { httpSetup } from "./setup";
 import { httpSources } from "./sources";
 
@@ -29,4 +30,5 @@ export const httpApi: FitcherApi = {
   models: httpModels,
   sources: httpSources,
   setup: httpSetup,
+  owner: httpOwner,
 };

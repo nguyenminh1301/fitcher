@@ -8,7 +8,7 @@ fitcher is a personal app: one owner, no accounts and no sign-in (DECISIONS §9)
 
 | | |
 | --- | --- |
-| Who uses it | The owner: every request acts as the owner with every role |
+| Who uses it | The owner: every request acts as the owner with every role; with the optional owner password, only a signed-in browser |
 | Who may reach the port | The local machine only: the api answers a loopback host name only from a connection on this machine (loopback, the container's default gateway or `FITCHER_TRUSTED_PEERS`), answers `FITCHER_ALLOWED_HOSTS` names from anywhere, and a change needs the same `Origin` |
 | Conversation delete | Removes the conversation, its messages and its feedback for good |
 | Data the agent reaches | What the active pack role grants, enforced by ClickHouse grants, row policies and settings profiles |
@@ -17,7 +17,7 @@ fitcher is a personal app: one owner, no accounts and no sign-in (DECISIONS §9)
 
 | Threat | What stops it | What remains |
 | --- | --- | --- |
-| Someone else reaches the instance | The image publishes the port on `127.0.0.1` in every documented command; the api refuses other host names (DNS rebinding), a loopback host name sent from another machine or container, and cross-site changes without the same `Origin` | Anyone with a shell on the same machine is the owner, and anyone who reaches a name listed in `FITCHER_ALLOWED_HOSTS` controls the instance. |
+| Someone else reaches the instance | The image publishes the port on `127.0.0.1` in every documented command; the api refuses other host names (DNS rebinding), a loopback host name sent from another machine or container, and cross-site changes without the same `Origin` | Without an owner password, anyone with a shell on the same machine is the owner. A name listed in `FITCHER_ALLOWED_HOSTS` answers only after an owner password is set, and then only to a signed-in browser. |
 | A malicious web page the user visits | `Origin` check on changes; a Content-Security-Policy with per-request nonces and `frame-ancestors 'none'`, `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: same-origin` | Styles allow `'unsafe-inline'` (the chart library sets style attributes); a style cannot run code. |
 | A malicious document or column value (prompt injection) | Screening of questions and document text (DECISIONS §9); the model writes one read-only query that the guard parses and limits; the query runs as the user's role user, which reads only granted views | Injected text can still change the wording of an answer or summary; it cannot widen what the role reads. |
 | A hostile source database | Connections run as `source_loader` through encrypted named collections; copies land in `raw` and are read through generated views; errors are reduced to fixed reasons, so a server's message never reaches a page, a log line or a row | A source can send a very large table; the per-query memory and time limits of the copy stop it, and the admin chooses the tables. |
@@ -28,7 +28,7 @@ Secrets in logs: tests fail when a provider key, a source password or the instan
 
 ## Hardening checklist
 
-- Keep the published port on `127.0.0.1`, and do not list names in `FITCHER_ALLOWED_HOSTS` that other people can reach.
+- Keep the published port on `127.0.0.1`. Before listing a name in `FITCHER_ALLOWED_HOSTS`, set an owner password on the Security page, and serve the name over HTTPS behind a reverse proxy.
 - Supply `FITCHER_SECRET_KEY` from a secret store instead of the generated `secret.key`.
 - Back up with `fitcher backup` (see [operations.md](operations.md)); keep archives made with `--include-secret-key` as safe as the volume.
 - Give each source connection a read-only database account.

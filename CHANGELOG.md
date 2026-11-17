@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Added
+
+- An optional owner password, set, changed and removed on the console's new Security page from this machine: once set, every browser signs in on `/sign-in` (Argon2id hash, server-side sessions in an `HttpOnly`, `SameSite=Strict` cookie, slowed down after repeated wrong passwords) and the account menu offers Sign out; an instance reachable through a `FITCHER_ALLOWED_HOSTS` name refuses requests until a password is set and keeps it while the name is listed.
+
 ### Removed
 
 - fitcher is a personal app without accounts: team mode, local accounts and their sessions and sign-in throttle, OpenID Connect sign-in, the sign-in page, the Users page, the setup's "Who uses this instance" step and the development accounts are removed; app-state change 0008 drops their tables, settings and secret, every request acts as the owner, and deleting a conversation always removes it for good.

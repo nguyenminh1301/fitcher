@@ -427,7 +427,9 @@
     "refusedTitle": "Không thể bắt đầu trả lời",
     "refusedText": "fitcher đã từ chối câu hỏi này trước khi chạy. Lượt chạy này chưa được lưu.",
     "noPackSection": "Chưa có gói",
-    "noPackSectionText": "Trang này hiển thị gói đang dùng. Hãy kết nối dữ liệu ở trang Nguồn dữ liệu và tạo gói trước."
+    "noPackSectionText": "Trang này hiển thị gói đang dùng. Hãy kết nối dữ liệu ở trang Nguồn dữ liệu và tạo gói trước.",
+    "nav_security": "Bảo mật",
+    "desc_security": "Bảo vệ instance này bằng mật khẩu chủ. Khi chưa có, nó chỉ trả lời máy tính này."
   },
   "instant": {
     "title": "Dựng gói dữ liệu",
@@ -674,5 +676,34 @@
     "savedAndPreparing": "Đã lưu lựa chọn. Đang chuẩn bị bảng…",
     "build": "Tạo gói",
     "buildOf": "Tạo gói của {name}"
+  },
+  "owner": {
+    "signInTitle": "Đăng nhập fitcher",
+    "signInHint": "Instance này được bảo vệ bằng mật khẩu chủ.",
+    "password": "Mật khẩu",
+    "signIn": "Đăng nhập",
+    "signOut": "Đăng xuất",
+    "signIn_wrong": "Mật khẩu không đúng.",
+    "signIn_throttled": "Nhập sai quá nhiều lần. Hãy đợi vài phút rồi thử lại.",
+    "signIn_unavailable": "Không đăng nhập được. Hãy thử lại.",
+    "statusOn": "Instance này được bảo vệ bằng mật khẩu chủ: mọi trình duyệt phải đăng nhập.",
+    "statusOff": "Chưa có mật khẩu chủ: instance này chỉ trả lời máy tính này, không cần đăng nhập.",
+    "exposedNeedsPassword": "Instance này truy cập được từ máy khác. Hãy đặt mật khẩu chủ trên máy này trước khi người khác mở nó.",
+    "setTitle": "Đặt mật khẩu chủ",
+    "changeTitle": "Đổi mật khẩu chủ",
+    "currentPassword": "Mật khẩu hiện tại",
+    "newPassword": "Mật khẩu mới",
+    "repeatPassword": "Nhập lại mật khẩu mới",
+    "rule": "Ít nhất {count} ký tự.",
+    "tooShort": "Hãy dùng ít nhất {count} ký tự.",
+    "mismatch": "Hai mật khẩu không giống nhau.",
+    "setButton": "Đặt mật khẩu",
+    "change": "Đổi mật khẩu",
+    "set": "Đã đặt mật khẩu chủ. Trình duyệt này vẫn đăng nhập.",
+    "changed": "Đã đổi mật khẩu. Các trình duyệt khác phải đăng nhập lại.",
+    "removeTitle": "Gỡ mật khẩu chủ",
+    "removeHint": "Nhập mật khẩu hiện tại ở trên để gỡ. Sau đó instance chỉ trả lời máy tính này, không cần đăng nhập.",
+    "remove": "Gỡ mật khẩu",
+    "removed": "Đã gỡ mật khẩu chủ."
   }
 }

@@ -33,6 +33,7 @@ from app.contracts.query_spec import QuerySpec  # noqa: E402
 from app.contracts.result import Result  # noqa: E402
 from app.contracts.review import DatasetView, ReviewItem, ReviewItemPatch  # noqa: E402
 from app.contracts.screening import ClassifierStatus  # noqa: E402
+from app.contracts.owner import OwnerPasswordChange, OwnerPasswordRemoval, OwnerSignIn, OwnerStatus  # noqa: E402
 from app.contracts.setup import SetupStatus  # noqa: E402
 from app.contracts.instant import InstantEstimate, InstantEstimateRequest, InstantJobReply, InstantRequest  # noqa: E402
 from app.contracts.sources import (  # noqa: E402
@@ -100,6 +101,10 @@ CONTRACTS = {
     "file_upload_view": (FileUploadView, "serialization"),
     "file_load": (FileLoad, "validation"),
     "setup_status": (SetupStatus, "serialization"),
+    "owner_status": (OwnerStatus, "serialization"),
+    "owner_sign_in": (OwnerSignIn, "validation"),
+    "owner_password_change": (OwnerPasswordChange, "validation"),
+    "owner_password_removal": (OwnerPasswordRemoval, "validation"),
 }
 SCHEMAS = ROOT / "apps" / "web" / "lib" / "contracts" / "schemas"
 

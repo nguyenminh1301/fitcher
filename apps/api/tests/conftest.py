@@ -26,6 +26,8 @@ def _address_checks_pass(request, monkeypatch):
     if request.node.get_closest_marker("address_checks") is None:
         from app.auth import origin
         monkeypatch.setattr(origin, "refusal", lambda *args, **kwargs: None)
+        # TestClient's host is "testserver"; to the owner-password gate it would be another machine.
+        monkeypatch.setattr(origin, "remote", lambda browser_host: False)
 
 
 FIXTURE_PACK = Path(__file__).parent / "fixtures" / "packs" / "minimal"
