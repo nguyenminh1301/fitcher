@@ -1,7 +1,6 @@
 """Model providers and the tier mapping (DECISIONS §2, §9, §15): the setup's Models step and the Models page.
 
-Until sign-in moves into the app (Phase 15) every endpoint needs the ``admin``
-role. A key goes into the vault and never comes back: responses carry only
+Every endpoint needs the ``admin`` role, which the owner holds. A key goes into the vault and never comes back: responses carry only
 whether it is set and its last four characters, and admin actions record the
 same. Adding the first provider maps every chat tier and the embedding to its
 proposed models; any tier can then be mapped to any model of a configured

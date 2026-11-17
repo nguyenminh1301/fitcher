@@ -4,8 +4,6 @@ version = "0.1.0"
 description = "Domain-neutral natural-language data analysis API"
 requires-python = ">=3.13,<3.14"
 dependencies = [
-    # Hashes local account passwords with Argon2id (app/auth/accounts.py).
-    "argon2-cffi==25.1.0",
     "clickhouse-connect==1.11.0",
     # Encrypts stored secrets with AES-256-GCM (app/state/secrets.py).
     "cryptography==50.0.2",
@@ -31,7 +29,6 @@ dependencies = [
     # Company documents (app/onboarding): read-only parsers; uploads are multipart forms.
     "openpyxl==3.1.5",
     "pydantic==2.14.1",
-    "pyjwt[crypto]==2.15.1",
     "pypdf==6.21.4",
     "python-docx==1.2.0",
     "python-multipart==0.0.32",
@@ -60,3 +57,4 @@ default-groups = ["dev", "jobs"]
 [tool.pytest.ini_options]
 testpaths = ["tests", "../../jobs/tests"]
 pythonpath = [".", "../.."]
+markers = ["address_checks: run the api's Host, Origin and peer checks, which the other API tests skip"]

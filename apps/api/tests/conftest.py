@@ -20,6 +20,14 @@ os.environ.setdefault("LITELLM_LOCAL_MODEL_COST_MAP", "True")
 # Tests that import litellm directly must not load the repository's .env into the test process.
 os.environ.setdefault("LITELLM_MODE", "PRODUCTION")
 
+@pytest.fixture(autouse=True)
+def _address_checks_pass(request, monkeypatch):
+    """Requests of the API tests come from TestClient's own host; the address checks have their own tests."""
+    if request.node.get_closest_marker("address_checks") is None:
+        from app.auth import origin
+        monkeypatch.setattr(origin, "refusal", lambda *args, **kwargs: None)
+
+
 FIXTURE_PACK = Path(__file__).parent / "fixtures" / "packs" / "minimal"
 SCHEMA_DIR = Path(__file__).resolve().parents[3] / "packs" / "_schema"
 
@@ -82,10 +90,3 @@ def isolated_data_dir(tmp_path, monkeypatch):
     reset_shared_state()
 
 
-@pytest.fixture(autouse=True)
-def team_mode(isolated_data_dir):
-    """Tests sign users in, so the test app state is in team mode; individual-mode tests set their own mode."""
-    from app.state.db import shared_state
-    from app.state.settings import Settings
-
-    Settings(shared_state()).set("instance", "mode", "team")

@@ -1,10 +1,10 @@
-"""The signed-in user and the active role on the HTTP endpoints, and the public pack identity."""
+"""The owner and the active role on the HTTP endpoints, and the pack identity."""
 
 from agent_fixtures import compiled_fixture
 from fastapi.testclient import TestClient
 import pytest
 
-from session_fixtures import UNKNOWN_SESSION, SessionHeaders
+from session_fixtures import SessionHeaders
 
 from app.api import runtime
 from app.main import app
@@ -19,30 +19,15 @@ def client():
     app.dependency_overrides.clear()
 
 
-def test_me_returns_the_signed_in_user_and_active_role(client):
-    response = client.get("/me", headers=SessionHeaders(user_id="dev.viewer", display_name="Lab Viewer"))
+def test_me_is_the_owner_with_every_pack_role_and_console_role(client):
+    response = client.get("/me")
 
     assert response.status_code == 200
+    pack_roles = [role.id for role in compiled_fixture().pack.policies.roles]
     assert response.json() == {
-        "user_id": "dev.viewer", "display_name": "Lab Viewer", "roles": ["viewer"], "active_role": "viewer", "mode": "team",
-        "exposed": False,
+        "user_id": "owner", "display_name": "Owner", "roles": [*pack_roles, "pack_reviewer", "admin"],
+        "active_role": pack_roles[0], "exposed": False,
     }
-
-
-@pytest.mark.parametrize("headers", [{}, UNKNOWN_SESSION, {"Authorization": "Bearer something"}])
-def test_a_missing_or_unknown_session_is_unauthorized_without_detail(client, headers):
-    response = client.get("/me", headers=headers)
-
-    assert response.status_code == 401
-    assert response.json() == {"detail": "sign in again"}
-
-
-def test_a_user_without_a_pack_role_has_no_active_role(client):
-    response = client.get("/me", headers=SessionHeaders(["admin"], user_id="dev.admin"))
-
-    assert response.status_code == 200
-    assert response.json()["roles"] == ["admin"]
-    assert response.json()["active_role"] is None
 
 
 def test_an_active_role_header_the_user_does_not_hold_is_forbidden(client):
@@ -62,7 +47,7 @@ def test_pack_names_the_active_pack_and_its_roles_without_a_token(client):
     }
 
 
-def test_a_pack_under_onboarding_signs_in_from_its_pack_files(client, monkeypatch, tmp_path):
+def test_a_pack_under_onboarding_is_named_from_its_pack_files(client, monkeypatch, tmp_path):
     from conftest import FIXTURE_PACK
 
     del app.dependency_overrides[runtime.get_compiled_or_none]
@@ -72,8 +57,8 @@ def test_a_pack_under_onboarding_signs_in_from_its_pack_files(client, monkeypatc
     monkeypatch.setenv("PACKS_DIR", str(FIXTURE_PACK.parent))
 
     assert client.get("/pack").json() == {"name": "minimal", "display_name": "Minimal widget shop", "roles": ["viewer"]}
-    me = client.get("/me", headers=SessionHeaders(["viewer", "pack_reviewer"])).json()
-    assert me["roles"] == ["viewer", "pack_reviewer"] and me["active_role"] == "viewer"
+    me = client.get("/me").json()
+    assert me["roles"] == ["viewer", "pack_reviewer", "admin"] and me["active_role"] == "viewer"
 
 
 def test_an_uncompiled_pack_makes_the_endpoints_unavailable(client, monkeypatch, tmp_path):
@@ -98,17 +83,16 @@ def test_suggestions_are_the_first_approved_example_questions_of_the_active_pack
     examples = [example for example in compiled_fixture().pack.examples.examples][:3]
     assert response.status_code == 200
     assert response.json() == [{"text": example.question, "lang": example.language} for example in examples]
-    assert client.get("/pack/suggestions").status_code == 401
 
 
-def test_a_new_instance_without_any_pack_still_knows_who_is_signed_in(client, monkeypatch):
+def test_a_new_instance_without_any_pack_still_knows_the_owner(client, monkeypatch):
     del app.dependency_overrides[runtime.get_compiled]
     del app.dependency_overrides[runtime.get_compiled_or_none]
     runtime.get_compiled.cache_clear()
     monkeypatch.setattr(runtime, "current_pack", lambda: "")
 
-    response = client.get("/me", headers=SessionHeaders(["admin"], user_id="owner"))
+    response = client.get("/me")
 
     assert response.status_code == 200
-    assert response.json()["active_role"] is None and response.json()["roles"] == ["admin"]
+    assert response.json()["active_role"] is None and response.json()["roles"] == ["pack_reviewer", "admin"]
     runtime.get_compiled.cache_clear()

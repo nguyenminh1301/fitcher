@@ -11,7 +11,6 @@ import { EvaluationReport, EvaluationSection } from "@/components/console/sectio
 import { FeedbackSection } from "@/components/console/sections/FeedbackSection";
 import { ReviewDetail, ReviewSection } from "@/components/console/sections/ReviewSection";
 import { RunDetail, RunsSection } from "@/components/console/sections/RunsSection";
-import { UsersSection } from "@/components/console/sections/UsersSection";
 import { createMockApi } from "@/lib/api/mock";
 import type { ConsoleFile } from "@/lib/api/provisional";
 import { FEATURES, type Sources } from "@/lib/api/sources";
@@ -47,7 +46,6 @@ const SURFACES: [string, string, ReactNode][] = [
   ["run trace", "runs", <RunDetail key="s" traceId="t1" />],
   ["audit", "audit", <AuditSection key="s" />],
   ["costs", "costs", <CostsSection key="s" />],
-  ["users", "users", <UsersSection key="s" />],
 ];
 
 function show(section: string, page: ReactNode, sources?: Partial<Sources>) {

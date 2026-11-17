@@ -58,16 +58,6 @@ describe("api client", () => {
     expect(await mock.sampleStatus()).toBe("missing");
   });
 
-  it("console actions change the sample state", async () => {
-    vi.stubGlobal("fetch", fakeFetch({ console: CONSOLE, scenarios: { suggestions: [], scenarios: [] } }));
-    const mock = createMockApi();
-
-    await mock.users.setRoles("u2", ["analyst"]);
-    await mock.users.setEnabled("u2", false);
-
-    expect(await mock.users.list()).toEqual([{ ...CONSOLE.users[0], roles: ["analyst"], enabled: false }]);
-    expect(await mock.datasets.list()).toEqual(CONSOLE.datasets);
-  });
 });
 
 describe("sample data badge", () => {

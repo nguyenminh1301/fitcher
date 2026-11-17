@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import {
-  createHttpAudit, createHttpCosts, createHttpEvaluation, createHttpFeedbackReview, createHttpRuns, createHttpUsers,
+  createHttpAudit, createHttpCosts, createHttpEvaluation, createHttpFeedbackReview, createHttpRuns,
 } from "@/lib/api/http/admin";
 
 function fetcher(status = 200, body: unknown = []) {
@@ -43,29 +43,4 @@ describe("http admin sections", () => {
       .rejects.toThrow("409: an eval run of shop is still running");
   });
 
-  it("sets roles and enables or disables a user", async () => {
-    const fetch = fetcher(204);
-    const users = createHttpUsers(fetch);
-    await users.setRoles("u1", ["analyst"]);
-    await users.setEnabled("u1", false);
-    await users.setEnabled("u1", true);
-    expect(calls(fetch)).toEqual([
-      ["/api/admin/users/u1", "PATCH"], ["/api/admin/users/u1", "PATCH"], ["/api/admin/users/u1", "PATCH"],
-    ]);
-    expect(fetch.mock.calls.map(([, init]) => JSON.parse(init?.body as string))).toEqual([
-      { roles: ["analyst"] }, { enabled: false }, { enabled: true },
-    ]);
-  });
-
-  it("creates an account and resets a password through the admin routes", async () => {
-    const created = { id: "u9", email: "bea@example.com", display_name: "Bea", roles: ["analyst"], enabled: true };
-    const fetch = fetcher(200, created);
-    const users = createHttpUsers(fetch);
-
-    expect(await users.create({ email: "bea@example.com", display_name: "Bea", password: "battery staple", roles: ["analyst"] })).toEqual(created);
-    await users.resetPassword("u9", "new password");
-
-    expect(calls(fetch)).toEqual([["/api/admin/users", "POST"], ["/api/admin/users/u9/password", "POST"]]);
-    expect(JSON.parse(fetch.mock.calls[1][1]?.body as string)).toEqual({ password: "new password" });
-  });
 });

@@ -33,14 +33,13 @@ from app.contracts.query_spec import QuerySpec  # noqa: E402
 from app.contracts.result import Result  # noqa: E402
 from app.contracts.review import DatasetView, ReviewItem, ReviewItemPatch  # noqa: E402
 from app.contracts.screening import ClassifierStatus  # noqa: E402
-from app.contracts.setup import SetupModeChange, SetupStatus  # noqa: E402
+from app.contracts.setup import SetupStatus  # noqa: E402
 from app.contracts.instant import InstantEstimate, InstantEstimateRequest, InstantJobReply, InstantRequest  # noqa: E402
 from app.contracts.sources import (  # noqa: E402
     FileLoad, FileUploadView, ProbeResult, SourceCreate, SourceDetail, SourceDrift, SourcePatch, SourceView, SyncView,
     TablesChange,
     SourceConnection,
 )
-from app.contracts.users import NewUser, PasswordReset, UserChange, UserView  # noqa: E402
 
 # Each contract with the JSON Schema mode of its direction: what the api accepts ("validation") or
 # what it sends ("serialization", where every field is present).
@@ -100,12 +99,7 @@ CONTRACTS = {
     "sync_view": (SyncView, "serialization"),
     "file_upload_view": (FileUploadView, "serialization"),
     "file_load": (FileLoad, "validation"),
-    "user_view": (UserView, "serialization"),
-    "user_change": (UserChange, "validation"),
-    "new_user": (NewUser, "validation"),
-    "password_reset": (PasswordReset, "validation"),
     "setup_status": (SetupStatus, "serialization"),
-    "setup_mode_change": (SetupModeChange, "validation"),
 }
 SCHEMAS = ROOT / "apps" / "web" / "lib" / "contracts" / "schemas"
 

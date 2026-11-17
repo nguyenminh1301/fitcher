@@ -17,7 +17,6 @@ export const EMPTY_CONSOLE: ConsoleFile = {
   traces: {},
   audit: [],
   costs: [],
-  users: [],
 };
 export const EMPTY_SCENARIOS: ScenarioFile = { suggestions: [], scenarios: [] };
 

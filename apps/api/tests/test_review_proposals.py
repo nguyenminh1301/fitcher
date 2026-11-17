@@ -201,11 +201,10 @@ def client():
     app.dependency_overrides.clear()
 
 
-def test_feedback_is_listed_for_a_reviewer(client):
+def test_feedback_is_listed_with_its_proposal(client):
     app.dependency_overrides[runtime.get_proposal_store] = lambda: Store()
     response = client.get("/admin/feedback", headers=REVIEWER, params={"rating": "dislike"})
     assert response.status_code == 200 and response.json()[0]["proposal"] == "proposed"
-    assert client.get("/admin/feedback", headers=ADMIN).status_code == 403
 
 
 def test_proposing_from_one_run(client):

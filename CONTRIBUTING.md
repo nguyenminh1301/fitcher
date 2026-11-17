@@ -29,33 +29,27 @@ You need Docker with Compose v2 and about 8 GB of memory for Docker. Run the com
    docker compose up --build --wait
    ```
 
-3. Create the development accounts with the password set as `DEV_ACCOUNT_PASSWORD` in `.env`. This also puts the instance in team mode, where everyone signs in. Skip it to use the app alone without signing in (individual mode).
+3. Open [localhost:3000](http://localhost:3000). The setup asks which models to use: a provider and its key, or a model server on this computer (Ollama, LM Studio or any OpenAI-compatible endpoint, reached as `host.docker.internal`). Its test call shows the model each task will use.
 
-   ```bash
-   docker compose run --rm jobs python -m jobs.seed_dev_accounts
-   ```
-
-4. Open [localhost:3000](http://localhost:3000) and sign in as `dev.admin@fitcher.test`. The setup asks who uses the instance and which models to use: a provider and its key, or a model server on this computer (Ollama, LM Studio or any OpenAI-compatible endpoint, reached as `host.docker.internal`). Its test call shows the model each task will use.
-
-5. Load the sample e-commerce data and build the tables the agent reads. This downloads [FreeEcommerceTwin14M](https://huggingface.co/datasets/ziadatalabs/FreeEcommerceTwin14M), 14.3 million rows licensed for non-commercial use only. On Linux, `./data` must be writable by user ID 10001.
+4. Load the sample e-commerce data and build the tables the agent reads. This downloads [FreeEcommerceTwin14M](https://huggingface.co/datasets/ziadatalabs/FreeEcommerceTwin14M), 14.3 million rows licensed for non-commercial use only. On Linux, `./data` must be writable by user ID 10001.
 
    ```bash
    docker compose run --rm jobs python -m jobs.refresh_data --source ecommerce_twin
    ```
 
-6. Publish the e-commerce Domain Pack. This checks it, test-runs its metrics, writes the database permissions and builds the search index with the embedding model of the provider from step 4, which costs a little with a hosted provider. With a provider that has no embedding model, such as Anthropic alone, a local model is downloaded once (about 0.2 GB) instead; it finds fewer matches ([measurement](docs/eval/local-embedding-report.md)).
+5. Publish the e-commerce Domain Pack. This checks it, test-runs its metrics, writes the database permissions and builds the search index with the embedding model of the provider from step 3, which costs a little with a hosted provider. With a provider that has no embedding model, such as Anthropic alone, a local model is downloaded once (about 0.2 GB) instead; it finds fewer matches ([measurement](docs/eval/local-embedding-report.md)).
 
    ```bash
    docker compose run --rm jobs python -m jobs.compile_pack --pack ecommerce_twin
    ```
 
-7. Optionally, install the prompt-injection classifier. Questions are always screened by English and Vietnamese rules; the classifier adds a model score. Accept the licence of `meta-llama/Llama-Prompt-Guard-2-86M` on Hugging Face, put your token in `.env` as `HF_TOKEN`, run the command below and turn the classifier on on the Models page.
+6. Optionally, install the prompt-injection classifier. Questions are always screened by English and Vietnamese rules; the classifier adds a model score. Accept the licence of `meta-llama/Llama-Prompt-Guard-2-86M` on Hugging Face, put your token in `.env` as `HF_TOKEN`, run the command below and turn the classifier on on the Models page.
 
    ```bash
    docker compose run --rm guard-model
    ```
 
-8. Sign in as `dev.analyst@fitcher.test` and pick one of the suggested questions. A hosted provider bills every question.
+7. Pick one of the suggested questions. A hosted provider bills every question.
 
 You can also ask from the command line:
 
@@ -64,19 +58,6 @@ docker compose run --rm api python -m jobs.ask "Top 10 best-selling products in 
 ```
 
 `make up`, `make ps`, `make logs`, `make smoke` and `make down` are shortcuts for the Compose commands. Stopping the services keeps the data.
-
-### Development accounts
-
-Each signs in with its e-mail, `<user>@fitcher.test`, and `DEV_ACCOUNT_PASSWORD`.
-
-| User | What they can see |
-| --- | --- |
-| `dev.analyst` | All sales, returns and site traffic |
-| `dev.marketing` | Site traffic only, so a sales question is refused |
-| `dev.northwest` | Sales and returns of the Northwest region only |
-| `dev.partner` | Daily sales and units by product category, never single orders |
-| `dev.reviewer` | What the analyst sees, plus the console's Review, Documents, Datasets, Feedback and Evaluation pages |
-| `dev.admin` | What the analyst sees, plus Runs and trace, Audit, Costs, Models and Users |
 
 ### Services
 

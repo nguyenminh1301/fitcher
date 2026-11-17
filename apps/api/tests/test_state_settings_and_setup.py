@@ -14,16 +14,15 @@ def db(tmp_path):
 
 def test_settings_return_the_default_until_set(db):
     settings = Settings(db)
-    assert settings.get("instance", "mode") is None
-    settings.set("instance", "mode", "team")
-    assert settings.get("instance", "mode") == "team"
-    assert Settings(db).get("instance", "mode") == "team"
+    assert settings.get("limits", "concurrent_questions") == 4
+    settings.set("limits", "concurrent_questions", 2)
+    assert Settings(db).get("limits", "concurrent_questions") == 2
 
 
 def test_settings_validate_type_and_choices(db):
     settings = Settings(db)
     with pytest.raises(SettingError):
-        settings.set("instance", "mode", "everyone")
+        settings.set("llm.embedding", "backend", "everywhere")
     with pytest.raises(SettingError):
         settings.set("setup", "complete", "yes")
     with pytest.raises(SettingError, match="unknown"):
@@ -40,46 +39,24 @@ def test_settings_can_register_a_typed_setting(db):
 
 def test_a_new_instance_has_every_step_pending_and_is_incomplete(db):
     status = setup.status(db)
-    assert status.mode is None and not status.complete
+    assert not status.complete
+    assert [step.id for step in status.steps] == ["models", "data", "documents"]
     assert status.steps and all(step.state == "pending" for step in status.steps)
 
 
-def test_choosing_a_mode_marks_its_step_done_and_is_kept(db):
-    setup.set_mode(db, "team", setup.FirstAdmin("ana@example.com", "Ana", "correct horse"), ["viewer"])
-    status = setup.status(db)
-    assert status.mode == "team"
-    assert {s.id: s.state for s in status.steps}["mode"] == "done"
-
-
-def test_team_mode_without_an_admin_needs_the_first_admin(db):
-    with pytest.raises(setup.FirstAdminNeeded):
-        setup.set_mode(db, "team")
-    assert setup.status(db).mode is None
-
-
-def test_the_first_admin_takes_the_owner_id_and_the_owner_roles(db):
-    created = setup.set_mode(db, "team", setup.FirstAdmin("ana@example.com", "Ana", "correct horse"), ["viewer"])
-
-    assert (created.id, created.roles) == ("owner", ("admin", "viewer"))
-    assert setup.set_mode(db, "team") is None
-
-
-def test_unknown_mode_and_step_are_rejected(db):
-    with pytest.raises(setup.SetupError):
-        setup.set_mode(db, "everyone")
+def test_an_unknown_step_is_rejected(db):
     with pytest.raises(setup.UnknownStep):
         setup.skip(db, "nope")
+    with pytest.raises(setup.UnknownStep):
+        setup.skip(db, "mode")
 
 
 def test_skip_marks_a_step_skipped(db):
-    setup.skip(db, "mode")
-    assert {s.id: s.state for s in setup.status(db).steps}["mode"] == "skipped"
+    setup.skip(db, "data")
+    assert {s.id: s.state for s in setup.status(db).steps}["data"] == "skipped"
 
 
 def test_complete_needs_every_step_decided(db):
-    with pytest.raises(setup.SetupError, match="mode"):
-        setup.complete(db)
-    setup.set_mode(db, "individual")
     with pytest.raises(setup.SetupError, match="models"):
         setup.complete(db)
     setup.mark_done(db, "models")

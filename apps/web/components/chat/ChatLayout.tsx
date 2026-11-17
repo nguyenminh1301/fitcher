@@ -26,7 +26,7 @@ const SIDE_DEFAULT = 272;
 type MenuState = { anchor: HTMLElement; items: MenuItem[]; align: "start" | "end"; label: string } | null;
 type DialogState = { kind: "rename-conv" | "rename-group" | "delete-conv" | "delete-group"; id: string } | null;
 
-export function ChatLayout({ children, onConsole, onSignOut }: { children: ReactNode; onConsole?: () => void; onSignOut?: () => void }) {
+export function ChatLayout({ children, onConsole }: { children: ReactNode; onConsole?: () => void }) {
   const { t } = useI18n();
   const { api, conversations, groups, activeId, navigate, refresh, now, identity } = useChat();
   const [drawer, setDrawer] = useState(false);
@@ -270,7 +270,7 @@ export function ChatLayout({ children, onConsole, onSignOut }: { children: React
           </section>
         </div>
         <div className="fc-side-foot">
-          <AccountMenu onConsole={onConsole ?? (() => window.location.assign("/console"))} onSignOut={onSignOut} />
+          <AccountMenu onConsole={onConsole ?? (() => window.location.assign("/console"))} />
         </div>
         <div
           className="fc-side-resize fc-desk-only"

@@ -36,11 +36,10 @@ type Props = {
   section: string | null;
   navigate: Navigate;
   onChat: () => void;
-  onSignOut?: () => void;
   children: ReactNode;
 };
 
-export function ConsoleLayout({ section, navigate, onChat, onSignOut, children }: Props) {
+export function ConsoleLayout({ section, navigate, onChat, children }: Props) {
   const { t } = useI18n();
   const { identity, pack, api } = useChat();
   const [drawer, setDrawer] = useState(false);
@@ -50,7 +49,7 @@ export function ConsoleLayout({ section, navigate, onChat, onSignOut, children }
   useEffect(() => {
     api.documents.settings().then((settings) => setDocumentsOn(settings.enabled)).catch(() => null);
   }, [api]);
-  const allowed = identity ? allowedSections(identity.roles, identity.mode, documentsOn ? [] : ["documents"]) : [];
+  const allowed = identity ? allowedSections(identity.roles, documentsOn ? [] : ["documents"]) : [];
   const current = allowed.find((item) => item.key === section);
   const firstAllowed = allowed[0]?.path;
 
@@ -89,7 +88,7 @@ export function ConsoleLayout({ section, navigate, onChat, onSignOut, children }
               </span>
             </div>
             <Button variant="ghost" icon="message" className="fc-hide-sm" onClick={onChat}>{t("ui.chatApp")}</Button>
-            <AccountMenu compact onChat={onChat} onSignOut={onSignOut} />
+            <AccountMenu compact onChat={onChat} />
           </header>
           <nav className="fc-cnav" aria-label={t("ui.consoleLabel")}>
             <div className="fc-drawer-only fc-cnav-head">

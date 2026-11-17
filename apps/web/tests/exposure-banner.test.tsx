@@ -7,17 +7,16 @@ import { I18nProvider } from "@/lib/i18n/react";
 afterEach(cleanup);
 
 describe("exposure banner", () => {
-  it("warns, without a way to dismiss it, when an individual instance is reachable by others", () => {
-    render(<I18nProvider initial="en"><ExposureBanner identity={{ user_id: "owner", display_name: "Owner", roles: [], mode: "individual", exposed: true }} /></I18nProvider>);
+  it("warns, without a way to dismiss it, when the instance is reachable by others", () => {
+    render(<I18nProvider initial="en"><ExposureBanner identity={{ user_id: "owner", display_name: "Owner", roles: [], exposed: true }} /></I18nProvider>);
 
     expect(screen.getByText(/Anyone who can reach this address controls this instance/)).toBeTruthy();
     expect(screen.queryByRole("button")).toBeNull();
   });
 
-  it("shows nothing on loopback or in team mode", () => {
+  it("shows nothing on loopback", () => {
     const { container } = render(<I18nProvider initial="en">
-      <ExposureBanner identity={{ user_id: "owner", display_name: "Owner", roles: [], mode: "individual", exposed: false }} />
-      <ExposureBanner identity={{ user_id: "ana", display_name: "Ana", roles: [], mode: "team" }} />
+      <ExposureBanner identity={{ user_id: "owner", display_name: "Owner", roles: [], exposed: false }} />
       <ExposureBanner identity={null} />
     </I18nProvider>);
 

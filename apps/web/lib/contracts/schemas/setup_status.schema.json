@@ -27,21 +27,6 @@
   },
   "additionalProperties": false,
   "properties": {
-    "mode": {
-      "anyOf": [
-        {
-          "enum": [
-            "individual",
-            "team"
-          ],
-          "type": "string"
-        },
-        {
-          "type": "null"
-        }
-      ],
-      "title": "Mode"
-    },
     "steps": {
       "items": {
         "$ref": "#/$defs/SetupStep"
@@ -55,7 +40,6 @@
     }
   },
   "required": [
-    "mode",
     "steps",
     "complete"
   ],

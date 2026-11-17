@@ -11,7 +11,6 @@ from app.api import providers as providers_api, runtime, setup as setup_api
 from app.llm.client import LLMError
 from app.llm.provider_models import ModelListError
 from app.main import app
-from app.state.settings import Settings
 
 ADMIN = SessionHeaders(['admin'], user_id='dev.admin')
 VIEWER = SessionHeaders()
@@ -60,7 +59,6 @@ def actions():
 @pytest.fixture
 def client(tmp_path, fakes, actions):
     db, vault = new_state(tmp_path)
-    Settings(db).set("instance", "mode", "team")
     app.dependency_overrides[setup_api.get_state_db] = lambda: db
     app.dependency_overrides[providers_api.get_vault] = lambda: vault
     app.dependency_overrides[providers_api.get_model_lister] = lambda: fakes.lister
@@ -75,15 +73,6 @@ def add_openai(client):
     response = client.post("/providers", headers=ADMIN, json={"kind": "openai", "api_key": KEY})
     assert response.status_code == 201, response.text
     return response
-
-
-@pytest.mark.parametrize(("method", "path"), [
-    ("get", "/providers"), ("post", "/providers"), ("patch", "/providers/openai"), ("delete", "/providers/openai"),
-    ("get", "/providers/openai/models"), ("post", "/providers/openai/test"), ("get", "/models/tiers"),
-    ("put", "/models/tiers/fast"), ("put", "/models/embedding"),
-])
-def test_every_endpoint_needs_the_admin_role(client, method, path):
-    assert getattr(client, method)(path, headers=VIEWER).status_code == 403
 
 
 def test_adding_the_first_provider_shows_only_the_key_ending_and_fills_the_tiers(client, actions):
@@ -219,7 +208,6 @@ def test_a_tier_change_that_does_not_fit_is_refused(client, tier, body, code):
     assert client.put(f"/models/tiers/{tier}", headers=ADMIN, json=body).status_code == code
 
 
-
 def test_a_key_the_instance_key_cannot_read_asks_for_the_key_again(client, fakes, tmp_path):
     from app.state.secrets import SecretVault
 
@@ -232,7 +220,6 @@ def test_a_key_the_instance_key_cannot_read_asks_for_the_key_again(client, fakes
         assert response.status_code == 409
         assert "enter it again" in response.json()["detail"]
     assert fakes.listed_with == [] and fakes.probed == []
-
 
 
 def test_changing_the_embedding_needs_a_confirmed_reindex(client):
@@ -278,7 +265,6 @@ def test_the_embedding_can_move_back_to_a_local_model(client):
 def test_an_embedding_change_that_does_not_fit_is_refused(client, change):
     add_openai(client)
     assert client.put("/models/embedding", headers=ADMIN, json={**change, "confirm_reindex": True}).status_code == 422
-
 
 
 def test_adding_a_provider_answers_the_setups_models_step(client):

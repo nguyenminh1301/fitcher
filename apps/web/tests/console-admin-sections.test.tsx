@@ -7,7 +7,6 @@ import { AuditSection } from "@/components/console/sections/AuditSection";
 import { CostsSection } from "@/components/console/sections/CostsSection";
 import { EvaluationSection } from "@/components/console/sections/EvaluationSection";
 import { RunDetail, RunsSection } from "@/components/console/sections/RunsSection";
-import { UsersSection } from "@/components/console/sections/UsersSection";
 import { createMockApi, type MockApi } from "@/lib/api/mock";
 import type { ConsoleFile } from "@/lib/api/provisional";
 import { ChatProvider } from "@/lib/chat/ChatContext";
@@ -62,10 +61,6 @@ const CONSOLE: Partial<ConsoleFile> = {
   costs: [
     { day: "2026-11-01", alias: "fast", model: "model-small", tier: "fast", provider: "openai", calls: 10, cost_usd: 0.25 },
     { day: "2026-11-02", alias: "sql-gen", model: "model-large", tier: "sql-gen", provider: "openai", calls: 4, cost_usd: 1.5 },
-  ],
-  users: [
-    { id: "adm", email: "adm@example.com", display_name: "Ada Admin", roles: ["admin", "analyst"], enabled: true },
-    { id: "ana", email: "ana@example.com", display_name: "Ana Analyst", roles: ["analyst"], enabled: true },
   ],
 };
 
@@ -191,103 +186,5 @@ describe("costs", () => {
     expect(await screen.findByText("$1.75")).toBeTruthy();
     expect(screen.getAllByText("Estimate").length).toBeGreaterThanOrEqual(3);
     expect(screen.getByText(/Estimated from token counts/)).toBeTruthy();
-  });
-});
-
-describe("users", () => {
-  it("changes a user's roles and disables them after confirmation", async () => {
-    show("users", <UsersSection />);
-    const row = (await screen.findByText("Ana Analyst")).closest("tr") as HTMLElement;
-
-    await act(async () => fireEvent.click(within(row).getByRole("button", { name: "viewer" })));
-    await waitFor(() => expect(within(row).getByRole("button", { name: "viewer" }).getAttribute("aria-pressed")).toBe("true"));
-
-    fireEvent.click(within(row).getByRole("button", { name: "Disable" }));
-    await act(async () => fireEvent.click(within(screen.getByRole("alertdialog", { name: "Disable Ana Analyst?" })).getByRole("button", { name: "Disable" })));
-    await waitFor(() => expect(within(row).getByText("Disabled")).toBeTruthy());
-    expect((await api.users.list()).find((user) => user.id === "ana")).toMatchObject({ roles: ["analyst", "viewer"], enabled: false });
-  });
-
-  it("creates an account with an e-mail, a name, a password and roles", async () => {
-    const create = vi.spyOn(api.users, "create");
-    show("users", <UsersSection />);
-    await screen.findByText("Ana Analyst");
-
-    fireEvent.click(screen.getByRole("button", { name: "New account" }));
-    const dialog = screen.getByRole("dialog", { name: "New account" });
-    fireEvent.change(within(dialog).getByLabelText("E-mail"), { target: { value: "bea@example.com" } });
-    fireEvent.change(within(dialog).getByLabelText("Name"), { target: { value: "Bea" } });
-    fireEvent.change(within(dialog).getByLabelText("Password"), { target: { value: "battery staple" } });
-    fireEvent.click(within(dialog).getByRole("button", { name: "analyst" }));
-    await act(async () => fireEvent.click(within(dialog).getByRole("button", { name: "Create" })));
-
-    expect(create).toHaveBeenCalledWith({ email: "bea@example.com", display_name: "Bea", password: "battery staple", roles: ["analyst"] });
-    expect(await screen.findByText("Bea", { selector: "b" })).toBeTruthy();
-  });
-
-  it("resets another user's password", async () => {
-    const reset = vi.spyOn(api.users, "resetPassword");
-    show("users", <UsersSection />);
-    const row = (await screen.findByText("Ana Analyst")).closest("tr") as HTMLElement;
-
-    fireEvent.click(within(row).getByRole("button", { name: "Reset password" }));
-    const dialog = screen.getByRole("dialog", { name: "Reset the password of Ana Analyst" });
-    fireEvent.change(within(dialog).getByLabelText("New password"), { target: { value: "new password" } });
-    await act(async () => fireEvent.click(within(dialog).getByRole("button", { name: "Save" })));
-
-    expect(reset).toHaveBeenCalledWith("ana", "new password");
-  });
-
-  it("opens the reset dialog of another user with an empty password", async () => {
-    await api.users.create({ email: "bea@example.com", display_name: "Bea Buyer", password: "battery staple", roles: ["analyst"] });
-    show("users", <UsersSection />);
-    const ana = (await screen.findByText("Ana Analyst")).closest("tr") as HTMLElement;
-
-    fireEvent.click(within(ana).getByRole("button", { name: "Reset password" }));
-    fireEvent.change(screen.getByLabelText("New password"), { target: { value: "typed for ana" } });
-    fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Cancel" }));
-    const bea = (await screen.findByText("Bea Buyer")).closest("tr") as HTMLElement;
-    fireEvent.click(within(bea).getByRole("button", { name: "Reset password" }));
-
-    expect((screen.getByLabelText("New password") as HTMLInputElement).value).toBe("");
-  });
-
-  it("sends a new account once while the request runs", async () => {
-    const create = vi.spyOn(api.users, "create").mockReturnValue(new Promise(() => undefined));
-    show("users", <UsersSection />);
-    await screen.findByText("Ana Analyst");
-
-    fireEvent.click(screen.getByRole("button", { name: "New account" }));
-    const dialog = screen.getByRole("dialog", { name: "New account" });
-    await act(async () => fireEvent.click(within(dialog).getByRole("button", { name: "Create" })));
-    await act(async () => fireEvent.click(within(dialog).getByRole("button", { name: "Create" })));
-
-    expect(create).toHaveBeenCalledTimes(1);
-    expect(within(dialog).getByRole("button", { name: "Create" }).hasAttribute("disabled")).toBe(true);
-    expect(within(dialog).getByRole("button", { name: "Cancel" }).hasAttribute("disabled")).toBe(true);
-  });
-
-  it("lists users for an admin who may not read the Datasets section", async () => {
-    vi.spyOn(api.datasets, "list").mockRejectedValue(new Error("this console section needs the pack_reviewer role"));
-    show("users", <UsersSection />);
-
-    expect(await screen.findByText("Ana Analyst")).toBeTruthy();
-  });
-
-  it("does not let the signed-in admin change their own roles or disable themselves", async () => {
-    show("users", <UsersSection />);
-    const row = (await screen.findByText("Ada Admin", { selector: "b" })).closest("tr") as HTMLElement;
-
-    expect(within(row).getByRole("button", { name: "analyst" }).hasAttribute("disabled")).toBe(true);
-    expect(within(row).queryByRole("button", { name: "Disable" })).toBeNull();
-  });
-
-  it("offers only the pack's roles, which are the only roles the api changes", async () => {
-    show("users", <UsersSection />);
-    const row = (await screen.findByText("Ana Analyst")).closest("tr") as HTMLElement;
-
-    expect(within(row).getAllByRole("button").map((button) => button.textContent)).toEqual(expect.arrayContaining(["analyst", "viewer"]));
-    expect(within(row).queryByRole("button", { name: "admin" })).toBeNull();
-    expect(within(row).queryByRole("button", { name: "pack_reviewer" })).toBeNull();
   });
 });

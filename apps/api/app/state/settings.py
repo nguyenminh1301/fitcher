@@ -26,10 +26,7 @@ class SettingSpec:
     choices: tuple[Any, ...] | None = None
 
 
-INSTANCE_MODES = ("individual", "team")
-
 SPECS: dict[tuple[str, str], SettingSpec] = {
-    ("instance", "mode"): SettingSpec(str, None, INSTANCE_MODES),
     ("setup", "complete"): SettingSpec(bool, False),
     # Each chat tier's model: {"provider_id": ..., "model": ...} (app/llm/routes.py).
     **{("llm.tiers", tier): SettingSpec(dict) for tier in CHAT_TIERS},
@@ -41,10 +38,6 @@ SPECS: dict[tuple[str, str], SettingSpec] = {
     ("llm.embedding", "provider_id"): SettingSpec(str),
     ("llm.embedding", "model"): SettingSpec(str),
     ("llm.embedding", "dimensions"): SettingSpec(int),
-    # The one OpenID Connect provider of team mode (DECISIONS §9); its client secret is the secret oidc:client_secret.
-    ("oidc", "issuer"): SettingSpec(str),
-    ("oidc", "client_id"): SettingSpec(str),
-    ("oidc", "roles_claim"): SettingSpec(str, "roles"),
     # Company documents (DECISIONS §5, §15): off hides the Documents page and its endpoints, and the compiler
     # indexes no chunks; the stored files and the registry are kept.
     ("documents", "enabled"): SettingSpec(bool, True),

@@ -13,28 +13,18 @@ import type {
   ReviewItem,
   RunRow,
   TraceItem,
-  UserRow,
 } from "@/lib/contracts";
 
 import type { ConversationThread } from "./conversations";
 import type { AskEvent } from "./events";
 
-/** Who a request acts as: the signed-in account, or the owner in individual mode; demo identities on sample data. */
+/** Who a request acts as: the owner of this personal app; demo identities on sample data. */
 export interface Identity {
   user_id: string;
   display_name: string;
   roles: string[];
-  /** Individual mode has no sign-in; absent on sample data, which behaves as team mode. */
-  mode?: "individual" | "team";
-  /** Individual mode reachable through a name other than localhost (DECISIONS §9). */
+  /** Reachable through a name other than localhost (DECISIONS §9). */
   exposed?: boolean;
-}
-
-/** Why a sign-in was refused: a wrong e-mail or password, or too many failures in a row. */
-export class SignInError extends Error {
-  constructor(readonly reason: "invalid" | "throttled" | "unavailable") {
-    super(`sign-in refused: ${reason}`);
-  }
 }
 
 /** A sample document row; the mock fills the rest of DocumentView, which only the api knows. */
@@ -82,5 +72,4 @@ export interface ConsoleFile {
   traces: Record<string, TraceItem[]>;
   audit: AuditRow[];
   costs: CostRow[];
-  users: UserRow[];
 }

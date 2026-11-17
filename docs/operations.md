@@ -4,7 +4,7 @@ This guide covers backup and restore, upgrades, an external ClickHouse, the limi
 
 ## Retention
 
-Conversations, their messages, groups and feedback have no expiry: they stay until their owner deletes them. Run logs, events, LLM calls, SQL runs, audit rows and screening results expire after 90 days. In individual mode a deleted conversation is removed for good with its messages and the feedback on its answers; in team mode it is only hidden from its owner, and an admin can still read it in the console.
+Conversations, their messages, groups and feedback have no expiry: they stay until their owner deletes them. Run logs, events, LLM calls, SQL runs, audit rows and screening results expire after 90 days. A deleted conversation is removed for good with its messages and the feedback on its answers.
 
 ## Backup
 

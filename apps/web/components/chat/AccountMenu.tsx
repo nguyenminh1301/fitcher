@@ -17,7 +17,7 @@ export function initials(name: string): string {
 /** Who is signed in, the interface language and theme, the console entry for console roles (or the
  *  chat app's, inside the console), and sign out. While sign-in runs on sample data it also offers the
  *  pack's demo identities. */
-export function AccountMenu({ onConsole, onChat, onSignOut, compact }: { onConsole?: () => void; onChat?: () => void; onSignOut?: () => void; compact?: boolean }) {
+export function AccountMenu({ onConsole, onChat, compact }: { onConsole?: () => void; onChat?: () => void; compact?: boolean }) {
   const { t, locale, setLocale } = useI18n();
   const { theme, setTheme } = useTheme();
   const { identity, identities, sources, switchIdentity } = useChat();
@@ -38,8 +38,6 @@ export function AccountMenu({ onConsole, onChat, onSignOut, compact }: { onConso
   items.push({ separator: true });
   if (onChat) items.push({ icon: "message", label: t("ui.chatApp"), onSelect: onChat });
   else if (hasConsole(roles) && onConsole) items.push({ icon: "layout", label: t("ui.console"), onSelect: onConsole });
-  // Individual mode has no sign-in, so there is nothing to sign out of.
-  if (identity.mode !== "individual") items.push({ icon: "logout", label: t("ui.signOut"), onSelect: onSignOut });
 
   const header = (
     <>

@@ -37,12 +37,7 @@ export type { FeedbackRow } from "./feedback_row";
 export type { ProposalResult } from "./proposal_result";
 export type { EvalLayer, EvalReportView as EvalReport, FailedCase } from "./eval_report_view";
 export type { EvalRunStarted } from "./eval_run_started";
-export type { UserView as UserRow } from "./user_view";
-export type { UserChange } from "./user_change";
-export type { NewUser } from "./new_user";
-export type { PasswordReset } from "./password_reset";
 export type { SetupStatus, SetupStep } from "./setup_status";
-export type { SetupModeChange } from "./setup_mode_change";
 export type {
   AskEvent as StreamEvent,
   ChartSpecEvent,

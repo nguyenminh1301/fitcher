@@ -1,8 +1,5 @@
 // The admin and feedback sections from the api (Phase 12), through the web server's /api/admin routes,
-// which add the session's access token. The api answers runs, audit, costs and users only to an admin,
-// feedback to a pack_reviewer, and eval reports to either.
-
-import type { PasswordReset, UserChange } from "@/lib/contracts";
+// to the api.
 
 import type { FitcherApi } from "../client";
 import { refused } from "./conversations";
@@ -17,9 +14,6 @@ async function call(fetcher: Fetcher, url: string, init?: RequestInit): Promise<
 
 const post = (body: unknown): RequestInit => ({
   method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body),
-});
-const patch = (body: UserChange): RequestInit => ({
-  method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify(body),
 });
 const id = (value: string) => encodeURIComponent(value);
 
@@ -63,25 +57,8 @@ export function createHttpEvaluation(fetcher: Fetcher = (...args) => fetch(...ar
   };
 }
 
-export function createHttpUsers(fetcher: Fetcher = (...args) => fetch(...args)): FitcherApi["users"] {
-  return {
-    list: async () => (await call(fetcher, "/api/admin/users")).json(),
-    setRoles: async (userId, roles) => {
-      await call(fetcher, `/api/admin/users/${id(userId)}`, patch({ roles }));
-    },
-    setEnabled: async (userId, enabled) => {
-      await call(fetcher, `/api/admin/users/${id(userId)}`, patch({ enabled }));
-    },
-    create: async (user) => (await call(fetcher, "/api/admin/users", post(user))).json(),
-    resetPassword: async (userId, password) => {
-      await call(fetcher, `/api/admin/users/${id(userId)}/password`, post({ password } satisfies PasswordReset));
-    },
-  };
-}
-
 export const httpRuns = createHttpRuns();
 export const httpAudit = createHttpAudit();
 export const httpCosts = createHttpCosts();
 export const httpFeedbackReview = createHttpFeedbackReview();
 export const httpEvaluation = createHttpEvaluation();
-export const httpUsers = createHttpUsers();

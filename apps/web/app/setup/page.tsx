@@ -8,17 +8,14 @@ import { api } from "@/lib/api";
 
 const packRoles = async () => (await api.auth.pack())?.roles ?? [];
 
-// The first-run setup. A user who is not signed in is sent to the sign-in page.
+// The first-run setup of this personal app; the owner answers every step.
 export default function SetupPage() {
   const router = useRouter();
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
   useEffect(() => {
-    void api.auth.current().then((identity) => {
-      if (!identity) router.replace("/sign-in");
-      else setIsAdmin(identity.roles.includes("admin"));
-    }).catch(() => router.replace("/sign-in"));
-  }, [router]);
+    void api.auth.current().then((identity) => setIsAdmin(identity?.roles.includes("admin") ?? true)).catch(() => setIsAdmin(true));
+  }, []);
   if (isAdmin === null) return null;
   return <SetupScreen setup={api.setup} models={api.models} sources={api.sources} documents={api.documents} packRoles={packRoles}
-    isAdmin={isAdmin} onSignedOut={() => router.replace("/sign-in")} onOpenChat={() => router.push("/")} />;
+    isAdmin={isAdmin} onOpenChat={() => router.push("/")} />;
 }

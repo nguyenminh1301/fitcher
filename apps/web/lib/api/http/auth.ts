@@ -1,9 +1,8 @@
-// Sign-in with an account of the instance (DECISIONS §9): the api keeps the session and the web server's
-// /api/session passes its cookie through. In individual mode every request is the owner, so there is no
-// sign-in. There is one identity per browser session, so there is nothing to switch to.
+// Who the app acts as (DECISIONS §9): fitcher is a personal app, so /api/session answers the owner. There is
+// one identity, so there is nothing to switch to.
 
 import type { FitcherApi } from "../client";
-import { type Identity, SignInError } from "../provisional";
+import type { Identity } from "../provisional";
 
 async function json<T>(response: Response): Promise<T> {
   if (!response.ok) throw new Error(`${response.url || "request"} answered ${response.status}`);
@@ -31,26 +30,6 @@ export function createHttpAuth(fetcher: typeof fetch = (...args) => fetch(...arg
     pack: async () => {
       const response = await fetcher("/api/pack", { cache: "no-store" });
       return response.status === 503 ? null : json(response);
-    },
-    signIn: async (email, password) => {
-      const response = await fetcher("/api/session", {
-        method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ email, password }),
-      });
-      if (response.status === 401) throw new SignInError("invalid");
-      if (response.status === 429) throw new SignInError("throttled");
-      if (!response.ok) throw new SignInError("unavailable");
-      current = null;
-    },
-    oidcEnabled: async () => {
-      const response = await fetcher("/api/session/oidc", { cache: "no-store" });
-      return response.ok && ((await response.json()) as { enabled?: boolean }).enabled === true;
-    },
-    signOut: async () => {
-      current = null;
-      const response = await fetcher("/api/session", { method: "DELETE" });
-      // A 401 means the api had already ended the session; anything else that failed leaves it signed in.
-      if (!response.ok && response.status !== 401) throw new Error(`sign-out answered ${response.status}`);
-      return "/sign-in";
     },
   };
 }

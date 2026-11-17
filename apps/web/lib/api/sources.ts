@@ -8,7 +8,7 @@ export type Sources = Record<Feature, Source>;
 
 export const FEATURES: Feature[] = [
   "auth", "chat", "conversations", "feedback", "datasets", "review", "documents",
-  "feedbackReview", "evaluation", "runs", "audit", "costs", "users", "models", "sources", "setup",
+  "feedbackReview", "evaluation", "runs", "audit", "costs", "models", "sources", "setup",
 ];
 
 // The demo build (NEXT_PUBLIC_FITCHER_DEMO=1, .github/workflows/demo.yml) runs every feature on the
@@ -28,7 +28,6 @@ const LIVE: Sources = {
   runs: "http",
   audit: "http",
   costs: "http",
-  users: "http",
   models: "http",
   sources: "http",
   setup: "http",

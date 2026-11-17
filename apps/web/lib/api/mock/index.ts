@@ -63,9 +63,6 @@ export function createMockApi(options: { latencyMs?: number; identity?: () => Pr
         const { console } = await load();
         return { ...console.pack, roles: console.pack_roles };
       },
-      signIn: async () => wait(undefined),
-      oidcEnabled: async () => false,
-      signOut: async () => "/sign-in",
     },
     chat: createMockChat(load, identity),
     conversations: createMockConversations(load, identity),
@@ -143,21 +140,6 @@ export function createMockApi(options: { latencyMs?: number; identity?: () => Pr
     },
     audit: { list: async () => wait((await load()).console.audit) },
     costs: { list: async () => wait((await load()).console.costs) },
-    users: {
-      list: async () => wait((await load()).console.users),
-      setRoles: async (id, roles) => {
-        find((await load()).console.users, id).roles = roles;
-      },
-      setEnabled: async (id, enabled) => {
-        find((await load()).console.users, id).enabled = enabled;
-      },
-      create: async (user) => {
-        const row = { id: `demo-${Date.now()}`, email: user.email.toLowerCase(), display_name: user.display_name, roles: user.roles, enabled: true };
-        (await load()).console.users.push(row);
-        return wait(row);
-      },
-      resetPassword: async () => wait(undefined),
-    },
     // The Models page has no sample data: providers, keys and tiers live in the instance's app state.
     models: Object.fromEntries([
       "providers", "addProvider", "changeProvider", "removeProvider", "providerModels", "testProvider", "tiers", "setTier",
@@ -170,9 +152,8 @@ export function createMockApi(options: { latencyMs?: number; identity?: () => Pr
     // The demo is an instance that was set up already, so it never redirects to the setup.
     setup: {
       status: async () => ({
-        mode: "individual", steps: [{ id: "mode", state: "done" }, { id: "models", state: "done" }, { id: "data", state: "done" }], complete: true,
+        steps: [{ id: "models", state: "done" }, { id: "data", state: "done" }, { id: "documents", state: "done" }], complete: true,
       }),
-      setMode: () => Promise.reject(new Error("The setup needs the api; it has no sample data.")),
       skip: () => Promise.reject(new Error("The setup needs the api; it has no sample data.")),
       complete: () => Promise.reject(new Error("The setup needs the api; it has no sample data.")),
     },

@@ -8,7 +8,7 @@ from app.api import instant as instant_api
 from app.main import app
 from app.onboarding.instant import InstantJob, InstantRefused
 
-ADMIN = SessionHeaders(["admin"], user_id="dev.admin")
+ADMIN = SessionHeaders(["admin"], user_id="owner")
 VIEWER = SessionHeaders()
 
 
@@ -54,15 +54,6 @@ def parts():
 BODY = {"source_id": "shop", "tables": ["widgets", "sales"], "confirm_billable": True}
 
 
-@pytest.mark.parametrize(("method", "path"), [
-    ("post", "/pack/instant"), ("post", "/pack/instant/estimate"), ("get", "/pack/instant/job1")])
-def test_every_endpoint_needs_the_admin_role(parts, method, path):
-    client, _, _ = parts
-    response = client.post(path, headers=VIEWER, json=BODY) if method == "post" else client.get(path, headers=VIEWER)
-
-    assert response.status_code == 403
-
-
 def test_the_estimate_shows_the_prompt_size_before_the_paid_call(parts):
     client, pipeline, _ = parts
 
@@ -89,7 +80,7 @@ def test_a_confirmed_request_starts_one_job_and_records_the_admin_action(parts):
 
     assert response.status_code == 202
     assert response.json()["job"]["id"] == "job1" and response.json()["job"]["status"] == "running"
-    assert pipeline.started == [("shop", ("widgets", "sales"), "dev.admin")]
+    assert pipeline.started == [("shop", ("widgets", "sales"), "owner")]
     assert [(record.action, record.target) for record in actions.records] == [("pack.instant", "shop")]
 
 

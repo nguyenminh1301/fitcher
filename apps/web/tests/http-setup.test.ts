@@ -19,15 +19,6 @@ describe("http setup", () => {
     expect(fetcher.mock.calls[0][0]).toBe("/api/setup/status");
   });
 
-  it("puts the chosen mode", async () => {
-    const { fetcher, setup } = client();
-    await setup.setMode("team");
-    const [url, init] = fetcher.mock.calls[0];
-    expect(url).toBe("/api/setup/mode");
-    expect(init?.method).toBe("PUT");
-    expect(JSON.parse(init?.body as string)).toEqual({ mode: "team" });
-  });
-
   it("skips a step and completes the setup with posts", async () => {
     const { fetcher, setup } = client();
     await setup.skip("mode");
