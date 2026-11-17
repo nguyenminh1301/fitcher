@@ -8,7 +8,7 @@ import time
 import uuid
 
 from agent_fixtures import GOOD_SQL, compiled_fixture, deps, extraction_reply, good_output, routing_reply
-from session_fixtures import UNKNOWN_SESSION, SessionHeaders
+from session_fixtures import SessionHeaders
 from fakes import FakeClassifier, FakeConversationClient, FakeRunner
 from fastapi.testclient import TestClient
 import pytest
@@ -70,6 +70,7 @@ def serve(agent: FakeAgent, compiled, per_minute: int = 3, store: ConversationSt
     store = store or ConversationStore(FakeConversationClient())
     app.dependency_overrides[runtime.get_conversation_store] = lambda: store
     app.dependency_overrides[runtime.get_compiled] = lambda: compiled
+    app.dependency_overrides[runtime.get_compiled_or_none] = lambda: compiled
     app.dependency_overrides[runtime.get_agent] = lambda: agent
     app.dependency_overrides[runtime.get_rate_limiter] = lambda: limiter
 
@@ -120,7 +121,7 @@ def test_a_data_question_streams_status_sql_result_chart_summary_and_done(ask_cl
     assert chart["type"] == "bar" and chart["allowed_types"] == ["bar", "table"]
     summary = next(event for event in events if event["event"] == "summary")
     assert (summary["text"], summary["lang"]) == ("Widget 0 led.", "en")
-    assert ask_client.agent.started[0][:2] == ("viewer", "dev.viewer")
+    assert ask_client.agent.started[0][:2] == ("viewer", "owner")
 
 
 def test_every_node_streams_a_start_and_an_end_status_in_graph_order(ask_client):
@@ -286,24 +287,9 @@ def test_a_client_disconnect_stops_the_run_and_kills_its_query():
 
 
 def collect(agent: FakeAgent, role="viewer") -> list[dict]:
-    run = agent.start(role=role, user_id="dev.viewer", today=None)
+    run = agent.start(role=role, user_id="owner", today=None)
     return parse("".join(asyncio.run(drain(event_stream(run, QUESTION, AnswerEvents(role))))))
 
-
-def test_a_missing_or_unknown_session_is_unauthorized_before_the_graph_starts(ask_client):
-    assert ask_client.post("/ask", json={"question": QUESTION}).status_code == 401
-    expired = ask_client.post("/ask", json={"question": QUESTION}, headers=UNKNOWN_SESSION)
-    assert expired.status_code == 401
-    assert ask_client.agent.started == []
-
-
-def test_a_user_without_a_pack_role_is_forbidden(ask_client):
-    response = ask_client.post(
-        "/ask", json={"question": QUESTION}, headers=SessionHeaders(['admin']),
-    )
-
-    assert response.status_code == 403
-    assert ask_client.agent.started == []
 
 
 def test_too_many_questions_are_refused_before_the_graph_starts(ask_client):
@@ -380,7 +366,7 @@ def test_a_first_question_starts_a_conversation_and_stores_both_turns():
     assert uuid.UUID(conversation_id).version == 4
     assert kinds(parse(response.text))[-1] == "done"
     [conversation] = client.tables["conversations"]
-    assert (conversation["user_id"], conversation["conversation_id"], conversation["title"]) == ("dev.viewer", conversation_id, QUESTION)
+    assert (conversation["user_id"], conversation["conversation_id"], conversation["title"]) == ("owner", conversation_id, QUESTION)
     asked, answered = client.tables["chat_messages"]
     assert (asked["role"], asked["content"], asked["turn"]) == ("user", QUESTION, 1)
     assert (answered["role"], answered["content"], answered["turn"]) == ("assistant", "Widget 0 led.", 1)
@@ -401,19 +387,6 @@ def test_a_follow_up_reads_the_previous_turn():
     assert (previous.turn, previous.question, previous.answer) == (1, QUESTION, "Widget 0 led.")
     assert previous.query_spec is not None and previous.result is not None
     assert [row["turn"] for row in client.tables["chat_messages"]] == [1, 1, 2, 2]
-
-
-def test_another_users_conversation_is_404_before_any_llm_call():
-    agent, client = answer(), FakeConversationClient()
-    store = ConversationStore(client)
-    theirs = store.open_turn("dev.analyst", None, "Their question")
-    store.question(theirs)
-
-    [response] = ask_with(agent, store, {"conversation_id": theirs.conversation_id})
-
-    assert response.status_code == 404
-    assert agent.started == []
-    assert [row["user_id"] for row in client.tables["chat_messages"]] == ["dev.analyst"]
 
 
 def test_an_unreachable_store_is_503():

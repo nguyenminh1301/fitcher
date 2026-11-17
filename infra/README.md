@@ -17,7 +17,6 @@ See [DECISIONS §3](../docs/DECISIONS.md#3-docker-compose) and the [Phase 0 plan
 | `clickhouse/changes/0003_model_tiers.sql` | Creates `data_meta.model_tiers`, the tier mapping of the LiteLLM Proxy era, which the api copies into its app state once |
 | `clickhouse/changes/0004_documents.sql` | Creates `data_meta.documents`, the registry of company documents |
 | `sources/fixtures/` | Lab-only fixture source systems of the `sources` Compose profile: the synthetic widget dataset (`widgets/`, written by `generate.py`) and one seed script per PostgreSQL, MySQL, MongoDB and the S3-compatible store |
-| `dev/accounts.yaml` | Development accounts of the development packs (one per pack role and console role), created in team mode by `jobs.seed_dev_accounts` with `DEV_ACCOUNT_PASSWORD` from `.env`; never in the released image |
 
 ## ClickHouse users and databases
 
@@ -94,18 +93,10 @@ For a local chat model, start `docker compose --profile local-models up -d --wai
 Every call, answered, failed or refused, is written to `agent_logs.llm_calls` with its tier, provider, model, tokens, estimated cost, latency and error; inside a traced run it carries the run's `trace_id` and graph node.
 The gateway refuses a call without `screening` metadata and reruns the EN/VI rules of `apps/api/app/screening/rules.py` on every message and embedding input before any provider call (DECISIONS §9); it closes code paths that forgot to screen and is not an authentication boundary.
 
-## Sign-in
+## Access
 
-Sign-in is built into the api (DECISIONS §9); no service runs for it.
-Individual mode answers only on localhost and the names of `FITCHER_ALLOWED_HOSTS`; Compose also sets `FITCHER_INTERNAL_HOSTS=api`, the name by which the web service reaches the api, which the web server sends with the browser's own host as `X-Forwarded-Host`.
-Team mode keeps accounts and sessions in the app state. For development, create the accounts of `dev/accounts.yaml` and put the instance in team mode:
-
-```bash
-docker compose run --rm jobs python -m jobs.seed_dev_accounts
-```
-
-A second run resets their passwords, roles and status. Their ids are the usernames the development users had under Keycloak, so their conversations and run logs stay theirs.
-An admin may register one OpenID Connect provider with `PUT /settings/oidc`; register `http://localhost:3000/auth/oidc/callback` (or the instance's public address) as its redirect URI.
+fitcher is a personal app without accounts (DECISIONS §9).
+The api answers only on localhost and the names of `FITCHER_ALLOWED_HOSTS`; Compose also sets `FITCHER_INTERNAL_HOSTS=api`, the name by which the web service reaches the api, which the web server sends with the browser's own host as `X-Forwarded-Host`.
 
 ## Release image
 

@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Removed
+
+- fitcher is a personal app without accounts: team mode, local accounts and their sessions and sign-in throttle, OpenID Connect sign-in, the sign-in page, the Users page, the setup's "Who uses this instance" step and the development accounts are removed; app-state change 0008 drops their tables, settings and secret, every request acts as the owner, and deleting a conversation always removes it for good.
+
 ### Fixed
 
 - A failed model call says what to do next for the common provider errors: a rate limit (a free model's daily or per-minute limit), a refused key, a missing model, a timeout, an unreachable or unavailable provider and a too-long request, still without the provider's own message, which can quote the key.

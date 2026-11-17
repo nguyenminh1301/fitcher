@@ -20,9 +20,10 @@ the turns after it out of the thread and of the context.
 Conversations and groups change by new ``ReplacingMergeTree`` rows read with
 ``FINAL``; each new row's ``updated_at`` is after the previous one, so two
 changes within one millisecond keep their order. Conversations have no
-expiry: in team mode delete only hides, and the rows stay for an admin to
-read; in individual mode ``erase`` removes the conversation, its messages and
-the feedback on its answers with lightweight deletes. Search folds case and diacritics over the user's
+expiry; ``erase`` removes the conversation, its messages and the feedback on
+its answers with lightweight deletes. ``delete`` only hides a conversation; the
+api no longer uses it, and the Conversations page of the console still marks
+the conversations a team-mode instance hid before fitcher became a personal app. Search folds case and diacritics over the user's
 titles and own questions, read by the ``(user_id, ...)`` key.
 """
 

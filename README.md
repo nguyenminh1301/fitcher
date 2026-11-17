@@ -28,7 +28,7 @@ The web app has a chat for everyone and a workspace console for reviewers and ad
 
 ![How the pieces fit together](docs/architecture/system.svg)
 
-The user talks to the web app, which streams answers from the API. One person uses it without signing in; a team signs in with accounts the API keeps, or through the company's OpenID Connect provider. The API runs the agent: it looks up the company's terms in the search index, sends language tasks to the AI models an admin connected in the app, and runs SQL in ClickHouse as the user's role. Models are called by task (fast replies, simple SQL, harder SQL), any task can use any model of a connected provider, and the pack's test results are shown next to each model. Search uses the provider's embedding model, or a local one when the provider has none. All of these services run together with Docker Compose on one machine.
+The user talks to the web app, which streams answers from the API. fitcher is a personal app: there are no accounts or sign-in, and the API answers only the machine it runs on. The API runs the agent: it looks up the company's terms in the search index, sends language tasks to the AI models connected in the app, and runs SQL in ClickHouse as a read-only role. Models are called by task (fast replies, simple SQL, harder SQL), any task can use any model of a connected provider, and the pack's test results are shown next to each model. Search uses the provider's embedding model, or a local one when the provider has none. All of these services run together with Docker Compose on one machine.
 
 ![How a question is answered](docs/architecture/question-flow.svg)
 
@@ -45,7 +45,6 @@ Each company's access rules live in one policy file. Publishing the pack turns i
 | Component | Technology |
 | --- | --- |
 | Web app | Next.js, ECharts, TanStack Table |
-| Sign-in | Accounts kept by the API (Argon2id, server-side sessions); optional OpenID Connect provider |
 | API and agent | FastAPI with streamed responses, LangGraph, sqlglot |
 | AI models | OpenAI, Anthropic, Gemini, a local Ollama model or any OpenAI-compatible endpoint, called in process through the LiteLLM SDK; the provider's embedding model, or a local multilingual one with fastembed |
 | Data and run logs | ClickHouse |
@@ -65,9 +64,7 @@ You need Docker. Start fitcher with one command:
 docker run -d --name fitcher -p 127.0.0.1:3000:3000 -v fitcher-data:/data ghcr.io/nguyenminh1301/fitcher
 ```
 
-Open [localhost:3000](http://localhost:3000) and follow the setup: choose whether only you or a team uses the instance, then connect a model provider and its key, or a model server on this computer reached as `host.docker.internal` (on Linux add `--add-host=host.docker.internal:host-gateway` to the command). Everything is kept in the `fitcher-data` volume.
-
-![The first setup step: who uses this instance](docs/media/setup.jpg)
+Open [localhost:3000](http://localhost:3000) and follow the setup: connect a model provider and its key, or a model server on this computer reached as `host.docker.internal` (on Linux add `--add-host=host.docker.internal:host-gateway` to the command). Everything is kept in the `fitcher-data` volume.
 
 [docs/install.md](docs/install.md) covers the first start and the settings, [docs/operations.md](docs/operations.md) backup, restore, upgrades, limits and the load measurement, and [docs/security.md](docs/security.md) the threat model and hardening checklist. The install guide also covers jobs, local models and measured memory use.
 
@@ -77,16 +74,15 @@ To work on fitcher itself with the development datasets, the sample packs and se
 
 ## Using the API
 
-These examples use the [development setup](CONTRIBUTING.md#development-setup), which publishes the API on port 8000. The API streams each answer as server-sent events. In individual mode a request from the local machine needs no sign-in; in team mode, sign in once to get the session cookie and send it with each request. In individual mode a request that changes something must name the page it comes from in `Origin`, which the example sends in both modes:
+These examples use the [development setup](CONTRIBUTING.md#development-setup), which publishes the API on port 8000. The API streams each answer as server-sent events. A request from the local machine needs no sign-in; a request that changes something must name the page it comes from in `Origin`, which the example sends:
 
 ```bash
-curl -s -c fitcher.cookies -H "Content-Type: application/json" -H "Origin: http://127.0.0.1:8000" -d "{\"email\":\"dev.analyst@fitcher.test\",\"password\":\"$DEV_ACCOUNT_PASSWORD\"}" http://127.0.0.1:8000/session
-curl -N -b fitcher.cookies -H "Content-Type: application/json" -H "Origin: http://127.0.0.1:8000" -d '{"question":"Top 10 best-selling products in Q1 2024 compared with Q1 2025","timezone":"Asia/Ho_Chi_Minh"}' http://127.0.0.1:8000/ask
+curl -N -H "Content-Type: application/json" -H "Origin: http://127.0.0.1:8000" -d '{"question":"Top 10 best-selling products in Q1 2024 compared with Q1 2025","timezone":"Asia/Ho_Chi_Minh"}' http://127.0.0.1:8000/ask
 ```
 
 The stream reports each step as it starts and finishes, then sends the SQL, the result, the chart and the summary. A question that cannot be answered ends with a clarifying question, a refusal, a blocked notice or an error instead. The response names the conversation it started; send that id with the next question to ask a follow-up. Closing the connection stops the run and its database query.
 
-Each user may ask 10 questions a minute by default. The same API manages conversations (list, search, rename, pin, group and delete), records likes and dislikes, and serves the console's admin pages. The [API docs](http://localhost:8000/docs) of a running stack list every endpoint.
+The owner may ask 10 questions a minute by default. The same API manages conversations (list, search, rename, pin, group and delete), records likes and dislikes, and serves the console's admin pages. The [API docs](http://localhost:8000/docs) of a running stack list every endpoint.
 
 ## Bringing in a new company
 

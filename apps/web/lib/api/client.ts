@@ -24,8 +24,6 @@ import type {
   ProposalResult,
   RunRow,
   TraceItem,
-  NewUser,
-  UserRow,
   FeedbackInput,
   ClassifierStatus,
   EmbeddingChange,
@@ -40,7 +38,6 @@ import type {
   TierView,
   ReviewItem,
   ReviewItemPatch,
-  SetupModeChange,
   SetupStatus,
   SourceConnection,
   SourceCreate,
@@ -66,12 +63,6 @@ export interface FitcherApi {
     switchTo(userId: string): Promise<Identity>;
     /** The active pack, or null while no pack is active (a new instance before its first pack is built). */
     pack(): Promise<{ name: string; display_name: string; roles: string[] } | null>;
-    /** Sign in with a local account; throws a SignInError when refused. */
-    signIn(email: string, password: string): Promise<void>;
-    /** Whether the sign-in page offers the OpenID Connect provider. */
-    oidcEnabled(): Promise<boolean>;
-    /** End the session; the address to open next. */
-    signOut(): Promise<string>;
   };
   chat: {
     /** Stream an answer; ``onConversation`` learns the id the api gave a conversation the request started. */
@@ -131,13 +122,6 @@ export interface FitcherApi {
   };
   audit: { list(): Promise<AuditRow[]> };
   costs: { list(): Promise<CostRow[]> };
-  users: {
-    list(): Promise<UserRow[]>;
-    setRoles(id: string, roles: string[]): Promise<void>;
-    setEnabled(id: string, enabled: boolean): Promise<void>;
-    create(user: NewUser): Promise<UserRow>;
-    resetPassword(id: string, password: string): Promise<void>;
-  };
   /** Model providers, the tier mapping, the embedding and the optional screening classifier (admin only). */
   models: {
     providers(): Promise<ProviderView[]>;
@@ -182,8 +166,6 @@ export interface FitcherApi {
   /** First-run setup (DECISIONS §15); the changes need the admin role. */
   setup: {
     status(): Promise<SetupStatus>;
-    /** Choose who uses the instance; moving to team mode without an admin needs the first admin. */
-    setMode(mode: SetupModeChange["mode"], admin?: NonNullable<SetupModeChange["admin"]>): Promise<SetupStatus>;
     skip(id: string): Promise<SetupStatus>;
     complete(): Promise<SetupStatus>;
   };

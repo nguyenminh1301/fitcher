@@ -1,6 +1,6 @@
-"""Host and Origin checks of individual mode (DECISIONS §9).
+"""Host and Origin checks of the personal app (DECISIONS §9).
 
-Individual mode has no sign-in, so the address is the only gate. A request is
+There are no accounts, so the address is the gate. A request is
 accepted only when its ``Host`` is a loopback name, a name listed in
 ``FITCHER_ALLOWED_HOSTS`` or a name in ``FITCHER_INTERNAL_HOSTS``, the
 private names by which the web server reaches the api (``api`` in the
@@ -22,8 +22,7 @@ connection's address on every request (``apps/web/peer-address.cjs``); the api
 listens on loopback or on the Compose network, so only the web server reaches it.
 
 A listed ``FITCHER_ALLOWED_HOSTS`` name makes the instance reachable by others,
-which ``/me`` reports as ``exposed`` so the interface can warn. Team mode signs
-users in and is not checked here.
+which ``/me`` reports as ``exposed`` so the interface can warn.
 """
 
 from collections.abc import Mapping
@@ -36,12 +35,9 @@ from urllib.parse import urlsplit
 
 from starlette.types import ASGIApp, Receive, Scope, Send
 
-from app.state.db import StateDb, shared_state
-from app.state.settings import Settings
 
 LOOPBACK = frozenset({"localhost", "127.0.0.1", "::1"})
 SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
-INDIVIDUAL = "individual"
 PEER_HEADER = "x-fitcher-peer"
 ROUTE_TABLE = Path("/proc/net/route")
 
@@ -120,18 +116,13 @@ def hostname(host: str) -> str:
     return host.rpartition(":")[0] if host.count(":") == 1 else host
 
 
-def instance_mode(db: StateDb | None = None) -> str:
-    """The instance's mode; a new instance is individual until its setup says otherwise."""
-    return Settings(db or shared_state()).get("instance", "mode") or INDIVIDUAL
-
-
 def https_forwarded(headers: Mapping[str, str]) -> bool:
     """A reverse proxy's ``X-Forwarded-Proto``, trusted only when the instance names its public hosts."""
     return bool(allowed_hosts()) and headers.get("x-forwarded-proto", "").strip().lower() == "https"
 
 
 def refusal(method: str, host: str, forwarded: str | None, origin: str | None, peer: str | None = None) -> str | None:
-    """Why a request is refused in individual mode, or None when it is accepted."""
+    """Why a request is refused, or None when it is accepted."""
     accepted = LOOPBACK | allowed_hosts() | internal_hosts()
     browser_host = forwarded if forwarded is not None else host
     for value in (host, browser_host):
@@ -150,13 +141,13 @@ def refusal(method: str, host: str, forwarded: str | None, origin: str | None, p
 
 
 class HostOriginGuard:
-    """ASGI middleware refusing, in individual mode, a request from a foreign host or a cross-origin change."""
+    """ASGI middleware refusing a request from a foreign host or machine, or a cross-origin change."""
 
     def __init__(self, app: ASGIApp):
         self.app = app
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
-        if scope["type"] != "http" or instance_mode() != INDIVIDUAL:
+        if scope["type"] != "http":
             await self.app(scope, receive, send)
             return
         headers = {key.decode("latin-1"): value.decode("latin-1") for key, value in scope["headers"]}

@@ -14,15 +14,12 @@ import { ProviderForm, ProviderTestButton, TestOutcome } from "@/components/mode
 import { DocumentsStep } from "@/components/setup/DocumentsStep";
 import { InstantPack } from "@/components/setup/InstantPack";
 import { SourceConnect } from "@/components/sources/SourceConnect";
-import { Button, TextField } from "@/components/ui/controls";
+import { Button } from "@/components/ui/controls";
 import { WarningBanner } from "@/components/ui/feedback";
 import { Preferences } from "@/components/ui/Preferences";
 import type { FitcherApi } from "@/lib/api/client";
 import type { ModelTiersView, ProviderTestResult, ProviderView, SetupStatus } from "@/lib/contracts";
 import { useI18n } from "@/lib/i18n/react";
-
-type Mode = NonNullable<SetupStatus["mode"]>;
-const MODES: Mode[] = ["individual", "team"];
 
 export type SetupScreenProps = {
   setup: FitcherApi["setup"];
@@ -31,9 +28,8 @@ export type SetupScreenProps = {
   documents: FitcherApi["documents"];
   /** The active pack's roles, for documents uploaded in the Documents step; rejects without an active pack. */
   packRoles: () => Promise<string[]>;
-  /** Whether the signed-in user may answer the steps. */
+  /** Whether the owner may answer the steps; false only on the sample-data demo. */
   isAdmin: boolean;
-  onSignedOut: () => void;
   onOpenChat: () => void;
 };
 
@@ -120,26 +116,15 @@ function DataStep({ sources, disabled, onDone, onSkip, onAsk }: {
   );
 }
 
-export function SetupScreen({ setup, models, sources, documents, packRoles, isAdmin, onSignedOut, onOpenChat }: SetupScreenProps) {
+export function SetupScreen({ setup, models, sources, documents, packRoles, isAdmin, onOpenChat }: SetupScreenProps) {
   const { t } = useI18n();
   const [status, setStatus] = useState<SetupStatus | null>(null);
   const [error, setError] = useState<"load" | "save" | null>(null);
   const [busy, setBusy] = useState(false);
-  const [mode, setMode] = useState<Mode>("individual");
-  // The first admin, asked for when the instance moves to team mode (DECISIONS §9); it keeps the owner's
-  // conversations, and the api signs this browser in as that admin.
-  const [admin, setAdmin] = useState({ email: "", display_name: "", password: "" });
-
-  const fail = useCallback((kind: "load" | "save", cause: unknown) => {
-    if (cause instanceof Error && cause.message.includes("401")) onSignedOut();
-    else setError(kind);
-  }, [onSignedOut]);
+  const fail = useCallback((kind: "load" | "save") => setError(kind), []);
 
   useEffect(() => {
-    setup.status().then((next) => {
-      setStatus(next);
-      if (next.mode) setMode(next.mode);
-    }).catch((cause) => fail("load", cause));
+    setup.status().then(setStatus).catch(() => fail("load"));
   }, [setup, fail]);
 
   const run = async (action: () => Promise<SetupStatus>) => {
@@ -147,8 +132,8 @@ export function SetupScreen({ setup, models, sources, documents, packRoles, isAd
     setError(null);
     try {
       setStatus(await action());
-    } catch (cause) {
-      fail("save", cause);
+    } catch {
+      fail("save");
     } finally {
       setBusy(false);
     }
@@ -212,42 +197,6 @@ export function SetupScreen({ setup, models, sources, documents, packRoles, isAd
                   onAsk={() => { setDataOpen(false); void run(async () => { await setup.skip("documents"); return setup.complete(); }).then(onOpenChat); }}
                   onDone={() => { setDataOpen(false); void run(() => setup.status()); }}
                   onSkip={() => { setDataOpen(false); void run(() => setup.skip("data")); }} />
-              ) : current?.id === "mode" ? (
-                <section className="fc-card" aria-label={t("setup.step_mode")}>
-                  <div className="fc-card-head"><h2 className="fc-card-title">{t("setup.modeQuestion")}</h2></div>
-                  <div className="fc-card-body fc-stack">
-                    <p className="fc-muted" style={{ margin: 0 }}>{t("setup.modeHint")}</p>
-                    <fieldset disabled={!isAdmin || busy} style={{ border: 0, padding: 0, margin: 0 }} className="fc-stack">
-                      <legend className="fc-muted" style={{ padding: 0 }}>{t("setup.modeQuestion")}</legend>
-                      {MODES.map((option) => (
-                        <label key={option} className="fc-row" style={{ alignItems: "flex-start", gap: "var(--base-size-12)" }}>
-                          <input type="radio" name="mode" value={option} checked={mode === option} onChange={() => setMode(option)} />
-                          <span>
-                            <strong>{t(`setup.${option}`)}</strong>
-                            <span className="fc-muted" style={{ display: "block" }}>{t(`setup.${option}Hint`)}</span>
-                          </span>
-                        </label>
-                      ))}
-                    </fieldset>
-                    {mode === "team" && status?.mode !== "team" ? (
-                      <fieldset disabled={!isAdmin || busy} style={{ border: 0, padding: 0, margin: 0 }} className="fc-stack">
-                        <legend className="fc-muted" style={{ padding: 0 }}>{t("setup.firstAdmin")}</legend>
-                        <TextField label={t("setup.adminEmail")} type="email" autoComplete="username" value={admin.email}
-                          onChange={(event) => setAdmin({ ...admin, email: event.target.value })} />
-                        <TextField label={t("setup.adminName")} autoComplete="name" value={admin.display_name}
-                          onChange={(event) => setAdmin({ ...admin, display_name: event.target.value })} />
-                        <TextField label={t("setup.adminPassword")} type="password" autoComplete="new-password" help={t("ui.passwordRule")}
-                          value={admin.password} onChange={(event) => setAdmin({ ...admin, password: event.target.value })} />
-                      </fieldset>
-                    ) : null}
-                    <div>
-                      <Button variant="primary" disabled={!isAdmin || busy}
-                        onClick={() => void run(() => (mode === "team" && status?.mode !== "team" ? setup.setMode(mode, admin) : setup.setMode(mode)))}>
-                        {busy ? t("setup.saving") : t("setup.save")}
-                      </Button>
-                    </div>
-                  </div>
-                </section>
               ) : (
                 <section className="fc-card" aria-label={t("setup.finish")}>
                   <div className="fc-card-body fc-stack">

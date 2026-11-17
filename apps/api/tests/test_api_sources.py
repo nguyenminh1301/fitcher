@@ -17,9 +17,8 @@ from app.main import app
 from app.sources.files import FileService
 from app.sources.service import SourceService
 from app.sources.store import SourceStore
-from app.state.settings import Settings
 
-ADMIN = SessionHeaders(["admin"], user_id="dev.admin")
+ADMIN = SessionHeaders(["admin"], user_id="owner")
 VIEWER = SessionHeaders()
 PASSWORD = "reader-pass-4711-xyz"
 BODY = {"kind": "postgres", "host": "db.internal", "port": 5432, "database": "erp", "schema_name": "public",
@@ -37,7 +36,6 @@ class Actions:
 @pytest.fixture
 def parts(tmp_path):
     db, vault = new_state(tmp_path)
-    Settings(db).set("instance", "mode", "team")
     store, clickhouse, actions = SourceStore(db), UploadClickHouse(), Actions()
     files = FileService(store, clickhouse, tmp_path / "uploads", max_bytes=2048)
     sqlserver = FakeSqlServer(clickhouse)
@@ -60,16 +58,6 @@ def connect(client, name="shop", **changes):
     response = client.post("/sources", headers=ADMIN, json={"name": name, **BODY, **changes})
     assert response.status_code == 201, response.text
     return response.json()
-
-
-@pytest.mark.parametrize(("method", "path"), [
-    ("get", "/sources"), ("post", "/sources/test"), ("post", "/sources"), ("patch", "/sources/shop"),
-    ("delete", "/sources/shop"), ("get", "/sources/shop/tables"), ("put", "/sources/shop/tables"),
-    ("post", "/sources/shop/sync"), ("post", "/sources/shop/sync/cancel"), ("get", "/sources/shop/syncs"),
-    ("post", "/sources/files"), ("post", "/sources/files/abc/load"),
-])
-def test_every_endpoint_needs_the_admin_role(client, method, path):
-    assert getattr(client, method)(path, headers=VIEWER).status_code == 403
 
 
 def test_testing_a_connection_lists_the_tables_with_sizes_and_the_proposed_mode(client, parts):
@@ -414,7 +402,6 @@ def test_drift_compares_the_catalog_with_the_columns_the_instant_pack_was_built_
 
     assert body["pack"] == "shop"
     assert body["changes"] == [{"table": built.name, "added": ["created_at"], "removed": ["gone"], "retyped": [], "missing": False}]
-    assert client.get("/sources/shop/drift", headers=VIEWER).status_code == 403
 
 
 def test_the_source_password_reaches_no_response_log_line_or_admin_action(client, parts, caplog):

@@ -15,7 +15,8 @@ This document states the target. §16 lists each decision that differs from the 
 - Acceptance question: "Top 10 best-selling products in Q1 2024 compared with Q1 2025".
 - Uber Finch is only a source of ideas. Uber/taxi data is not reproduced.
 - It is an **open-source, self-hosted product** for developers who run it on their own machine or server: one image, one container, one data volume and one published port (§3). The reference machine is a laptop with 8 GB of memory.
-- A first-run setup (§15) asks who uses the instance (one person or a team), which models to use, which data to connect and whether to add company documents. Nothing requires editing a file.
+- It is a **personal app**: one owner, no accounts, sign-in or user management (§9).
+- A first-run setup (§15) asks which models to use, which data to connect and whether to add company documents. Nothing requires editing a file.
 
 ### Out of scope
 
@@ -34,8 +35,8 @@ This document states the target. §16 lists each decision that differs from the 
 | Component | Choice | Notes |
 |---|---|---|
 | Frontend | Next.js | Chat app and workspace console (§15): chat, tables, charts, SQL view, Review, Documents and Admin pages; English/Vietnamese interface, light and dark themes |
-| Auth | Built into `api` | Individual mode has no sign-in; team mode has local accounts and server-side sessions, with any OIDC provider as an optional sign-in (§9) |
-| App state | SQLite file in the data volume | settings, encrypted secrets, accounts, sessions, sources and the setup state; ClickHouse keeps data and logs |
+| Access | Built into `api` | One owner without accounts; the api answers only this machine and the names of `FITCHER_ALLOWED_HOSTS` (§9) |
+| App state | SQLite file in the data volume | settings, encrypted secrets, sources and the setup state; ClickHouse keeps data and logs |
 | API | FastAPI | sync/async, SSE |
 | Orchestration | LangGraph | one graph; nodes deterministic where possible |
 | LLM gateway | LiteLLM Python SDK inside `api` | one client for every provider; no proxy service |
@@ -320,10 +321,7 @@ Principles:
 - **Layer 3, ClickHouse:** the real security layer.
 - **Aggregate-only:** grant only on pre-aggregated views that also hide groups with fewer than k records. Never enforced by analysing SQL.
 - Application roles map 1:1 to ClickHouse users/roles. The API never gives credentials to the LLM.
-- **Individual mode.** There is no sign-in. Every request acts as one built-in owner who holds every pack role and every console role. The api accepts a request only when its `Host` is a loopback name sent from this machine (a loopback address, the container's default gateway or `FITCHER_TRUSTED_PEERS`, as recorded by the web server from the connection) or is listed in `FITCHER_ALLOWED_HOSTS`, and a state-changing request only from the same origin; with a non-loopback host allowed, the interface shows a standing warning that anyone who can reach the address controls the instance.
-- **Team mode.** Users sign in with a local account: passwords are hashed with Argon2id, sessions are random identifiers stored server-side in the app state and sent as an `HttpOnly`, `SameSite=Strict` cookie, and repeated failed sign-ins are slowed down. An `admin` creates, disables and enables accounts, resets passwords and assigns pack and console roles on the Users page (§15); every change is written to `agent_logs.admin_actions` and takes effect on the user's next request. An admin cannot disable or demote the last admin.
-- **OIDC (optional, team mode).** An admin may register one OpenID Connect provider. A user signing in through it gets an account on first sign-in with the roles named by a configured claim, or no role when the claim is absent. Local accounts keep working.
-- **Changing mode.** Switching from individual to team creates the first admin account and gives it the owner's conversations and history; switching back is refused while more than one account is enabled.
+- **Personal app.** fitcher has one user, the owner, and no accounts, sign-in or user management. Every request acts as the owner, who holds every pack role and every console role. The api accepts a request only when its `Host` is a loopback name sent from this machine (a loopback address, the container's default gateway or `FITCHER_TRUSTED_PEERS`, as recorded by the web server from the connection) or is listed in `FITCHER_ALLOWED_HOSTS`, and a state-changing request only from the same origin; with a non-loopback host allowed, the interface shows a standing warning that anyone who can reach the address controls the instance.
 - Every per-query limit in a ClickHouse settings profile has a minimum of 1 as well as a maximum, because 0 means unlimited.
 - Every ALLOW/DENY decision is written to `agent_logs.audit`.
 - Retrieved content (documents, column values) is **data, not instructions**. Prompts must state this explicitly to resist prompt injection, and the LLM client sends instructions in a `system` message and untrusted content in the `user` message.
@@ -331,12 +329,12 @@ Principles:
   - Screened: every new question (graph node `screen`), and document chunks and low-cardinality column values when they are indexed. History is not screened again: each turn was screened when asked, and a blocked turn is not stored. Reviewed pack content is trusted.
   - Screener: EN/VI rules on folded text (known attack phrases, fake prompt boundaries), then the local classifier score over 512-token windows. Verdicts `allow`, `flag` and `block` by thresholds in `.env`; a rule hit blocks.
   - `SCREEN_MODE=log` records verdicts without blocking; `enforce` blocks. Enforcement starts only after `screen_eval.py` shows no false positive on the benign set and at least 90% recall on the attack set, in English and in Vietnamese.
-  - The classifier is optional. Individual mode starts with rules only; an admin can download and enable the classifier, and team mode proposes it during setup. **Fail closed:** when the classifier is enabled and cannot run, no question reaches an LLM; the reply is the `blocked` notice that screening is unavailable.
+  - The classifier is optional. An instance starts with rules only; the owner can download and enable the classifier. **Fail closed:** when the classifier is enabled and cannot run, no question reaches an LLM; the reply is the `blocked` notice that screening is unavailable.
   - A blocked chunk is not indexed. A flagged column value is reported by the compiler and still indexed, because it is real data the filters need.
   - The LLM client in `api` is the only code that calls a provider. It rejects any call without `screening` metadata and reruns the rules on the whole request, which closes code paths that forgot to screen; it is not an authentication boundary.
   - Out of scope: scanning model output, and fine-tuning the classifier.
-- Source database users are read-only; their credentials stay in ClickHouse named collections (§4), except a SQL Server password, which is an encrypted secret of the app state like a provider key. In team mode only an `admin` creates, edits or deletes a source.
-- Provider keys and the OIDC client secret are encrypted in the app state with the instance's secret key (§3) and are never returned by any endpoint; the interface shows only whether a key is set and its last four characters.
+- Source database users are read-only; their credentials stay in ClickHouse named collections (§4), except a SQL Server password, which is an encrypted secret of the app state like a provider key.
+- Provider keys are encrypted in the app state with the instance's secret key (§3) and are never returned by any endpoint; the interface shows only whether a key is set and its last four characters.
 
 ## 10. Logging (ClickHouse `agent_logs`)
 
@@ -428,10 +426,10 @@ Tables (MergeTree, 90-day TTL except the conversation tables and `feedback`, ord
 
 The interface follows the Fitcher web app design, summarized in [design/web-app.md](design/web-app.md); its component names are the names used in `apps/web`.
 
-- **Setup.** A new instance opens on a setup of four steps, each of which can be changed later in the console: who uses the instance (individual or team, creating the first admin for a team), models (pick a provider, enter a key or a base URL, test it, accept the proposed tier mapping), data (connect a source and choose tables, or skip) and documents (on by default, or off). The setup can be left after the models step; the chat then explains what is still missing.
-- **Sources page** (`admin`, or the owner in individual mode). Lists the sources with their kind, host, tables, mode and last sync. Adding a source asks for the kind and its connection fields (host, port, database, schema, user, password, TLS mode and certificate; a file upload for the file kind), tests the connection, lists the tables with their size and proposed mode, and saves. A saved password is never shown again.
-- **Two surfaces, one sign-in.** The Chat app is for every role. The workspace console is for console roles: `pack_reviewer` sees Review, Documents, Datasets, Feedback and Evaluation; `admin` sees Runs and trace, Audit, Costs, Evaluation, Models and Users. Navigation lists only the sections the user's roles allow, and the api enforces the same rule on every endpoint. A console role reaches the console from the account menu.
-- **Conversations.** A user can start, list, search, pin, rename and delete their own conversations and sort them into personal groups. The sidebar shows Pinned, Groups and Recent (today, past week, past month). A group is a folder only: conversations never share context, and there is no sharing or collaboration. A conversation's title is its first question cut to 80 characters; no LLM call names it. Search matches titles and the user's own questions, inside the user's conversations only. Delete only hides the conversation from its owner, at once: nothing is removed, and an `admin` can still read every conversation, deleted or not, with its messages and runs in the console's Runs and trace section. Conversations, their messages, groups and feedback have no expiry; run logs keep the 90-day TTL.
+- **Setup.** A new instance opens on a setup of three steps, each of which can be changed later in the console: models (pick a provider, enter a key or a base URL, test it, accept the proposed tier mapping), data (connect a source and choose tables, or skip) and documents (on by default, or off). The setup can be left after the models step; the chat then explains what is still missing.
+- **Sources page** (`admin`, which the owner holds). Lists the sources with their kind, host, tables, mode and last sync. Adding a source asks for the kind and its connection fields (host, port, database, schema, user, password, TLS mode and certificate; a file upload for the file kind), tests the connection, lists the tables with their size and proposed mode, and saves. A saved password is never shown again.
+- **Two surfaces.** The Chat app and the workspace console. The console's sections belong to console roles, which the owner holds: `pack_reviewer` for Review, Documents, Datasets, Feedback and Evaluation, `admin` for Runs and trace, Audit, Costs, Evaluation, Sources and Models. The owner reaches the console from the account menu.
+- **Conversations.** A user can start, list, search, pin, rename and delete their own conversations and sort them into personal groups. The sidebar shows Pinned, Groups and Recent (today, past week, past month). A group is a folder only: conversations never share context, and there is no sharing or collaboration. A conversation's title is its first question cut to 80 characters; no LLM call names it. Search matches titles and the user's own questions, inside the user's conversations only. Delete removes the conversation, its messages and the feedback on its answers for good. Conversations, their messages, groups and feedback have no expiry; run logs keep the 90-day TTL.
 - **Messages.** Under an answer: copy, like, dislike with an optional note, and retry. Under the user's own message: copy and edit. Edit and retry write a new revision of that turn and answer it again; the turns after it in the older revision leave the conversation and its context.
 - **Language.** The English/Vietnamese switch translates the interface only: navigation, labels, step names, notices the app raises, chart axes and number and date formats. User messages, answers and pack content keep the language they were written in (§6). The choice is kept per browser.
 - **Theme.** Light and dark, following the system setting unless the user picks one; the choice is kept per browser.
@@ -439,7 +437,6 @@ The interface follows the Fitcher web app design, summarized in [design/web-app.
 - **Datasets page.** A read-only view of the compiled pack's datasets: columns, types, roles and which pack roles may read each dataset.
 - **Feedback page.** Likes and dislikes with their notes, question and trace; a reviewer can propose an example from one disliked or failed run, which runs the same proposal code as `propose_examples.py` (§11 step 8).
 - **Evaluation page.** Reads `eval_reports`: per-layer rates, the threshold result, the required question categories and failed cases. An `admin` can start a run of the active pack's eval set: it is labelled as using paid AI, asks for confirmation, runs one at a time per pack inside `api`, and stores its report like `eval.py`.
-- **Users page** (team mode only). Lists accounts with their roles and status; an `admin` creates accounts, resets passwords, changes roles and disables or enables users as set in §9.
 - **Costs page.** LLM cost by day, alias, model, tier and provider from `llm_calls`, always labelled as an estimate.
 - **Models page** (`admin`). Lists the providers with whether a key is set, and the model tiers with their current model and its latest eval result for the pack, or "not evaluated". An `admin` adds, tests and removes providers and maps a tier to any model of a configured provider (§2). Each change is written to `agent_logs.admin_actions`.
 - **Audit page.** Shows the access decisions of `audit` and the input-screening verdicts of `input_screening`.
@@ -460,3 +457,4 @@ The code built in Phases 0 to 12 follows v3. Each row is replaced by the phase n
 | Marts hand-written in dbt, pack usable only after review and eval | Instant pack (§11) | 19 |
 | Qdrant | Search in ClickHouse, documents optional (§2, §5) | 20 |
 | 90-day expiry of conversations, one worker, development datasets in the image | Retention split, hardening, release and demo (§3, §14) | 21 |
+| Individual and team modes, local accounts, OIDC and the Users page | One personal app without accounts; app-state change 0008 drops the team tables (§9, §15) | after 0.0.1 |

@@ -35,6 +35,7 @@ def service(tmp_path):
 @pytest.fixture
 def client(service):
     app.dependency_overrides[runtime.get_compiled] = lambda: compiled_fixture()
+    app.dependency_overrides[runtime.get_compiled_or_none] = lambda: compiled_fixture()
     app.dependency_overrides[runtime.get_document_service] = lambda: service
     app.dependency_overrides[runtime.get_document_service_or_none] = lambda: service
     with TestClient(app) as test_client:
@@ -53,7 +54,7 @@ def test_upload_indexes_the_document_and_lists_it(client):
     assert response.status_code == 201
     body = response.json()
     assert body["name"] == "glossary.md" and body["status"] == "indexed" and body["roles"] == ["viewer"]
-    assert body["chunk_count"] == 3 and body["blocked_chunks"] == 0 and body["uploaded_by"] == "dev.viewer"
+    assert body["chunk_count"] == 3 and body["blocked_chunks"] == 0 and body["uploaded_by"] == "owner"
     listed = client.get("/documents", headers=REVIEWER).json()
     assert listed["compiling"] is False
     assert [item["id"] for item in listed["documents"]] == [body["id"]]
@@ -104,15 +105,6 @@ def test_patch_changes_the_roles(client):
     assert bad.status_code == 422
 
 
-@pytest.mark.parametrize(("method", "path"), [
-    ("get", "/documents"), ("delete", "/documents/abc"), ("patch", "/documents/abc"),
-])
-def test_only_a_pack_reviewer_reaches_documents(client, method, path):
-    response = client.request(method.upper(), path, headers=VIEWER, json={"allowed_roles": ["viewer"]})
-    assert response.status_code == 403
-    assert upload(client, headers=VIEWER).status_code == 403
-
-
 class StubDrafter:
     def __init__(self):
         self.chunks = []
@@ -159,7 +151,6 @@ def test_draft_from_one_document_writes_drafts_and_reports_review_ids(client, dr
 
 def test_draft_needs_an_indexed_document(client, drafting):
     assert client.post("/documents/nope/draft", headers=REVIEWER).status_code == 404
-    assert client.post("/documents/nope/draft", headers=VIEWER).status_code == 403
 
 
 # Turning company documents off (DECISIONS §15)
@@ -191,9 +182,7 @@ def test_with_documents_off_no_document_endpoint_answers_and_the_files_are_kept(
     assert [item["id"] for item in client.get("/documents", headers=REVIEWER).json()["documents"]] == [record["id"]]
 
 
-def test_only_an_admin_turns_documents_off_and_answering_marks_the_setup_step_done(client):
-    assert client.put("/settings/documents", headers=REVIEWER, json={"enabled": False}).status_code == 403
-
+def test_turning_documents_off_marks_the_setup_step_done(client):
     client.put("/settings/documents", headers=ADMIN, json={"enabled": False})
 
     steps = {step["id"]: step["state"] for step in client.get("/setup/status", headers=ADMIN).json()["steps"]}

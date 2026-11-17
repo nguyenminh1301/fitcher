@@ -52,18 +52,16 @@ def test_a_report_shows_layers_categories_and_failed_cases(client):
     assert [report["id"] for report in client.get("/admin/eval-reports", headers=ADMIN).json()] == ["r1"]
 
 
-def test_an_unknown_report_is_404_and_a_viewer_is_refused(client):
+def test_an_unknown_report_is_404(client):
     app.dependency_overrides[runtime.get_eval_reports] = lambda: reports([])
     assert client.get("/admin/eval-reports/nope", headers=ADMIN).status_code == 404
-    assert client.get("/admin/eval-reports", headers=VIEWER).status_code == 403
 
 
-def test_only_an_admin_starts_a_run_and_a_second_one_waits(client):
+def test_a_second_eval_run_waits_for_the_first(client):
     started = []
     runs = EvalRuns(lambda pack: started.append(pack) or 0, start_thread=lambda target: None)
     app.dependency_overrides[runtime.get_eval_runs] = lambda: runs
 
-    assert client.post("/admin/eval-runs", headers=REVIEWER).status_code == 403
     response = client.post("/admin/eval-runs", headers=ADMIN)
     assert response.status_code == 202 and response.json() == {"pack": "minimal", "running": True}
     assert client.post("/admin/eval-runs", headers=ADMIN).status_code == 409

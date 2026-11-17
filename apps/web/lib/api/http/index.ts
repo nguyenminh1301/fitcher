@@ -1,7 +1,7 @@
 // The real api, feature by feature; lib/api/sources.ts chooses between it and the sample data.
 
 import type { FitcherApi } from "../client";
-import { httpAudit, httpCosts, httpEvaluation, httpFeedbackReview, httpRuns, httpUsers } from "./admin";
+import { httpAudit, httpCosts, httpEvaluation, httpFeedbackReview, httpRuns } from "./admin";
 import { httpAuth } from "./auth";
 import { httpChat } from "./chat";
 import { httpConversations } from "./conversations";
@@ -26,7 +26,6 @@ export const httpApi: FitcherApi = {
   runs: httpRuns,
   audit: httpAudit,
   costs: httpCosts,
-  users: httpUsers,
   models: httpModels,
   sources: httpSources,
   setup: httpSetup,

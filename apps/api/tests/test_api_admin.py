@@ -42,6 +42,7 @@ def logs(answers) -> tuple[AdminLogs, Script]:
 @pytest.fixture
 def client():
     app.dependency_overrides[runtime.get_compiled] = lambda: compiled_fixture()
+    app.dependency_overrides[runtime.get_compiled_or_none] = lambda: compiled_fixture()
     with TestClient(app) as test_client:
         yield test_client
     app.dependency_overrides.clear()
@@ -150,15 +151,6 @@ def test_an_admin_reads_a_conversation_its_owner_deleted(client):
 
     assert listed[0]["deleted"] is True
     assert thread["conversation"]["deleted"] is True and thread["messages"][0]["content"] == "Revenue by widget"
-
-
-@pytest.mark.parametrize("path", [
-    "/admin/runs", "/admin/runs/t1", "/admin/audit", "/admin/screening", "/admin/costs", "/admin/conversations",
-    "/admin/conversations/c1",
-])
-def test_only_an_admin_reads_the_run_logs(client, path):
-    use(logs([])[0])
-    assert client.get(path, headers=REVIEWER).status_code == 403
 
 
 def test_an_unreachable_log_store_is_503(client):

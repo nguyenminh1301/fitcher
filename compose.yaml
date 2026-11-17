@@ -190,8 +190,6 @@ services:
       DBT_TARGET_PATH: /tmp/dbt/target
       DBT_LOG_PATH: /tmp/dbt/logs
       COLUMN_VALUES_TOP_K: ${COLUMN_VALUES_TOP_K:-10000}
-      # seed_dev_accounts gives every development account of infra/dev/accounts.yaml this password.
-      DEV_ACCOUNT_PASSWORD: ${DEV_ACCOUNT_PASSWORD:-}
       # compile_pack, eval and ask screen like the api.
       SCREEN_MODE: ${SCREEN_MODE:-log}
       SCREEN_FLAG_AT: ${SCREEN_FLAG_AT:-0.5}

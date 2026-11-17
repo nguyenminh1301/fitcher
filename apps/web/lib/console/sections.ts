@@ -13,8 +13,6 @@ export type Section = {
   roles: string[];
   /** The api feature the section reads, which decides its Sample data badge. */
   feature: Feature;
-  /** Shown only in team mode: individual mode has one owner and no accounts. */
-  teamOnly?: boolean;
 };
 
 const REVIEWER = "pack_reviewer";
@@ -30,7 +28,6 @@ export const SECTIONS: Section[] = [
   { key: "audit", group: "observe", path: "/console/audit", icon: "shieldCheck", roles: [ADMIN], feature: "audit" },
   { key: "costs", group: "observe", path: "/console/costs", icon: "coins", roles: [ADMIN], feature: "costs" },
   { key: "evaluation", group: "quality", path: "/console/evaluation", icon: "gauge", roles: [REVIEWER, ADMIN], feature: "evaluation" },
-  { key: "users", group: "administration", path: "/console/users", icon: "users", roles: [ADMIN], feature: "users", teamOnly: true },
   { key: "sources", group: "administration", path: "/console/sources", icon: "database", roles: [ADMIN], feature: "sources" },
   { key: "models", group: "administration", path: "/console/models", icon: "compass", roles: [ADMIN], feature: "models" },
 ];
@@ -39,9 +36,9 @@ export const SECTIONS: Section[] = [
  * The sections these roles may open, in navigation order; empty for a role without console access.
  * ``hidden`` leaves out sections the instance turned off, such as Documents when company documents are off.
  */
-export function allowedSections(roles: string[], mode?: "individual" | "team", hidden: string[] = []): Section[] {
+export function allowedSections(roles: string[], hidden: string[] = []): Section[] {
   return SECTIONS.filter((section) => section.roles.some((role) => roles.includes(role))
-    && !(section.teamOnly && mode === "individual") && !hidden.includes(section.key));
+    && !hidden.includes(section.key));
 }
 
 /** The section key of a console path such as ``/console/runs/abc``, or null for ``/console``. */

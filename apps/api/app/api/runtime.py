@@ -13,7 +13,6 @@ import os
 from pathlib import Path
 import threading
 
-import httpx
 import yaml
 
 from typing import Annotated
@@ -71,12 +70,6 @@ def get_vault() -> SecretVault:
     return shared_vault()
 
 
-@cache
-def get_oidc_http() -> httpx.Client:
-    """The HTTP client of OIDC discovery, JWKS and code exchanges."""
-    return httpx.Client(follow_redirects=False)
-
-
 def current_pack() -> str:
     """The active pack: ``ACTIVE_PACK``, else the pack an instant pack made active (app/packs/active.py)."""
     return active_pack(get_state_db())
@@ -117,7 +110,7 @@ def _read(path: Path) -> dict:
 def pack_identity(compiled: CompiledPack | None) -> PackIdentity:
     """Name, display name and roles of the active pack: from ``compiled.json``, else from its pack files.
 
-    A new company's pack is reviewed before its first compile, so sign-in, Review and Documents read the
+    A new company's pack is reviewed before its first compile, so ``/pack``, Review and Documents read the
     pack files until ``compile_pack`` has run; questions still need the compiled pack.
     """
     if compiled is not None:

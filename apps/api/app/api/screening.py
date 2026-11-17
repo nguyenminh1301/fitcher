@@ -6,8 +6,8 @@ model directory: the model is gated and is exported to ONNX with PyTorch, so
 it is fetched by the ``guard-model`` job (``jobs.fetch_guard_model``) in its
 own image rather than by the api. Once it is on, screening fails closed
 whenever the model cannot run. Each change is written to
-``agent_logs.admin_actions``. Until sign-in moves into the app (Phase 15) the
-endpoints need the ``admin`` role.
+``agent_logs.admin_actions``. The endpoints need the ``admin`` role, which the
+owner holds.
 """
 
 import json

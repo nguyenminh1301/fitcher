@@ -10,7 +10,6 @@ from state_fixtures import new_state
 
 from app.api import runtime, screening as screening_api, setup as setup_api
 from app.main import app
-from app.state.settings import Settings
 from app.screening.screen import Screener
 from fakes import FakeClassifier
 
@@ -39,7 +38,6 @@ def actions():
 @pytest.fixture
 def client(tmp_path, model_dir, actions):
     db, _ = new_state(tmp_path)
-    Settings(db).set("instance", "mode", "team")
     loaded = []
     screener = Screener(None, loader=lambda: loaded.append(1) or FakeClassifier(), enabled=lambda: False)
     app.dependency_overrides[setup_api.get_state_db] = lambda: db
@@ -55,11 +53,6 @@ def write_model(model_dir):
     for name in ("model.onnx", "tokenizer.json"):
         (model_dir / name).write_bytes(b"x")
     (model_dir / "version.json").write_text(json.dumps({"version": "prompt-guard-2-86m@abc123"}))
-
-
-@pytest.mark.parametrize("method", ["get", "post", "delete"])
-def test_only_an_admin_reaches_the_classifier(client, method):
-    assert getattr(client, method)("/screening/classifier", headers=VIEWER).status_code == 403
 
 
 def test_the_classifier_starts_off_with_the_rules_screening_alone(client):

@@ -1,30 +1,25 @@
 """The principal of every request, plus ``/me`` and ``/pack``.
 
-``current_principal`` returns the owner in individual mode and otherwise
-reads the session cookie of a signed-in account. It answers 401 for a
-missing, unknown or expired session and never says which check failed; ``current_role`` answers 403 when the
-principal holds no pack role or the ``X-Active-Role`` header names one it does
-not hold. ``/pack`` is public: the sign-in screen names the active pack.
+fitcher is a personal app (DECISIONS §9): ``current_principal`` is always the owner, and the address checks of
+``app/auth/origin.py`` decide who reaches the api. ``current_role`` answers 403 when the ``X-Active-Role``
+header names a pack role the owner does not hold.
 """
 
-from typing import Annotated, Literal
+from typing import Annotated
 
-from fastapi import APIRouter, Cookie, Depends, Header, HTTPException, status
+from fastapi import APIRouter, Depends, Header, HTTPException, status
 from pydantic import BaseModel
 
 from app.api.runtime import (
-    PackIdentity, get_compiled, get_compiled_or_none, get_pack_identity, get_pack_identity_or_none, get_state_db,
+    PackIdentity, get_compiled, get_compiled_or_none, get_pack_identity, get_pack_identity_or_none,
     pack_identity,
 )
-from app.auth import account_sessions, origin
-from app.auth.principal import SESSION_COOKIE, Principal, owner
+from app.auth import origin
+from app.auth.principal import Principal, owner
 from app.auth.roles import RoleError, active_role, known_roles
 from app.packs.compiler import CompiledPack
-from app.state.db import StateDb
 
 router = APIRouter()
-
-UNAUTHORIZED = HTTPException(status.HTTP_401_UNAUTHORIZED, detail="sign in again")
 
 
 def pack_roles(compiled: CompiledPack) -> list[str]:
@@ -39,18 +34,8 @@ def _owner_pack_roles(compiled: Annotated[CompiledPack | None, Depends(get_compi
         return []
 
 
-def current_principal(
-    db: Annotated[StateDb, Depends(get_state_db)],
-    owner_roles: Annotated[list[str], Depends(_owner_pack_roles)],
-    session: Annotated[str | None, Cookie(alias=SESSION_COOKIE)] = None,
-) -> Principal:
-    if origin.instance_mode(db) == origin.INDIVIDUAL:
-        # The address checks of app/auth/origin.py are the gate; there is no sign-in.
-        return owner(owner_roles)
-    principal = account_sessions.principal_for(db, session) if session else None
-    if principal is None:
-        raise UNAUTHORIZED
-    return principal
+def current_principal(owner_roles: Annotated[list[str], Depends(_owner_pack_roles)]) -> Principal:
+    return owner(owner_roles)
 
 
 def current_role(
@@ -69,8 +54,7 @@ class Me(BaseModel):
     display_name: str
     roles: list[str]
     active_role: str | None
-    mode: Literal["individual", "team"]
-    # Individual mode reachable through a name other than loopback: the interface shows a standing warning.
+    # Reachable through a name other than loopback: the interface shows a standing warning.
     exposed: bool
 
 
@@ -84,7 +68,6 @@ class PackInfo(BaseModel):
 def me(
     principal: Annotated[Principal, Depends(current_principal)],
     identity: Annotated[PackIdentity | None, Depends(get_pack_identity_or_none)],
-    db: Annotated[StateDb, Depends(get_state_db)],
     x_active_role: Annotated[str | None, Header()] = None,
 ) -> Me:
     """The user a request acts as; ``active_role`` is null for a user who holds console roles only, as on a new
@@ -96,11 +79,9 @@ def me(
         if x_active_role is not None:
             raise HTTPException(status.HTTP_403_FORBIDDEN, detail=str(error)) from None
         role = None
-    mode = origin.instance_mode(db)
     return Me(
         user_id=principal.user_id, display_name=principal.display_name,
-        roles=known_roles(principal.roles, roles), active_role=role, mode=mode,
-        exposed=mode == origin.INDIVIDUAL and origin.exposed(),
+        roles=known_roles(principal.roles, roles), active_role=role, exposed=origin.exposed(),
     )
 
 

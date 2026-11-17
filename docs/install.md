@@ -12,7 +12,7 @@ docker run -d --name fitcher -p 127.0.0.1:3000:3000 -v fitcher-data:/data ghcr.i
 
 On Linux, add `--add-host=host.docker.internal:host-gateway` if a model server runs on the same machine (see [Local models](#local-models)).
 
-Open [localhost:3000](http://localhost:3000). The setup asks who uses the instance (only you, or a team that signs in) and which models to use. `docker ps` shows the container as `healthy` once the web app, the API and ClickHouse all answer.
+Open [localhost:3000](http://localhost:3000). The setup asks which models to use, which data to connect and whether to use company documents. `docker ps` shows the container as `healthy` once the web app, the API and ClickHouse all answer.
 
 The command publishes the app on the local machine only. To use another host port, change the first number: `-p 127.0.0.1:8080:3000`.
 
