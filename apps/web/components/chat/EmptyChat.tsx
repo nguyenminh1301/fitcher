@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 
 import { Icon } from "@/components/brand/Icon";
 import { useChat } from "@/lib/chat/ChatContext";
+import { takeQuestion } from "@/lib/chat/pendingQuestion";
 import { useI18n } from "@/lib/i18n/react";
 
 import { Composer, PackChip } from "./Composer";
@@ -31,6 +32,13 @@ export function EmptyChat() {
   useEffect(() => {
     void api.chat.suggestions().then(setSuggestions);
   }, [api]);
+
+  // A question picked in the setup is asked as soon as the pack is known.
+  useEffect(() => {
+    if (!loaded || !pack) return;
+    const question = takeQuestion();
+    if (question) void ask(question);
+  }, [loaded, pack, ask]);
 
   const firstName = identity?.display_name.split(" ")[0] ?? "";
   if (loaded && !pack) return <NoPack />;

@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 
 import { SetupScreen } from "@/components/setup/SetupScreen";
 import { api } from "@/lib/api";
+import { keepQuestion } from "@/lib/chat/pendingQuestion";
 
 const packRoles = async () => (await api.auth.pack())?.roles ?? [];
 
@@ -21,5 +22,5 @@ export default function SetupPage() {
   }, [router]);
   if (isAdmin === null) return null;
   return <SetupScreen setup={api.setup} models={api.models} sources={api.sources} documents={api.documents} packRoles={packRoles}
-    isAdmin={isAdmin} onOpenChat={() => router.push("/")} />;
+    isAdmin={isAdmin} onOpenChat={(question) => { if (question) keepQuestion(question); router.push("/"); }} />;
 }

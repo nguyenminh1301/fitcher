@@ -6,6 +6,7 @@
 
 - An optional owner password, set, changed and removed on the console's new Security page from this machine: once set, every browser signs in on `/sign-in` (Argon2id hash, server-side sessions in an `HttpOnly`, `SameSite=Strict` cookie, slowed down after repeated wrong passwords) and the account menu offers Sign out; an instance reachable through a `FITCHER_ALLOWED_HOSTS` name refuses requests until a password is set and keeps it while the name is listed.
 - Adding a model provider offers a curated list (OpenAI, Anthropic, Gemini; OpenRouter, Groq, Mistral, DeepSeek, xAI, Together AI, Fireworks, Cerebras; Ollama, LM Studio, vLLM; any other OpenAI-compatible endpoint) that fills in the service's endpoint or the usual local address and links to the page where its key is created; OpenRouter shows a short animated walkthrough of creating a key, and in the setup a provider that proposes no models lets the owner search its model list (OpenRouter's free models first) and use the chosen one for every chat tier.
+- The setup lists its steps with a number and a check mark once done, and an answered step can be opened again from that list or with Back, keeping its answer unless it is changed; a suggested question picked after the first pack is built opens the chat and asks it.
 
 ### Removed
 

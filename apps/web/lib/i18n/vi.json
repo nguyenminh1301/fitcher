@@ -486,7 +486,10 @@
     "documentsKept": "{count} tài liệu đang lưu vẫn được giữ nhưng không còn được tìm kiếm.",
     "documentsConfirmOff": "Tắt tài liệu",
     "continueWithoutPack": "Tiếp tục khi chưa có gói",
-    "chooseLater": "Chọn sau"
+    "chooseLater": "Chọn sau",
+    "keepAnswer": "Giữ câu trả lời cũ",
+    "reopen": "Mở lại bước {step}",
+    "back": "Quay lại {step}"
   },
   "models": {
     "providers": "Nhà cung cấp",

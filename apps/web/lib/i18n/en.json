@@ -486,7 +486,10 @@
     "documentsKept": "{count} kept documents stay stored but are no longer searched.",
     "documentsConfirmOff": "Turn documents off",
     "continueWithoutPack": "Continue without a pack",
-    "chooseLater": "Choose later"
+    "chooseLater": "Choose later",
+    "keepAnswer": "Keep my answer",
+    "reopen": "Open the {step} step again",
+    "back": "Back to {step}"
   },
   "models": {
     "providers": "Providers",

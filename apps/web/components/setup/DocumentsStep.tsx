@@ -20,9 +20,11 @@ export type DocumentsStepProps = {
   disabled: boolean;
   onDone: () => void;
   onSkip: () => void;
+  /** The step was answered before and is open again: leaving it keeps that answer. */
+  answered?: boolean;
 };
 
-export function DocumentsStep({ documents, packRoles, disabled, onDone, onSkip }: DocumentsStepProps) {
+export function DocumentsStep({ documents, packRoles, disabled, onDone, onSkip, answered = false }: DocumentsStepProps) {
   const { t } = useI18n();
   const [enabled, setEnabled] = useState(true);
   const [roles, setRoles] = useState<string[] | null>(null);
@@ -107,7 +109,7 @@ export function DocumentsStep({ documents, packRoles, disabled, onDone, onSkip }
         {error ? <WarningBanner tone="danger">{error}</WarningBanner> : null}
         <div className="fc-row" style={{ gap: "var(--base-size-8)" }}>
           <Button variant="primary" disabled={locked} onClick={() => void save()}>{t("setup.continue")}</Button>
-          {disabled ? null : <Button onClick={onSkip}>{t("setup.skip")}</Button>}
+          {disabled ? null : <Button onClick={onSkip}>{answered ? t("setup.keepAnswer") : t("setup.skip")}</Button>}
         </div>
       </div>
     </section>
