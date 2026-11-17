@@ -138,3 +138,23 @@ def test_drafting_needs_a_profile_or_documents(files):
 def test_estimate_counts_prompt_characters_per_file(files):
     estimate = Drafter(FakeLLMClient(), Warehouse()).estimate(files, PROFILE, CHUNKS)
     assert set(estimate) == set(DRAFT_FILES) and all(count > 100 for count in estimate.values())
+
+
+def test_drafted_ids_and_references_are_made_valid_instead_of_failing_the_pack(files):
+    llm = FakeLLMClient([{"items": [metric("sumIf_amount_status"), metric("Revenue-Total 2025"), metric("2nd_metric")]}])
+
+    items = Drafter(llm, Warehouse()).draft("metrics.yaml", files, PROFILE, CHUNKS)
+
+    assert [item["id"] for item in items] == ["sum_if_amount_status", "revenue_total_2025", "m_2nd_metric"]
+
+
+def test_metric_references_of_examples_follow_the_same_ids(files):
+    llm = FakeLLMClient([{"items": [{
+        "id": "OrdersPerMonth", "question": "Orders per month?", "language": "en", "sql": "SELECT 1",
+        "datasets": ["widget_sales"], "metrics": ["sumIf_amount_status"],
+        "evidence": [{"kind": "profile", "ref": "widget_sales"}], "confidence": 0.6,
+    }]}])
+
+    [item] = Drafter(llm, Warehouse()).draft("examples.yaml", files, PROFILE, CHUNKS)
+
+    assert (item["id"], item["metrics"]) == ("orders_per_month", ["sum_if_amount_status"])

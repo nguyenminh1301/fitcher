@@ -14,9 +14,10 @@ confidence of at most 0.2. Calls are billable.
 
 from collections.abc import Sequence
 import json
-from typing import Literal
+import re
+from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import AfterValidator, BaseModel, ConfigDict, Field
 
 from app.agent.prompts import render
 from app.llm.client import LLMClient
@@ -43,6 +44,19 @@ class DraftError(RuntimeError):
     """There is nothing to draft from."""
 
 
+def pack_id(value: str) -> str:
+    """A drafted id in the pack's form (``^[a-z][a-z0-9_]*$``): a model's ``sumIf_amount`` or ``Revenue-Total``
+    would otherwise fail the whole pack's validation, so it becomes ``sum_if_amount`` or ``revenue_total``."""
+    snake = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", "_", value.strip())
+    cleaned = re.sub(r"[^a-z0-9_]+", "_", snake.lower()).strip("_")
+    if not cleaned:
+        return "item"
+    return cleaned if cleaned[0].isalpha() else f"m_{cleaned}"
+
+
+PackId = Annotated[str, AfterValidator(pack_id)]
+
+
 class _Reply(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -53,7 +67,7 @@ class DraftEvidence(_Reply):
 
 
 class _Drafted(_Reply):
-    id: str
+    id: PackId
     evidence: list[DraftEvidence] = []
     confidence: float = 0.5
 
@@ -80,7 +94,7 @@ class DraftedAliases(_Reply):
 
 class DraftedTarget(_Reply):
     kind: Literal["metric", "column", "value"]
-    metric: str | None = None
+    metric: PackId | None = None
     dataset: str | None = None
     column: str | None = None
     value: str | None = None
@@ -108,7 +122,7 @@ class DraftedExample(_Drafted):
     language: str
     sql: str
     datasets: list[str] = Field(min_length=1)
-    metrics: list[str] = []
+    metrics: list[PackId] = []
 
 
 class DraftedDatasets(_Reply):
