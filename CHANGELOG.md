@@ -4,6 +4,7 @@
 
 ### Security
 
+- In individual mode the api accepts a loopback `Host` only from a connection on this machine: the web server records each connection's address in `X-Fitcher-Peer` over any value the client sent, and a request from another machine or container claiming `Host: localhost` is refused (`FITCHER_TRUSTED_PEERS` adds addresses for container runtimes that deliver local connections from elsewhere).
 - Changing a provider's base URL now requires its API key in the same change when a key is stored, so a changed address never receives the key that was entered for the old one.
 
 ## 0.0.1 - 2026-11-17

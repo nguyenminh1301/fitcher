@@ -22,6 +22,7 @@ ENV NODE_ENV=production \
     PORT=3000
 COPY --from=build --chown=node:node /app/.next/standalone ./
 COPY --from=build --chown=node:node /app/.next/static ./.next/static
+COPY --from=build --chown=node:node /app/peer-address.cjs ./
 USER node
 EXPOSE 3000
-CMD ["node", "server.js"]
+CMD ["node", "--require", "./peer-address.cjs", "server.js"]

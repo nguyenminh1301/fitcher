@@ -3,4 +3,5 @@
 exec 2>&1
 cd /opt/web
 export NODE_ENV=production HOSTNAME=0.0.0.0 PORT=3000 API_URL=http://127.0.0.1:8000
-exec node server.js
+# peer-address.cjs records each connection's address for the api's local-peer check.
+exec node --require ./peer-address.cjs server.js

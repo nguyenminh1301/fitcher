@@ -41,7 +41,7 @@ def client(idp, log):
     app.dependency_overrides[runtime.get_compiled_or_none] = compiled_fixture
     app.dependency_overrides[runtime.get_oidc_http] = idp.client
     app.dependency_overrides[runtime.get_admin_action_log] = lambda: log
-    with TestClient(app, base_url="http://localhost:3000", follow_redirects=False) as test_client:
+    with TestClient(app, base_url="http://localhost:3000", client=("127.0.0.1", 50000), follow_redirects=False) as test_client:
         yield test_client
     app.dependency_overrides.clear()
 

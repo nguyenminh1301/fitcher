@@ -7,7 +7,7 @@ This document is the threat model of a fitcher instance: what each mode protects
 | | Individual mode | Team mode |
 | --- | --- | --- |
 | Who is signed in | Nobody signs in: every request acts as the owner with every role | Local accounts or one OpenID Connect provider; a session cookie (`HttpOnly`, `SameSite=Strict`, `Secure` over HTTPS) |
-| Who may reach the port | The local machine only: the api answers loopback host names and `FITCHER_ALLOWED_HOSTS`, and a change needs the same `Origin` | Anyone the network lets through; every request needs a session |
+| Who may reach the port | The local machine only: the api answers a loopback host name only from a connection on this machine (loopback, the container's default gateway or `FITCHER_TRUSTED_PEERS`), answers `FITCHER_ALLOWED_HOSTS` names from anywhere, and a change needs the same `Origin` | Anyone the network lets through; every request needs a session |
 | Conversation delete | Removes the conversation, its messages and its feedback for good | Hides it from its owner; an admin can still read it |
 | Data a user reaches | Everything | What the user's pack role grants, enforced by ClickHouse row policies and grants |
 
@@ -15,7 +15,7 @@ This document is the threat model of a fitcher instance: what each mode protects
 
 | Threat | What stops it | What remains |
 | --- | --- | --- |
-| Someone else reaches an individual-mode instance | The image publishes the port on `127.0.0.1` in every documented command; the api refuses other host names (DNS rebinding) and cross-site changes without the same `Origin` | Anyone with a shell on the same machine is the owner. Exposing the instance needs team mode. |
+| Someone else reaches an individual-mode instance | The image publishes the port on `127.0.0.1` in every documented command; the api refuses other host names (DNS rebinding), a loopback host name sent from another machine or container, and cross-site changes without the same `Origin` | Anyone with a shell on the same machine is the owner. Exposing the instance needs team mode. |
 | A malicious web page the user visits | `SameSite=Strict` session cookie; `Origin` check on changes; a Content-Security-Policy with per-request nonces and `frame-ancestors 'none'`, `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: same-origin` | Styles allow `'unsafe-inline'` (the chart library sets style attributes); a style cannot run code. |
 | A malicious document or column value (prompt injection) | Screening of questions and document text (DECISIONS §9); the model writes one read-only query that the guard parses and limits; the query runs as the user's role user, which reads only granted views | Injected text can still change the wording of an answer or summary; it cannot widen what the role reads. |
 | A hostile source database | Connections run as `source_loader` through encrypted named collections; copies land in `raw` and are read through generated views; errors are reduced to fixed reasons, so a server's message never reaches a page, a log line or a row | A source can send a very large table; the per-query memory and time limits of the copy stop it, and the admin chooses the tables. |
@@ -44,6 +44,8 @@ The review covered the surfaces added since Phase 12: setup, model providers, da
 | A sync, a compile and an eval could run at the same time and compete for memory | Fixed: they and `fitcher backup` wait for each other |
 | No Content-Security-Policy or framing protection on pages | Fixed: nonce policy and headers above |
 | Development Dockerfiles and the Compose ClickHouse image were pinned by tag only | Fixed: pinned by digest. The source fixtures of the `sources` Compose profile (PostgreSQL, MySQL, SQL Server, MongoDB, SeaweedFS) stay pinned by tag: they run only on a developer's machine with synthetic data |
+| Individual mode trusted a forged `Host: localhost`: another container on the same Docker network reached the container's address directly and became the owner | Fixed: the web server records each connection's address in `X-Fitcher-Peer` over any value the client sent, and the api accepts a loopback host only from a loopback address, the container's default gateway (Docker's published ports) or `FITCHER_TRUSTED_PEERS` |
+| Changing a provider's base URL kept its stored key, so the key went to the new address | Fixed: a new base URL of a provider with a key needs the key in the same change |
 | Team mode answers any `Host` header | Recorded: every team-mode request needs a session cookie that is `SameSite=Strict` and bound to the instance's own origin, so a rebound name gets no data; a reverse proxy sets the public name |
 | `style-src` keeps `'unsafe-inline'` | Recorded: the chart library and React set style attributes; scripts, which can run code, need the nonce |
 | The generated `secret.key` sits on the volume it protects | Recorded: documented above; `FITCHER_SECRET_KEY` moves it off the volume |
