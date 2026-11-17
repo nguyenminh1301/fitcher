@@ -3,7 +3,7 @@
 from conftest import SCHEMA_DIR
 import yaml
 
-from app.onboarding.instant_files import READER_ROLE, dataset_items, write_pack_files
+from app.onboarding.instant_files import dataset_items, write_pack_files
 from app.onboarding.marts import MartTable, SourceColumn, plan_marts
 from app.packs.loader import load_pack
 from app.sources.inspect import ForeignKey
@@ -52,7 +52,7 @@ def test_numbers_are_measures_dates_time_and_keys_and_text_dimensions():
     roles = {column["name"]: (column["type"], column["role"]) for column in sales["columns"]}
     assert roles == {"sale_id": ("number", "dimension"), "sold_on": ("date", "time"), "widget_id": ("number", "dimension"),
                      "sale_amount": ("number", "measure"), "paid": ("boolean", "dimension")}
-    assert sales["time_column"] == "sold_on" and sales["allowed_roles"] == [READER_ROLE]
+    assert sales["time_column"] == "sold_on" and "allowed_roles" not in sales
     assert sales["status"] == "draft" and sales["evidence"] == [{"kind": "profile", "ref": "shop__sales"}]
 
 
@@ -82,8 +82,10 @@ def test_the_written_pack_is_valid_with_one_role_reading_every_dataset(tmp_path)
 
     pack = load_pack(pack_dir, schema_dir=SCHEMA_DIR)
     assert pack.business_profile.conventions == [] and pack.business_profile.currency == "USD"
+    # No policies.yaml is written: the loader grants every dataset to the pack's one reader role.
+    assert not (pack_dir / "policies.yaml").exists()
     [role] = pack.policies.roles
-    assert role.id == READER_ROLE and role.status == "approved"
+    assert role.id == "reader" and role.status == "approved"
     assert {grant.dataset for grant in role.datasets} == {"shop__sales__wide", "shop__widgets", "shop__sales"}
     assert [(item.from_dataset, item.status) for item in pack.relationships.relationships] == [("shop__sales", "approved")]
     assert not (pack_dir / "eval.yaml").exists()
@@ -142,7 +144,6 @@ def test_generated_items_are_approved_as_unreviewed_and_failed_ones_dropped_with
     assert [(item.id, item.status, item.reviewed) for item in pack.metrics.metrics] == [("sales_total", "approved", False)]
     assert [item.id for item in pack.glossary.terms] == ["sales"] and [item.id for item in pack.examples.examples] == ["total"]
     assert all(item.status == "approved" and item.reviewed is False for item in pack.datasets.datasets)
-    assert pack.policies.roles[0].reviewed is False
     assert [(item.status, item.reviewed) for item in pack.relationships.relationships] == [("draft", None)]
     assert summary["dropped"] == ["metrics.broken", "glossary.broken_term", "examples.uses_broken"]
 

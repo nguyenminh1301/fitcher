@@ -73,7 +73,6 @@ def test_upload_stores_screens_embeds_and_indexes_every_chunk(service, search, t
 
 @pytest.mark.parametrize(("data", "roles", "error", "status"), [
     (b"x" * 10_001, ["analyst"], "larger than", 413),
-    (MARKDOWN, [], "at least one", 422),
     (MARKDOWN, ["analyst", "stranger"], "not roles of this pack: stranger", 422),
     (b"", ["analyst"], "empty", 422),
 ])

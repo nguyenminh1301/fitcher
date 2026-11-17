@@ -4,7 +4,6 @@ datasets:
       Line-level sales fact table for orders, combining order, customer, product, pricing, and return flag details for each purchased item.
     grain: one row per order line
     time_column: order_date
-    allowed_roles: [analyst, northwest_sales, category_partner]
     status: approved
     evidence:
       - kind: profile
@@ -119,7 +118,6 @@ datasets:
     description: Return-level fact table capturing refunded order items, including return timing, reason, customer, product, and original order context.
     grain: one row per return
     time_column: return_date
-    allowed_roles: [analyst, northwest_sales]
     status: approved
     evidence:
       - kind: profile
@@ -226,7 +224,6 @@ datasets:
     description: Daily web sessions aggregate segmented by device, acquisition channel, customer region, and customer segment, with conversion and engagement measures.
     grain: one row per day, device, channel, customer region and customer segment
     time_column: session_date
-    allowed_roles: [analyst, marketing]
     status: approved
     evidence:
       - kind: profile

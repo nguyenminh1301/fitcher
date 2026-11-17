@@ -29,7 +29,7 @@ def _expected(**updates) -> EvalExpected:
 def _case(**updates) -> EvalCase:
     case = EvalCase(
         id="top_widgets", question="Top 10 widgets in Q1 2024 vs Q1 2025", language="en", category="two_period_compare",
-        role="viewer", expected=_expected(), expected_sql="SELECT 1", status="approved",
+        role="reader", expected=_expected(), expected_sql="SELECT 1", status="approved",
         evidence=[{"kind": "manual", "ref": "fixture"}], confidence=1.0,
     )
     return case.model_copy(update=updates)

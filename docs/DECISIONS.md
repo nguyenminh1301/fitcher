@@ -133,12 +133,11 @@ Path: `<packs dir>/<company>/`, in the data volume of a running instance. Packs 
 | File | Contents |
 |---|---|
 | `business_profile.yaml` | industry, currency, fiscal year start month, default conventions (e.g. "best-selling" = by revenue); never the user's time zone or answer language (§6) |
-| `datasets.yaml` | marts: table/column descriptions, types, roles (dimension/measure/time), grain, primary time column, allowed_roles |
+| `datasets.yaml` | marts: table/column descriptions, types, roles (dimension/measure/time), grain, primary time column |
 | `glossary.yaml` | terms with **Vietnamese + English** aliases, pointing to metrics/columns/values |
 | `metrics.yaml` | id, sql_expr, dataset, grain, unit, owner |
 | `relationships.yaml` | allowed join paths (if any); the LLM may not invent joins |
 | `examples.yaml` | question -> canonical SQL (used as few-shot), optionally with a reviewed spec (§6 step 7) |
-| `policies.yaml` | role -> dataset/columns, row filters, aggregate-only (granted through views) |
 | `eval.yaml` | question -> correct result (or correct SQL), labelled per layer |
 
 Every drafter-generated item has `status: draft|approved`, `evidence` and `confidence`. The compiler uses only `approved` items. An instant pack (§11) approves its generated items automatically and marks them `reviewed: false`, which the interface shows as unreviewed until a person confirms them.
@@ -165,7 +164,7 @@ Every query filters by `allowed_roles` and fuses the dense and sparse results wi
 Documents are runtime content managed in the application, not files in Git; the pack YAML stays the reviewed source for datasets, metrics and policies.
 
 - **Formats:** PDF (text layer only, no OCR), DOCX, Markdown, plain text and XLSX (cell values with the sheet's header row; formulas are not evaluated and macro-enabled workbooks are rejected). A spreadsheet of business data is data, not a document: it is loaded into ClickHouse (§1).
-- **Upload and delete at any time:** a `pack_reviewer` uploads, lists and deletes documents on the Documents page of the web app, choosing each document's `allowed_roles` from the pack's roles. `ingest_docs.py` loads a folder through the same code path for bulk onboarding.
+- **Upload and delete at any time:** a `pack_reviewer` uploads, lists and deletes documents on the Documents page of the web app, and every document is read through the pack's reader role. `ingest_docs.py` loads a folder through the same code path for bulk onboarding.
 - **Storage:** original files live in the `api` service's documents volume. The registry table `data_meta.documents` records id, pack, file name, type, size, SHA-256, uploader, `allowed_roles`, status (`processing`, `indexed`, `failed`) with the error, and upload and delete times; a dedicated ClickHouse user writes only that table. A file whose SHA-256 is already registered for the pack is rejected as a duplicate.
 - **Upload:** check the type from the file content and a size cap, store the file, parse, chunk, screen each chunk (§9), embed through `embed` and index the chunks into the pack's live `kb_docs` alias. A failure marks the document `failed` and leaves no chunks.
 - **Delete:** remove the document's chunks from `kb_docs`, delete the stored file and mark the registry row deleted. Pack items whose evidence cites the document are flagged in the Review UI; approved YAML is never changed automatically.
@@ -310,12 +309,12 @@ Principles:
 
 ## 9. RBAC
 
-- **Single source of truth:** `policies.yaml`. The compiler generates:
-  - `CREATE ROLE`, `GRANT SELECT` on marts or views
-  - `ROW POLICY`
-  - settings profiles
+- **One reader role per pack.** A personal app has no access rules to write, so a pack has no `policies.yaml`: the loader grants every column of every approved dataset to the pack's one `reader` role, and every question runs as it. An older pack's `policies.yaml`, `datasets[].allowed_roles` or eval-case `role` is ignored. From that role the compiler generates:
+  - `CREATE ROLE` and `GRANT SELECT` on the pack's marts columns
+  - the read-only settings profile and the role's login user
   - the guard allowlist
   - `allowed_roles` for the indices
+  The compiler still supports row policies and aggregate-only views, but no pack declares them any more.
 - **Layer 1, retrieval:** reduces noise in the context given to SQL generation. Not a security layer: term resolution may see items the role cannot read, and the gate denies them.
 - **Layer 2, guard:** blocks early with an understandable message.
 - **Layer 3, ClickHouse:** the real security layer.
@@ -391,7 +390,6 @@ Tables (MergeTree, 90-day TTL except the conversation tables and `feedback`, ord
   - filter by a string value
   - monthly trend
   - ambiguous question (must return clarify)
-  - unauthorized question (must return deny)
   - out-of-scope question
 - Run with `eval.py --pack <company>`, or by an `admin` from the Evaluation page (§15). Reports are stored in `agent_logs` and printed as Markdown.
 
@@ -435,7 +433,7 @@ The interface follows the Fitcher web app design, summarized in [design/web-app.
 - **Language.** The English/Vietnamese switch translates the interface only: navigation, labels, step names, notices the app raises, chart axes and number and date formats. User messages, answers and pack content keep the language they were written in (§6). The choice is kept per browser.
 - **Theme.** Light and dark, following the system setting unless the user picks one; the choice is kept per browser.
 - **Visual system.** Primer-based colour, type and spacing tokens with the fitcher neutrals from `docs/brand`, the Inter font with its Vietnamese subset, Lucide icons; WCAG 2.2 AA in both themes.
-- **Datasets page.** A read-only view of the compiled pack's datasets: columns, types, roles and which pack roles may read each dataset.
+- **Datasets page.** A read-only view of the compiled pack's datasets: columns, types and roles.
 - **Feedback page.** Likes and dislikes with their notes, question and trace; a reviewer can propose an example from one disliked or failed run, which runs the same proposal code as `propose_examples.py` (§11 step 8).
 - **Evaluation page.** Reads `eval_reports`: per-layer rates, the threshold result, the required question categories and failed cases. An `admin` can start a run of the active pack's eval set: it is labelled as using paid AI, asks for confirmation, runs one at a time per pack inside `api`, and stores its report like `eval.py`.
 - **Costs page.** LLM cost by day, alias, model, tier and provider from `llm_calls`, always labelled as an estimate.

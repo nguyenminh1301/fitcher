@@ -87,10 +87,6 @@ datasets:
         type: number
         role: measure
         description: Margin amount retained by the state for the transaction line.
-    allowed_roles:
-      - analyst
-      - polk_county_manager
-      - vendor_partner
     evidence:
       - kind: profile
         ref: liquor_sales

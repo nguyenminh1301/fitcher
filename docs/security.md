@@ -11,7 +11,7 @@ fitcher is a personal app: one owner, no accounts and no sign-in (DECISIONS §9)
 | Who uses it | The owner: every request acts as the owner with every role; with the optional owner password, only a signed-in browser |
 | Who may reach the port | The local machine only: the api answers a loopback host name only from a connection on this machine (loopback, the container's default gateway or `FITCHER_TRUSTED_PEERS`), answers `FITCHER_ALLOWED_HOSTS` names from anywhere, and a change needs the same `Origin` |
 | Conversation delete | Removes the conversation, its messages and its feedback for good |
-| Data the agent reaches | What the active pack role grants, enforced by ClickHouse grants, row policies and settings profiles |
+| Data the agent reaches | The approved datasets of the active pack, through its read-only reader role: ClickHouse grants on the marts columns and a read-only settings profile |
 
 ## Threats
 

@@ -1,23 +1,21 @@
 "use client";
 
 import { Icon } from "@/components/brand/Icon";
-import { Button, Chip } from "@/components/ui/controls";
+import { Button } from "@/components/ui/controls";
 import { StatusPill } from "@/components/ui/feedback";
 import type { DocumentView as Document } from "@/lib/contracts";
 import { useI18n } from "@/lib/i18n/react";
 
 type Props = {
   document: Document;
-  /** The pack's roles; the chips choose which of them may see the document in search. */
-  packRoles: string[];
   compiling: boolean;
-  onRoles: (roles: string[]) => void;
   onDraft: () => void;
   onDelete: () => void;
 };
 
-/** One uploaded document: its file, the roles that may see it, its status and actions. */
-export function DocumentRow({ document, packRoles, compiling, onRoles, onDraft, onDelete }: Props) {
+/** One uploaded document: its file, its status and actions. A pack has one reader role (DECISIONS §9), which reads
+ * every document, so there is no choice of roles. */
+export function DocumentRow({ document, compiling, onDraft, onDelete }: Props) {
   const { t, formatNumber, formatDate } = useI18n();
   const size = document.size >= 1024 * 1024
     ? `${formatNumber(document.size / 1024 / 1024, { maximumFractionDigits: 1 })} MB`
@@ -30,16 +28,6 @@ export function DocumentRow({ document, packRoles, compiling, onRoles, onDraft, 
           <div className="fc-doc-name" title={document.name}>{document.name}</div>
           <div className="fc-doc-meta">{`${size} · ${formatDate(document.uploaded_at)}`}</div>
         </div>
-      </div>
-      <div className="fc-doc-roles" role="group" aria-label={`${t("ui.visibleTo")} · ${document.name}`}>
-        {packRoles.map((role) => {
-          const on = document.roles.includes(role);
-          return (
-            <Chip key={role} size="sm" selected={on} onClick={() => onRoles(on ? document.roles.filter((item) => item !== role) : [...document.roles, role])}>
-              {role}
-            </Chip>
-          );
-        })}
       </div>
       <div className="fc-doc-status"><StatusPill status={document.status} /></div>
       <div className="fc-doc-actions">

@@ -50,7 +50,7 @@ export function DocumentsSection() {
         setError(null);
         try {
           // Every pack role may read a new document until the reviewer narrows it with the role chips.
-          await api.documents.upload(file, pack?.roles ?? []);
+          await api.documents.upload(file, []);
           toast(t("ui.uploaded", { name: file.name }));
         } catch (reason) {
           setError(reason instanceof Error ? reason.message : String(reason));
@@ -81,8 +81,7 @@ export function DocumentsSection() {
         <div className="fc-docs-head">{t("ui.files", { n: documents.length })}</div>
         <div role="list">
           {documents.map((document) => (
-            <DocumentRow key={document.id} document={document} packRoles={pack?.roles ?? []} compiling={compiling}
-              onRoles={async (roles) => { await api.documents.setRoles(document.id, roles); await reload(); }}
+            <DocumentRow key={document.id} document={document} compiling={compiling}
               onDraft={() => setDrafting(document)}
               onDelete={() => setDeleting(document)} />
           ))}

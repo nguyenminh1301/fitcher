@@ -71,5 +71,5 @@ def test_datasets_list_columns_and_the_roles_granted_each(client):
     assert response.status_code == 200
     by_id = {dataset["id"]: dataset for dataset in response.json()}
     sales = by_id["widget_sales"]
-    assert sales["readable_roles"] == ["viewer"] and sales["time_column"] == "sold_on"
+    assert sales["readable_roles"] == ["reader"] and sales["time_column"] == "sold_on"
     assert sales["columns"][0] == {"name": "sale_ref", "type": "string", "role": "dimension", "description": "Sale key."}

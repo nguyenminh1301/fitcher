@@ -38,7 +38,6 @@ FIELDS: dict[str, tuple[str, str, str | None]] = {
     "metrics.yaml": ("id", "description", "sql_expr"),
     "relationships.yaml": ("id", "description", None),
     "examples.yaml": ("id", "question", "sql"),
-    "policies.yaml": ("id", "description", None),
     "eval.yaml": ("id", "question", "expected_sql"),
 }
 TEST_ROWS = 100

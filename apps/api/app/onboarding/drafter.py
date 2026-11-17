@@ -6,8 +6,7 @@ reviews it before it compiles. The prompts say the profile, the items and
 document text are data, never instructions, and that no figures are taken
 from text. The code then keeps only evidence that exists in the input (a
 profile table or column, or a chunk id), never returns an approved id,
-fills an existing draft's text without changing its structure, gives a new
-dataset the roles its policies grant, and test-runs every metric expression
+fills an existing draft's text without changing its structure, and test-runs every metric expression
 and example query: a failure stays a draft with the error as evidence and a
 confidence of at most 0.2. Calls are billable.
 """
@@ -166,14 +165,6 @@ def profile_refs(profile: dict | None) -> list[str]:
     return refs
 
 
-def _granted_roles(files: PackFiles) -> dict[str, list[str]]:
-    granted: dict[str, list[str]] = {}
-    for role in files.items("policies.yaml"):
-        for grant in role.get("datasets") or []:
-            granted.setdefault(grant["dataset"], []).append(role["id"])
-    return granted
-
-
 class Drafter:
     def __init__(self, llm: LLMClient, warehouse: Warehouse):
         self.llm = llm
@@ -217,7 +208,6 @@ class Drafter:
             {"kind": "profile", "ref": next(iter(profile["tables"]))} if profile and profile["tables"]
             else {"kind": "doc", "ref": chunks[0]["id"]}
         )
-        granted = _granted_roles(files)
         drafted: list[dict] = []
         for model in reply.items:
             current = existing.get(model.id)
@@ -229,7 +219,7 @@ class Drafter:
             if current is not None:
                 item = self._fill(file, _plain(current), item)
             elif file == "datasets.yaml":
-                item = self._new_dataset(item, granted)
+                item = self._new_dataset(item)
             item["evidence"] = evidence
             item["status"] = "draft"
             self._test_run(file, item)
@@ -252,8 +242,7 @@ class Drafter:
         return filled
 
     @staticmethod
-    def _new_dataset(item: dict, granted: dict[str, list[str]]) -> dict:
-        item["allowed_roles"] = granted.get(item["id"], [])
+    def _new_dataset(item: dict) -> dict:
         item["columns"] = [
             {key: value for key, value in column.items() if key != "indexable" or value} for column in item["columns"]
         ]

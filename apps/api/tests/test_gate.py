@@ -34,7 +34,7 @@ def _spec(**extraction):
 
 
 def test_role_with_the_dataset_and_its_columns_is_allowed():
-    assert authorize(_spec(), deps([]).compiled.pack, "viewer", "en") is None
+    assert authorize(_spec(), deps([]).compiled.pack, "reader", "en") is None
 
 
 def test_role_without_the_dataset_is_denied_naming_it():

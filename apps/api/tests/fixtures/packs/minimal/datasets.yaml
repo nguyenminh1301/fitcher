@@ -3,7 +3,6 @@ datasets:
     description: One row per widget sale.
     grain: one row per sale
     time_column: sold_on
-    allowed_roles: [viewer]
     status: approved
     evidence: [{kind: manual, ref: fixture}]
     confidence: 1.0
@@ -16,7 +15,6 @@ datasets:
     description: One row per refunded widget sale.
     grain: one row per refund
     time_column: refunded_on
-    allowed_roles: [viewer]
     status: approved
     evidence: [{kind: manual, ref: fixture}]
     confidence: 1.0

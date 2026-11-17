@@ -16,7 +16,7 @@ from app.main import app
 TS = datetime(2026, 11, 5, 9, 0, tzinfo=UTC)
 ADMIN = SessionHeaders(['admin'])
 REVIEWER = SessionHeaders(['pack_reviewer'])
-RUN = ("t1", TS, "dev.analyst", "viewer", "Revenue by widget", "data_query", "succeeded", 1200, 0.0042, "")
+RUN = ("t1", TS, "dev.analyst", "reader", "Revenue by widget", "data_query", "succeeded", 1200, 0.0042, "")
 
 
 class Script:
@@ -61,7 +61,7 @@ def test_runs_are_filtered_paged_and_scoped_to_the_pack(client):
 
     assert response.status_code == 200
     assert response.json()[0] == {
-        "trace_id": "t1", "ts": "2026-11-05T09:00:00Z", "user_id": "dev.analyst", "role": "viewer",
+        "trace_id": "t1", "ts": "2026-11-05T09:00:00Z", "user_id": "dev.analyst", "role": "reader",
         "question": "Revenue by widget", "intent": "data_query", "status": "succeeded", "latency_ms": 1200,
         "cost_usd": 0.0042, "error": "",
     }
@@ -81,7 +81,7 @@ def test_a_trace_merges_nodes_llm_calls_sql_and_access_in_time_order(client):
             (TS.replace(second=2), "summarize", "", "lab", "openai/house-model", 80, None, 150, "success", ""),
         ]),
         (r"FROM agent_logs\.sql_runs", [(later, 1, "SELECT 1", 1, "")]),
-        (r"FROM agent_logs\.audit", [(TS.replace(second=3), "viewer", "ALLOW", "widget_sales", "")]),
+        (r"FROM agent_logs\.audit", [(TS.replace(second=3), "reader", "ALLOW", "widget_sales", "")]),
     ])
     use(reader)
 

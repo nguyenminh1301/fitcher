@@ -6,8 +6,7 @@ From the mart views and their profile:
   columns the agent needs. A number is a measure, a date or a date and time is time, and text, booleans and key
   columns are dimensions; a string column with at most ``INDEXED_VALUES`` values, other than a key, is indexable so
   its values can be matched in filters. Descriptions are left for the drafter (``status: draft``).
-- ``business_profile.yaml`` with neutral defaults and no convention, ``policies.yaml`` with one role reading every
-  column of every dataset, and ``relationships.yaml`` with the source's foreign keys (approved) and the profile's
+- ``business_profile.yaml`` with neutral defaults and no convention, and ``relationships.yaml`` with the source's foreign keys (approved) and the profile's
   join-key candidates (drafts).
 - empty glossary, metrics and examples for the drafter, and no ``eval.yaml``.
 
@@ -23,7 +22,6 @@ from app.onboarding.marts import MartTable, MartView
 from app.onboarding.pack_yaml import PackFiles
 from app.onboarding.relationships import candidate_relationships, source_relationships
 
-READER_ROLE = "reader"
 INDEXED_VALUES = 1000
 TO_DRAFT = "Description to draft."
 DEFAULT_CURRENCY = "USD"
@@ -60,7 +58,7 @@ def dataset_items(views: Sequence[MartView], profile: dict) -> list[dict]:
                  else f"One row of {view.table}")
         items.append({
             "id": view.name, "description": TO_DRAFT, "grain": grain, "time_column": times[0],
-            "allowed_roles": [READER_ROLE], "columns": columns, "status": "draft",
+            "columns": columns, "status": "draft",
             "evidence": [{"kind": "profile", "ref": view.name}], "confidence": 0.5,
         })
     return items
@@ -83,12 +81,6 @@ def write_pack_files(pack_dir: Path, *, pack: str, display_name: str, source: st
         "business_profile.yaml": {"name": pack, "display_name": display_name, "industry": "not specified",
                                   "currency": currency, "fiscal_year_start_month": 1, "conventions": []},
         "datasets.yaml": {"datasets": datasets},
-        "policies.yaml": {"roles": [{
-            "id": READER_ROLE, "description": "Reads every column of every dataset.",
-            "datasets": [{"dataset": item["id"], "columns": [column["name"] for column in item["columns"]]}
-                         for item in datasets],
-            "status": "approved", "evidence": [GENERATED], "confidence": 1.0,
-        }]},
         "relationships.yaml": {"relationships": relationships},
         "glossary.yaml": {"terms": []},
         "metrics.yaml": {"metrics": []},
@@ -97,12 +89,14 @@ def write_pack_files(pack_dir: Path, *, pack: str, display_name: str, source: st
     for file, data in files.items():
         _dump(pack_dir / file, data)
     (pack_dir / "eval.yaml").unlink(missing_ok=True)
+    # A pack has no roles of its own any more; the loader grants every dataset to its one reader role.
+    (pack_dir / "policies.yaml").unlink(missing_ok=True)
     return {"datasets": len(datasets), "relationships": len(relationships),
             "skipped": [view.name for view in views if view.name not in listed]}
 
 
 # Files whose drafts an instant pack approves, in an order where an item comes after those it may cite.
-APPROVED_FILES = ("datasets.yaml", "metrics.yaml", "glossary.yaml", "examples.yaml", "policies.yaml", "relationships.yaml")
+APPROVED_FILES = ("datasets.yaml", "metrics.yaml", "glossary.yaml", "examples.yaml", "relationships.yaml")
 
 
 def _cites_missing(file: str, item: dict, metrics: set[str], columns: dict[str, set[str]]) -> bool:

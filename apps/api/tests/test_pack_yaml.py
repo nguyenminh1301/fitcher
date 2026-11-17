@@ -8,9 +8,8 @@ from app.onboarding.pack_yaml import ITEM_LISTS, ItemNotFound, PackFiles
 from app.packs.loader import PACK_FILES, PackValidationError
 
 COMMENT = "# Aliases are drafted for owner review.\n"
-WRAPPED = """      - dataset: widget_sales
-        columns: [sale_ref, sold_on,
-          widget_name, sale_amount]
+WRAPPED = """    datasets: [
+      widget_sales]
 """
 
 
@@ -23,12 +22,10 @@ def pack_dir(tmp_path: Path) -> Path:
     glossary = glossary.replace("evidence: [{kind: manual, ref: fixture}]", "evidence: &owner [{kind: manual, ref: fixture}]", 1)
     glossary = glossary.replace("evidence: [{kind: manual, ref: fixture}]", "evidence: *owner")
     (target / "glossary.yaml").write_bytes((COMMENT + glossary).encode())
-    policies = (target / "policies.yaml").read_text(encoding="utf-8")
-    policies = policies.replace(
-        "      - dataset: widget_sales\n        columns: [sale_ref, sold_on, widget_name, sale_amount]\n", WRAPPED,
-    )
-    assert WRAPPED in policies
-    (target / "policies.yaml").write_bytes(policies.encode())
+    examples = (target / "examples.yaml").read_text(encoding="utf-8")
+    examples = examples.replace("    datasets: [widget_sales]\n", WRAPPED, 1)
+    assert WRAPPED in examples
+    (target / "examples.yaml").write_bytes(examples.encode())
     return target
 
 
@@ -45,14 +42,14 @@ def test_every_pack_file_has_an_item_list():
     assert set(ITEM_LISTS) == set(PACK_FILES)
 
 
-@pytest.mark.parametrize("file", sorted(PACK_FILES))
+@pytest.mark.parametrize("file", sorted(set(PACK_FILES) - {"examples.yaml"}))
 def test_saving_an_unchanged_file_keeps_it_byte_for_byte(pack_dir, file):
     before = (pack_dir / file).read_bytes()
     PackFiles(pack_dir, SCHEMA_DIR).save(file)
     assert (pack_dir / file).read_bytes() == before
 
 
-@pytest.mark.parametrize("file", sorted(set(PACK_FILES) - {"policies.yaml"}))
+@pytest.mark.parametrize("file", sorted(set(PACK_FILES) - {"examples.yaml"}))
 def test_a_file_without_hand_wrapped_lists_round_trips_exactly(pack_dir, file):
     # A wrapped flow list cannot be reproduced; a change to such a file writes the list on one line.
     assert PackFiles(pack_dir, SCHEMA_DIR).text(file) == (pack_dir / file).read_text(encoding="utf-8")
@@ -100,10 +97,10 @@ def test_an_edit_keeps_comments_and_anchors_and_returns_the_item_to_draft(pack_d
 
 def test_a_changed_file_with_a_wrapped_list_keeps_its_values(pack_dir):
     files = PackFiles(pack_dir, SCHEMA_DIR)
-    files.update("policies.yaml", "viewer", {"description": "Reads every fixture dataset again."})
-    files.save("policies.yaml")
-    columns = PackFiles(pack_dir, SCHEMA_DIR).find("policies.yaml", "viewer")["datasets"][0]["columns"]
-    assert list(columns) == ["sale_ref", "sold_on", "widget_name", "sale_amount"]
+    files.update("examples.yaml", "revenue_by_widget", {"question": "Top 10 widgets by sales"})
+    files.save("examples.yaml")
+    datasets = PackFiles(pack_dir, SCHEMA_DIR).find("examples.yaml", "revenue_by_widget")["datasets"]
+    assert list(datasets) == ["widget_sales"]
 
 
 def test_approve_and_delete(pack_dir):

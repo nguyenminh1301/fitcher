@@ -66,4 +66,4 @@ def test_every_pack_file_has_a_schema():
     # sample_*.schema.json describe a pack's sample_data/ files for the web app, not pack YAML files.
     pack_schemas = {path.name for path in SCHEMA_DIR.glob("*.schema.json") if not path.name.startswith("sample_")}
     assert names == pack_schemas - {"common.schema.json"}
-    assert len(PACK_FILES) == 8
+    assert len(PACK_FILES) == 7

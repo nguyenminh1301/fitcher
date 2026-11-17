@@ -4,7 +4,7 @@
   "description": "Sample identities, conversations and console rows the web app shows before their api exists (DECISIONS §15). Hand-written; never copied or derived from a licensed dataset.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["pack", "pack_roles", "identities", "conversations", "datasets", "review_items", "documents", "feedback", "eval_reports", "runs", "traces", "audit", "costs", "users"],
+  "required": ["pack", "pack_roles", "identities", "conversations", "datasets", "review_items", "documents", "feedback", "eval_reports", "runs", "traces", "audit", "costs"],
   "$defs": {
     "text": {"type": "string", "minLength": 1},
     "time": {"type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}"},
@@ -96,10 +96,6 @@
       "type": "array",
       "items": {"type": "object", "required": ["ts", "trace_id", "user_id", "role", "decision", "dataset", "blocked_tables", "reason"], "properties": {"decision": {"enum": ["ALLOW", "DENY"]}}}
     },
-    "costs": {"type": "array", "items": {"type": "object", "required": ["day", "alias", "model", "calls", "cost_usd"]}},
-    "users": {
-      "type": "array",
-      "items": {"type": "object", "required": ["id", "email", "display_name", "roles", "enabled"]}
-    }
+    "costs": {"type": "array", "items": {"type": "object", "required": ["day", "alias", "model", "calls", "cost_usd"]}}
   }
 }

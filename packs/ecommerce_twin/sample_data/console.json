@@ -4,54 +4,16 @@
     "display_name": "E-commerce twin"
   },
   "pack_roles": [
-    "analyst",
-    "marketing",
-    "northwest_sales",
-    "category_partner"
+    "reader"
   ],
   "identities": [
     {
-      "user_id": "dev.analyst",
-      "display_name": "Lab Analyst",
+      "user_id": "owner",
+      "display_name": "Owner",
       "roles": [
-        "analyst"
-      ]
-    },
-    {
-      "user_id": "dev.marketing",
-      "display_name": "Lab Marketing",
-      "roles": [
-        "marketing"
-      ]
-    },
-    {
-      "user_id": "dev.northwest",
-      "display_name": "Lab Northwest",
-      "roles": [
-        "northwest_sales"
-      ]
-    },
-    {
-      "user_id": "dev.partner",
-      "display_name": "Lab Partner",
-      "roles": [
-        "category_partner"
-      ]
-    },
-    {
-      "user_id": "dev.reviewer",
-      "display_name": "Lab Reviewer",
-      "roles": [
+        "reader",
         "pack_reviewer",
-        "analyst"
-      ]
-    },
-    {
-      "user_id": "dev.admin",
-      "display_name": "Lab Admin",
-      "roles": [
-        "admin",
-        "analyst"
+        "admin"
       ]
     }
   ],
@@ -1715,64 +1677,6 @@
       "model": "text-embedding-3-large",
       "calls": 4,
       "cost_usd": 0.0031
-    }
-  ],
-  "users": [
-    {
-      "id": "dev.analyst",
-      "email": "analyst@example.com",
-      "display_name": "Lab Analyst",
-      "roles": [
-        "analyst"
-      ],
-      "enabled": true
-    },
-    {
-      "id": "dev.marketing",
-      "email": "marketing@example.com",
-      "display_name": "Lab Marketing",
-      "roles": [
-        "marketing"
-      ],
-      "enabled": true
-    },
-    {
-      "id": "dev.northwest",
-      "email": "northwest@example.com",
-      "display_name": "Lab Northwest",
-      "roles": [
-        "northwest_sales"
-      ],
-      "enabled": true
-    },
-    {
-      "id": "dev.partner",
-      "email": "partner@example.com",
-      "display_name": "Lab Partner",
-      "roles": [
-        "category_partner"
-      ],
-      "enabled": true
-    },
-    {
-      "id": "dev.reviewer",
-      "email": "reviewer@example.com",
-      "display_name": "Lab Reviewer",
-      "roles": [
-        "pack_reviewer",
-        "analyst"
-      ],
-      "enabled": true
-    },
-    {
-      "id": "dev.admin",
-      "email": "admin@example.com",
-      "display_name": "Lab Admin",
-      "roles": [
-        "admin",
-        "analyst"
-      ],
-      "enabled": true
     }
   ]
 }

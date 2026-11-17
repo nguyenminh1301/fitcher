@@ -26,7 +26,7 @@ def service(tmp_path):
     search.create("minimal_kb_docs", 1, 4)
     search.switch_live({"minimal_kb_docs": 1})
     return DocumentService(
-        pack="minimal", pack_roles=["viewer"], registry=InMemoryDocumentRegistry(), search=search,
+        pack="minimal", pack_roles=["reader"], registry=InMemoryDocumentRegistry(), search=search,
         embeddings=FakeEmbeddings(), screener=WordScreener(), store_dir=tmp_path / "documents",
         compiled_dir=tmp_path / "compiled", max_bytes=10_000, clock=lambda: NOW,
     )
@@ -43,7 +43,7 @@ def client(service):
     app.dependency_overrides.clear()
 
 
-def upload(client, data=MARKDOWN, name="glossary.md", roles=("viewer",), headers=REVIEWER):
+def upload(client, data=MARKDOWN, name="glossary.md", roles=("reader",), headers=REVIEWER):
     return client.post("/documents", headers=headers, files={"file": (name, data, "application/octet-stream")},
                        data={"allowed_roles": list(roles)})
 
@@ -53,7 +53,7 @@ def test_upload_indexes_the_document_and_lists_it(client):
 
     assert response.status_code == 201
     body = response.json()
-    assert body["name"] == "glossary.md" and body["status"] == "indexed" and body["roles"] == ["viewer"]
+    assert body["name"] == "glossary.md" and body["status"] == "indexed" and body["roles"] == ["reader"]
     assert body["chunk_count"] == 3 and body["blocked_chunks"] == 0 and body["uploaded_by"] == "owner"
     listed = client.get("/documents", headers=REVIEWER).json()
     assert listed["compiling"] is False
@@ -62,7 +62,6 @@ def test_upload_indexes_the_document_and_lists_it(client):
 
 @pytest.mark.parametrize(("kwargs", "status", "detail"), [
     ({"data": b"x" * 10_001}, 413, "larger than"),
-    ({"roles": ()}, 422, "at least one"),
     ({"roles": ("stranger",)}, 422, "stranger"),
     ({"data": b"PK\x03\x04junk", "name": "a.pdf"}, 415, "not a supported type"),
     ({"data": b"%PDF-1.4\n"}, 422, "PDF"),
@@ -99,8 +98,8 @@ def test_delete_removes_the_document(client):
 
 def test_patch_changes_the_roles(client):
     document = upload(client).json()
-    response = client.patch(f"/documents/{document['id']}", headers=REVIEWER, json={"allowed_roles": ["viewer"]})
-    assert response.status_code == 200 and response.json()["roles"] == ["viewer"]
+    response = client.patch(f"/documents/{document['id']}", headers=REVIEWER, json={"allowed_roles": ["reader"]})
+    assert response.status_code == 200 and response.json()["roles"] == ["reader"]
     bad = client.patch(f"/documents/{document['id']}", headers=REVIEWER, json={"allowed_roles": ["stranger"]})
     assert bad.status_code == 422
 
