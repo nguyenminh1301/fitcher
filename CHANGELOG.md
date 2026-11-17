@@ -4,6 +4,11 @@
 
 ### Fixed
 
+- An instant pack drops a glossary term or example that cites a metric, dataset or column the pack does not have, not only one citing a dropped metric, so a model naming a metric it never drafted no longer fails the compile.
+- A drafted glossary term, metric or example that breaks the pack schema (for example a metric target without its metric) is dropped and listed with the instant pack's dropped items instead of failing the whole pack; datasets still fail loudly because their marts already exist.
+- An instant pack whose model drafted no metric asks for the metrics once more and then gets a row count per dataset and a total per measure column, so the pack can answer questions about amounts instead of answering every one with "no metric matches".
+- A model reply without content (a reasoning model that spent its reply on reasoning) is asked once more before the call fails with "returned an empty reply".
+- Drafted pack ids and the metric ids that examples and glossary terms refer to are turned into the pack's form (`sumIf_amount` becomes `sum_if_amount`), so one oddly named item from a model no longer fails the whole instant pack.
 - The setup and sign-in pages scroll when they are taller than the window (they were clipped by the chat shell's fixed height), and the chat follows a new answer to the bottom while it streams and when it ends unless the reader has scrolled up.
 - Saving the chosen tables of a source in the setup or on the Sources page also prepares them (live tables are attached and copies start), so the setup offers to build the pack right away instead of failing with a missing `src_<source>` database, its Continue button says it continues without a pack, and every source on the Sources page has a Build the pack action.
 - A new instance without an active pack loads the chat and the console again: `GET /api/pack` answering 503 no longer stops the page from loading, the chat explains how to connect data and build the pack instead of offering a question box, console pages that read the pack say there is none yet, and a question the api refuses before answering shows the api's reason instead of "Connection lost".

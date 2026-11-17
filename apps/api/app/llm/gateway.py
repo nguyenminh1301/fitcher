@@ -50,6 +50,8 @@ from app.screening import rules
 
 TIMEOUT_SECONDS = 120
 RETRIES = 2
+# Calls made when a model's reply has no content, before the call fails.
+EMPTY_REPLY_ATTEMPTS = 2
 BATCH_SIZE = 256
 
 ModelT = TypeVar("ModelT", bound=BaseModel)
@@ -194,18 +196,21 @@ class Gateway:
             request["response_format"] = response_format
         if self._temperature is not None:
             request["temperature"] = self._temperature
-        try:
-            response = self._sender.send(tier, route, (prompt.system, prompt.user), request)
-        except _ProviderFailure as failure:
-            raise LLMError(f"request to model {route.model} failed: {failure}") from None
-        choices = calls.field(response, "choices")
-        message = calls.field(choices[0], "message") if isinstance(choices, list) and choices else None
-        content = calls.field(message, "content")
-        if content is not None and not isinstance(content, str):
-            raise LLMError(f"model {route.model} returned a malformed reply")
-        if not content or not content.strip():
-            raise LLMError(f"model {route.model} returned an empty reply")
-        return route.model, content
+        # A reasoning model sometimes spends its whole reply on reasoning and returns no content; it is asked
+        # once more before the call fails.
+        for _ in range(EMPTY_REPLY_ATTEMPTS):
+            try:
+                response = self._sender.send(tier, route, (prompt.system, prompt.user), request)
+            except _ProviderFailure as failure:
+                raise LLMError(f"request to model {route.model} failed: {failure}") from None
+            choices = calls.field(response, "choices")
+            message = calls.field(choices[0], "message") if isinstance(choices, list) and choices else None
+            content = calls.field(message, "content")
+            if content is not None and not isinstance(content, str):
+                raise LLMError(f"model {route.model} returned a malformed reply")
+            if content and content.strip():
+                return route.model, content
+        raise LLMError(f"model {route.model} returned an empty reply")
 
 
 class GatewayEmbeddings:

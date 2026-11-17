@@ -145,3 +145,25 @@ def test_generated_items_are_approved_as_unreviewed_and_failed_ones_dropped_with
     assert pack.policies.roles[0].reviewed is False
     assert [(item.status, item.reviewed) for item in pack.relationships.relationships] == [("draft", None)]
     assert summary["dropped"] == ["metrics.broken", "glossary.broken_term", "examples.uses_broken"]
+
+
+def test_items_citing_a_metric_dataset_or_column_the_pack_does_not_have_are_dropped(tmp_path):
+    from app.onboarding.instant_files import approve_generated
+    pack_dir = _draft_pack(tmp_path)
+    glossary = yaml.safe_load((pack_dir / "glossary.yaml").read_text(encoding="utf-8"))
+    term = {key: value for key, value in glossary["terms"][0].items() if key not in ("id", "term", "targets")}
+    glossary["terms"] += [
+        {"id": "amount", "term": "amount", "targets": [{"kind": "metric", "metric": "order_amount"}], **term},
+        {"id": "widget", "term": "widget", "targets": [{"kind": "column", "dataset": "widgets", "column": "widget_name"}], **term},
+        {"id": "colour", "term": "colour", "targets": [{"kind": "column", "dataset": "shop__widgets", "column": "colour"}], **term},
+    ]
+    (pack_dir / "glossary.yaml").write_text(yaml.safe_dump(glossary, allow_unicode=True), encoding="utf-8")
+    examples = yaml.safe_load((pack_dir / "examples.yaml").read_text(encoding="utf-8"))
+    examples["examples"].append({**examples["examples"][0], "id": "elsewhere", "datasets": ["orders"], "metrics": []})
+    (pack_dir / "examples.yaml").write_text(yaml.safe_dump(examples), encoding="utf-8")
+
+    summary = approve_generated(pack_dir, schema_dir=SCHEMA_DIR)
+
+    assert {"glossary.amount", "glossary.widget", "glossary.colour", "examples.elsewhere"} <= set(summary["dropped"])
+    pack = load_pack(pack_dir, schema_dir=SCHEMA_DIR)
+    assert [item.id for item in pack.glossary.terms] == ["sales"]
