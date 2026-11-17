@@ -29,6 +29,7 @@ export function AccountMenu({ onConsole, onChat, compact }: { onConsole?: () => 
   }, [api]);
   if (!identity) return null;
   const roles = identity.roles;
+  const sample = isSample("auth", sources);
 
   const items: MenuItem[] = [
     { icon: "globe", label: t("ui.language"), sub: (["en", "vi"] as const).map((code) => ({ label: t(`language.${code}`), checked: locale === code, onSelect: () => setLocale(code) })) },
@@ -53,7 +54,8 @@ export function AccountMenu({ onConsole, onChat, compact }: { onConsole?: () => 
         <span className="fc-avatar" aria-hidden>{initials(identity.display_name)}</span>
         <div style={{ minWidth: 0 }}><b>{identity.display_name}</b>{identity.user_id}</div>
       </div>
-      <div className="fc-menu-row"><span className="fc-muted">{t("ui.role")}</span><StatusPill status="neutral">{roles.join(", ")}</StatusPill></div>
+      {/* The owner holds every role (DECISIONS §9); roles mean something only among the demo identities. */}
+      {sample ? <div className="fc-menu-row"><span className="fc-muted">{t("ui.role")}</span><StatusPill status="neutral">{roles.join(", ")}</StatusPill></div> : null}
       <div className="fc-menu-sep" role="separator" />
     </>
   );
@@ -76,7 +78,7 @@ export function AccountMenu({ onConsole, onChat, compact }: { onConsole?: () => 
           onClick={toggle}
         >
           <span className="fc-avatar" aria-hidden>{initials(identity.display_name)}</span>
-          <span className="fc-acct-text">{identity.display_name}<small>{roles.join(", ")}</small></span>
+          <span className="fc-acct-text">{identity.display_name}{sample ? <small>{roles.join(", ")}</small> : null}</span>
           <Icon name="chevronsUpDown" />
         </button>
       )}

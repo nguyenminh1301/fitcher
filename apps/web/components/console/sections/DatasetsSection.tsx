@@ -1,7 +1,7 @@
 "use client";
 
 // Datasets (DECISIONS §15): a read-only view of the compiled pack's datasets, their columns, types and
-// roles, and which pack roles may read each one.
+// roles.
 
 import { useCallback, useState } from "react";
 
@@ -13,14 +13,6 @@ import { useChat } from "@/lib/chat/ChatContext";
 import { useLoad } from "@/lib/console/useLoad";
 import { useI18n } from "@/lib/i18n/react";
 import { langOf } from "@/lib/text";
-
-export function RoleChips({ roles }: { roles: string[] }) {
-  return (
-    <span className="fc-row" style={{ gap: "var(--base-size-4)" }}>
-      {roles.map((role) => <span key={role} className="fc-pill fc-pill-neutral fc-mono">{role}</span>)}
-    </span>
-  );
-}
 
 export function DatasetsSection() {
   const { t } = useI18n();
@@ -60,8 +52,6 @@ function DatasetDetail({ dataset, onBack }: { dataset?: DatasetView; onBack: () 
             <dd>{dataset.grain}</dd>
             <dt>{t("ui.timeColumn")}</dt>
             <dd><code className="fc-code">{dataset.time_column}</code></dd>
-            <dt>{t("ui.allowedRoles")}</dt>
-            <dd><RoleChips roles={dataset.readable_roles} /></dd>
           </dl>
           <RecordTable
             label={t("ui.columns")}

@@ -239,16 +239,6 @@ describe("documents", () => {
     await waitFor(() => expect(within(row).getByText("Indexed")).toBeTruthy());
   });
 
-  it("lets the reviewer choose which pack roles may see a document", async () => {
-    show("documents", <DocumentsSection />);
-    const row = (await screen.findByText("Handbook.pdf")).closest(".fc-doc") as HTMLElement;
-
-    await act(async () => fireEvent.click(within(row).getByRole("button", { name: "viewer" })));
-
-    await waitFor(() => expect(within(row).getByRole("button", { name: "viewer" }).getAttribute("aria-pressed")).toBe("true"));
-    expect((await api.documents.list()).documents.find((doc) => doc.id === "d1")?.roles).toEqual(["analyst", "viewer"]);
-  });
-
   it("labels Draft pack items as paid AI and asks before drafting", async () => {
     const draft = vi.spyOn(api.documents, "draft");
     show("documents", <DocumentsSection />);
@@ -270,13 +260,13 @@ describe("documents", () => {
 });
 
 describe("datasets", () => {
-  it("lists the compiled datasets and opens one with its columns and readable roles", async () => {
+  it("lists the compiled datasets and opens one with its columns, without roles", async () => {
     show("datasets", <DatasetsSection />);
 
     fireEvent.click(await screen.findByRole("button", { name: /table_one/ }));
 
     expect(await screen.findByText("Line amount")).toBeTruthy();
-    expect(screen.getByText("analyst", { selector: ".fc-pill" })).toBeTruthy();
+    expect(screen.queryByText("analyst", { selector: ".fc-pill" })).toBeNull();
   });
 });
 
