@@ -4,7 +4,7 @@ name: Release
 # the scan gate of the Security workflow runs first, then linux/amd64 and linux/arm64 are built
 # and pushed to ghcr.io/<owner>/fitcher with the version, the minor version and `latest` tags,
 # carrying an SBOM and a provenance attestation. A tag with a pre-release suffix (v1.2.0-rc.1)
-# does not move `latest`.
+# does not move `latest`. The GitHub release takes its notes from the tag's CHANGELOG.md section.
 
 on:
   push:
@@ -77,3 +77,26 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           annotations: ${{ steps.meta.outputs.annotations }}
+
+  notes:
+    name: Publish the release notes
+    needs: publish
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - name: Create the GitHub release from the changelog section of the tag
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          version="${TAG#v}"
+          awk -v v="$version" '$0 ~ "^## \\[?" v "\\]?( |$)" {on=1; next} on && /^## / {exit} on {print}' CHANGELOG.md > notes.md
+          test -s notes.md || { echo "CHANGELOG.md has no section for $version" >&2; exit 1; }
+          prerelease=""
+          case "$TAG" in *-*) prerelease="--prerelease" ;; esac
+          gh release create "$TAG" --title "fitcher $TAG" --notes-file notes.md --verify-tag $prerelease
