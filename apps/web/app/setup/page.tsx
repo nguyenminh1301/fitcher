@@ -6,7 +6,7 @@ import { useEffect, useState } from "react";
 import { SetupScreen } from "@/components/setup/SetupScreen";
 import { api } from "@/lib/api";
 
-const packRoles = async () => (await api.auth.pack()).roles;
+const packRoles = async () => (await api.auth.pack())?.roles ?? [];
 
 // The first-run setup. A user who is not signed in is sent to the sign-in page.
 export default function SetupPage() {

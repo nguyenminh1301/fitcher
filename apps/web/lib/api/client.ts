@@ -64,7 +64,8 @@ export interface FitcherApi {
     identities(): Promise<Identity[]>;
     current(): Promise<Identity | null>;
     switchTo(userId: string): Promise<Identity>;
-    pack(): Promise<{ name: string; display_name: string; roles: string[] }>;
+    /** The active pack, or null while no pack is active (a new instance before its first pack is built). */
+    pack(): Promise<{ name: string; display_name: string; roles: string[] } | null>;
     /** Sign in with a local account; throws a SignInError when refused. */
     signIn(email: string, password: string): Promise<void>;
     /** Whether the sign-in page offers the OpenID Connect provider. */

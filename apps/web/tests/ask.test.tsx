@@ -5,6 +5,7 @@ import { createMockChat } from "@/lib/api/mock/chat";
 import { createMockConversations } from "@/lib/api/mock/conversations";
 import { EMPTY_CONSOLE, type SampleData } from "@/lib/api/mock/load";
 import type { FitcherApi } from "@/lib/api/client";
+import { AskRefused } from "@/lib/api/http/chat";
 import type { Identity, Scenario } from "@/lib/api/provisional";
 import { ChatProvider, useChat, type ChatState } from "@/lib/chat/ChatContext";
 
@@ -15,13 +16,13 @@ const SCENARIO: Scenario = {
 };
 const IDENTITY: Identity = { user_id: "ana", display_name: "Ana", roles: ["analyst"] };
 
-function api(stepMs = 0): FitcherApi {
+function api(stepMs = 0, overrides: Partial<{ pack: FitcherApi["auth"]["pack"]; chat: FitcherApi["chat"] }> = {}): FitcherApi {
   const data: SampleData = { console: { ...EMPTY_CONSOLE, identities: [IDENTITY] }, scenarios: { suggestions: [], scenarios: [SCENARIO] }, status: "ok" };
   const load = async () => data;
   const identity = async () => IDENTITY;
   return {
-    auth: { current: identity, identities: async () => [IDENTITY], switchTo: identity, pack: async () => ({ name: "shop", display_name: "Shop", roles: ["analyst"] }) },
-    chat: createMockChat(load, identity, { stepMs }),
+    auth: { current: identity, identities: async () => [IDENTITY], switchTo: identity, pack: overrides.pack ?? (async () => ({ name: "shop", display_name: "Shop", roles: ["analyst"] })) },
+    chat: overrides.chat ?? createMockChat(load, identity, { stepMs }),
     conversations: createMockConversations(load, identity),
   } as unknown as FitcherApi;
 }
@@ -32,10 +33,10 @@ function Probe() {
   return null;
 }
 
-function setup(stepMs = 0) {
+function setup(stepMs = 0, overrides: Parameters<typeof api>[1] = {}) {
   const navigate = vi.fn();
   render(
-    <ChatProvider api={api(stepMs)} navigate={navigate} activeId={null}>
+    <ChatProvider api={api(stepMs, overrides)} navigate={navigate} activeId={null}>
       <Probe />
     </ChatProvider>,
   );
@@ -61,6 +62,30 @@ describe("asking a question", () => {
     expect(state.conversations[0]).toMatchObject({ id, title: question.slice(0, 80) });
     expect(state.busy).toBeNull();
     expect((await state.api.conversations.get(id))?.turns[0].events.at(-1)?.event).toBe("done");
+  });
+
+  it("loads the identity and conversations when no pack is active yet", async () => {
+    setup(0, { pack: async () => null });
+
+    await waitFor(() => expect(state.loaded).toBe(true));
+    expect(state.identity).toEqual(IDENTITY);
+    expect(state.pack).toBeNull();
+  });
+
+  it("ends a question the api refused with its reason rather than a lost connection", async () => {
+    const refusing = {
+      async *ask() { throw new AskRefused(503, "no pack is active"); },
+      suggestions: async () => [],
+    } as unknown as FitcherApi["chat"];
+    setup(0, { chat: refusing });
+    await waitFor(() => expect(state.loaded).toBe(true));
+
+    let id = "";
+    await act(async () => {
+      id = await state.ask("top");
+    });
+
+    await waitFor(() => expect(state.threads[id]?.turns[0].events.at(-1)).toMatchObject({ event: "error", kind: "refused", message: "no pack is active" }));
   });
 
   it("stops the running answer", async () => {

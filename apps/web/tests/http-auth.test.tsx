@@ -86,6 +86,12 @@ describe("http auth", () => {
     expect(await createHttpAuth(fetcher({ "/api/pack": () => Response.json(pack) })).pack()).toEqual(pack);
   });
 
+  it("reads no pack while none is active, so a new instance still loads", async () => {
+    const answer = () => Response.json({ detail: "no pack is active" }, { status: 503 });
+
+    expect(await createHttpAuth(fetcher({ "/api/pack": answer })).pack()).toBeNull();
+  });
+
   it("sends a signed-out user to sign-in", async () => {
     const auth = createHttpAuth(fetcher({ "/api/session": () => Response.json({}, { status: 401 }), "/api/pack": () => Response.json({ name: "shop", display_name: "Shop", roles: [] }) }));
     const api = { ...createMockApi(), auth };

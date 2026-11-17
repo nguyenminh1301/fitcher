@@ -26,16 +26,28 @@ export function ConversationView({ id }: { id: string }) {
   }, [id, loadThread]);
 
   const running = busy === id;
+  const turns = thread?.turns.length ?? 0;
   const lastEvents = thread?.turns.at(-1)?.events.length ?? 0;
+  // Follow the newest answer while it streams and when it finishes, unless the reader scrolled up to read
+  // an earlier one; a new question always brings the view back down.
+  const following = useRef(true);
+  const seenTurns = useRef(turns);
   useEffect(() => {
     const element = scroll.current;
-    if (element && running) element.scrollTop = element.scrollHeight;
-  }, [running, lastEvents]);
+    if (!element) return;
+    if (turns !== seenTurns.current) following.current = true;
+    seenTurns.current = turns;
+    if (following.current) element.scrollTo({ top: element.scrollHeight, behavior: running ? "auto" : "smooth" });
+  }, [running, turns, lastEvents]);
+  const onScroll = () => {
+    const element = scroll.current;
+    if (element) following.current = element.scrollHeight - element.scrollTop - element.clientHeight < 120;
+  };
 
   if (missing) return <div className="fc-scroll"><div className="fc-thread"><p className="fc-muted">{t("ui.noResults")}</p></div></div>;
   return (
     <>
-      <div className="fc-scroll" ref={scroll}>
+      <div className="fc-scroll" ref={scroll} onScroll={onScroll}>
         {!thread ? (
           <div className="fc-thread"><Skeleton variant="thread" /></div>
         ) : (

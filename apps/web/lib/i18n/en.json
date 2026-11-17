@@ -436,7 +436,15 @@
     "tierDesc_sql_gen_hard": "The last SQL retry.",
     "tierDesc_embed": "Vectors for search over the pack.",
     "nav_sources": "Sources",
-    "desc_sources": "The databases and files fitcher reads. Connect a source, choose its tables, and keep copies fresh on a schedule."
+    "desc_sources": "The databases and files fitcher reads. Connect a source, choose its tables, and keep copies fresh on a schedule.",
+    "heroTitleAnonymous": "What would you like to know?",
+    "noPackTitle": "Connect your data to start",
+    "noPackText": "fitcher answers from a pack built from your own data. Connect a database or upload a file, choose its tables, then build the pack; it takes a few minutes.",
+    "noPackAction": "Connect data and build the pack",
+    "refusedTitle": "The answer could not start",
+    "refusedText": "fitcher refused this question before running it. Nothing from this run was saved.",
+    "noPackSection": "No pack yet",
+    "noPackSectionText": "This page shows the active pack. Connect your data on the Sources page and build the pack first."
   },
   "instant": {
     "title": "Build the pack",
@@ -502,7 +510,8 @@
     "documentsUploaded": "Uploaded documents",
     "documentsNoPack": "Upload documents on the Documents page once your data is connected.",
     "documentsKept": "{count} kept documents stay stored but are no longer searched.",
-    "documentsConfirmOff": "Turn documents off"
+    "documentsConfirmOff": "Turn documents off",
+    "continueWithoutPack": "Continue without a pack"
   },
   "models": {
     "providers": "Providers",
@@ -688,6 +697,10 @@
     "kind_sqlserver": "SQL Server",
     "sqlserverTls": "The certificate of a SQL Server connection is not verified; the connection is encrypted when TLS is required.",
     "copyOnly": "SQL Server tables are read through fitcher and copied only; there is no live mode.",
-    "why_copy_only": "SQL Server is copied only"
+    "why_copy_only": "SQL Server is copied only",
+    "saveAndPrepare": "Save and prepare tables",
+    "savedAndPreparing": "Selection saved. Preparing the tables…",
+    "build": "Build the pack",
+    "buildOf": "Build the pack of {name}"
   }
 }

@@ -249,7 +249,7 @@ describe("setup data step", () => {
     expect(setup.skip).toHaveBeenCalledWith("data");
   });
 
-  it("connects a database, chooses its tables and continues", async () => {
+  it("connects a database, saves and prepares its tables and continues without a pack", async () => {
     const setup = fakeSetup(DATA_PENDING);
     const sources = fakeSources();
     wrap(<SetupScreen {...documentProps()} sources={sources} models={fakeModels()} setup={setup} isAdmin onSignedOut={() => {}} onOpenChat={() => {}} />);
@@ -263,15 +263,16 @@ describe("setup data step", () => {
     await userEvent.click(screen.getByRole("button", { name: "Test connection" }));
     await userEvent.click(await screen.findByRole("button", { name: "Connect" }));
     await userEvent.click(await screen.findByRole("checkbox", { name: "Use orders" }));
-    await userEvent.click(screen.getByRole("button", { name: "Save selection" }));
-    await userEvent.click(await screen.findByRole("button", { name: "Continue" }));
+    await userEvent.click(screen.getByRole("button", { name: "Save and prepare tables" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Continue without a pack" }));
 
     expect(sources.create).toHaveBeenCalledWith(expect.objectContaining({ name: "erp", password: "pw" }));
     expect(sources.changeTables).toHaveBeenCalled();
+    expect(sources.sync).toHaveBeenCalledWith("erp");
     await waitFor(() => expect(setup.status).toHaveBeenCalledTimes(2));
   });
 
-  it("builds the instant pack after the chosen tables are copied and then opens the chat", async () => {
+  it("offers the instant pack as soon as the chosen tables are saved and prepared, then opens the chat", async () => {
     const setup = fakeSetup(DATA_PENDING);
     const ready = {
       id: "job1", source_id: "erp", tables: ["orders"], status: "succeeded", started_at: "2026-11-15T10:00:00Z", finished_at: null,
@@ -295,9 +296,8 @@ describe("setup data step", () => {
     await userEvent.click(screen.getByRole("button", { name: "Test connection" }));
     await userEvent.click(await screen.findByRole("button", { name: "Connect" }));
     expect(((await screen.findByRole("checkbox", { name: "Use orders" })) as HTMLInputElement).checked).toBe(true);
-    await userEvent.click(screen.getByRole("button", { name: "Save selection" }));
     expect(screen.queryByRole("region", { name: "Build the pack" })).toBeNull();
-    await userEvent.click(await screen.findByRole("button", { name: "Sync now" }));
+    await userEvent.click(screen.getByRole("button", { name: "Save and prepare tables" }));
 
     await userEvent.click(await screen.findByRole("button", { name: "Build the pack" }));
     expect(sources.instantStart).toHaveBeenCalledWith({ source_id: "erp", tables: ["orders"], confirm_billable: true });

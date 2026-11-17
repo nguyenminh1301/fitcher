@@ -29,10 +29,20 @@ type ListPageProps = {
 
 export function ListPage({ section, actions, loading, failed, skeleton = "list", children }: ListPageProps) {
   const { t } = useI18n();
-  const { sources } = useChat();
+  const { sources, pack, loaded } = useChat();
   const feature = SECTIONS.find((item) => item.key === section)?.feature;
   let body: ReactNode = children;
-  if (failed) body = <div className="fc-card"><EmptyState icon="alert" title={t("ui.loadFailed")} /></div>;
+  // Most sections read the active pack; before the first pack is built they say so instead of failing.
+  if (failed && loaded && !pack) {
+    body = (
+      <div className="fc-card">
+        <EmptyState icon="database" title={t("ui.noPackSection")}
+          action={<a className="fc-btn fc-btn-primary" href="/console/sources">{t("ui.noPackAction")}</a>}>
+          {t("ui.noPackSectionText")}
+        </EmptyState>
+      </div>
+    );
+  } else if (failed) body = <div className="fc-card"><EmptyState icon="alert" title={t("ui.loadFailed")} /></div>;
   else if (loading) body = <Skeleton variant={skeleton} rows={8} />;
   return (
     <div className="fc-page">

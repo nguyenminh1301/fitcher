@@ -107,7 +107,7 @@ function DataStep({ sources, disabled, onDone, onSkip, onAsk }: {
               onSynced={() => setSynced(true)} />
           )}
           <div className="fc-row" style={{ gap: "var(--base-size-8)" }}>
-            {connected ? <Button variant="primary" onClick={onDone}>{t("setup.continue")}</Button> : null}
+            {connected ? <Button onClick={onDone}>{t("setup.continueWithoutPack")}</Button> : null}
             {connected || disabled ? null : <Button onClick={onSkip}>{t("setup.skip")}</Button>}
           </div>
         </div>
@@ -166,7 +166,7 @@ export function SetupScreen({ setup, models, sources, documents, packRoles, isAd
     if (pending?.id === "data") setDataOpen(true);
   }, [pending?.id]);
   return (
-    <div className="fc-app" style={{ flexDirection: "column", minHeight: "100vh" }}>
+    <div className="fc-app fc-flow">
       <header style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "var(--base-size-16)", padding: "var(--base-size-24) var(--base-size-24) 0" }}>
         <Logo height={24} />
         <Preferences />

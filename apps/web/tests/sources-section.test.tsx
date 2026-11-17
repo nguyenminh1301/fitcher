@@ -189,7 +189,7 @@ describe("Sources page", () => {
     expect(screen.queryByRole("button", { name: "Connect" })).toBeNull();
   });
 
-  it("chooses tables, a mode, a refresh interval and a cursor, then saves the selection", async () => {
+  it("chooses tables, a mode, a refresh interval and a cursor, then saves and prepares them", async () => {
     const user = userEvent.setup();
     const sources = fakeSources();
     show(sources);
@@ -199,14 +199,25 @@ describe("Sources page", () => {
     await user.click(within(events).getByRole("checkbox", { name: "Use events" }));
     await user.selectOptions(within(events).getByLabelText("Refresh events"), "3600");
     await user.selectOptions(within(events).getByLabelText("Only new rows after events"), "created_at");
-    await user.click(screen.getByRole("button", { name: "Save selection" }));
+    await user.click(screen.getByRole("button", { name: "Save and prepare tables" }));
 
-    await waitFor(() => expect(sources.changeTables).toHaveBeenCalled());
+    await waitFor(() => expect(sources.sync).toHaveBeenCalledWith("shop"));
     const change = (sources.changeTables as ReturnType<typeof vi.fn>).mock.calls[0][1] as { tables: Record<string, unknown>[] };
     expect(change.tables.find((item) => item.name === "events")).toMatchObject({
       selected: true, mode: "copy", interval_seconds: 3600, cursor_column: "created_at",
     });
-    expect(screen.getByText("Selection saved.")).toBeTruthy();
+    expect(screen.getByText("Selection saved. Preparing the tables…")).toBeTruthy();
+  });
+
+  it("builds the pack of a source with chosen tables from its row", async () => {
+    const user = userEvent.setup();
+    const sources = fakeSources();
+    show(sources);
+
+    await user.click(await screen.findByRole("button", { name: "Build the pack of shop" }));
+
+    expect(await screen.findByRole("region", { name: "Build the pack" })).toBeTruthy();
+    expect(sources.tables).toHaveBeenCalledWith("shop");
   });
 
   it("shows the columns that changed since the source's pack was built and offers to rebuild it", async () => {
