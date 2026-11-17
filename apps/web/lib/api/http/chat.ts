@@ -10,14 +10,22 @@ import type { FitcherApi } from "../client";
 import type { AskEvent } from "../events";
 import type { ScenarioFile } from "../provisional";
 
+/** The api answered before any event: the run never started, and ``reason`` says why. */
+export class AskRefused extends Error {
+  constructor(readonly status: number, readonly reason: string) {
+    super(`The api answered ${status}${reason ? `: ${reason}` : ""}`);
+    this.name = "AskRefused";
+  }
+}
+
 /** Why the api did not start an answer, from its JSON error body. */
-async function refusal(response: Response): Promise<string> {
+async function refusal(response: Response): Promise<AskRefused> {
   try {
     const body = (await response.json()) as { detail?: unknown; error?: unknown };
     const reason = typeof body.detail === "string" ? body.detail : typeof body.error === "string" ? body.error : "";
-    return `The api answered ${response.status}${reason ? `: ${reason}` : ""}`;
+    return new AskRefused(response.status, reason);
   } catch {
-    return `The api answered ${response.status}`;
+    return new AskRefused(response.status, "");
   }
 }
 
@@ -36,7 +44,7 @@ export function createHttpChat(fetcher: typeof fetch = (...args) => fetch(...arg
         yield stopped();
         return;
       }
-      if (!response.ok || !response.body) throw new Error(await refusal(response));
+      if (!response.ok || !response.body) throw await refusal(response);
       const started = response.headers.get("x-conversation-id");
       if (started) onConversation?.(started);
       try {

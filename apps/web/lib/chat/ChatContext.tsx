@@ -5,6 +5,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
+import { AskRefused } from "@/lib/api/http/chat";
 import type { FitcherApi } from "@/lib/api/client";
 import type { Conversation, ConversationGroup, ConversationThread, Turn } from "@/lib/api/conversations";
 import type { Identity } from "@/lib/api/provisional";
@@ -167,7 +168,12 @@ export function ChatProvider({ api, navigate, activeId, sources = currentSources
           }
         } catch (error) {
           const last = thread.turns.at(-1) as Turn;
-          const failure = { event: "error" as const, kind: "network" as const, message: String(error), sql: null, error: null, trace_id: last.events.at(-1)?.trace_id ?? "" };
+          // A refusal before the stream started has the api's reason; anything else lost the stream.
+          const refused = error instanceof AskRefused;
+          const failure = {
+            event: "error" as const, kind: refused ? "refused" as const : "network" as const,
+            message: refused ? error.reason : String(error), sql: null, error: null, trace_id: last.events.at(-1)?.trace_id ?? "",
+          };
           thread = { ...thread, turns: [...thread.turns.slice(0, -1), { ...last, events: [...last.events, failure] }] };
           putThread(thread);
         } finally {

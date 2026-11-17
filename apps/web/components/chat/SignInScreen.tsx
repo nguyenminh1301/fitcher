@@ -37,7 +37,7 @@ export function SignInScreen({ failed = false, auth = api.auth, onSignedIn = () 
   const [refusal, setRefusal] = useState<string | null>(null);
   const sample = isSample("auth");
   useEffect(() => {
-    void auth.pack().then((info) => setPack(info.name)).catch(() => undefined);
+    void auth.pack().then((info) => setPack(info?.name ?? "")).catch(() => undefined);
     void auth.oidcEnabled().then(setOidc).catch(() => undefined);
     if (!sample) void auth.current().then((identity) => identity?.mode === "individual" && onSignedIn()).catch(() => undefined);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- read once when the page opens

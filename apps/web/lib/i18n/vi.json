@@ -436,7 +436,15 @@
     "tierDesc_sql_gen_hard": "Lần thử lại SQL cuối cùng.",
     "tierDesc_embed": "Vector cho tìm kiếm trong gói.",
     "nav_sources": "Nguồn dữ liệu",
-    "desc_sources": "Các cơ sở dữ liệu và tệp mà fitcher đọc. Nối một nguồn, chọn bảng và giữ các bản sao luôn mới theo lịch."
+    "desc_sources": "Các cơ sở dữ liệu và tệp mà fitcher đọc. Nối một nguồn, chọn bảng và giữ các bản sao luôn mới theo lịch.",
+    "heroTitleAnonymous": "Bạn muốn biết điều gì?",
+    "noPackTitle": "Kết nối dữ liệu để bắt đầu",
+    "noPackText": "fitcher trả lời dựa trên một gói tạo từ dữ liệu của bạn. Kết nối một database hoặc tải lên một file, chọn bảng, rồi tạo gói; chỉ mất vài phút.",
+    "noPackAction": "Kết nối dữ liệu và tạo gói",
+    "refusedTitle": "Không thể bắt đầu trả lời",
+    "refusedText": "fitcher đã từ chối câu hỏi này trước khi chạy. Lượt chạy này chưa được lưu.",
+    "noPackSection": "Chưa có gói",
+    "noPackSectionText": "Trang này hiển thị gói đang dùng. Hãy kết nối dữ liệu ở trang Nguồn dữ liệu và tạo gói trước."
   },
   "instant": {
     "title": "Dựng gói dữ liệu",

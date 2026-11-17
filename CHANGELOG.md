@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Fixed
+
+- A new instance without an active pack loads the chat and the console again: `GET /api/pack` answering 503 no longer stops the page from loading, the chat explains how to connect data and build the pack instead of offering a question box, console pages that read the pack say there is none yet, and a question the api refuses before answering shows the api's reason instead of "Connection lost".
+
 ### Security
 
 - In individual mode the api accepts a loopback `Host` only from a connection on this machine: the web server records each connection's address in `X-Fitcher-Peer` over any value the client sent, and a request from another machine or container claiming `Host: localhost` is refused (`FITCHER_TRUSTED_PEERS` adds addresses for container runtimes that deliver local connections from elsewhere).

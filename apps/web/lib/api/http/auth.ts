@@ -27,7 +27,11 @@ export function createHttpAuth(fetcher: typeof fetch = (...args) => fetch(...arg
     switchTo: async () => {
       throw new Error("A session has one identity; sign out to use another account.");
     },
-    pack: async () => json(await fetcher("/api/pack", { cache: "no-store" })),
+    // 503 means no pack is active yet: a new instance before its first pack is built.
+    pack: async () => {
+      const response = await fetcher("/api/pack", { cache: "no-store" });
+      return response.status === 503 ? null : json(response);
+    },
     signIn: async (email, password) => {
       const response = await fetcher("/api/session", {
         method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ email, password }),

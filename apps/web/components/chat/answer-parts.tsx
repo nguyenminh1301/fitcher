@@ -72,7 +72,7 @@ export function Summary({ text, lang }: { text: string; lang: string }) {
 
 const NOTICE = {
   denied: ["lock", "neutral", "deniedTitle"], blocked: ["shieldCheck", "warning", "blockedTitle"], failed: ["circleX", "danger", "failedTitle"], empty: ["searchX", "neutral", "emptyTitle"],
-  network: ["wifiOff", "warning", "networkTitle"], stopped: ["stop", "neutral", "stoppedTitle"],
+  network: ["wifiOff", "warning", "networkTitle"], stopped: ["stop", "neutral", "stoppedTitle"], refused: ["warning", "warning", "refusedTitle"],
 } as const;
 
 type NoticeProps = {
@@ -91,7 +91,7 @@ type NoticeProps = {
 export function NoticeCard({ kind, lang, text, blocked, sql, error, onRetry, onRephrase }: NoticeProps) {
   const { t } = useI18n();
   const [icon, tone, title] = NOTICE[kind];
-  const fallback = { denied: "", blocked: "blockedText", failed: "failedText", empty: "emptyText", network: "networkText", stopped: "stoppedText" }[kind];
+  const fallback = { denied: "", blocked: "blockedText", failed: "failedText", empty: "emptyText", network: "networkText", stopped: "stoppedText", refused: "refusedText" }[kind];
   return (
     <div className={cx("fc-notice", tone !== "neutral" && `fc-notice-${tone}`)} role={kind === "failed" || kind === "network" ? "alert" : "status"}>
       <div className="fc-notice-head" lang={lang}>

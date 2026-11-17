@@ -100,6 +100,9 @@ describe("http chat", () => {
     const { chat: http } = chat(() => Response.json({ detail: "too many questions; try again shortly" }, { status: 429 }));
 
     await expect(collect(http.ask({ question: "q" }, new AbortController().signal))).rejects.toThrow("429: too many questions");
+    await expect(collect(http.ask({ question: "q" }, new AbortController().signal))).rejects.toMatchObject({
+      name: "AskRefused", status: 429, reason: "too many questions; try again shortly",
+    });
   });
 
   it("treats a stream that ends before done or error as a lost connection", async () => {
