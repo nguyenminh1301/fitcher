@@ -13,7 +13,7 @@ docker exec fitcher fitcher backup --output /data/backups/2026-11-17
 docker cp fitcher:/data/backups/2026-11-17.tar.gz .
 ```
 
-The archive holds a ClickHouse `BACKUP` of every fitcher database, an online copy of `app.db`, the packs, compiled packs, documents, uploaded files and the generated ClickHouse passwords. Both copies are taken while no source sync, pack compile or eval run is in progress, and the instance keeps answering questions meanwhile. The archive is written with mode 0600.
+The archive holds a ClickHouse `BACKUP` of every fitcher database and of the pack role users, roles and settings profiles created with SQL, an online copy of `app.db`, the packs, compiled packs, documents, uploaded files and the generated ClickHouse passwords. Both copies are taken while no source sync, pack compile or eval run is in progress, and the instance keeps answering questions meanwhile. The archive is written with mode 0600.
 
 | Option | Effect |
 | --- | --- |
@@ -34,7 +34,7 @@ docker run -d --name fitcher -p 127.0.0.1:3000:3000 -v fitcher-restored:/data gh
 
 `fitcher restore` refuses a volume that holds anything other than `backups/`, so two instances are never mixed. The files are restored at once; the ClickHouse data is restored by the first start, after ClickHouse answers and before the schema changes newer than the backup are applied. Without `secret.key` in the archive the stored secrets are removed, and provider keys and source passwords are entered again in the console.
 
-This path was checked on the release image: a conversation written 200 days earlier was backed up from one container, restored into a second one, listed by `GET /api/conversations` there, and then deleted for good.
+This path was checked on the release image twice. A conversation written 200 days earlier was backed up from one container, restored into a second one, listed by `GET /api/conversations` there, and then deleted for good. An instance with an instant pack, its role user and a two-turn conversation answered by an OpenRouter model was backed up with `--include-secret-key` and restored into a new volume; the restored instance answered a third question of that conversation that needed the earlier turns ("Which month of that year was highest?"). Downloaded models are not in the archive, so the first question after a restore that uses local embeddings waits for the model to download again.
 
 ## Upgrade
 
@@ -54,7 +54,7 @@ Every start applies the pending schema changes to the app state and to ClickHous
 With `CLICKHOUSE_URL` the embedded ClickHouse does not start (see [install.md](install.md#external-clickhouse)). Moving an instance to an external server:
 
 1. Take a backup with `fitcher backup` while the embedded server still runs.
-2. Restore the archive's `clickhouse/<name>.zip` on the external server with `RESTORE ALL EXCEPT DATABASES system, information_schema, INFORMATION_SCHEMA FROM File(...)`, from a path in its `backups.allowed_path`.
+2. Restore the archive's `clickhouse/<name>.zip` on the external server with `RESTORE ALL FROM File(...)`, from a path in its `backups.allowed_path`.
 3. Create the fitcher users of `infra/clickhouse/users.d` there with the passwords of the archive's `secrets/clickhouse.env`.
 4. Start the image with `CLICKHOUSE_URL` and the same passwords. From then on, back up ClickHouse on that server and the instance with `--app-only`.
 

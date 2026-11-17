@@ -1,6 +1,7 @@
 """``fitcher backup`` and ``fitcher restore`` on a temporary data directory with a fake ClickHouse."""
 
 import json
+from types import SimpleNamespace
 from pathlib import Path
 import sqlite3
 import tarfile
@@ -11,10 +12,14 @@ from jobs import backup, restore
 
 
 class FakeClickHouse:
-    """Writes the file a BACKUP names and records every command."""
+    """Writes the file a BACKUP names, lists two databases and records every command."""
 
     def __init__(self):
         self.commands = []
+
+    def query(self, sql):
+        assert sql == backup.DATABASES_SQL
+        return SimpleNamespace(result_rows=[("marts",), ("agent_logs",)])
 
     def command(self, sql):
         self.commands.append(sql)
@@ -48,8 +53,11 @@ def test_a_backup_holds_clickhouse_the_state_and_the_packs_but_not_the_key_or_mo
 
     written = backup.write_archive(root, root / "backups" / "rc.tar.gz", clickhouse, include_secret_key=False)
 
-    assert clickhouse.commands == [backup.backup_sql(str(root / "backups" / "clickhouse" / "rc.zip"))]
-    assert "EXCEPT DATABASES system" in clickhouse.commands[0]
+    assert clickhouse.commands == [
+        "BACKUP DATABASE `agent_logs`, DATABASE `marts`, TABLE system.users, TABLE system.roles, "
+        "TABLE system.settings_profiles, TABLE system.row_policies, TABLE system.quotas "
+        f"TO File('{root / 'backups' / 'clickhouse' / 'rc.zip'}')"
+    ]
     assert names(written) == {"manifest.json", "app.db", "packs/shop/pack.yaml", "compiled/shop/pack.json",
                               "secrets/clickhouse.env", "clickhouse/rc.zip"}
     assert not (root / "backups" / "clickhouse" / "rc.zip").exists()
@@ -105,6 +113,11 @@ def test_a_restore_refuses_a_member_that_leaves_the_directory(tmp_path):
     with pytest.raises(tarfile.TarError):
         restore.extract(evil, tmp_path / "new")
     assert not (tmp_path / "escaped").exists()
+
+
+def test_an_unexpected_database_name_is_refused():
+    with pytest.raises(backup.BackupError):
+        backup.backup_sql("/data/backups/clickhouse/x.zip", ["marts`; DROP"])
 
 
 def test_a_backup_name_is_checked():

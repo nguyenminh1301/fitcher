@@ -1,7 +1,9 @@
 """``fitcher backup --output /data/backups/<name>``: one archive of the instance (DECISIONS §3).
 
 The archive ``<name>.tar.gz`` holds a ClickHouse ``BACKUP`` of every user
-database, an online copy of the app state (``app.db``) and the packs,
+database and of the access entities created with SQL (the pack role users,
+roles, settings profiles, row policies and quotas, which a backup of the
+databases alone leaves out), an online copy of the app state (``app.db``) and the packs,
 compiled packs, documents, uploaded files and ClickHouse passwords of the data
 directory. Both copies are taken while ``one_job``'s lock is held, so no sync,
 compile or eval of the api changes them in between; questions still run and
@@ -29,6 +31,9 @@ ARCHIVE_VERSION = 1
 # Data directory entries copied as they are; models are downloaded again and run files are rebuilt at start.
 COPIED = ("packs", "compiled", "documents", "sources", "secrets/clickhouse.env")
 SKIPPED_DATABASES = ("system", "information_schema", "INFORMATION_SCHEMA")
+ACCESS_TABLES = ("system.users", "system.roles", "system.settings_profiles", "system.row_policies", "system.quotas")
+DATABASES_SQL = "SELECT name FROM system.databases WHERE name NOT IN ('system', 'information_schema', 'INFORMATION_SCHEMA')"
+_DATABASE = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
 CLICKHOUSE_BACKUPS = Path("backups") / "clickhouse"
 _NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,99}")
 
@@ -49,8 +54,12 @@ def archive_path(output: str) -> Path:
     return path.with_name(f"{name}.tar.gz")
 
 
-def backup_sql(file: str) -> str:
-    return f"BACKUP ALL EXCEPT DATABASES {', '.join(SKIPPED_DATABASES)} TO File('{file}')"
+def backup_sql(file: str, databases: list[str]) -> str:
+    for name in databases:
+        if not _DATABASE.fullmatch(name):
+            raise BackupError(f"unexpected ClickHouse database name {name!r}")
+    items = [f"DATABASE `{name}`" for name in sorted(databases)] + [f"TABLE {table}" for table in ACCESS_TABLES]
+    return f"BACKUP {', '.join(items)} TO File('{file}')"
 
 
 def copy_state(source: Path, target: Path) -> None:
@@ -78,7 +87,8 @@ def write_archive(
                 copy_state(root / "app.db", state_copy)
             if clickhouse is not None:
                 clickhouse_file.parent.mkdir(parents=True, exist_ok=True)
-                clickhouse.command(backup_sql(str(clickhouse_file)))
+                databases = [row[0] for row in clickhouse.query(DATABASES_SQL).result_rows]
+                clickhouse.command(backup_sql(str(clickhouse_file), databases))
         manifest = {"version": ARCHIVE_VERSION, "created_at": clock().isoformat(),
                     "clickhouse": clickhouse_file.name if clickhouse is not None else None,
                     "secret_key": include_secret_key}

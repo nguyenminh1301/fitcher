@@ -19,7 +19,7 @@ import sqlite3
 import sys
 import tarfile
 
-from jobs.backup import ARCHIVE_VERSION, CLICKHOUSE_BACKUPS, SKIPPED_DATABASES, data_dir
+from jobs.backup import ARCHIVE_VERSION, CLICKHOUSE_BACKUPS, data_dir
 
 PENDING = "restore.pending"
 ALLOWED_ENTRIES = {"backups", "lost+found"}
@@ -30,7 +30,8 @@ class RestoreError(RuntimeError):
 
 
 def restore_sql(file: str) -> str:
-    return f"RESTORE ALL EXCEPT DATABASES {', '.join(SKIPPED_DATABASES)} FROM File('{file}')"
+    # The backup holds the fitcher databases and the access entities created with SQL; ALL restores both.
+    return f"RESTORE ALL FROM File('{file}')"
 
 
 def extract(archive_file: Path, root: Path) -> dict:

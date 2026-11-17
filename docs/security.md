@@ -49,4 +49,5 @@ The review covered the surfaces added since Phase 12: setup, model providers, da
 | The generated `secret.key` sits on the volume it protects | Recorded: documented above; `FITCHER_SECRET_KEY` moves it off the volume |
 | A backup without the secret key still holds conversations, data and ClickHouse passwords | Recorded: an archive is as sensitive as the volume; it is written with mode 0600 and documented so |
 | A restore without the secret key cannot read the stored secrets | Recorded: the restore removes them and says that provider keys and source passwords are entered again |
+| A ClickHouse backup of the databases alone left out the pack role users, so a restored instance could not run a question | Fixed: the backup also holds `system.users`, `system.roles`, `system.settings_profiles`, `system.row_policies` and `system.quotas` |
 | The load was measured with a fake graph only, not against a development dataset in ClickHouse | Recorded in [operations.md](operations.md#load-measurement) with the limits that stand in until it is measured |
