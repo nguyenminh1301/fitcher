@@ -39,7 +39,7 @@ The application keeps its settings in `app.db`; these environment variables set 
 | Variable | Meaning |
 | --- | --- |
 | `FITCHER_SECRET_KEY` | The instance key instead of a generated `secret.key` |
-| `FITCHER_ALLOWED_HOSTS` | Comma-separated host names under which others reach the instance, for example behind a reverse proxy; without it only the local machine is answered |
+| `FITCHER_ALLOWED_HOSTS` | Comma-separated host names under which others reach the instance, for example behind a reverse proxy; without it only the local machine is answered. A listed name answers only once an owner password is set on the Security page, and then only to a signed-in browser |
 | `FITCHER_TRUSTED_PEERS` | Comma-separated addresses or networks (`10.0.2.0/24`) whose connections count as this machine. Only needed when a container runtime (rootless Docker, Podman) delivers the browser's connections from an address that is neither loopback nor the container's default gateway; the refusal names the address it saw |
 | `CLICKHOUSE_URL` | An external ClickHouse server instead of the embedded one (see below) |
 | `FITCHER_DATA_DIR` | The data directory inside the container (default `/data`) |

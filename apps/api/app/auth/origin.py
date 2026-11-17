@@ -23,10 +23,15 @@ listens on loopback or on the Compose network, so only the web server reaches it
 
 A listed ``FITCHER_ALLOWED_HOSTS`` name makes the instance reachable by others,
 which ``/me`` reports as ``exposed`` so the interface can warn.
+
+The owner password (``app/auth/owner.py``) is checked after the address: once it is set, every request but
+the public paths needs a signed-in session; without it, a request through a name other than this computer's
+is refused until the owner sets one here.
 """
 
 from collections.abc import Mapping
 from functools import cache
+from http.cookies import CookieError, SimpleCookie
 from ipaddress import IPv4Address, IPv6Address, ip_address, ip_network
 import json
 import os
@@ -34,6 +39,9 @@ from pathlib import Path
 from urllib.parse import urlsplit
 
 from starlette.types import ASGIApp, Receive, Scope, Send
+
+from app.auth import owner
+from app.state.db import shared_state
 
 
 LOOPBACK = frozenset({"localhost", "127.0.0.1", "::1"})
@@ -140,6 +148,40 @@ def refusal(method: str, host: str, forwarded: str | None, origin: str | None, p
     return None
 
 
+# Reachable without a session: liveness, whether a password is set, and signing in or out.
+PUBLIC = frozenset({("GET", "/health"), ("GET", "/owner/status"), ("POST", "/owner/session"), ("DELETE", "/owner/session")})
+# Answered before a password exists to a request from another machine, so its page can say what to do.
+OPEN_WITHOUT_PASSWORD = frozenset({("GET", "/health"), ("GET", "/owner/status")})
+
+
+def session_cookie(header: str | None) -> str | None:
+    cookies = SimpleCookie()
+    try:
+        cookies.load(header or "")
+    except CookieError:
+        return None
+    morsel = cookies.get(owner.SESSION_COOKIE)
+    return morsel.value if morsel else None
+
+
+def remote(browser_host: str) -> bool:
+    """Whether the browser reached the instance through a name other than this computer's."""
+    return hostname(browser_host) not in LOOPBACK | internal_hosts()
+
+
+def owner_refusal(method: str, path: str, browser_host: str, cookie: str | None) -> tuple[int, str] | None:
+    """The status and reason of a request the owner password refuses, or None when it may go on."""
+    db = shared_state()
+    if owner.password_set(db):
+        if (method, path) in PUBLIC or owner.session_valid(db, session_cookie(cookie)):
+            return None
+        return 401, "sign in with the owner password"
+    if remote(browser_host) and (method, path) not in OPEN_WITHOUT_PASSWORD:
+        return 403, (f"this instance is reachable from other machines through {browser_host!r}; set an owner "
+                     "password on this computer first")
+    return None
+
+
 class HostOriginGuard:
     """ASGI middleware refusing a request from a foreign host or machine, or a cross-origin change."""
 
@@ -153,12 +195,15 @@ class HostOriginGuard:
         headers = {key.decode("latin-1"): value.decode("latin-1") for key, value in scope["headers"]}
         client = scope.get("client")
         peer = headers.get(PEER_HEADER, client[0] if client else None)
-        reason = refusal(scope["method"], headers.get("host", ""), headers.get("x-forwarded-host"), headers.get("origin"),
-                         peer)
-        if reason is None:
+        forwarded = headers.get("x-forwarded-host")
+        reason = refusal(scope["method"], headers.get("host", ""), forwarded, headers.get("origin"), peer)
+        refused = (403, reason) if reason is not None else owner_refusal(
+            scope["method"], scope["path"], forwarded if forwarded is not None else headers.get("host", ""), headers.get("cookie"))
+        if refused is None:
             await self.app(scope, receive, send)
             return
-        body = json.dumps({"detail": reason}).encode()
-        await send({"type": "http.response.start", "status": 403,
+        code, detail = refused
+        body = json.dumps({"detail": detail}).encode()
+        await send({"type": "http.response.start", "status": code,
                     "headers": [(b"content-type", b"application/json"), (b"content-length", str(len(body)).encode())]})
         await send({"type": "http.response.body", "body": body})

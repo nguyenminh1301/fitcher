@@ -11,11 +11,13 @@ import { ChatProvider } from "@/lib/chat/ChatContext";
 // The chat app keeps its sidebar and streaming answers across conversation pages.
 export default function ChatAppLayout({ children }: { children: ReactNode }) {
   const router = useRouter();
+  // With an owner password set, a browser without a session is sent to sign in.
+  const signIn = useCallback(() => router.replace("/sign-in"), [router]);
   const pathname = usePathname();
   const activeId = pathname.startsWith("/c/") ? decodeURIComponent(pathname.slice(3)) : null;
   const navigate = useCallback((id: string | null) => router.push(id ? `/c/${encodeURIComponent(id)}` : "/"), [router]);
   return (
-    <ChatProvider api={api} navigate={navigate} activeId={activeId}>
+    <ChatProvider api={api} navigate={navigate} activeId={activeId} onSignedOut={signIn}>
       <SetupGate api={api} redirect={router.replace}>
         <ChatLayout onConsole={() => router.push("/console")}>
           {children}

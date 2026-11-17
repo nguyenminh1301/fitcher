@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type MouseEvent } from "react";
+import { useEffect, useState, type MouseEvent } from "react";
 
 import { Icon } from "@/components/brand/Icon";
 import { StatusPill } from "@/components/ui/feedback";
@@ -20,8 +20,13 @@ export function initials(name: string): string {
 export function AccountMenu({ onConsole, onChat, compact }: { onConsole?: () => void; onChat?: () => void; compact?: boolean }) {
   const { t, locale, setLocale } = useI18n();
   const { theme, setTheme } = useTheme();
-  const { identity, identities, sources, switchIdentity } = useChat();
+  const { api, identity, identities, sources, switchIdentity } = useChat();
   const [anchor, setAnchor] = useState<HTMLElement | null>(null);
+  // Signing out is offered only once the owner has set a password; without one there is no session.
+  const [signedIn, setSignedIn] = useState(false);
+  useEffect(() => {
+    void api.owner.status().then((status) => setSignedIn(status.password_set && status.signed_in)).catch(() => setSignedIn(false));
+  }, [api]);
   if (!identity) return null;
   const roles = identity.roles;
 
@@ -38,6 +43,9 @@ export function AccountMenu({ onConsole, onChat, compact }: { onConsole?: () => 
   items.push({ separator: true });
   if (onChat) items.push({ icon: "message", label: t("ui.chatApp"), onSelect: onChat });
   else if (hasConsole(roles) && onConsole) items.push({ icon: "layout", label: t("ui.console"), onSelect: onConsole });
+  if (signedIn) {
+    items.push({ icon: "logout", label: t("owner.signOut"), onSelect: () => void api.owner.signOut().finally(() => window.location.assign("/sign-in")) });
+  }
 
   const header = (
     <>

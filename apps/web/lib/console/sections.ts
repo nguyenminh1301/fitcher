@@ -30,6 +30,7 @@ export const SECTIONS: Section[] = [
   { key: "evaluation", group: "quality", path: "/console/evaluation", icon: "gauge", roles: [REVIEWER, ADMIN], feature: "evaluation" },
   { key: "sources", group: "administration", path: "/console/sources", icon: "database", roles: [ADMIN], feature: "sources" },
   { key: "models", group: "administration", path: "/console/models", icon: "compass", roles: [ADMIN], feature: "models" },
+  { key: "security", group: "administration", path: "/console/security", icon: "lock", roles: [ADMIN], feature: "owner" },
 ];
 
 /**

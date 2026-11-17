@@ -427,7 +427,9 @@
     "refusedTitle": "The answer could not start",
     "refusedText": "fitcher refused this question before running it. Nothing from this run was saved.",
     "noPackSection": "No pack yet",
-    "noPackSectionText": "This page shows the active pack. Connect your data on the Sources page and build the pack first."
+    "noPackSectionText": "This page shows the active pack. Connect your data on the Sources page and build the pack first.",
+    "nav_security": "Security",
+    "desc_security": "Protect this instance with an owner password. Without one it answers this computer only."
   },
   "instant": {
     "title": "Build the pack",
@@ -674,5 +676,34 @@
     "savedAndPreparing": "Selection saved. Preparing the tables…",
     "build": "Build the pack",
     "buildOf": "Build the pack of {name}"
+  },
+  "owner": {
+    "signInTitle": "Sign in to fitcher",
+    "signInHint": "This instance is protected with an owner password.",
+    "password": "Password",
+    "signIn": "Sign in",
+    "signOut": "Sign out",
+    "signIn_wrong": "The password is not right.",
+    "signIn_throttled": "Too many wrong passwords. Wait a few minutes and try again.",
+    "signIn_unavailable": "Signing in did not work. Try again.",
+    "statusOn": "An owner password protects this instance: every browser signs in.",
+    "statusOff": "No owner password: this instance answers this computer only, without signing in.",
+    "exposedNeedsPassword": "This instance is reachable from other machines. Set an owner password on this computer before anyone else opens it.",
+    "setTitle": "Set an owner password",
+    "changeTitle": "Change the owner password",
+    "currentPassword": "Current password",
+    "newPassword": "New password",
+    "repeatPassword": "Repeat the new password",
+    "rule": "At least {count} characters.",
+    "tooShort": "Use at least {count} characters.",
+    "mismatch": "The two passwords are not the same.",
+    "setButton": "Set password",
+    "change": "Change password",
+    "set": "The owner password is set. This browser stays signed in.",
+    "changed": "The password is changed. Other browsers must sign in again.",
+    "removeTitle": "Remove the owner password",
+    "removeHint": "Enter the current password above to remove it. The instance then answers this computer only, without signing in.",
+    "remove": "Remove password",
+    "removed": "The owner password is removed."
   }
 }

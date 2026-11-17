@@ -38,6 +38,7 @@ export type { ProposalResult } from "./proposal_result";
 export type { EvalLayer, EvalReportView as EvalReport, FailedCase } from "./eval_report_view";
 export type { EvalRunStarted } from "./eval_run_started";
 export type { SetupStatus, SetupStep } from "./setup_status";
+export type { OwnerStatus } from "./owner_status";
 export type {
   AskEvent as StreamEvent,
   ChartSpecEvent,
