@@ -1,5 +1,5 @@
--- fitcher is a personal app (DECISIONS §9): the accounts, sessions, sign-in
--- throttle and OpenID Connect sign-in of team mode are removed together with
+-- fitcher is a personal app (DECISIONS §9): the accounts, their sign-in
+-- state and throttle and the OpenID Connect sign-in of team mode are removed with
 -- their settings and secret. On an instance that was in team mode, the first
 -- admin was created with the owner's id, so the admin's conversations stay the
 -- owner's; other accounts' conversations stay in ClickHouse but no longer show.
