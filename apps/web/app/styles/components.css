@@ -634,3 +634,39 @@ button.fc-avatar { cursor: pointer; }
 .fc-skel-table .fc-card-head { min-height: 44px; }
 .fc-skel-bubble { align-self: flex-end; width: min(360px, 70%); }
 .fc-skel-bubble .fc-skel { border-radius: var(--borderRadius-xlarge); }
+
+/* Onboarding: a step or card that appears slides in briefly; the reduced-motion rule in globals.css stops it. */
+@keyframes fc-enter { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+.fc-enter { animation: fc-enter 200ms ease-out both; }
+
+/* The OpenRouter key walkthrough: a small drawing of the page with the element to click marked. */
+@keyframes fc-guide-pulse { 0%, 100% { box-shadow: 0 0 0 0 var(--focus-outlineColor); } 50% { box-shadow: 0 0 0 4px var(--bgColor-accent-muted); } }
+.fc-guide { display: flex; flex-direction: column; gap: var(--base-size-12); padding: var(--base-size-16); border: 1px solid var(--borderColor-default); border-radius: var(--borderRadius-medium); background: var(--bgColor-muted); }
+.fc-guide-head { display: flex; align-items: center; justify-content: space-between; gap: var(--base-size-8); }
+.fc-guide-window { border: 1px solid var(--borderColor-default); border-radius: var(--borderRadius-medium); background: var(--bgColor-default); overflow: hidden; }
+.fc-guide-address { display: flex; align-items: center; gap: var(--base-size-4); padding: var(--base-size-4) var(--base-size-8); border-bottom: 1px solid var(--borderColor-muted); font-size: 12px; line-height: 16px; color: var(--fgColor-muted); font-family: var(--font-mono); }
+.fc-guide-screen { min-height: 96px; padding: var(--base-size-12); animation: fc-enter 200ms ease-out both; font-size: 12px; line-height: 16px; }
+.fc-guide-bar { display: flex; align-items: center; gap: var(--base-size-8); }
+.fc-guide-brand { font-weight: 600; margin-right: auto; }
+.fc-guide-chip, .fc-guide-button { display: inline-flex; align-items: center; gap: var(--base-size-4); padding: 4px var(--base-size-8); border: 1px solid var(--borderColor-default); border-radius: var(--borderRadius-full); }
+.fc-guide-button { border-radius: var(--borderRadius-medium); background: var(--button-primary-bgColor-rest); color: var(--button-primary-fgColor-rest); border-color: transparent; align-self: flex-start; }
+.fc-guide-target { animation: fc-guide-pulse 1.6s ease-in-out infinite; font-weight: 600; }
+.fc-guide-split { display: grid; grid-template-columns: 96px 1fr; gap: var(--base-size-12); }
+.fc-guide-nav { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.fc-guide-nav li { padding: 2px var(--base-size-8); border-radius: var(--borderRadius-small); color: var(--fgColor-muted); }
+.fc-guide-nav li.fc-guide-target { color: var(--fgColor-default); background: var(--bgColor-neutral-muted); }
+.fc-guide-lines { display: flex; flex-direction: column; gap: var(--base-size-8); padding-top: 4px; }
+.fc-guide-lines span { height: 8px; border-radius: var(--borderRadius-full); background: var(--bgColor-neutral-muted); }
+.fc-guide-lines span:nth-child(2) { width: 70%; }
+.fc-guide-lines span:nth-child(3) { width: 45%; }
+.fc-guide-form { display: flex; flex-direction: column; gap: var(--base-size-8); }
+.fc-guide-field { padding: 4px var(--base-size-8); border: 1px solid var(--borderColor-emphasis); border-radius: var(--borderRadius-medium); }
+.fc-guide-muted { color: var(--fgColor-muted); border-color: var(--borderColor-default); }
+.fc-guide-mono { font-family: var(--font-mono); }
+.fc-guide-arrow { display: inline-flex; align-items: center; gap: var(--base-size-4); color: var(--fgColor-muted); }
+.fc-guide-steps { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: var(--base-size-8); }
+.fc-guide-step { display: flex; align-items: flex-start; gap: var(--base-size-8); width: 100%; min-height: 44px; padding: var(--base-size-8); border: 1px solid transparent; border-radius: var(--borderRadius-medium); background: transparent; color: var(--fgColor-muted); font: inherit; font-size: 12px; line-height: 16px; text-align: left; cursor: pointer; transition: background-color 120ms, color 120ms, border-color 120ms; }
+.fc-guide-step:hover { background: var(--control-transparent-bgColor-hover); }
+.fc-guide-step[aria-current="step"] { color: var(--fgColor-default); border-color: var(--borderColor-emphasis); background: var(--bgColor-default); }
+.fc-guide-num { flex: none; display: inline-grid; place-items: center; width: 20px; height: 20px; border-radius: var(--borderRadius-full); background: var(--bgColor-neutral-muted); font-weight: 600; }
+.fc-guide-step[aria-current="step"] .fc-guide-num { background: var(--button-primary-bgColor-rest); color: var(--button-primary-fgColor-rest); }

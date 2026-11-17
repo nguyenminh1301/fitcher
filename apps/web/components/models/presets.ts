@@ -1,0 +1,91 @@
+// The providers offered when adding one (DECISIONS §2, §15). Each preset is one of the api's provider kinds with
+// what a person would otherwise have to look up: the display name, the endpoint of a hosted OpenAI-compatible
+// service, the usual address of a model server on this computer and the page where its key is created. Every
+// OpenAI-compatible service goes through the same `openai_compatible` kind; "Other" takes any endpoint.
+
+import type { ProviderCreate } from "@/lib/contracts";
+
+export type ProviderKind = ProviderCreate["kind"];
+export type PresetGroup = "hosted" | "service" | "local" | "other";
+
+export type ProviderPreset = {
+  id: string;
+  kind: ProviderKind;
+  /** The display name sent to the api; the api names the hosted kinds itself. */
+  name?: string;
+  group: PresetGroup;
+  /** The endpoint of a hosted OpenAI-compatible service; fixed, so it is not asked. */
+  baseUrl?: string;
+  /** The usual address of a server on this computer, as seen from inside the container; it can be changed. */
+  suggestedUrl?: string;
+  /** The page where the key is created. */
+  keyUrl?: string;
+  /** Whether a key is required, optional or not taken at all. */
+  key: "required" | "optional" | "none";
+};
+
+export const PRESETS: ProviderPreset[] = [
+  { id: "openai", kind: "openai", group: "hosted", key: "required", keyUrl: "https://platform.openai.com/api-keys" },
+  { id: "anthropic", kind: "anthropic", group: "hosted", key: "required", keyUrl: "https://console.anthropic.com/settings/keys" },
+  { id: "gemini", kind: "gemini", group: "hosted", key: "required", keyUrl: "https://aistudio.google.com/apikey" },
+  {
+    id: "openrouter", kind: "openai_compatible", name: "OpenRouter", group: "service", key: "required",
+    baseUrl: "https://openrouter.ai/api/v1", keyUrl: "https://openrouter.ai/settings/keys",
+  },
+  {
+    id: "groq", kind: "openai_compatible", name: "Groq", group: "service", key: "required",
+    baseUrl: "https://api.groq.com/openai/v1", keyUrl: "https://console.groq.com/keys",
+  },
+  {
+    id: "mistral", kind: "openai_compatible", name: "Mistral", group: "service", key: "required",
+    baseUrl: "https://api.mistral.ai/v1", keyUrl: "https://console.mistral.ai/api-keys",
+  },
+  {
+    id: "deepseek", kind: "openai_compatible", name: "DeepSeek", group: "service", key: "required",
+    baseUrl: "https://api.deepseek.com/v1", keyUrl: "https://platform.deepseek.com/api_keys",
+  },
+  {
+    id: "xai", kind: "openai_compatible", name: "xAI", group: "service", key: "required",
+    baseUrl: "https://api.x.ai/v1", keyUrl: "https://console.x.ai",
+  },
+  {
+    id: "together", kind: "openai_compatible", name: "Together AI", group: "service", key: "required",
+    baseUrl: "https://api.together.xyz/v1", keyUrl: "https://api.together.ai/settings/api-keys",
+  },
+  {
+    id: "fireworks", kind: "openai_compatible", name: "Fireworks", group: "service", key: "required",
+    baseUrl: "https://api.fireworks.ai/inference/v1", keyUrl: "https://fireworks.ai/account/api-keys",
+  },
+  {
+    id: "cerebras", kind: "openai_compatible", name: "Cerebras", group: "service", key: "required",
+    baseUrl: "https://api.cerebras.ai/v1", keyUrl: "https://cloud.cerebras.ai",
+  },
+  { id: "ollama", kind: "ollama", group: "local", key: "none", suggestedUrl: "http://host.docker.internal:11434" },
+  {
+    id: "lmstudio", kind: "openai_compatible", name: "LM Studio", group: "local", key: "none",
+    suggestedUrl: "http://host.docker.internal:1234/v1",
+  },
+  {
+    id: "vllm", kind: "openai_compatible", name: "vLLM", group: "local", key: "optional",
+    suggestedUrl: "http://host.docker.internal:8000/v1",
+  },
+  { id: "openai_compatible", kind: "openai_compatible", group: "other", key: "optional" },
+];
+
+export const PRESET_GROUPS: PresetGroup[] = ["hosted", "service", "local", "other"];
+
+export function presetById(id: string): ProviderPreset {
+  return PRESETS.find((preset) => preset.id === id) ?? PRESETS[0];
+}
+
+/** Whether a provider's models are OpenRouter's, whose free models end in ":free". */
+export function isOpenRouter(baseUrl: string | null | undefined): boolean {
+  if (!baseUrl) return false;
+  try {
+    return new URL(baseUrl).hostname.endsWith("openrouter.ai");
+  } catch {
+    return false;
+  }
+}
+
+export const FREE_SUFFIX = ":free";

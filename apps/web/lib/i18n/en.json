@@ -485,7 +485,8 @@
     "documentsNoPack": "Upload documents on the Documents page once your data is connected.",
     "documentsKept": "{count} kept documents stay stored but are no longer searched.",
     "documentsConfirmOff": "Turn documents off",
-    "continueWithoutPack": "Continue without a pack"
+    "continueWithoutPack": "Continue without a pack",
+    "chooseLater": "Choose later"
   },
   "models": {
     "providers": "Providers",
@@ -495,7 +496,7 @@
     "kind_anthropic": "Anthropic",
     "kind_gemini": "Gemini",
     "kind_ollama": "Ollama model server",
-    "kind_openai_compatible": "OpenAI-compatible endpoint",
+    "kind_openai_compatible": "Other OpenAI-compatible endpoint",
     "name": "Name",
     "apiKey": "API key",
     "apiKeyOptional": "API key (optional)",
@@ -551,7 +552,23 @@
     "turnOff": "Turn off",
     "proposed": "Proposed models",
     "cancel": "Cancel",
-    "failed": "The change was not saved: {reason}"
+    "failed": "The change was not saved: {reason}",
+    "group_hosted": "Model makers",
+    "group_service": "Model services",
+    "group_local": "On this computer",
+    "group_other": "Other",
+    "about_hosted": "Paste a key from the provider's console. Each question is billed by the provider.",
+    "about_service": "One key gives access to many models, often with free or low-cost ones.",
+    "about_local": "A model server running on this computer. Nothing leaves the computer and nothing is billed.",
+    "about_other": "Any service or server that speaks the OpenAI API, at the address it gives you.",
+    "getKey": "Get a key from {name}",
+    "chooseHint": "{name} does not say which model suits SQL best. Choose one; it answers every question, and each tier can be changed later on the Models page.",
+    "loadingModels": "Loading the models…",
+    "searchModels": "Search models",
+    "freeOnly": "Free models only",
+    "shownCount": "{shown} of {total} models shown",
+    "noneShown": "No model matches.",
+    "useForAll": "Use this model"
   },
   "sources": {
     "manyTables": "This source has {count} tables. Choose the ones the questions need: every table becomes a mart and makes the pack's draft longer.",
@@ -705,5 +722,15 @@
     "removeHint": "Enter the current password above to remove it. The instance then answers this computer only, without signing in.",
     "remove": "Remove password",
     "removed": "The owner password is removed."
+  },
+  "guide": {
+    "title": "How to get an OpenRouter key",
+    "play": "Play",
+    "pause": "Pause",
+    "step_signIn": "Sign in at openrouter.ai",
+    "step_keys": "Open Settings, then Keys",
+    "step_create": "Create a key named fitcher; leave the credit limit empty",
+    "step_paste": "Copy the key, which is shown only once, and paste it below",
+    "freeNote": "Models whose name ends in :free cost nothing: up to 50 requests a day, or 1,000 a day once the account has bought 10 credits."
   }
 }

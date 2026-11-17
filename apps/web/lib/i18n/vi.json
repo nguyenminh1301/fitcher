@@ -485,7 +485,8 @@
     "documentsNoPack": "Tải tài liệu lên ở trang Tài liệu sau khi đã kết nối dữ liệu.",
     "documentsKept": "{count} tài liệu đang lưu vẫn được giữ nhưng không còn được tìm kiếm.",
     "documentsConfirmOff": "Tắt tài liệu",
-    "continueWithoutPack": "Tiếp tục khi chưa có gói"
+    "continueWithoutPack": "Tiếp tục khi chưa có gói",
+    "chooseLater": "Chọn sau"
   },
   "models": {
     "providers": "Nhà cung cấp",
@@ -495,7 +496,7 @@
     "kind_anthropic": "Anthropic",
     "kind_gemini": "Gemini",
     "kind_ollama": "Máy chủ model Ollama",
-    "kind_openai_compatible": "Endpoint tương thích OpenAI",
+    "kind_openai_compatible": "Endpoint tương thích OpenAI khác",
     "name": "Tên",
     "apiKey": "Khoá API",
     "apiKeyOptional": "Khoá API (không bắt buộc)",
@@ -551,7 +552,23 @@
     "turnOff": "Tắt",
     "proposed": "Model đề xuất",
     "cancel": "Huỷ",
-    "failed": "Chưa lưu được thay đổi: {reason}"
+    "failed": "Chưa lưu được thay đổi: {reason}",
+    "group_hosted": "Nhà phát triển mô hình",
+    "group_service": "Dịch vụ mô hình",
+    "group_local": "Trên máy này",
+    "group_other": "Khác",
+    "about_hosted": "Dán key lấy từ trang quản lý của nhà cung cấp. Mỗi câu hỏi do nhà cung cấp tính phí.",
+    "about_service": "Một key dùng được nhiều mô hình, thường có mô hình miễn phí hoặc giá rẻ.",
+    "about_local": "Máy chủ mô hình chạy trên máy này. Không gì rời khỏi máy và không bị tính phí.",
+    "about_other": "Bất kỳ dịch vụ hay máy chủ nào dùng API của OpenAI, theo địa chỉ mà nó cung cấp.",
+    "getKey": "Lấy key từ {name}",
+    "chooseHint": "{name} không cho biết mô hình nào hợp với SQL nhất. Hãy chọn một mô hình; nó trả lời mọi câu hỏi, và từng tier có thể đổi sau ở trang Mô hình.",
+    "loadingModels": "Đang tải danh sách mô hình…",
+    "searchModels": "Tìm mô hình",
+    "freeOnly": "Chỉ mô hình miễn phí",
+    "shownCount": "Đang hiện {shown}/{total} mô hình",
+    "noneShown": "Không có mô hình nào khớp.",
+    "useForAll": "Dùng mô hình này"
   },
   "sources": {
     "manyTables": "Nguồn này có {count} bảng. Hãy chọn các bảng cần cho câu hỏi: mỗi bảng thành một mart và làm bản nháp của gói dài hơn.",
@@ -705,5 +722,15 @@
     "removeHint": "Nhập mật khẩu hiện tại ở trên để gỡ. Sau đó instance chỉ trả lời máy tính này, không cần đăng nhập.",
     "remove": "Gỡ mật khẩu",
     "removed": "Đã gỡ mật khẩu chủ."
+  },
+  "guide": {
+    "title": "Cách lấy key OpenRouter",
+    "play": "Phát",
+    "pause": "Tạm dừng",
+    "step_signIn": "Đăng nhập tại openrouter.ai",
+    "step_keys": "Mở Settings, rồi Keys",
+    "step_create": "Tạo key tên fitcher; để trống giới hạn credit",
+    "step_paste": "Sao chép key (chỉ hiện một lần) và dán vào ô bên dưới",
+    "freeNote": "Mô hình có tên kết thúc bằng :free không mất phí: tối đa 50 yêu cầu mỗi ngày, hoặc 1.000 yêu cầu mỗi ngày khi tài khoản đã mua 10 credit."
   }
 }

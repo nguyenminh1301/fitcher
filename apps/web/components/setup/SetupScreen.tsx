@@ -2,14 +2,16 @@
 
 // First-run setup (DECISIONS §15): the steps as a list with the current one open. A step that has no
 // implementation yet is not listed (the api lists the steps it knows). Only an admin can answer a step.
-// The Models step adds a provider, tests it and shows the models proposed for each tier; adding the
-// provider answers the step, and the setup can be left after it. The Data step connects a database or a
+// The Models step adds a provider, tests it and shows the models proposed for each tier, or lets the admin
+// choose one among the provider's models when it proposes none; adding the provider answers the step, and the
+// setup can be left after it. The Data step connects a database or a
 // file and chooses its tables; it can be skipped and repeated later on the Sources page. The Documents step
 // that follows turns company documents on or off and uploads them in place once a pack is active.
 
 import { useCallback, useEffect, useState } from "react";
 
 import { Logo } from "@/components/brand/Logo";
+import { ModelChooser } from "@/components/models/ModelChooser";
 import { ProviderForm, ProviderTestButton, TestOutcome } from "@/components/models/ProviderForm";
 import { DocumentsStep } from "@/components/setup/DocumentsStep";
 import { InstantPack } from "@/components/setup/InstantPack";
@@ -42,34 +44,48 @@ function ModelsStep({ models, disabled, onDone, onSkip }: {
   const { t } = useI18n();
   const [provider, setProvider] = useState<ProviderView | null>(null);
   const [tiers, setTiers] = useState<ModelTiersView | null>(null);
+  const [chosen, setChosen] = useState<string | null>(null);
   const [test, setTest] = useState<{ result: ProviderTestResult | null; error?: string } | null>(null);
 
   const added = async (next: ProviderView) => {
     setProvider(next);
     setTiers(await models.tiers().catch(() => null));
   };
+  // An OpenAI-compatible provider proposes no model, so its model is chosen from the ones it lists.
+  const proposed = tiers?.tiers.some((tier) => tier.provider_id === provider?.id && tier.model) ?? false;
+  const choosing = Boolean(provider && tiers && !proposed && !chosen);
   return (
-    <section className="fc-card" aria-label={t("setup.step_models")}>
+    <section className="fc-card fc-enter" aria-label={t("setup.step_models")}>
       <div className="fc-card-head"><h2 className="fc-card-title">{t("setup.modelsQuestion")}</h2></div>
       <div className="fc-card-body fc-stack">
         <p className="fc-muted" style={{ margin: 0 }}>{t("setup.modelsHint")}</p>
         {provider ? (
           <>
             <p style={{ margin: 0 }}>{t("models.added", { name: provider.name })}</p>
-            <ProviderTestButton models={models} provider={provider} onResult={(result, error) => setTest({ result, error })} />
-            {test?.result ? <TestOutcome result={test.result} /> : null}
-            {test?.error ? <WarningBanner tone="danger">{t("models.testFailed", { reason: test.error })}</WarningBanner> : null}
-            {tiers ? (
-              <dl className="fc-kv" aria-label={t("models.proposed")}>
-                {tiers.tiers.map((tier) => (
-                  <div key={tier.tier} style={{ display: "contents" }}>
-                    <dt className="fc-mono">{tier.tier}</dt>
-                    <dd>{tier.model ?? t("models.notMapped")}</dd>
-                  </div>
-                ))}
-              </dl>
-            ) : null}
-            <div><Button variant="primary" onClick={onDone}>{t("setup.continue")}</Button></div>
+            {choosing && tiers ? (
+              <ModelChooser models={models} provider={provider} tiers={tiers.tiers.map((tier) => tier.tier)}
+                onChosen={(model) => { setChosen(model); void models.tiers().then(setTiers).catch(() => undefined); }} />
+            ) : (
+              <>
+                <ProviderTestButton models={models} provider={provider} model={chosen ?? undefined}
+                  onResult={(result, error) => setTest({ result, error })} />
+                {test?.result ? <TestOutcome result={test.result} /> : null}
+                {test?.error ? <WarningBanner tone="danger">{t("models.testFailed", { reason: test.error })}</WarningBanner> : null}
+                {tiers ? (
+                  <dl className="fc-kv" aria-label={t("models.proposed")}>
+                    {tiers.tiers.map((tier) => (
+                      <div key={tier.tier} style={{ display: "contents" }}>
+                        <dt className="fc-mono">{tier.tier}</dt>
+                        <dd>{tier.model ?? t("models.notMapped")}</dd>
+                      </div>
+                    ))}
+                  </dl>
+                ) : null}
+              </>
+            )}
+            <div className="fc-row" style={{ gap: "var(--base-size-8)" }}>
+              <Button variant={choosing ? "secondary" : "primary"} onClick={onDone}>{choosing ? t("setup.chooseLater") : t("setup.continue")}</Button>
+            </div>
           </>
         ) : disabled ? null : (
           <>
