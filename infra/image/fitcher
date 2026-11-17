@@ -14,7 +14,8 @@ esac
 [ -f "/app/jobs/$job.py" ] || { echo "fitcher: unknown job $1" >&2; exit 2; }
 shift
 set -a
-. /data/secrets/admin.env
+# A restore runs on a new volume, before init-data wrote this file.
+[ -f /data/secrets/admin.env ] && . /data/secrets/admin.env
 set +a
 cd /app
 exec python -m "jobs.$job" "$@"

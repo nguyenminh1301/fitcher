@@ -267,6 +267,24 @@ class FakeConversationClient:
         assert database == "agent_logs"
         self.tables[table] += [dict(zip(column_names, row)) for row in data]
 
+    def command(self, sql, parameters):
+        """The lightweight deletes of ``ConversationStore.erase``, matched by user and conversation or trace ids."""
+        from app.conversation import store
+
+        self._check()
+        self.queries.append(sql)
+        table = {store.ERASE_FEEDBACK_SQL: "feedback", store.ERASE_MESSAGES_SQL: "chat_messages",
+                 store.ERASE_CONVERSATION_SQL: "conversations"}[sql]
+
+        def erased(row):
+            if row["user_id"] != parameters["user_id"]:
+                return False
+            if table == "feedback":
+                return row["trace_id"] in parameters["trace_ids"]
+            return row["conversation_id"] == parameters["conversation_id"]
+
+        self.tables[table] = [row for row in self.tables[table] if not erased(row)]
+
     def _latest(self, table: str, key: str, user_id: str) -> list[dict]:
         latest: dict[str, dict] = {}
         for row in self.tables[table]:

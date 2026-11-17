@@ -15,6 +15,7 @@ import re
 import secrets
 import threading
 
+from app.api.limits import one_job
 from app.sources.attach import RAW_DATABASE, Source, Table, attach_live, copy_table, drop_source, valid_name
 from app.sources.collections import CollectionAdmin, CollectionError, ca_key
 from app.sources.connection import COPY_ONLY_KINDS, Connection, validate
@@ -275,6 +276,11 @@ class SourceService:
         return self.run(self._claim(source_id, started_by))
 
     def run(self, record: SyncRecord, only: list[str] | None = None) -> SyncRecord:
+        """Run the claimed sync once no compile or eval runs (``one_job``)."""
+        with one_job():
+            return self._run(record, only)
+
+    def _run(self, record: SyncRecord, only: list[str] | None = None) -> SyncRecord:
         stored = self._store.get(record.source_id)
         done = threading.Event()
 

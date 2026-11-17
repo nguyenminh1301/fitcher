@@ -16,7 +16,7 @@ from app.main import app
 TS = datetime(2026, 11, 5, 9, 0, tzinfo=UTC)
 ADMIN = SessionHeaders(['admin'])
 REVIEWER = SessionHeaders(['pack_reviewer'])
-RUN = ("t1", TS, "lab.analyst", "viewer", "Revenue by widget", "data_query", "succeeded", 1200, 0.0042, "")
+RUN = ("t1", TS, "dev.analyst", "viewer", "Revenue by widget", "data_query", "succeeded", 1200, 0.0042, "")
 
 
 class Script:
@@ -56,17 +56,17 @@ def test_runs_are_filtered_paged_and_scoped_to_the_pack(client):
     use(reader)
 
     response = client.get("/admin/runs", headers=ADMIN,
-                          params={"user": "lab.analyst", "status": "succeeded", "from": "2026-11-01", "to": "2026-11-06", "page": 2})
+                          params={"user": "dev.analyst", "status": "succeeded", "from": "2026-11-01", "to": "2026-11-06", "page": 2})
 
     assert response.status_code == 200
     assert response.json()[0] == {
-        "trace_id": "t1", "ts": "2026-11-05T09:00:00Z", "user_id": "lab.analyst", "role": "viewer",
+        "trace_id": "t1", "ts": "2026-11-05T09:00:00Z", "user_id": "dev.analyst", "role": "viewer",
         "question": "Revenue by widget", "intent": "data_query", "status": "succeeded", "latency_ms": 1200,
         "cost_usd": 0.0042, "error": "",
     }
     sql, parameters = script.calls[0]
     assert "r.pack = {pack:String}" in sql and "r.user_id = {user:String}" in sql and "r.status = {status:String}" in sql
-    assert parameters == {"pack": "minimal", "user": "lab.analyst", "status": "succeeded", "start": date(2026, 11, 1),
+    assert parameters == {"pack": "minimal", "user": "dev.analyst", "status": "succeeded", "start": date(2026, 11, 1),
                           "end": date(2026, 11, 6), "limit": PAGE_SIZE, "offset": PAGE_SIZE}
 
 
@@ -104,8 +104,8 @@ def test_an_unknown_trace_is_404(client):
 
 def test_audit_denials_and_screening_verdicts(client):
     reader, script = logs([
-        (r"FROM agent_logs\.audit", [(TS, "t1", "lab.marketing", "marketing", "DENY", "returns", ["returns"], "not granted")]),
-        (r"FROM agent_logs\.input_screening", [(TS, "t2", "lab.analyst", "question", "block", "log", 0.97, ["en_override"])]),
+        (r"FROM agent_logs\.audit", [(TS, "t1", "dev.marketing", "marketing", "DENY", "returns", ["returns"], "not granted")]),
+        (r"FROM agent_logs\.input_screening", [(TS, "t2", "dev.analyst", "question", "block", "log", 0.97, ["en_override"])]),
     ])
     use(reader)
 
@@ -139,13 +139,13 @@ def test_costs_are_grouped_with_their_provider(client):
 
 def test_an_admin_reads_a_conversation_its_owner_deleted(client):
     reader, _ = logs([
-        (r"FROM agent_logs\.conversations FINAL WHERE conversation_id", [("c1", "lab.analyst", "Revenue", 1, TS)]),
-        (r"FROM agent_logs\.conversations FINAL", [("c1", "lab.analyst", "Revenue", 1, TS)]),
+        (r"FROM agent_logs\.conversations FINAL WHERE conversation_id", [("c1", "dev.analyst", "Revenue", 1, TS)]),
+        (r"FROM agent_logs\.conversations FINAL", [("c1", "dev.analyst", "Revenue", 1, TS)]),
         (r"FROM agent_logs\.chat_messages", [(TS, "user", "Revenue by widget", "t1", 1, 0)]),
     ])
     use(reader)
 
-    listed = client.get("/admin/conversations", headers=ADMIN, params={"user": "lab.analyst"}).json()
+    listed = client.get("/admin/conversations", headers=ADMIN, params={"user": "dev.analyst"}).json()
     thread = client.get("/admin/conversations/c1", headers=ADMIN).json()
 
     assert listed[0]["deleted"] is True

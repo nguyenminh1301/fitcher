@@ -2,7 +2,7 @@
 # the gated classifier to ONNX. The api image runs the export with ONNX
 # Runtime only, so none of these packages reach it. Versions are pinned; the
 # CPU wheel index keeps CUDA libraries out.
-FROM python:3.13.18-slim-bookworm
+FROM python:3.13.18-slim-bookworm@sha256:a5a7017efc5969e00ae2b91c8eb0631049a569652aa4ffc4501769049ae45c72
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \

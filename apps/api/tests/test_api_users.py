@@ -154,7 +154,7 @@ def test_a_reset_to_a_short_password_is_refused(setup):
 
 def test_only_an_admin_manages_users(setup):
     client, _ = setup
-    sign_in(client, "lab.viewer", ["viewer"])
+    sign_in(client, "dev.viewer", ["viewer"])
 
     assert client.get("/admin/users").status_code == 403
     assert client.post("/admin/users", json=NEW).status_code == 403

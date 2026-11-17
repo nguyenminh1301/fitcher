@@ -30,15 +30,7 @@ The command publishes the app on the local machine only. To use another host por
 | `documents/` | Uploaded company documents |
 | `models/` | Downloaded local models |
 
-Back up an instance by stopping it and copying the volume:
-
-```bash
-docker stop fitcher
-docker run --rm -v fitcher-data:/data:ro -v "$PWD":/backup debian:trixie-slim tar -czf /backup/fitcher-data.tar.gz -C /data .
-docker start fitcher
-```
-
-Keep `secret.key` with the backup, or supply the key yourself as `FITCHER_SECRET_KEY` (base64 of 32 bytes): without it the stored provider keys cannot be read.
+Back up a running instance with `fitcher backup` and restore it into a new volume with `fitcher restore`; [operations.md](operations.md) shows both. Without the secret key in the backup, provider keys and source passwords are entered again after a restore.
 
 ## Settings
 

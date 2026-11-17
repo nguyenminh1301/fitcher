@@ -1,5 +1,5 @@
 #!/command/with-contenv sh
-# Waits for ClickHouse, then applies the pending schema changes as the ClickHouse admin (jobs/migrate.py).
+# Waits for ClickHouse, restores a pending backup (jobs/restore.py), then applies the pending schema changes as the ClickHouse admin (jobs/migrate.py).
 set -a
 . /data/secrets/admin.env
 set +a
@@ -13,4 +13,5 @@ until python -c "import os, urllib.request; urllib.request.urlopen('http://%s:%s
     fi
     sleep 1
 done
+python -m jobs.restore --finish
 exec python -m jobs.migrate

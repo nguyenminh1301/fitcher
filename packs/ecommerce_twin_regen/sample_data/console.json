@@ -11,35 +11,35 @@
   ],
   "identities": [
     {
-      "user_id": "lab.analyst",
+      "user_id": "dev.analyst",
       "display_name": "Lab Analyst",
       "roles": [
         "analyst"
       ]
     },
     {
-      "user_id": "lab.marketing",
+      "user_id": "dev.marketing",
       "display_name": "Lab Marketing",
       "roles": [
         "marketing"
       ]
     },
     {
-      "user_id": "lab.northwest",
+      "user_id": "dev.northwest",
       "display_name": "Lab Northwest",
       "roles": [
         "northwest_sales"
       ]
     },
     {
-      "user_id": "lab.partner",
+      "user_id": "dev.partner",
       "display_name": "Lab Partner",
       "roles": [
         "category_partner"
       ]
     },
     {
-      "user_id": "lab.reviewer",
+      "user_id": "dev.reviewer",
       "display_name": "Lab Reviewer",
       "roles": [
         "pack_reviewer",
@@ -47,7 +47,7 @@
       ]
     },
     {
-      "user_id": "lab.admin",
+      "user_id": "dev.admin",
       "display_name": "Lab Admin",
       "roles": [
         "admin",
@@ -1115,7 +1115,7 @@
     {
       "trace_id": "5b1d0c2e9a4f4e7d8c3b2a1f0e9d8c7b",
       "ts": "2026-11-02T08:16:10Z",
-      "user_id": "lab.analyst",
+      "user_id": "dev.analyst",
       "rating": "like",
       "question": "Doanh thu thuần theo danh mục năm 2025",
       "run_status": "succeeded"
@@ -1123,7 +1123,7 @@
     {
       "trace_id": "3f2a1b0c9d8e7f6a5b4c3d2e1f0a9b8c",
       "ts": "2026-10-29T11:22:00Z",
-      "user_id": "lab.analyst",
+      "user_id": "dev.analyst",
       "rating": "dislike",
       "question": "Net sales by warehouse in 2025",
       "note": "We don't track warehouses in this pack, it should have told me.",
@@ -1132,7 +1132,7 @@
     {
       "trace_id": "a1b2c3d4e5f60718293a4b5c6d7e8f90",
       "ts": "2026-11-02T08:04:30Z",
-      "user_id": "lab.analyst",
+      "user_id": "dev.analyst",
       "rating": "dislike",
       "question": "Average order value by region in 2025",
       "note": "The totals looked too high",
@@ -1142,7 +1142,7 @@
     {
       "trace_id": "7c2e1d3f4a5b6c7d8e9f0a1b2c3d4e5f",
       "ts": "2026-10-30T14:03:00Z",
-      "user_id": "lab.marketing",
+      "user_id": "dev.marketing",
       "rating": "like",
       "question": "Monthly conversion rate in 2025",
       "run_status": "succeeded"
@@ -1150,7 +1150,7 @@
     {
       "trace_id": "9e8d7c6b5a4f3e2d1c0b9a8f7e6d5c4b",
       "ts": "2026-10-12T09:41:00Z",
-      "user_id": "lab.northwest",
+      "user_id": "dev.northwest",
       "rating": "like",
       "question": "Top 5 brands by net sales in Q1 2025 compared with Q1 2024",
       "run_status": "succeeded"
@@ -1266,7 +1266,7 @@
     {
       "trace_id": "5b1d0c2e9a4f4e7d8c3b2a1f0e9d8c7b",
       "ts": "2026-11-02T08:15:00Z",
-      "user_id": "lab.analyst",
+      "user_id": "dev.analyst",
       "role": "analyst",
       "question": "Doanh thu thuần theo danh mục năm 2025",
       "status": "succeeded",
@@ -1276,7 +1276,7 @@
     {
       "trace_id": "a1b2c3d4e5f60718293a4b5c6d7e8f90",
       "ts": "2026-11-02T08:03:00Z",
-      "user_id": "lab.analyst",
+      "user_id": "dev.analyst",
       "role": "analyst",
       "question": "Average order value by region in 2025",
       "status": "succeeded",
@@ -1286,7 +1286,7 @@
     {
       "trace_id": "0f1e2d3c4b5a69788796a5b4c3d2e1f0",
       "ts": "2026-11-02T07:51:00Z",
-      "user_id": "lab.marketing",
+      "user_id": "dev.marketing",
       "role": "marketing",
       "question": "Tổng tiền hoàn trả năm 2025 là bao nhiêu?",
       "status": "denied",
@@ -1296,7 +1296,7 @@
     {
       "trace_id": "7c2e1d3f4a5b6c7d8e9f0a1b2c3d4e5f",
       "ts": "2026-10-30T14:02:00Z",
-      "user_id": "lab.marketing",
+      "user_id": "dev.marketing",
       "role": "marketing",
       "question": "Monthly conversion rate in 2025",
       "status": "succeeded",
@@ -1306,7 +1306,7 @@
     {
       "trace_id": "3f2a1b0c9d8e7f6a5b4c3d2e1f0a9b8c",
       "ts": "2026-10-29T11:20:00Z",
-      "user_id": "lab.analyst",
+      "user_id": "dev.analyst",
       "role": "analyst",
       "question": "Net sales by warehouse in 2025",
       "status": "failed",
@@ -1316,7 +1316,7 @@
     {
       "trace_id": "9e8d7c6b5a4f3e2d1c0b9a8f7e6d5c4b",
       "ts": "2026-10-12T09:40:00Z",
-      "user_id": "lab.northwest",
+      "user_id": "dev.northwest",
       "role": "northwest_sales",
       "question": "Top 5 brands by net sales in Q1 2025 compared with Q1 2024",
       "status": "succeeded",
@@ -1326,7 +1326,7 @@
     {
       "trace_id": "b7a6c5d4e3f2019a8b7c6d5e4f3a2b1c",
       "ts": "2026-10-11T15:05:00Z",
-      "user_id": "lab.partner",
+      "user_id": "dev.partner",
       "role": "category_partner",
       "question": "Net sales by brand in 2025",
       "status": "denied",
@@ -1336,7 +1336,7 @@
     {
       "trace_id": "c9d8e7f6a5b4c3d2e1f0a9b8c7d6e5f4",
       "ts": "2026-10-10T10:12:00Z",
-      "user_id": "lab.analyst",
+      "user_id": "dev.analyst",
       "role": "analyst",
       "question": "How did we do last quarter?",
       "status": "rejected",
@@ -1478,7 +1478,7 @@
     {
       "ts": "2026-11-02T08:15:04Z",
       "trace_id": "5b1d0c2e9a4f4e7d8c3b2a1f0e9d8c7b",
-      "user_id": "lab.analyst",
+      "user_id": "dev.analyst",
       "role": "analyst",
       "decision": "ALLOW",
       "dataset": "sales_lines",
@@ -1488,7 +1488,7 @@
     {
       "ts": "2026-11-02T08:03:05Z",
       "trace_id": "a1b2c3d4e5f60718293a4b5c6d7e8f90",
-      "user_id": "lab.analyst",
+      "user_id": "dev.analyst",
       "role": "analyst",
       "decision": "ALLOW",
       "dataset": "sales_lines",
@@ -1498,7 +1498,7 @@
     {
       "ts": "2026-11-02T07:51:02Z",
       "trace_id": "0f1e2d3c4b5a69788796a5b4c3d2e1f0",
-      "user_id": "lab.marketing",
+      "user_id": "dev.marketing",
       "role": "marketing",
       "decision": "DENY",
       "dataset": "returns_fact",
@@ -1510,7 +1510,7 @@
     {
       "ts": "2026-10-30T14:02:03Z",
       "trace_id": "7c2e1d3f4a5b6c7d8e9f0a1b2c3d4e5f",
-      "user_id": "lab.marketing",
+      "user_id": "dev.marketing",
       "role": "marketing",
       "decision": "ALLOW",
       "dataset": "sessions_daily",
@@ -1520,7 +1520,7 @@
     {
       "ts": "2026-10-11T15:05:01Z",
       "trace_id": "b7a6c5d4e3f2019a8b7c6d5e4f3a2b1c",
-      "user_id": "lab.partner",
+      "user_id": "dev.partner",
       "role": "category_partner",
       "decision": "DENY",
       "dataset": "sales_lines",
@@ -1532,7 +1532,7 @@
     {
       "ts": "2026-10-09T09:30:00Z",
       "trace_id": "d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6",
-      "user_id": "lab.northwest",
+      "user_id": "dev.northwest",
       "role": "northwest_sales",
       "decision": "DENY",
       "dataset": "sessions_daily",
@@ -1719,7 +1719,7 @@
   ],
   "users": [
     {
-      "id": "lab.analyst",
+      "id": "dev.analyst",
       "email": "analyst@example.com",
       "display_name": "Lab Analyst",
       "roles": [
@@ -1728,7 +1728,7 @@
       "enabled": true
     },
     {
-      "id": "lab.marketing",
+      "id": "dev.marketing",
       "email": "marketing@example.com",
       "display_name": "Lab Marketing",
       "roles": [
@@ -1737,7 +1737,7 @@
       "enabled": true
     },
     {
-      "id": "lab.northwest",
+      "id": "dev.northwest",
       "email": "northwest@example.com",
       "display_name": "Lab Northwest",
       "roles": [
@@ -1746,7 +1746,7 @@
       "enabled": true
     },
     {
-      "id": "lab.partner",
+      "id": "dev.partner",
       "email": "partner@example.com",
       "display_name": "Lab Partner",
       "roles": [
@@ -1755,7 +1755,7 @@
       "enabled": true
     },
     {
-      "id": "lab.reviewer",
+      "id": "dev.reviewer",
       "email": "reviewer@example.com",
       "display_name": "Lab Reviewer",
       "roles": [
@@ -1765,7 +1765,7 @@
       "enabled": true
     },
     {
-      "id": "lab.admin",
+      "id": "dev.admin",
       "email": "admin@example.com",
       "display_name": "Lab Admin",
       "roles": [

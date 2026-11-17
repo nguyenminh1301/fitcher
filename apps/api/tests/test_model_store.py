@@ -58,9 +58,9 @@ def test_record_action_inserts_one_row():
     client = FakeClient()
 
     ClickHouseModelStore(client).record_action(AdminActionRecord(
-        ts=NOW, actor="lab.admin", action="model_tier", target="fast", old_value="openai/gpt-5.4-mini",
+        ts=NOW, actor="dev.admin", action="model_tier", target="fast", old_value="openai/gpt-5.4-mini",
         new_value="openai/gpt-5.5",
     ))
 
     [(table, rows, columns)] = client.inserts
-    assert table == "agent_logs.admin_actions" and rows[0][1] == "lab.admin" and columns[0] == "ts"
+    assert table == "agent_logs.admin_actions" and rows[0][1] == "dev.admin" and columns[0] == "ts"

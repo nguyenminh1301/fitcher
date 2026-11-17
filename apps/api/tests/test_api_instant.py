@@ -8,7 +8,7 @@ from app.api import instant as instant_api
 from app.main import app
 from app.onboarding.instant import InstantJob, InstantRefused
 
-ADMIN = SessionHeaders(["admin"], user_id="lab.admin")
+ADMIN = SessionHeaders(["admin"], user_id="dev.admin")
 VIEWER = SessionHeaders()
 
 
@@ -89,7 +89,7 @@ def test_a_confirmed_request_starts_one_job_and_records_the_admin_action(parts):
 
     assert response.status_code == 202
     assert response.json()["job"]["id"] == "job1" and response.json()["job"]["status"] == "running"
-    assert pipeline.started == [("shop", ("widgets", "sales"), "lab.admin")]
+    assert pipeline.started == [("shop", ("widgets", "sales"), "dev.admin")]
     assert [(record.action, record.target) for record in actions.records] == [("pack.instant", "shop")]
 
 

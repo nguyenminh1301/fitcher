@@ -2,8 +2,17 @@
 
 ## Unreleased
 
+## 0.0.1 - 2026-11-17
+
+The first release of the one-image product.
+
 ### Added
 
+- The Demo workflow builds the web app with every feature on the sample data and no backend (`NEXT_PUBLIC_FITCHER_DEMO=1`), each page marked with the Sample data badge, and publishes it from `main` as `ghcr.io/<owner>/fitcher-demo`.
+- The Release workflow creates the GitHub release of a version tag with the tag's `CHANGELOG.md` section as its notes.
+- `fitcher backup --output /data/backups/<name>` writes one archive of a ClickHouse `BACKUP` of the fitcher databases and the pack role users, roles and settings profiles created with SQL, and an online copy of the app state with the packs, compiled packs, documents, uploads and ClickHouse passwords, taken while no sync, compile or eval runs (`--app-only` leaves ClickHouse out, `--include-secret-key` adds the secret key with a warning); `fitcher restore --input <archive>` restores it into an empty data directory, refuses a non-empty one, and restores ClickHouse at the next start.
+- The api answers at most `limits.concurrent_questions` questions at once (4 by default, changed by an admin through `GET`/`PUT /settings/limits`); later questions wait in arrival order with a `queue` status event the chat shows as waiting, a question whose client leaves gives up its place, a source sync, a pack compile and an eval run never run at the same time, and each pack role's ClickHouse profile caps a user at 8 concurrent queries.
+- In individual mode, deleting a conversation removes it for good: its rows, its messages and the feedback on its answers are deleted from ClickHouse, while team mode still only hides it so an admin can read it.
 - Company documents can be turned off through `PUT /settings/documents` (`documents.enabled`, on by default; an admin answers the new last setup step, Documents): off answers 404 on every `/documents` endpoint, compiles `kb_docs` without chunks and lets `metadata_qa` answer from the glossary, metrics and datasets; turning it off while documents are kept needs confirmation and keeps the files, and turning it on again indexes them at the next compile.
 - The setup's Documents step turns company documents on or off, confirms when documents are kept, and uploads documents in place once a pack is active; the console hides the Documents page while documents are off.
 - Pack search can run in ClickHouse (`SEARCH_ENGINE=clickhouse`): each generation of a collection is a table in the `search` database written and queried by a dedicated `search_index` user, `search.live` switches all collections of a pack at once, and queries score dense, BM25 and trigram lists exactly and fuse them with RRF as Qdrant does.
@@ -203,6 +212,9 @@
 
 ### Changed
 
+- `docs/security.md` records the threat model, what each mode protects, the hardening checklist and the review findings; `docs/operations.md` covers retention, backup, restore, upgrades, moving to an external ClickHouse, the limits and the load measurement; `SECURITY.md` states that the latest released minor version gets fixes; the README shows the setup and links them.
+- The development accounts are `dev.*` instead of `lab.*`, the dbt target is `dev`, the remaining "lab" wording is gone from tracked files outside the changelog and the phase plans, and the system diagram shows the model gateway and sign-in inside the api of the one container.
+- Questions run on a thread pool of their own instead of the event loop's default executor, which holds only CPUs + 4 threads and on a small host capped the questions running or waiting below `limits.concurrent_questions`; `scripts/measure_question_load.py` measures 1, 5 and 20 questions at once with a fixed-latency fake graph.
 - Conversations, their messages, groups and feedback no longer expire after 90 days: the ClickHouse change `0007_keep_conversations` removes their TTL on new and existing volumes, while run logs, events, LLM calls, SQL runs, audit and screening keep the 90-day expiry.
 - Pack search runs only in ClickHouse: the compiler, company documents, the agent and the jobs use the `search` database, and at start the api compiles again every compiled pack whose search collections are missing, which rebuilds the index after an upgrade from Qdrant (every item is embedded again).
 - The pack compiler, company documents, the agent and the jobs reach search only through `app/search/engine.py`, an interface of logical collections and live generations that the Qdrant client implements unchanged, so another search engine can replace it.
@@ -260,6 +272,7 @@
 
 ### Fixed
 
+- `fitcher compile_pack` reads packs from `PACKS_DIR` by default, so in the release image it compiles the packs of the data volume without `--packs-dir`.
 - Finish the setup when one of the instant pack's questions is chosen, so the chat opens instead of the setup's last step, and label the instant pack's waiting steps "Waiting" instead of showing the untranslated key.
 - Answer `/me` on a new instance where no pack is active yet, with no pack role, instead of 503: the web app sent the owner of a fresh release image to the sign-in page, so the setup that builds the first pack could not start.
 - Profile an instant pack's wide views from the tables they join instead of scanning the join: on the seven e-commerce tables the scan exceeded the 2 GB query memory limit, while the joined columns' facts are already known from the referenced tables.
@@ -302,6 +315,9 @@
 
 ### Security
 
+- The web app uses Next.js 16.4.5, which fixes an information disclosure across root params when a `use cache` function is called through `unstable_cache()` (GHSA-mfr8-8qww-v76h).
+- The development Dockerfiles of the api, the web app and the guard model and the Compose ClickHouse image are pinned by digest like the release image.
+- Every page carries a Content-Security-Policy whose scripts run only from the instance or with a per-request nonce (no inline script), `frame-ancestors 'none'`, `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff` and `Referrer-Policy: same-origin`; styles keep `'unsafe-inline'` for the chart library's style attributes.
 - Add the ClickHouse user `pack_admin` (`infra/clickhouse/users.d/pack_admin.xml`, password `CLICKHOUSE_PACK_ADMIN_PASSWORD`, generated by `jobs.init_data` in the image and passed to the api in both Compose layouts): the definer of instant pack marts, it reads `raw` and `src_*`, creates and replaces views in `marts` and manages the pack's roles, users, row policies and settings profile, but can grant only `SELECT` on `marts` and reads no log, app or named collection secret.
 - Scan the release image in the Security workflow next to the Compose images, through `scripts/scan_image.sh`, the checksum-verified Trivy gate both the Security and Release workflows now share.
 - Keep the model gateway from loading a `.env` file: LiteLLM reads one from the working directory into the environment on import unless it runs in production mode, which would have handed the api or a job every key and password in the repository's `.env`; the gateway now sets `LITELLM_MODE=PRODUCTION` before importing it.
@@ -331,6 +347,8 @@
 
 ### Tests
 
+- An uploaded data file named with `../` stays inside the upload directory.
+- Tests fail when a provider key, a source password, a session id or the instance secret key appears in an API response, a log line, an admin action or an `llm_calls` row, including when a provider or source error quotes it.
 - Check connecting sources on a running ClickHouse with the `sources` profile (`apps/api/tests/test_sources_connect_live.py`, `SOURCES_LIVE_TEST=1`): the fixture PostgreSQL and MySQL are connected through named collections and their tables listed with sizes and keys, a wrong password, host, port and database each fail with their own reason, one table is attached live and one copied, an incremental copy of a throwaway table adds only the rows above the cursor and not an updated row, no password is in the app state, `system.tables`, `system.query_log`, `system.processes` or `system.named_collections`, `source_admin` cannot override a collection's host or read its secrets, and a CSV and an XLSX load into `raw` with the confirmed types. The grants check of `test_sources_live.py` now names both source users.
 - Let two chat tests wait for the answer they started to finish, so a state update after the test environment is torn down no longer fails the web suite at random.
 - Prove company documents on a running Qdrant with `QDRANT_LIVE_URL` set: an uploaded document is found by search only for its roles and is gone once deleted, and a document whose only chunk carries a prompt injection from the screening attack set is marked failed and adds no chunk to `kb_docs`.

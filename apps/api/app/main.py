@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
-from app.api import admin, ask, auth, conversations, datasets, documents, evaluation, feedback, feedback_review, instant, oidc, providers, review, runtime, screening, session, setup, sources, users
+from app.api import admin, ask, auth, conversations, datasets, documents, evaluation, feedback, feedback_review, instant, limit_settings, oidc, providers, review, runtime, screening, session, setup, sources, users
 from app.auth.origin import HostOriginGuard
 from app.llm.clients import bootstrap
 from app.state.db import shared_state
@@ -43,6 +43,7 @@ app.include_router(providers.router)
 app.include_router(screening.router)
 app.include_router(sources.router)
 app.include_router(instant.router)
+app.include_router(limit_settings.router)
 
 
 @app.get("/health")

@@ -14,7 +14,7 @@ from app.state.settings import Settings
 from app.screening.screen import Screener
 from fakes import FakeClassifier
 
-ADMIN = SessionHeaders(['admin'], user_id='lab.admin')
+ADMIN = SessionHeaders(['admin'], user_id='dev.admin')
 VIEWER = SessionHeaders()
 
 

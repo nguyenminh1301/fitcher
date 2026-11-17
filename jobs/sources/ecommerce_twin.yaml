@@ -1,4 +1,4 @@
-# Free Synthetic E-commerce Twin, the Phase 1 lab dataset.
+# Free Synthetic E-commerce Twin, the Phase 1 development dataset.
 # Licence: CC BY-NC 4.0, non-commercial use only. Downloads stay in ignored data/.
 # Every date column, sessions.session_start included, is a YYYY-MM-DD string with
 # no time of day, so staging types them as Date without a timezone conversion.

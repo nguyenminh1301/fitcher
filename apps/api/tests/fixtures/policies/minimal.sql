@@ -1,4 +1,4 @@
-CREATE SETTINGS PROFILE OR REPLACE `fitcher_agent__minimal` SETTINGS readonly = 2 CONST, max_execution_time = 30 MIN 1 MAX 120, max_result_rows = 10000 MIN 1 MAX 100000, max_memory_usage = 2000000000 MIN 1 MAX 4000000000
+CREATE SETTINGS PROFILE OR REPLACE `fitcher_agent__minimal` SETTINGS readonly = 2 CONST, max_concurrent_queries_for_user = 8 CONST, max_execution_time = 30 MIN 1 MAX 120, max_result_rows = 10000 MIN 1 MAX 100000, max_memory_usage = 2000000000 MIN 1 MAX 4000000000
 CREATE ROLE IF NOT EXISTS `fitcher_role__minimal__blue_viewer`
 CREATE ROLE IF NOT EXISTS `fitcher_role__minimal__summary_reader`
 CREATE ROLE IF NOT EXISTS `fitcher_role__minimal__viewer`

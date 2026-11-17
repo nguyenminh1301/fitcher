@@ -49,7 +49,8 @@ from app.state.settings import documents_enabled
 from jobs.lib.clickhouse import admin_client
 
 ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_PACKS_DIR = ROOT / "packs"
+# PACKS_DIR is /data/packs in the release image, where instant packs and edited packs live.
+DEFAULT_PACKS_DIR = Path(os.environ.get("PACKS_DIR") or ROOT / "packs")
 CHECK_SEARCH_SIZE = 3
 UPLOAD_WAIT_SECONDS = 120
 UPLOAD_POLL_SECONDS = 2

@@ -14,6 +14,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 
 from app.api.auth import current_principal
 from app.api.runtime import get_conversation_store, unavailable
+from app.auth.origin import INDIVIDUAL, instance_mode
 from app.auth.principal import Principal
 from app.contracts.conversations import Conversation, ConversationGroup, ConversationPatch, ConversationThread, GroupInput
 from app.conversation.store import ConversationNotFound, ConversationStore, GroupNotFound
@@ -65,9 +66,16 @@ def update_conversation(conversation_id: str, patch: ConversationPatch, user: Us
     return _call(lambda: store.update(user.user_id, conversation_id, patch))
 
 
+def deletes_for_good() -> bool:
+    """Individual mode deletes a conversation for good; team mode only hides it, so an admin can still read it."""
+    return instance_mode() == INDIVIDUAL
+
+
 @router.delete("/conversations/{conversation_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_conversation(conversation_id: str, user: User, store: Store) -> Response:
-    _call(lambda: store.delete(user.user_id, conversation_id))
+def delete_conversation(
+    conversation_id: str, user: User, store: Store, erase: Annotated[bool, Depends(deletes_for_good)],
+) -> Response:
+    _call(lambda: (store.erase if erase else store.delete)(user.user_id, conversation_id))
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 

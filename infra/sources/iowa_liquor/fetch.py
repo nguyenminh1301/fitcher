@@ -78,7 +78,7 @@ def summarize(path: Path) -> tuple[int, str]:
 
 
 def download(url: str, target: Path) -> None:
-    request = urllib.request.Request(url, headers={"User-Agent": "fitcher-lab-fixture"})
+    request = urllib.request.Request(url, headers={"User-Agent": "fitcher-dev-fixture"})
     with urllib.request.urlopen(request, timeout=120) as response, target.open("wb") as out:  # noqa: S310 - fixed https URL
         shutil.copyfileobj(response, out, CHUNK)
 

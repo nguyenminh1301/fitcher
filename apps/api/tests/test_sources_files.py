@@ -140,7 +140,7 @@ def test_a_parquet_schema_maps_to_clickhouse_types():
 def test_an_upload_keeps_the_original_and_proposes_the_inferred_types(parts, tmp_path):
     store, clickhouse, service = parts
 
-    upload = service.upload("Orders.csv", BytesIO(CSV), uploaded_by="lab.admin")
+    upload = service.upload("Orders.csv", BytesIO(CSV), uploaded_by="dev.admin")
 
     assert (upload.format, upload.size_bytes, upload.file_name) == ("csv", len(CSV), "Orders.csv")
     assert [(c.name, c.type) for c in upload.columns] == [
@@ -206,7 +206,7 @@ def confirmed(upload, **changes):
 
 def test_a_confirmed_load_stages_streams_publishes_and_registers_the_source(parts):
     store, clickhouse, service = parts
-    upload = service.upload("Orders.csv", BytesIO(CSV), uploaded_by="lab.admin")
+    upload = service.upload("Orders.csv", BytesIO(CSV), uploaded_by="dev.admin")
 
     source = service.load(upload.id, None, confirmed(upload, **{"Số tiền": "Nullable(Decimal(18, 2))"}))
 

@@ -41,7 +41,7 @@ def test_status_of_a_new_instance(client):
 
 
 def test_any_signed_in_user_can_read_the_status_but_not_change_it(client):
-    sign_in(client, "lab.viewer", ["viewer"])
+    sign_in(client, "dev.viewer", ["viewer"])
 
     assert client.get("/setup/status").status_code == 200
     assert client.put("/setup/mode", json={"mode": "team"}).status_code == 403

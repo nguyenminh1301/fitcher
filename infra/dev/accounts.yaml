@@ -4,27 +4,27 @@
 # users had before, so their conversations and run logs stay theirs. Never used
 # in the released image.
 accounts:
-  - id: lab.analyst
-    email: lab.analyst@fitcher.test
+  - id: dev.analyst
+    email: dev.analyst@fitcher.test
     display_name: Lab Analyst
     roles: [analyst]
-  - id: lab.marketing
-    email: lab.marketing@fitcher.test
+  - id: dev.marketing
+    email: dev.marketing@fitcher.test
     display_name: Lab Marketing
     roles: [marketing]
-  - id: lab.northwest
-    email: lab.northwest@fitcher.test
+  - id: dev.northwest
+    email: dev.northwest@fitcher.test
     display_name: Lab Northwest
     roles: [northwest_sales]
-  - id: lab.partner
-    email: lab.partner@fitcher.test
+  - id: dev.partner
+    email: dev.partner@fitcher.test
     display_name: Lab Partner
     roles: [category_partner]
-  - id: lab.reviewer
-    email: lab.reviewer@fitcher.test
+  - id: dev.reviewer
+    email: dev.reviewer@fitcher.test
     display_name: Lab Reviewer
     roles: [pack_reviewer, analyst]
-  - id: lab.admin
-    email: lab.admin@fitcher.test
+  - id: dev.admin
+    email: dev.admin@fitcher.test
     display_name: Lab Admin
     roles: [admin, analyst]

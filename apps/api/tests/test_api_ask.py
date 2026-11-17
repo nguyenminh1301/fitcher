@@ -120,7 +120,7 @@ def test_a_data_question_streams_status_sql_result_chart_summary_and_done(ask_cl
     assert chart["type"] == "bar" and chart["allowed_types"] == ["bar", "table"]
     summary = next(event for event in events if event["event"] == "summary")
     assert (summary["text"], summary["lang"]) == ("Widget 0 led.", "en")
-    assert ask_client.agent.started[0][:2] == ("viewer", "lab.viewer")
+    assert ask_client.agent.started[0][:2] == ("viewer", "dev.viewer")
 
 
 def test_every_node_streams_a_start_and_an_end_status_in_graph_order(ask_client):
@@ -286,7 +286,7 @@ def test_a_client_disconnect_stops_the_run_and_kills_its_query():
 
 
 def collect(agent: FakeAgent, role="viewer") -> list[dict]:
-    run = agent.start(role=role, user_id="lab.viewer", today=None)
+    run = agent.start(role=role, user_id="dev.viewer", today=None)
     return parse("".join(asyncio.run(drain(event_stream(run, QUESTION, AnswerEvents(role))))))
 
 
@@ -380,7 +380,7 @@ def test_a_first_question_starts_a_conversation_and_stores_both_turns():
     assert uuid.UUID(conversation_id).version == 4
     assert kinds(parse(response.text))[-1] == "done"
     [conversation] = client.tables["conversations"]
-    assert (conversation["user_id"], conversation["conversation_id"], conversation["title"]) == ("lab.viewer", conversation_id, QUESTION)
+    assert (conversation["user_id"], conversation["conversation_id"], conversation["title"]) == ("dev.viewer", conversation_id, QUESTION)
     asked, answered = client.tables["chat_messages"]
     assert (asked["role"], asked["content"], asked["turn"]) == ("user", QUESTION, 1)
     assert (answered["role"], answered["content"], answered["turn"]) == ("assistant", "Widget 0 led.", 1)
@@ -406,14 +406,14 @@ def test_a_follow_up_reads_the_previous_turn():
 def test_another_users_conversation_is_404_before_any_llm_call():
     agent, client = answer(), FakeConversationClient()
     store = ConversationStore(client)
-    theirs = store.open_turn("lab.analyst", None, "Their question")
+    theirs = store.open_turn("dev.analyst", None, "Their question")
     store.question(theirs)
 
     [response] = ask_with(agent, store, {"conversation_id": theirs.conversation_id})
 
     assert response.status_code == 404
     assert agent.started == []
-    assert [row["user_id"] for row in client.tables["chat_messages"]] == ["lab.analyst"]
+    assert [row["user_id"] for row in client.tables["chat_messages"]] == ["dev.analyst"]
 
 
 def test_an_unreachable_store_is_503():
@@ -555,3 +555,17 @@ def test_the_sql_event_names_the_unreviewed_metrics_the_answer_uses():
 
     assert sql.event == "sql" and sql.unreviewed_metrics == ["refunded_value"]
     assert AnswerEvents("viewer").node("guard", "end", state, {"attempts": [SimpleNamespace(sql="SELECT 1")]})[1].unreviewed_metrics == []
+
+
+def test_a_question_beyond_the_limit_streams_a_queue_status_until_it_gets_a_place():
+    from app.api.limits import QuestionGate
+
+    gate = QuestionGate(lambda: 1, poll_seconds=0.01)
+    gate.enter(lambda: None, lambda: False)
+    threading.Timer(0.1, gate.leave).start()
+
+    events = parse("".join(asyncio.run(drain(event_stream(ScriptedRun(), QUESTION, AnswerEvents("viewer"), gate=gate)))))
+
+    queue = [(e["node"], e["phase"]) for e in events if e.get("event") == "status" and e["node"] == "queue"]
+    assert queue == [("queue", "start"), ("queue", "end")] and events[0]["node"] == "queue"
+    assert gate.running == 0

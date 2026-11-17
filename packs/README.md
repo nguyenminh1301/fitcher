@@ -22,7 +22,7 @@ Loading a pack (`app.packs.loader.load_pack`) validates every file against its s
 All problems are reported together as `<file>: <item path>: <message>`.
 The API tests load every pack here against the column lists of the dbt mart schemas.
 
-[`ecommerce_twin/`](ecommerce_twin/) describes the `sales_lines`, `returns_fact` and `sessions_daily` marts of the e-commerce lab dataset.
+[`ecommerce_twin/`](ecommerce_twin/) describes the `sales_lines`, `returns_fact` and `sessions_daily` marts of the e-commerce development dataset.
 
 ## Sample data for the web app
 

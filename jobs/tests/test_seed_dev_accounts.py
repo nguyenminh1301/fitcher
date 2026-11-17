@@ -22,10 +22,10 @@ def db(tmp_path):
 def test_the_six_development_users_can_sign_in_with_their_roles(db, capsys):
     assert job.seed(db, job.read_accounts(), PASSWORD) == 6
 
-    admin = accounts.authenticate(db, "lab.admin@fitcher.test", PASSWORD)
-    assert (admin.id, admin.roles) == ("lab.admin", ("admin", "analyst"))
+    admin = accounts.authenticate(db, "dev.admin@fitcher.test", PASSWORD)
+    assert (admin.id, admin.roles) == ("dev.admin", ("admin", "analyst"))
     assert [account.id for account in accounts.list_all(db)] == [
-        "lab.admin", "lab.analyst", "lab.marketing", "lab.northwest", "lab.partner", "lab.reviewer",
+        "dev.admin", "dev.analyst", "dev.marketing", "dev.northwest", "dev.partner", "dev.reviewer",
     ]
     assert PASSWORD not in capsys.readouterr().out
 
@@ -38,11 +38,11 @@ def test_the_instance_is_put_in_team_mode(db):
 
 def test_a_second_run_resets_passwords_roles_and_status(db):
     job.seed(db, job.read_accounts(), PASSWORD)
-    accounts.update(db, "lab.analyst", roles=["marketing"], enabled=False)
+    accounts.update(db, "dev.analyst", roles=["marketing"], enabled=False)
 
     job.seed(db, job.read_accounts(), "another-password")
 
-    analyst = accounts.authenticate(db, "lab.analyst@fitcher.test", "another-password")
+    analyst = accounts.authenticate(db, "dev.analyst@fitcher.test", "another-password")
     assert analyst is not None and analyst.roles == ("analyst",)
     assert len(accounts.list_all(db)) == 6
 
@@ -62,10 +62,10 @@ def test_the_password_comes_from_the_environment(tmp_path, monkeypatch):
 
 def test_a_reseed_restores_the_admin_when_another_account_holds_the_only_admin_role(db):
     job.seed(db, job.read_accounts(), PASSWORD)
-    accounts.update(db, "lab.analyst", roles=["analyst", "admin"])
-    accounts.update(db, "lab.admin", enabled=False)
+    accounts.update(db, "dev.analyst", roles=["analyst", "admin"])
+    accounts.update(db, "dev.admin", enabled=False)
 
     job.seed(db, job.read_accounts(), PASSWORD)
 
-    assert accounts.get(db, "lab.admin").enabled
-    assert accounts.get(db, "lab.analyst").roles == ("analyst",)
+    assert accounts.get(db, "dev.admin").enabled
+    assert accounts.get(db, "dev.analyst").roles == ("analyst",)

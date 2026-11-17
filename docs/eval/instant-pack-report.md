@@ -98,7 +98,7 @@ Measured on 2026-11-15 with the same model tiers as the baseline, reference date
 Both sources were connected as PostgreSQL sources of the `sources` profile and built through the instant pack job (`POST /pack/instant`), with no file written by hand and every generated item approved as unreviewed:
 
 - `iowa_src`: database `iowa_liquor` of the fixture (one text table, copied: 2,490,620 rows). Estimate 3,080 prompt tokens; one dataset; 1 min 20 s from the copy to the active pack.
-- `ecom_src`: database `ecommerce_twin`, which `infra/sources/ecommerce_twin/seed.sh` fills from the lab tables with typed columns, primary keys and the ten foreign keys of the baseline, all seven tables copied. Estimate 13,727 prompt tokens; twelve marts (five wide), eleven datasets (`order_items` alone has no time column), seven approved join paths; 2 min 10 s.
+- `ecom_src`: database `ecommerce_twin`, which `infra/sources/ecommerce_twin/seed.sh` fills from the development tables with typed columns, primary keys and the ten foreign keys of the baseline, all seven tables copied. Estimate 13,727 prompt tokens; twelve marts (five wide), eleven datasets (`order_items` alone has no time column), seven approved join paths; 2 min 10 s.
 
 The first run of `ecom_src` stopped at the profile step: scanning the wide views' joins exceeded the 2 GB query memory limit. The generator now profiles each wide view from the tables it joins instead, and the job is otherwise unchanged.
 

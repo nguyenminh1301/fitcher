@@ -22,7 +22,7 @@ It filled all 36 placeholders, added no new items and left no item with an `erro
 
 ## Review
 
-The reviewer signed in to the console as the lab `pack_reviewer`, read each drafted item against the hand-written meaning and the profile's real values, test-ran the metrics and approved all 36.
+The reviewer signed in to the console as the development `pack_reviewer`, read each drafted item against the hand-written meaning and the profile's real values, test-ran the metrics and approved all 36.
 Three drafts were edited before approval because they lost a rule the pack relies on:
 
 | Item | Draft | Approved |

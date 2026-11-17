@@ -21,6 +21,7 @@ from typing import Annotated
 from fastapi import Depends, HTTPException, status
 
 from app.api.agent import Agent
+from app.api.limits import QuestionGate, one_job
 from app.api.rate_limit import RateLimiter
 from app.config import load_settings, positive_int
 from app.conversation.store import ConversationStore, conversations_client
@@ -42,7 +43,7 @@ from app.onboarding.instant import InstantPipeline, InstantWarehouse
 from app.packs.active import active_pack, set_active_pack
 from app.packs.compiler import CompileError, CompiledPack, compile_pack, load_compiled
 from app.packs.search_indices import INDEX_NAMES, alias_name
-from app.state.settings import documents_enabled
+from app.state.settings import Settings, documents_enabled
 from app.screening.screen import Screener
 from app.search.engine import open_search
 from app.sources.client import source_admin_client
@@ -305,7 +306,11 @@ def _run_eval(pack: str) -> int:
 
 @cache
 def get_eval_runs() -> EvalRuns:
-    return EvalRuns(_run_eval)
+    def execute(pack: str) -> int:
+        with one_job():  # an eval run waits for a sync or a compile in progress, and they for it
+            return _run_eval(pack)
+
+    return EvalRuns(execute)
 
 
 @cache
@@ -330,6 +335,12 @@ def get_admin_logs() -> AdminLogs:
         return AdminLogs.from_client(trace_reader_client(), pack_identity(get_compiled_or_none()).name)
     except Exception as error:  # noqa: BLE001 - a missing password or ClickHouse unreachable
         raise unavailable(f"the run logs are unavailable: {error}") from None
+
+
+@cache
+def get_question_gate() -> QuestionGate:
+    """The questions answered at once; ``limits.concurrent_questions`` is read again as each question queues."""
+    return QuestionGate(lambda: Settings(get_state_db()).get("limits", "concurrent_questions"))
 
 
 @cache
@@ -390,6 +401,11 @@ def _compile_instant(pack_dir: Path) -> object:
     """Compile an instant pack as ``pack_admin``, as ``jobs.compile_pack`` does as the admin user."""
     settings = load_settings()
     compiled_dir = Path(settings.compiled_pack_dir)
+    with one_job():
+        return _compile_instant_now(pack_dir, settings, compiled_dir)
+
+
+def _compile_instant_now(pack_dir: Path, settings, compiled_dir: Path) -> object:
     lock = compile_lock_path(compiled_dir, pack_dir.name)
     lock.parent.mkdir(parents=True, exist_ok=True)
     lock.write_text(datetime.now(UTC).isoformat(), encoding="utf-8")

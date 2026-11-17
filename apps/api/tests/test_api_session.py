@@ -2,6 +2,7 @@
 
 from agent_fixtures import compiled_fixture
 from fastapi.testclient import TestClient
+import logging
 import pytest
 
 from app.api import runtime
@@ -118,3 +119,16 @@ def test_a_proxy_https_header_is_trusted_only_when_the_public_hosts_are_listed(c
 
     monkeypatch.setenv("FITCHER_ALLOWED_HOSTS", "fitcher.example.com")
     assert "Secure" in client.post("/session", json=SIGN_IN, headers=forwarded).headers["set-cookie"]
+
+
+def test_the_session_id_and_the_secret_key_reach_no_log_line_or_response_body(client, account, caplog):
+    from app.state.db import data_dir
+    from app.state.secrets import KEY_FILE
+
+    caplog.set_level(logging.DEBUG)
+    signed_in = client.post("/session", json=SIGN_IN)
+    token = client.cookies["fitcher_session"]
+    bodies = [signed_in.text, client.get("/me").text, client.get("/conversations").text, client.delete("/session").text]
+    key_file = data_dir() / KEY_FILE
+    secrets = [token, *([key_file.read_text(encoding="ascii").strip()] if key_file.exists() else [])]
+    assert all(secret not in text for secret in secrets for text in [*bodies, caplog.text])

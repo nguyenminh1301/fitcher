@@ -20,11 +20,11 @@ def client():
 
 
 def test_me_returns_the_signed_in_user_and_active_role(client):
-    response = client.get("/me", headers=SessionHeaders(user_id="lab.viewer", display_name="Lab Viewer"))
+    response = client.get("/me", headers=SessionHeaders(user_id="dev.viewer", display_name="Lab Viewer"))
 
     assert response.status_code == 200
     assert response.json() == {
-        "user_id": "lab.viewer", "display_name": "Lab Viewer", "roles": ["viewer"], "active_role": "viewer", "mode": "team",
+        "user_id": "dev.viewer", "display_name": "Lab Viewer", "roles": ["viewer"], "active_role": "viewer", "mode": "team",
         "exposed": False,
     }
 
@@ -38,7 +38,7 @@ def test_a_missing_or_unknown_session_is_unauthorized_without_detail(client, hea
 
 
 def test_a_user_without_a_pack_role_has_no_active_role(client):
-    response = client.get("/me", headers=SessionHeaders(["admin"], user_id="lab.admin"))
+    response = client.get("/me", headers=SessionHeaders(["admin"], user_id="dev.admin"))
 
     assert response.status_code == 200
     assert response.json()["roles"] == ["admin"]
