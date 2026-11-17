@@ -555,3 +555,17 @@ def test_the_sql_event_names_the_unreviewed_metrics_the_answer_uses():
 
     assert sql.event == "sql" and sql.unreviewed_metrics == ["refunded_value"]
     assert AnswerEvents("viewer").node("guard", "end", state, {"attempts": [SimpleNamespace(sql="SELECT 1")]})[1].unreviewed_metrics == []
+
+
+def test_a_question_beyond_the_limit_streams_a_queue_status_until_it_gets_a_place():
+    from app.api.limits import QuestionGate
+
+    gate = QuestionGate(lambda: 1, poll_seconds=0.01)
+    gate.enter(lambda: None, lambda: False)
+    threading.Timer(0.1, gate.leave).start()
+
+    events = parse("".join(asyncio.run(drain(event_stream(ScriptedRun(), QUESTION, AnswerEvents("viewer"), gate=gate)))))
+
+    queue = [(e["node"], e["phase"]) for e in events if e.get("event") == "status" and e["node"] == "queue"]
+    assert queue == [("queue", "start"), ("queue", "end")] and events[0]["node"] == "queue"
+    assert gate.running == 0

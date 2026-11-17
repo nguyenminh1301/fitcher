@@ -18,6 +18,7 @@ be running is killed.
 """
 
 import asyncio
+from concurrent.futures import ThreadPoolExecutor
 from collections.abc import AsyncIterator, Mapping
 import logging
 import math
@@ -184,6 +185,12 @@ class StoredTurn:
         )
 
 
+# Questions run, or wait for a place, on their own threads: the event loop's default executor holds only
+# min(32, CPUs + 4) threads, which on a small host is fewer than the questions limits.concurrent_questions
+# lets run plus those waiting in order (docs/operations.md, load measurement).
+QUESTION_THREADS = ThreadPoolExecutor(max_workers=128, thread_name_prefix="question")
+
+
 async def event_stream(
     run: AgentRun, question: str, events: AnswerEvents, heartbeat_seconds: float = HEARTBEAT_SECONDS,
     record: Record | None = None, gate: QuestionGate | None = None,
@@ -241,7 +248,7 @@ async def event_stream(
                 gate.leave()
             put(None)
 
-    loop.run_in_executor(None, work)
+    loop.run_in_executor(QUESTION_THREADS, work)
     finished = False
     try:
         while True:
