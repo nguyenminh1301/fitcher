@@ -111,6 +111,27 @@ class _ProviderFailure(Exception):
     """The SDK call raised; carries only the error type's name."""
 
 
+# What a person can do about a provider failure, by the SDK's error type. The provider's own message is never
+# shown: it can quote the key or the request.
+FAILURE_HINTS = {
+    "RateLimitError": "the provider is limiting requests; a free model's daily or per-minute limit may be used up. "
+                      "Try again later or choose another model on the Models page",
+    "AuthenticationError": "the provider refused the API key; enter it again on the Models page",
+    "PermissionDeniedError": "the API key may not use this model; choose another model on the Models page",
+    "NotFoundError": "the provider does not have this model; choose another model on the Models page",
+    "Timeout": "the model took too long to answer; try again or choose a faster model on the Models page",
+    "APIConnectionError": "the provider could not be reached; check its address and the network",
+    "ServiceUnavailableError": "the provider is unavailable for now; try again later",
+    "ContextWindowExceededError": "the request is longer than this model accepts; choose a model with a larger context",
+}
+
+
+def failure_text(error_type: str) -> str:
+    """An error type with what to do about it, when that is known."""
+    hint = FAILURE_HINTS.get(error_type)
+    return f"{error_type} ({hint})" if hint else error_type
+
+
 @dataclass(frozen=True)
 class _Sender:
     """Screens one call, sends it through the SDK and writes its ``llm_calls`` row."""
@@ -202,7 +223,7 @@ class Gateway:
             try:
                 response = self._sender.send(tier, route, (prompt.system, prompt.user), request)
             except _ProviderFailure as failure:
-                raise LLMError(f"request to model {route.model} failed: {failure}") from None
+                raise LLMError(f"request to model {route.model} failed: {failure_text(str(failure))}") from None
             choices = calls.field(response, "choices")
             message = calls.field(choices[0], "message") if isinstance(choices, list) and choices else None
             content = calls.field(message, "content")

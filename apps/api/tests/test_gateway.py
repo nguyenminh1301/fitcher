@@ -152,6 +152,17 @@ def test_a_provider_error_raises_llm_error_without_the_providers_message(screene
     assert raised.value.__cause__ is None and raised.value.__suppress_context__
 
 
+def test_a_rate_limited_call_says_what_the_user_can_do(screened):
+    sdk = FakeSdk(litellm.RateLimitError("Rate limit exceeded: free-models-per-day. sk-or-v1-abcd", "openrouter", "x:free"))
+
+    with pytest.raises(LLMError) as raised:
+        gateway(sdk).text("fast", PROMPT)
+
+    message = str(raised.value)
+    assert "RateLimitError" in message and "limiting requests" in message and "Models page" in message
+    assert "sk-or" not in message
+
+
 @pytest.mark.parametrize("content", [None, "", "   "])
 def test_an_empty_reply_raises_llm_error(screened, content):
     with pytest.raises(LLMError, match="empty reply"):
