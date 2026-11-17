@@ -19,8 +19,10 @@ the turns after it out of the thread and of the context.
 
 Conversations and groups change by new ``ReplacingMergeTree`` rows read with
 ``FINAL``; each new row's ``updated_at`` is after the previous one, so two
-changes within one millisecond keep their order. Delete only hides: the rows
-stay, since conversations have no expiry. Search folds case and diacritics over the user's
+changes within one millisecond keep their order. Conversations have no
+expiry: in team mode delete only hides, and the rows stay for an admin to
+read; in individual mode ``erase`` removes the conversation, its messages and
+the feedback on its answers with lightweight deletes. Search folds case and diacritics over the user's
 titles and own questions, read by the ``(user_id, ...)`` key.
 """
 
@@ -53,6 +55,15 @@ USER = "agent_conversations"
 # Stream events kept apart from an answer's stored events.
 NOT_STORED = frozenset({"status", "result"})
 
+ERASE_FEEDBACK_SQL = (
+    "DELETE FROM agent_logs.feedback WHERE user_id = {user_id:String} AND has({trace_ids:Array(String)}, trace_id)"
+)
+ERASE_MESSAGES_SQL = (
+    "DELETE FROM agent_logs.chat_messages WHERE user_id = {user_id:String} AND conversation_id = {conversation_id:String}"
+)
+ERASE_CONVERSATION_SQL = (
+    "DELETE FROM agent_logs.conversations WHERE user_id = {user_id:String} AND conversation_id = {conversation_id:String}"
+)
 CONVERSATION_COLUMNS = ("conversation_id", "title", "pinned", "group_id", "deleted", "created_at", "updated_at")
 GROUP_COLUMNS = ("group_id", "name", "deleted", "updated_at")
 MESSAGE_COLUMNS = ("turn", "revision", "role", "content", "query_spec", "result", "trace_id", "ts", "events")
@@ -281,6 +292,15 @@ class ConversationStore:
     def delete(self, user_id: str, conversation_id: str) -> None:
         row = self._owned(user_id, conversation_id)
         self._insert(row.model_copy(update={"deleted": True, "updated_at": self._after(row.updated_at)}))
+
+    def erase(self, user_id: str, conversation_id: str) -> None:
+        """Remove the conversation for good: the feedback on its answers, its messages, then its rows."""
+        self._owned(user_id, conversation_id)
+        traces = sorted({row.trace_id for row in self._messages(user_id, conversation_id) if row.trace_id})
+        if traces:
+            self._client.command(ERASE_FEEDBACK_SQL, parameters={"user_id": user_id, "trace_ids": traces})
+        for sql in (ERASE_MESSAGES_SQL, ERASE_CONVERSATION_SQL):
+            self._client.command(sql, parameters={"user_id": user_id, "conversation_id": conversation_id})
 
     # groups
 

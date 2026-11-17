@@ -4,6 +4,7 @@
 
 ### Added
 
+- In individual mode, deleting a conversation removes it for good: its rows, its messages and the feedback on its answers are deleted from ClickHouse, while team mode still only hides it so an admin can read it.
 - Company documents can be turned off through `PUT /settings/documents` (`documents.enabled`, on by default; an admin answers the new last setup step, Documents): off answers 404 on every `/documents` endpoint, compiles `kb_docs` without chunks and lets `metadata_qa` answer from the glossary, metrics and datasets; turning it off while documents are kept needs confirmation and keeps the files, and turning it on again indexes them at the next compile.
 - The setup's Documents step turns company documents on or off, confirms when documents are kept, and uploads documents in place once a pack is active; the console hides the Documents page while documents are off.
 - Pack search can run in ClickHouse (`SEARCH_ENGINE=clickhouse`): each generation of a collection is a table in the `search` database written and queried by a dedicated `search_index` user, `search.live` switches all collections of a pack at once, and queries score dense, BM25 and trigram lists exactly and fuse them with RRF as Qdrant does.

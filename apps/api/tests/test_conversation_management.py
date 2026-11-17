@@ -210,6 +210,24 @@ def test_a_deleted_conversation_is_gone_for_its_owner_but_its_rows_stay(store, c
     assert len(client.tables["chat_messages"]) == 2 and client.tables["conversations"][-1]["deleted"] is True
 
 
+def test_erasing_a_conversation_removes_its_rows_and_feedback_and_leaves_the_others(store, client):
+    gone = answered(store, question="Doanh thu")
+    for row in client.tables["chat_messages"]:
+        row["trace_id"] = "g" * 32
+    kept = answered(store, question="Top widgets")
+    other = answered(store, user="bao", question="Doanh thu")
+    client.tables["feedback"] += [{"user_id": "ana", "trace_id": "g" * 32}, {"user_id": "ana", "trace_id": T["trace_id"]}]
+
+    store.erase("ana", gone.conversation_id)
+
+    assert [c.id for c in store.conversations("ana", limit=10, offset=0)] == [kept.conversation_id]
+    assert {row["conversation_id"] for row in client.tables["chat_messages"]} == {kept.conversation_id, other.conversation_id}
+    assert all(row["conversation_id"] != gone.conversation_id for row in client.tables["conversations"])
+    assert client.tables["feedback"] == [{"user_id": "ana", "trace_id": T["trace_id"]}]
+    with pytest.raises(ConversationNotFound):
+        store.erase("bao", kept.conversation_id)
+
+
 def test_groups_are_created_renamed_listed_and_deleted_per_user(store):
     sales = store.create_group("ana", "Sales")
     store.create_group("bao", "Bao's")

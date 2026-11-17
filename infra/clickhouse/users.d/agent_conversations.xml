@@ -5,7 +5,8 @@
         its owner, so follow-up questions see the previous turn, and writes a
         user's feedback on their own answers. It reaches only the conversation
         and feedback tables; every query filters by the requesting
-        user. The password comes from the clickhouse container environment.
+        user. In individual mode it deletes a
+        conversation for good (ALTER DELETE, used by lightweight DELETE). The password comes from the clickhouse container environment.
     -->
     <users>
         <agent_conversations>
@@ -16,10 +17,10 @@
                 <ip>::/0</ip>
             </networks>
             <grants>
-                <query>GRANT SELECT, INSERT ON agent_logs.chat_messages</query>
-                <query>GRANT SELECT, INSERT ON agent_logs.conversations</query>
+                <query>GRANT SELECT, INSERT, ALTER DELETE ON agent_logs.chat_messages</query>
+                <query>GRANT SELECT, INSERT, ALTER DELETE ON agent_logs.conversations</query>
                 <query>GRANT SELECT, INSERT ON agent_logs.conversation_groups</query>
-                <query>GRANT INSERT ON agent_logs.feedback</query>
+                <query>GRANT INSERT, ALTER DELETE ON agent_logs.feedback</query>
             </grants>
         </agent_conversations>
     </users>

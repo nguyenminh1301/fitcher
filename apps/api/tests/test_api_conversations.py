@@ -89,6 +89,20 @@ def test_rename_pin_group_and_delete(client, store):
     assert client.get(f"/conversations/{mine}", headers=headers()).status_code == 404
 
 
+@pytest.mark.parametrize("for_good", [False, True])
+def test_delete_hides_in_team_mode_and_erases_in_individual_mode(client, store, for_good):
+    from app.api.conversations import deletes_for_good
+
+    app.dependency_overrides[deletes_for_good] = lambda: for_good
+    mine = asked(store)
+
+    assert client.delete(f"/conversations/{mine}", headers=headers()).status_code == 204
+
+    rows = [row for row in store._client.tables["conversations"] if row["conversation_id"] == mine]
+    assert (rows == []) is for_good
+    assert client.get(f"/conversations/{mine}", headers=headers()).status_code == 404
+
+
 @pytest.mark.parametrize(("method", "path", "body"), [
     ("get", "/conversations/{conversation}", None),
     ("patch", "/conversations/{conversation}", {"title": "Mine now"}),
