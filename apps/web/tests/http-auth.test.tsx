@@ -33,6 +33,12 @@ describe("http auth", () => {
     expect(await createHttpAuth(fetcher({ "/api/pack": () => Response.json(pack) })).pack()).toEqual(pack);
   });
 
+  it("reads no pack while signed out, so the page can go on to sign in", async () => {
+    const answer = () => Response.json({ error: "signed_out" }, { status: 401 });
+
+    expect(await createHttpAuth(fetcher({ "/api/pack": answer })).pack()).toBeNull();
+  });
+
   it("reads no pack while none is active, so a new instance still loads", async () => {
     const answer = () => Response.json({ detail: "no pack is active" }, { status: 503 });
 
