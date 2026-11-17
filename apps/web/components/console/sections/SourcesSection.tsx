@@ -159,6 +159,8 @@ function SourceRow({ sources, source, syncing, onSyncing, onChanged, onDelete }:
           ) : (
             <Button size="sm" aria-label={t("sources.syncOf", { name: source.id })} disabled={source.selected_count === 0} onClick={() => void syncNow()}>{t("sources.syncNow")}</Button>
           )}
+          <Button size="sm" variant="primary" aria-label={t("sources.buildOf", { name: source.id })} disabled={source.selected_count === 0 || running}
+            onClick={() => void startRebuild()}>{t("sources.build")}</Button>
           {source.kind !== "file" ? <Button size="sm" aria-label={t("sources.editOf", { name: source.id })} onClick={() => setPanel(panel === "edit" ? null : "edit")}>{t("sources.edit")}</Button> : null}
           <Button size="sm" aria-label={t("sources.deleteOf", { name: source.id })} onClick={onDelete}>{t("sources.delete")}</Button>
         </span>
@@ -175,7 +177,8 @@ function SourceRow({ sources, source, syncing, onSyncing, onChanged, onDelete }:
         <InstantPack sources={sources} sourceId={source.id} tables={rebuild} onAsk={() => { setRebuild(null); void onChanged(); }} />
       ) : null}
       {panel === "tables" && tables ? (
-        <TableChooser sources={sources} id={source.id} tables={tables} copyOnly={source.kind === "sqlserver"} onSaved={() => void onChanged()} />
+        <TableChooser sources={sources} id={source.id} tables={tables} copyOnly={source.kind === "sqlserver"} onSaved={() => void onChanged()}
+          onSynced={() => onSyncing(true)} />
       ) : null}
       {panel === "edit" ? <EditForm sources={sources} source={source} onDone={() => { setPanel(null); void onChanged(); }} /> : null}
     </li>

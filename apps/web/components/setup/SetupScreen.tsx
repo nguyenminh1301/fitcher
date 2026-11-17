@@ -107,7 +107,7 @@ function DataStep({ sources, disabled, onDone, onSkip, onAsk }: {
               onSynced={() => setSynced(true)} />
           )}
           <div className="fc-row" style={{ gap: "var(--base-size-8)" }}>
-            {connected ? <Button variant="primary" onClick={onDone}>{t("setup.continue")}</Button> : null}
+            {connected ? <Button onClick={onDone}>{t("setup.continueWithoutPack")}</Button> : null}
             {connected || disabled ? null : <Button onClick={onSkip}>{t("setup.skip")}</Button>}
           </div>
         </div>

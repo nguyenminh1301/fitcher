@@ -127,6 +127,12 @@ export function TableChooser({ sources, id, tables, copyOnly, onSaved, onSynced,
       setShown(result);
       setSaved(true);
       onSaved?.(result);
+      // Saving prepares the chosen tables at once: live tables are attached and copies start, so the pack
+      // can be built right after without a separate sync.
+      if (onSynced && result.some((table) => table.selected)) {
+        await sources.sync(id);
+        onSynced();
+      }
     } catch (cause) {
       setError(message(cause));
     } finally {
@@ -207,9 +213,9 @@ export function TableChooser({ sources, id, tables, copyOnly, onSaved, onSynced,
       <p className="fc-muted" style={{ margin: 0 }}>{t("sources.approx")} {t("sources.cursorHelp")}</p>
       {copyOnly ? <p className="fc-muted" style={{ margin: 0 }}>{t("sources.copyOnly")}</p> : null}
       {error ? <WarningBanner tone="danger">{t("sources.failed", { reason: error })}</WarningBanner> : null}
-      {saved ? <p style={{ margin: 0 }} role="status">{t("sources.saved")}</p> : null}
+      {saved ? <p style={{ margin: 0 }} role="status">{onSynced ? t("sources.savedAndPreparing") : t("sources.saved")}</p> : null}
       <div className="fc-row" style={{ gap: "var(--base-size-8)" }}>
-        <Button variant="primary" disabled={busy} onClick={() => void save()}>{t("sources.saveTables")}</Button>
+        <Button variant="primary" disabled={busy} onClick={() => void save()}>{onSynced ? t("sources.saveAndPrepare") : t("sources.saveTables")}</Button>
         {onSynced ? <Button disabled={busy || !chosen} onClick={() => void syncNow()}>{t("sources.syncNow")}</Button> : null}
       </div>
     </div>

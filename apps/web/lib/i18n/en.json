@@ -510,7 +510,8 @@
     "documentsUploaded": "Uploaded documents",
     "documentsNoPack": "Upload documents on the Documents page once your data is connected.",
     "documentsKept": "{count} kept documents stay stored but are no longer searched.",
-    "documentsConfirmOff": "Turn documents off"
+    "documentsConfirmOff": "Turn documents off",
+    "continueWithoutPack": "Continue without a pack"
   },
   "models": {
     "providers": "Providers",
@@ -696,6 +697,10 @@
     "kind_sqlserver": "SQL Server",
     "sqlserverTls": "The certificate of a SQL Server connection is not verified; the connection is encrypted when TLS is required.",
     "copyOnly": "SQL Server tables are read through fitcher and copied only; there is no live mode.",
-    "why_copy_only": "SQL Server is copied only"
+    "why_copy_only": "SQL Server is copied only",
+    "saveAndPrepare": "Save and prepare tables",
+    "savedAndPreparing": "Selection saved. Preparing the tables…",
+    "build": "Build the pack",
+    "buildOf": "Build the pack of {name}"
   }
 }
