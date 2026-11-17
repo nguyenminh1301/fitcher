@@ -74,7 +74,7 @@ To work on fitcher itself with the development datasets, the sample packs and se
 These examples use the [development setup](CONTRIBUTING.md#development-setup), which publishes the API on port 8000. The API streams each answer as server-sent events. In individual mode a request from the local machine needs no sign-in; in team mode, sign in once to get the session cookie and send it with each request. In individual mode a request that changes something must name the page it comes from in `Origin`, which the example sends in both modes:
 
 ```bash
-curl -s -c fitcher.cookies -H "Content-Type: application/json" -H "Origin: http://127.0.0.1:8000" -d "{\"email\":\"lab.analyst@fitcher.test\",\"password\":\"$DEV_ACCOUNT_PASSWORD\"}" http://127.0.0.1:8000/session
+curl -s -c fitcher.cookies -H "Content-Type: application/json" -H "Origin: http://127.0.0.1:8000" -d "{\"email\":\"dev.analyst@fitcher.test\",\"password\":\"$DEV_ACCOUNT_PASSWORD\"}" http://127.0.0.1:8000/session
 curl -N -b fitcher.cookies -H "Content-Type: application/json" -H "Origin: http://127.0.0.1:8000" -d '{"question":"Top 10 best-selling products in Q1 2024 compared with Q1 2025","timezone":"Asia/Ho_Chi_Minh"}' http://127.0.0.1:8000/ask
 ```
 

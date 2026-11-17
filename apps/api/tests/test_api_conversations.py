@@ -16,7 +16,7 @@ from app.conversation.store import ConversationStore
 from app.main import app
 
 
-def headers(user: str = "lab.viewer") -> SessionHeaders:
+def headers(user: str = "dev.viewer") -> SessionHeaders:
     return SessionHeaders(user_id=user)
 
 
@@ -34,7 +34,7 @@ def client(store):
     app.dependency_overrides.clear()
 
 
-def asked(store, user="lab.viewer", question="Doanh thu quý 1") -> str:
+def asked(store, user="dev.viewer", question="Doanh thu quý 1") -> str:
     turn = store.open_turn(user, None, question)
     store.question(turn)
     store.answer(turn, trace_id="t" * 32, content="Blue led.", query_spec=None, result=None)
@@ -44,7 +44,7 @@ def asked(store, user="lab.viewer", question="Doanh thu quý 1") -> str:
 def test_list_search_and_read_a_thread(client, store):
     mine = asked(store)
     asked(store, question="Top widgets")
-    asked(store, user="lab.analyst", question="Doanh thu của người khác")
+    asked(store, user="dev.analyst", question="Doanh thu của người khác")
 
     listed = client.get("/conversations", headers=headers()).json()
     found = client.get("/conversations/search", params={"q": "DOANH THU"}, headers=headers()).json()
@@ -112,8 +112,8 @@ def test_delete_hides_in_team_mode_and_erases_in_individual_mode(client, store, 
     ("patch", "/conversations/{own}", {"group_id": "{group}"}),
 ])
 def test_another_users_conversation_or_group_is_not_found(client, store, method, path, body):
-    theirs = asked(store, user="lab.analyst")
-    their_group = store.create_group("lab.analyst", "Theirs").id
+    theirs = asked(store, user="dev.analyst")
+    their_group = store.create_group("dev.analyst", "Theirs").id
     own = asked(store)
     fill = {"conversation": theirs, "group": their_group, "own": own}
     body = {key: value.format(**fill) for key, value in body.items()} if body else None
@@ -122,7 +122,7 @@ def test_another_users_conversation_or_group_is_not_found(client, store, method,
 
     assert response.status_code == 404
     assert client.get("/conversations", headers=headers()).json()[0]["id"] == own
-    assert store.thread("lab.analyst", theirs).conversation.title == "Doanh thu quý 1"
+    assert store.thread("dev.analyst", theirs).conversation.title == "Doanh thu quý 1"
 
 
 def test_every_conversation_endpoint_needs_a_session(client):
@@ -158,7 +158,7 @@ def test_an_edit_answers_the_new_question_and_drops_the_turns_after_it(store):
 
     assert kinds(parse(edited.text))[-1] == "done"
     assert editor.histories == [[]]
-    thread = store.thread("lab.viewer", conversation_id)
+    thread = store.thread("dev.viewer", conversation_id)
     assert [(turn.turn, turn.revision, turn.question) for turn in thread.turns] == [(1, 2, "Top widgets in Q2 2025")]
     assert [event.event for event in thread.turns[0].events] == ["sql", "result", "chart_spec", "summary", "done"]
 
@@ -169,7 +169,7 @@ def test_a_retry_asks_the_stored_question_again(store):
 
     ask_with(answer(), store, {"question": "anything", "conversation_id": conversation_id, "retry_of_turn": 1})
 
-    thread = store.thread("lab.viewer", conversation_id)
+    thread = store.thread("dev.viewer", conversation_id)
     assert [(turn.turn, turn.revision, turn.question) for turn in thread.turns] == [(1, 2, QUESTION)]
 
 

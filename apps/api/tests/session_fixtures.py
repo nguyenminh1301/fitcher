@@ -31,7 +31,7 @@ class SessionHeaders(Mapping[str, str]):
     the tests that only need a signed-in user.
     """
 
-    def __init__(self, roles: Iterable[str] = ("viewer",), user_id: str = "lab.viewer", display_name: str | None = None):
+    def __init__(self, roles: Iterable[str] = ("viewer",), user_id: str = "dev.viewer", display_name: str | None = None):
         self._roles = list(roles)
         self._user_id = user_id
         self._display_name = display_name or user_id

@@ -10,14 +10,14 @@
   ],
   "identities": [
     {
-      "user_id": "lab.analyst",
+      "user_id": "dev.analyst",
       "display_name": "Lab Analyst",
       "roles": [
         "analyst"
       ]
     },
     {
-      "user_id": "lab.reviewer",
+      "user_id": "dev.reviewer",
       "display_name": "Lab Reviewer",
       "roles": [
         "pack_reviewer",
@@ -25,7 +25,7 @@
       ]
     },
     {
-      "user_id": "lab.admin",
+      "user_id": "dev.admin",
       "display_name": "Lab Admin",
       "roles": [
         "admin",

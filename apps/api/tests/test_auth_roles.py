@@ -31,6 +31,6 @@ def test_a_token_without_a_pack_role_is_refused():
 
 
 def test_known_roles_keep_pack_and_console_roles_only():
-    assert known_roles(["offline_access", "admin", "partner", "default-roles-lab", "analyst"], PACK_ROLES) == [
+    assert known_roles(["offline_access", "admin", "partner", "default-roles-dev", "analyst"], PACK_ROLES) == [
         "analyst", "partner", "admin",
     ]

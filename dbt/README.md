@@ -17,7 +17,7 @@ Each source folder is tagged with its manifest's `dbt_tag` in `dbt_project.yml`,
 All sources share this project, so dbt rejects two models that resolve to the same relation; models never set `alias`.
 No dbt packages are used, so builds need no network access.
 
-## E-commerce lab marts
+## E-commerce development marts
 
 | Mart | Grain |
 | --- | --- |
@@ -53,4 +53,4 @@ docker compose run --rm jobs dbt compile --project-dir dbt --profiles-dir dbt --
 The compiled acceptance query is written to `/tmp/dbt/target/compiled/fitcher/analyses/top_products_q1_compare.sql` inside the container.
 The `top_products_q1_matches_staging` test recomputes the same answer from the staging views on every build.
 
-See [DECISIONS §4](../docs/DECISIONS.md#4-lab-dataset) and the [Phase 1 plan](../docs/plans/phase-01-data-and-marts.md).
+See [DECISIONS §4](../docs/DECISIONS.md#4-development-datasets-and-data-sources) and the [Phase 1 plan](../docs/plans/phase-01-data-and-marts.md).

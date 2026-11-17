@@ -106,7 +106,7 @@ def test_removing_the_provider_turns_oidc_sign_in_off(configured, log):
 
 
 def test_only_an_admin_reads_or_changes_the_provider(client):
-    sign_in(client, "lab.viewer", ["viewer"])
+    sign_in(client, "dev.viewer", ["viewer"])
 
     assert client.get("/settings/oidc").status_code == 403
     assert client.put("/settings/oidc", json=CONFIG).status_code == 403

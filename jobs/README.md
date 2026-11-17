@@ -113,7 +113,7 @@ The catalog is read with these same grants: PostgreSQL's `pg_catalog` and `infor
 
 ### Fixture sources
 
-The `sources` Compose profile starts lab-only PostgreSQL, MySQL, MongoDB, S3-compatible (SeaweedFS) and SQL Server fixtures seeded with the synthetic widget dataset of [`infra/sources/fixtures`](../infra/sources/fixtures) (40 widgets, 3,000 sales and 300 refunds), each with a read-only user.
+The `sources` Compose profile starts development-only PostgreSQL, MySQL, MongoDB, S3-compatible (SeaweedFS) and SQL Server fixtures seeded with the synthetic widget dataset of [`infra/sources/fixtures`](../infra/sources/fixtures) (40 widgets, 3,000 sales and 300 refunds), each with a read-only user.
 The manifests `fixture_postgres`, `fixture_mysql`, `fixture_mongodb` and `fixture_files` feed the `fixture_widgets` marts `widget_sales` and `widget_refunds`, whose columns cover the minimal test pack.
 
 ```bash

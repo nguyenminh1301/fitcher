@@ -2,7 +2,7 @@
 # Seeds the fixture SQL Server: starts the server, creates the widget tables from /fixtures, a type probe table
 # and a login that can only read them, then keeps the server in the foreground. The image's own entrypoint runs
 # no init scripts, so this script is the container's command.
-# The lab passwords are placed in SQL literals, so they must not contain quotes. FIXTURE_ADMIN_PASSWORD is the
+# The fixture passwords are placed in SQL literals, so they must not contain quotes. FIXTURE_ADMIN_PASSWORD is the
 # server's administrator (sa) and never leaves this container.
 set -eu
 

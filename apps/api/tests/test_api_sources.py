@@ -19,7 +19,7 @@ from app.sources.service import SourceService
 from app.sources.store import SourceStore
 from app.state.settings import Settings
 
-ADMIN = SessionHeaders(["admin"], user_id="lab.admin")
+ADMIN = SessionHeaders(["admin"], user_id="dev.admin")
 VIEWER = SessionHeaders()
 PASSWORD = "reader-pass-4711-xyz"
 BODY = {"kind": "postgres", "host": "db.internal", "port": 5432, "database": "erp", "schema_name": "public",

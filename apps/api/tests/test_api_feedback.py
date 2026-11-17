@@ -14,7 +14,7 @@ from app.main import app
 TRACE = "a" * 32
 
 
-def headers(user: str = "lab.viewer") -> SessionHeaders:
+def headers(user: str = "dev.viewer") -> SessionHeaders:
     return SessionHeaders(user_id=user)
 
 
@@ -26,7 +26,7 @@ def tables():
 @pytest.fixture
 def client(tables):
     store = ConversationStore(tables)
-    turn = store.open_turn("lab.viewer", None, "Top widgets")
+    turn = store.open_turn("dev.viewer", None, "Top widgets")
     store.question(turn)
     store.answer(turn, trace_id=TRACE, content="Blue led.", query_spec=None, result=None)
     app.dependency_overrides[runtime.get_compiled] = lambda: compiled_fixture()
@@ -42,7 +42,7 @@ def test_a_like_with_a_note_is_written_to_feedback(client, tables):
     assert response.status_code == 204
     [row] = tables.tables["feedback"]
     assert {key: row[key] for key in ("user_id", "trace_id", "rating", "note")} == {
-        "user_id": "lab.viewer", "trace_id": TRACE, "rating": "dislike", "note": "Wrong quarter",
+        "user_id": "dev.viewer", "trace_id": TRACE, "rating": "dislike", "note": "Wrong quarter",
     }
 
 
@@ -52,7 +52,7 @@ def test_the_note_is_optional(client, tables):
 
 
 def test_feedback_on_another_users_answer_is_rejected(client, tables):
-    response = client.post("/feedback", json={"trace_id": TRACE, "rating": "like"}, headers=headers("lab.analyst"))
+    response = client.post("/feedback", json={"trace_id": TRACE, "rating": "like"}, headers=headers("dev.analyst"))
 
     assert response.status_code == 404
     assert tables.tables["feedback"] == []

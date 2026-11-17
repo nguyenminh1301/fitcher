@@ -133,7 +133,7 @@ def grid(cols, w, gap):
 
 
 def system():
-    s = Section("system", "1. How the pieces fit together", 1280)
+    s = Section("system", "1. How the pieces fit together in the one container", 1280)
     W, H = 200, 120
     c = grid(5, W, 70)
     r = [60, 250, 440]
@@ -142,9 +142,9 @@ def system():
     s.box("user", c[0], r[1], W, H, "user", "User", "Asks in English\nor Vietnamese", "yellow")
     s.box("web", c[1], r[1], W, H, "monitor", "Web app", "Chat and\nworkspace console", "blue")
     s.box("api", c[2], r[1], W, H, "server", "API and agent", "Understands the question\nand writes the SQL", "green")
-    s.box("gateway", c[3], r[1], W, H, "route", "LLM gateway", "Sends each task to\nthe right model (LiteLLM)", "orange")
+    s.box("gateway", c[3], r[1], W, H, "route", "LLM gateway", "Sends each task to\nthe right model (in the API)", "orange")
     s.box("models", c[4], r[1], W, H, "sparkles", "AI models", "OpenAI, Anthropic,\nGemini or a local model", "gray")
-    s.box("signin", c[1], r[2], W, H, "lock", "Sign-in", "Accounts and roles\n(Keycloak)", "violet")
+    s.box("signin", c[1], r[2], W, H, "lock", "Sign-in", "Local accounts or a\ncompany OpenID provider", "violet")
     s.box("dw", c[2], r[2], W, H, "database", "Data warehouse", "Company data and\nrun logs (ClickHouse)", "teal")
     s.box("sources", c[3], r[2], W, H, "plug", "Company sources", "Databases and files,\ncopied or read live", "gray")
     s.arrow("user", "web", "asks")

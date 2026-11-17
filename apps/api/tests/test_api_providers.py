@@ -13,7 +13,7 @@ from app.llm.provider_models import ModelListError
 from app.main import app
 from app.state.settings import Settings
 
-ADMIN = SessionHeaders(['admin'], user_id='lab.admin')
+ADMIN = SessionHeaders(['admin'], user_id='dev.admin')
 VIEWER = SessionHeaders()
 KEY = "sk-test-endpoint-key-7777"
 

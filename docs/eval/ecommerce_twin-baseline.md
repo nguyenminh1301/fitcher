@@ -1,6 +1,6 @@
 # Eval baseline: ecommerce_twin
 
-Recorded on 2026-11-02 by running, against the compiled pack and the lab marts:
+Recorded on 2026-11-02 by running, against the compiled pack and the development marts:
 
 ```bash
 docker compose run --rm -v ./build/eval:/app/build/eval api python -m jobs.eval --pack ecommerce_twin --baseline packs/ecommerce_twin/eval_baseline.json --output-dir build/eval

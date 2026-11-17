@@ -3,7 +3,7 @@
 This document is the source of truth for implementation.
 Every decision here is binding; to change one, edit this file first.
 
-v4 turns fitcher from a six-service lab into a self-hosted product that starts with one Docker command.
+v4 turns fitcher from a six-service development stack into a self-hosted product that starts with one Docker command.
 The reasoning, measurements and sources behind v4 are in [self-hosted-product-assessment.md](self-hosted-product-assessment.md).
 The architecture diagram in [finch-architecture.excalidraw](finch-architecture.excalidraw) and [architecture/](architecture/) still draws v3 and is redrawn in Phase 21; where it and this document disagree, this document wins.
 This document states the target. §16 lists each decision that differs from the code built in Phases 0 to 12 and the phase that implements it; until that phase is merged, the code keeps the earlier behaviour and nobody removes it ahead of its phase.
@@ -83,7 +83,7 @@ docker run -d --name fitcher -p 127.0.0.1:3000:3000 -v fitcher-data:/data ghcr.i
 - **Upgrades.** Every start applies the pending numbered schema changes to the app state and to ClickHouse, each recorded in a version table. A newer image therefore upgrades an older volume in place; a volume written by a newer image refuses to start on an older one.
 - **Local models.** A model server on the host is reached as `host.docker.internal`; on Linux the command adds `--add-host=host.docker.internal:host-gateway`.
 - **Jobs.** The job modules (`sync_sources`, `profile`, `draft_pack`, `compile_pack`, `eval`, `ingest_docs` and the others) are in the image and run with `docker exec`; the application starts the same code from the console.
-- **Development.** `compose.yaml` builds `api`, `web` and ClickHouse as separate services and keeps the `sources` fixtures and the `local-models` profile. dbt and the lab datasets are development tools and are not in the released image.
+- **Development.** `compose.yaml` builds `api`, `web` and ClickHouse as separate services and keeps the `sources` fixtures and the `local-models` profile. dbt and the development datasets are development tools and are not in the released image.
 
 ## 4. Development datasets and data sources
 

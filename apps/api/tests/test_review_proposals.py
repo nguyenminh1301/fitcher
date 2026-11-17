@@ -55,7 +55,7 @@ class Store:
         return self.known
 
     def feedback(self, pack, rating, start, end):
-        return [FeedbackRow(trace_id="t9", ts=TS, user_id="lab.analyst", rating="dislike", question="Revenue?",
+        return [FeedbackRow(trace_id="t9", ts=TS, user_id="dev.analyst", rating="dislike", question="Revenue?",
                             note="wrong", run_status="succeeded", proposal="proposed")]
 
 

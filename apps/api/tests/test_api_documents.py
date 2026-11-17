@@ -53,7 +53,7 @@ def test_upload_indexes_the_document_and_lists_it(client):
     assert response.status_code == 201
     body = response.json()
     assert body["name"] == "glossary.md" and body["status"] == "indexed" and body["roles"] == ["viewer"]
-    assert body["chunk_count"] == 3 and body["blocked_chunks"] == 0 and body["uploaded_by"] == "lab.viewer"
+    assert body["chunk_count"] == 3 and body["blocked_chunks"] == 0 and body["uploaded_by"] == "dev.viewer"
     listed = client.get("/documents", headers=REVIEWER).json()
     assert listed["compiling"] is False
     assert [item["id"] for item in listed["documents"]] == [body["id"]]

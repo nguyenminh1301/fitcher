@@ -1,6 +1,6 @@
 # Infrastructure
 
-Service configuration for the local lab; `compose.yaml` at the repository root references these files so plain `docker compose` works without `-f`.
+Service configuration for the local development stack; `compose.yaml` at the repository root references these files so plain `docker compose` works without `-f`.
 See [DECISIONS §3](../docs/DECISIONS.md#3-docker-compose) and the [Phase 0 plan](../docs/plans/phase-00-repository-and-infrastructure.md).
 
 | Path | Purpose |

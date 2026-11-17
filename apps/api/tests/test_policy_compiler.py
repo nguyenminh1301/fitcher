@@ -231,10 +231,10 @@ def test_read_managed_finds_objects_by_the_pack_prefixes_only():
 def test_apply_runs_the_plan_and_sends_only_password_hashes(pack):
     access = FakeAccess(ManagedObjects(row_policies={RowPolicy("fitcher_row__minimal__gone", "widget_sales")}))
 
-    statements = apply_policies(pack, access, "lab-secret")
+    statements = apply_policies(pack, access, "dev-secret")
 
     assert access.commands == statements
-    password = agent_password("lab-secret", "fitcher_agent__minimal__viewer")
+    password = agent_password("dev-secret", "fitcher_agent__minimal__viewer")
     assert not any(password in command for command in access.commands)
     assert any(hashlib.sha256(password.encode()).hexdigest() in command for command in access.commands)
     assert "DROP ROW POLICY IF EXISTS `fitcher_row__minimal__gone` ON `marts`.`widget_sales`" in statements

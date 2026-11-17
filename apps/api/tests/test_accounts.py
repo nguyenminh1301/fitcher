@@ -51,9 +51,9 @@ def test_a_short_password_is_refused(db):
 
 
 def test_a_given_id_is_kept(db):
-    created = accounts.create(db, "viewer@example.com", "Viewer", "correct horse", ["viewer"], account_id="lab.viewer")
+    created = accounts.create(db, "viewer@example.com", "Viewer", "correct horse", ["viewer"], account_id="dev.viewer")
 
-    assert created.id == "lab.viewer"
+    assert created.id == "dev.viewer"
 
 
 def test_authenticate_returns_the_account_for_the_right_password_only(db):

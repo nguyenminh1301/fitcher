@@ -256,7 +256,7 @@ def test_skip_index_stops_after_the_metric_test_run(pack_dir, tmp_path):
 def test_policies_are_applied_after_the_metric_test_run(pack_dir, tmp_path):
     fake = warehouse()
 
-    summary = run(pack_dir, tmp_path, FakeSearch(), warehouse=fake, access=fake, agent_secret="lab-secret", skip_index=True)
+    summary = run(pack_dir, tmp_path, FakeSearch(), warehouse=fake, access=fake, agent_secret="dev-secret", skip_index=True)
 
     assert summary.roles_applied == ["viewer"]
     assert fake.commands[0].startswith("CREATE SETTINGS PROFILE OR REPLACE `fitcher_agent__minimal`")
@@ -268,7 +268,7 @@ def test_failing_metric_applies_no_policy(pack_dir, tmp_path):
     fake = warehouse(failures={"sum(sale_amount)": "Code: 47. Unknown identifier"})
 
     with pytest.raises(CompileError):
-        run(pack_dir, tmp_path, FakeSearch(), warehouse=fake, access=fake, agent_secret="lab-secret")
+        run(pack_dir, tmp_path, FakeSearch(), warehouse=fake, access=fake, agent_secret="dev-secret")
 
     assert fake.commands == []
 

@@ -5,7 +5,7 @@ import { createMockApi } from "@/lib/api/mock";
 import { createHttpAuth } from "@/lib/api/http/auth";
 import { ChatProvider } from "@/lib/chat/ChatContext";
 
-const IDENTITY = { user_id: "lab.viewer", display_name: "Lab Viewer", roles: ["viewer", "admin"], mode: "team" as const, exposed: false };
+const IDENTITY = { user_id: "dev.viewer", display_name: "Lab Viewer", roles: ["viewer", "admin"], mode: "team" as const, exposed: false };
 
 function fetcher(replies: Record<string, (init?: RequestInit) => Response>) {
   return vi.fn(async (url: RequestInfo | URL, init?: RequestInit) => {
@@ -24,7 +24,7 @@ describe("http auth", () => {
     expect(await auth.current()).toEqual(IDENTITY);
     expect(await auth.identities()).toEqual([IDENTITY]);
     expect(fetch).toHaveBeenCalledTimes(1);
-    await expect(auth.switchTo("lab.other")).rejects.toThrow("sign out");
+    await expect(auth.switchTo("dev.other")).rejects.toThrow("sign out");
   });
 
   it("is signed out when the session route answers 401", async () => {

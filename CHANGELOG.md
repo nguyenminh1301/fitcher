@@ -206,6 +206,7 @@
 
 ### Changed
 
+- The development accounts are `dev.*` instead of `lab.*`, the dbt target is `dev`, the remaining "lab" wording is gone from tracked files outside the changelog and the phase plans, and the system diagram shows the model gateway and sign-in inside the api of the one container.
 - Questions run on a thread pool of their own instead of the event loop's default executor, which holds only CPUs + 4 threads and on a small host capped the questions running or waiting below `limits.concurrent_questions`; `scripts/measure_question_load.py` measures 1, 5 and 20 questions at once with a fixed-latency fake graph.
 - Conversations, their messages, groups and feedback no longer expire after 90 days: the ClickHouse change `0007_keep_conversations` removes their TTL on new and existing volumes, while run logs, events, LLM calls, SQL runs, audit and screening keep the 90-day expiry.
 - Pack search runs only in ClickHouse: the compiler, company documents, the agent and the jobs use the `search` database, and at start the api compiles again every compiled pack whose search collections are missing, which rebuilds the index after an upgrade from Qdrant (every item is embedded again).

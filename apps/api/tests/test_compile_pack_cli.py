@@ -32,7 +32,7 @@ def services(monkeypatch, tmp_path):
         fixture_catalog().tables, coverage={"widget_sales": (5, date(2024, 1, 1), date(2024, 12, 31))}
     )
     monkeypatch.setenv("COMPILED_PACK_DIR", str(tmp_path / "build"))
-    monkeypatch.setenv("CLICKHOUSE_AGENT_PASSWORD", "lab-secret")
+    monkeypatch.setenv("CLICKHOUSE_AGENT_PASSWORD", "dev-secret")
     monkeypatch.setattr(cli, "admin_client", lambda: object())
     monkeypatch.setattr(cli, "ClickHouseWarehouse", lambda client: fake_warehouse)
     monkeypatch.setattr(cli, "open_search", lambda: search)
