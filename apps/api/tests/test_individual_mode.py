@@ -134,6 +134,14 @@ def test_a_loopback_host_claimed_by_another_machine_is_refused(client, peer):
     assert "FITCHER_TRUSTED_PEERS" in response.json()["detail"]
 
 
+def test_a_loopback_host_behind_an_internal_forwarded_host_still_needs_a_local_peer(client, monkeypatch):
+    monkeypatch.setenv("FITCHER_INTERNAL_HOSTS", "api")
+    headers = {"Host": "localhost:8000", "X-Forwarded-Host": "api:8000", "X-Fitcher-Peer": "172.17.0.9"}
+
+    assert client.get("/me", headers=headers).status_code == 403
+    assert client.get("/me", headers={**headers, "X-Fitcher-Peer": "127.0.0.1"}).status_code == 200
+
+
 def test_without_a_forwarded_peer_the_connection_address_decides(monkeypatch):
     monkeypatch.delenv("FITCHER_TRUSTED_PEERS", raising=False)
     monkeypatch.setattr(origin, "default_gateways", lambda: frozenset())

@@ -138,8 +138,9 @@ def refusal(method: str, host: str, forwarded: str | None, origin: str | None, p
         if not value or hostname(value) not in accepted:
             return (f"the host {value!r} is not allowed; reach the instance through localhost or list the name "
                     "in FITCHER_ALLOWED_HOSTS")
-    if hostname(browser_host) in LOOPBACK and not local_peer(peer):
-        return (f"the request names {browser_host!r} but comes from {peer!r}, which is not this computer; "
+    claimed = next((value for value in (browser_host, host) if hostname(value) in LOOPBACK), None)
+    if claimed is not None and not local_peer(peer):
+        return (f"the request names {claimed!r} but comes from {peer!r}, which is not this computer; "
                 "list the address in FITCHER_TRUSTED_PEERS if your container runtime delivers local connections "
                 "from it")
     if method not in SAFE_METHODS:
