@@ -4,6 +4,7 @@
 
 ### Fixed
 
+- The setup and sign-in pages scroll when they are taller than the window (they were clipped by the chat shell's fixed height), and the chat follows a new answer to the bottom while it streams and when it ends unless the reader has scrolled up.
 - Saving the chosen tables of a source in the setup or on the Sources page also prepares them (live tables are attached and copies start), so the setup offers to build the pack right away instead of failing with a missing `src_<source>` database, its Continue button says it continues without a pack, and every source on the Sources page has a Build the pack action.
 - A new instance without an active pack loads the chat and the console again: `GET /api/pack` answering 503 no longer stops the page from loading, the chat explains how to connect data and build the pack instead of offering a question box, console pages that read the pack say there is none yet, and a question the api refuses before answering shows the api's reason instead of "Connection lost".
 

@@ -59,7 +59,7 @@ export function SignInScreen({ failed = false, auth = api.auth, onSignedIn = () 
   }
 
   return (
-    <div className="fc-app" style={{ flexDirection: "column", minHeight: "100vh" }}>
+    <div className="fc-app fc-flow">
       <header style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "var(--base-size-16)", padding: "var(--base-size-24) var(--base-size-24) 0" }}>
         <Logo height={24} />
         <Preferences />
