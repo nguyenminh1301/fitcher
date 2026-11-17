@@ -11,14 +11,13 @@ import { formatBytes } from "@/components/sources/format";
 import { Button } from "@/components/ui/controls";
 import { WarningBanner } from "@/components/ui/feedback";
 import type { FitcherApi } from "@/lib/api/client";
+import { errorText } from "@/lib/api/errorText";
 import type { TableView } from "@/lib/contracts";
 import { useI18n } from "@/lib/i18n/react";
 
 export const INTERVALS = [900, 3600, 21_600, 86_400, 604_800];
 
-function message(cause: unknown): string {
-  return cause instanceof Error ? cause.message : String(cause);
-}
+const message = errorText;
 
 /** What the page tells about a table before it is chosen: estimates, the proposed mode and flags. */
 export function TableFacts({ table }: { table: TableView }) {
@@ -107,6 +106,8 @@ export function TableChooser({ sources, id, tables, copyOnly, onSaved, onSynced,
   const [shown, setShown] = useState(tables);
   const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState(false);
+  // In the setup the save also starts preparing the tables: "preparing" until that has started.
+  const [preparing, setPreparing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const change = (name: string, patch: Partial<Choice>) => {
@@ -130,12 +131,14 @@ export function TableChooser({ sources, id, tables, copyOnly, onSaved, onSynced,
       // Saving prepares the chosen tables at once: live tables are attached and copies start, so the pack
       // can be built right after without a separate sync.
       if (onSynced && result.some((table) => table.selected)) {
+        setPreparing(true);
         await sources.sync(id);
         onSynced();
       }
     } catch (cause) {
       setError(message(cause));
     } finally {
+      setPreparing(false);
       setBusy(false);
     }
   }
@@ -213,7 +216,11 @@ export function TableChooser({ sources, id, tables, copyOnly, onSaved, onSynced,
       <p className="fc-muted" style={{ margin: 0 }}>{t("sources.approx")} {t("sources.cursorHelp")}</p>
       {copyOnly ? <p className="fc-muted" style={{ margin: 0 }}>{t("sources.copyOnly")}</p> : null}
       {error ? <WarningBanner tone="danger">{t("sources.failed", { reason: error })}</WarningBanner> : null}
-      {saved ? <p style={{ margin: 0 }} role="status">{onSynced ? t("sources.savedAndPreparing") : t("sources.saved")}</p> : null}
+      {saved ? (
+        <p style={{ margin: 0 }} role="status">
+          {preparing ? t("sources.savedAndPreparing") : onSynced && !error ? t("sources.savedAndPrepared") : t("sources.saved")}
+        </p>
+      ) : null}
       <div className="fc-row" style={{ gap: "var(--base-size-8)" }}>
         <Button variant="primary" disabled={busy} onClick={() => void save()}>{onSynced ? t("sources.saveAndPrepare") : t("sources.saveTables")}</Button>
         {onSynced ? <Button disabled={busy || !chosen} onClick={() => void syncNow()}>{t("sources.syncNow")}</Button> : null}

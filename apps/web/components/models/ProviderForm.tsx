@@ -14,12 +14,11 @@ import { PRESET_GROUPS, PRESETS, presetById } from "@/components/models/presets"
 import { Button, TextField } from "@/components/ui/controls";
 import { WarningBanner } from "@/components/ui/feedback";
 import type { FitcherApi } from "@/lib/api/client";
+import { errorText } from "@/lib/api/errorText";
 import type { ProviderCreate, ProviderTestResult, ProviderView } from "@/lib/contracts";
 import { useI18n } from "@/lib/i18n/react";
 
-function message(cause: unknown): string {
-  return cause instanceof Error ? cause.message : String(cause);
-}
+const message = errorText;
 
 export function ProviderForm({ models, onAdded }: { models: FitcherApi["models"]; onAdded: (provider: ProviderView) => void }) {
   const { t } = useI18n();

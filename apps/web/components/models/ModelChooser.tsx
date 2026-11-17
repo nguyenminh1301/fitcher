@@ -10,12 +10,11 @@ import { FREE_SUFFIX, isOpenRouter } from "@/components/models/presets";
 import { Button, Chip, TextField } from "@/components/ui/controls";
 import { WarningBanner } from "@/components/ui/feedback";
 import type { FitcherApi } from "@/lib/api/client";
+import { errorText } from "@/lib/api/errorText";
 import type { ProviderView } from "@/lib/contracts";
 import { useI18n } from "@/lib/i18n/react";
 
-function message(cause: unknown): string {
-  return cause instanceof Error ? cause.message : String(cause);
-}
+const message = errorText;
 
 export function ModelChooser({ models, provider, tiers, onChosen }: {
   models: FitcherApi["models"];

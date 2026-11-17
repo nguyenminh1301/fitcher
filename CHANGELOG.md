@@ -15,6 +15,7 @@
 
 ### Fixed
 
+- The setup no longer says "Preparing the tables…" forever after saving the chosen tables, no longer calls every pack draft a paid call (free and local models cost nothing), no longer mentions pack roles for uploaded documents, and shows the api's reason without the raw "The api answered 422:" prefix.
 - The web server's `/api/pack` route forwards the browser's session and address headers like every other route, and a signed-out `/api/pack` no longer stops the page from reaching the sign-in page.
 - A failed model call says what to do next for the common provider errors: a rate limit (a free model's daily or per-minute limit), a refused key, a missing model, a timeout, an unreachable or unavailable provider and a too-long request, still without the provider's own message, which can quote the key.
 - Adding an Ollama provider asks the server for its installed models first: the chat tiers are proposed from an installed model (instead of `qwen2.5-coder:7b`, which may not be there), `nomic-embed-text` is proposed only when it is installed, and a server that does not answer is refused with how to make Ollama reachable from the container on Linux, or with how to install a chat model when it has none.

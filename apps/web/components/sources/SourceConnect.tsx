@@ -12,6 +12,7 @@ import { TableChooser, TableList } from "@/components/sources/TableChooser";
 import { Button, Tabs, TextField } from "@/components/ui/controls";
 import { WarningBanner } from "@/components/ui/feedback";
 import type { FitcherApi } from "@/lib/api/client";
+import { errorText } from "@/lib/api/errorText";
 import { SourceError } from "@/lib/api/http/sources";
 import type { FileUploadView, SourceConnection, SourceDetail, TableView } from "@/lib/contracts";
 import { useI18n } from "@/lib/i18n/react";
@@ -29,7 +30,7 @@ export function useFailure() {
   return (cause: unknown): string => {
     if (cause instanceof SourceError && cause.reason) return t(`sources.reason_${cause.reason}`);
     if (cause instanceof SourceError && cause.marts?.length) return t("sources.inUse", { marts: cause.marts.join(", ") });
-    return t("sources.failed", { reason: cause instanceof Error ? cause.message : String(cause) });
+    return t("sources.failed", { reason: errorText(cause) });
   };
 }
 

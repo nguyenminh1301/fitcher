@@ -9,6 +9,7 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/controls";
 import { StatusPill, WarningBanner } from "@/components/ui/feedback";
 import type { FitcherApi } from "@/lib/api/client";
+import { errorText } from "@/lib/api/errorText";
 import type { InstantEstimate, InstantJobView } from "@/lib/contracts";
 import { useI18n } from "@/lib/i18n/react";
 
@@ -23,10 +24,6 @@ type Props = {
 };
 
 const PILL: Record<string, string> = { pending: "neutral", running: "running", done: "succeeded", failed: "error" };
-
-function errorText(cause: unknown): string {
-  return cause instanceof Error ? cause.message : String(cause);
-}
 
 export function InstantPack({ sources, sourceId, tables, onAsk, pollMs = 2000 }: Props) {
   const { t, formatNumber } = useI18n();

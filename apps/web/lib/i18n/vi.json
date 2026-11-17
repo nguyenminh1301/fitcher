@@ -435,7 +435,7 @@
     "title": "Dựng gói dữ liệu",
     "copying": "Đang sao chép các bảng đã chọn trước khi dựng gói…",
     "syncFailed": "Sao chép các bảng đã chọn thất bại; hãy sửa ở trang Nguồn dữ liệu rồi dựng gói tại đó.",
-    "estimate": "{datasets} bảng và view của bạn trở thành mart. Soạn mô tả, chỉ số và câu hỏi mẫu là một lần gọi mô hình có tính phí, khoảng {tokens} token prompt.",
+    "estimate": "{datasets} bảng và view của bạn sẽ thành mart. Việc soạn mô tả, chỉ số và câu hỏi mẫu là một lần gọi mô hình khoảng {tokens} token prompt; nhà cung cấp sẽ tính phí trừ khi mô hình miễn phí hoặc chạy trên máy này.",
     "build": "Dựng gói",
     "modelMissing": "Cần có mô hình trước khi soạn gói: {reason}",
     "failed": "{step} thất bại: {error}. Các câu hỏi trước đây vẫn trả lời như cũ.",
@@ -480,7 +480,7 @@
     "documentsHint": "Chính sách, sổ tay và bảng thuật ngữ giúp trả lời một thuật ngữ nghĩa là gì. Số liệu luôn lấy từ dữ liệu của bạn, không bao giờ từ tài liệu.",
     "documentsOn": "Có, dùng tài liệu của công ty",
     "documentsOff": "Không dùng tài liệu",
-    "documentsUpload": "Tải tài liệu lên ngay, hoặc sau này ở trang Tài liệu. Mọi vai trò của gói đều đọc được cho đến khi bạn thu hẹp ở đó.",
+    "documentsUpload": "Tải tài liệu lên ngay, hoặc để sau ở trang Tài liệu.",
     "documentsUploaded": "Tài liệu đã tải lên",
     "documentsNoPack": "Tải tài liệu lên ở trang Tài liệu sau khi đã kết nối dữ liệu.",
     "documentsKept": "{count} tài liệu đang lưu vẫn được giữ nhưng không còn được tìm kiếm.",
@@ -557,11 +557,11 @@
     "group_service": "Dịch vụ mô hình",
     "group_local": "Trên máy này",
     "group_other": "Khác",
-    "about_hosted": "Dán key lấy từ trang quản lý của nhà cung cấp. Mỗi câu hỏi do nhà cung cấp tính phí.",
-    "about_service": "Một key dùng được nhiều mô hình, thường có mô hình miễn phí hoặc giá rẻ.",
+    "about_hosted": "Dán khoá lấy từ trang quản lý của nhà cung cấp. Mỗi câu hỏi do nhà cung cấp tính phí.",
+    "about_service": "Một khoá dùng được nhiều mô hình, thường có mô hình miễn phí hoặc giá rẻ.",
     "about_local": "Máy chủ mô hình chạy trên máy này. Không gì rời khỏi máy và không bị tính phí.",
     "about_other": "Bất kỳ dịch vụ hay máy chủ nào dùng API của OpenAI, theo địa chỉ mà nó cung cấp.",
-    "getKey": "Lấy key từ {name}",
+    "getKey": "Lấy khoá từ {name}",
     "chooseHint": "{name} không cho biết mô hình nào hợp với SQL nhất. Hãy chọn một mô hình; nó trả lời mọi câu hỏi, và từng tier có thể đổi sau ở trang Mô hình.",
     "loadingModels": "Đang tải danh sách mô hình…",
     "searchModels": "Tìm mô hình",
@@ -692,7 +692,8 @@
     "saveAndPrepare": "Lưu và chuẩn bị bảng",
     "savedAndPreparing": "Đã lưu lựa chọn. Đang chuẩn bị bảng…",
     "build": "Tạo gói",
-    "buildOf": "Tạo gói của {name}"
+    "buildOf": "Tạo gói của {name}",
+    "savedAndPrepared": "Đã lưu lựa chọn. Các bảng đã chọn đang được chuẩn bị."
   },
   "owner": {
     "signInTitle": "Đăng nhập fitcher",
@@ -724,13 +725,13 @@
     "removed": "Đã gỡ mật khẩu chủ."
   },
   "guide": {
-    "title": "Cách lấy key OpenRouter",
+    "title": "Cách lấy khoá OpenRouter",
     "play": "Phát",
     "pause": "Tạm dừng",
     "step_signIn": "Đăng nhập tại openrouter.ai",
     "step_keys": "Mở Settings, rồi Keys",
-    "step_create": "Tạo key tên fitcher; để trống giới hạn credit",
-    "step_paste": "Sao chép key (chỉ hiện một lần) và dán vào ô bên dưới",
+    "step_create": "Tạo khoá tên fitcher; để trống giới hạn credit",
+    "step_paste": "Sao chép khoá (chỉ hiện một lần) và dán vào ô bên dưới",
     "freeNote": "Mô hình có tên kết thúc bằng :free không mất phí: tối đa 50 yêu cầu mỗi ngày, hoặc 1.000 yêu cầu mỗi ngày khi tài khoản đã mua 10 credit."
   }
 }

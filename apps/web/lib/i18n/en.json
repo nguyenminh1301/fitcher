@@ -435,7 +435,7 @@
     "title": "Build the pack",
     "copying": "Copying the chosen tables before the pack is built…",
     "syncFailed": "The copy of the chosen tables failed; fix it on the Sources page, then build the pack there.",
-    "estimate": "Your {datasets} tables and views become marts. Drafting their descriptions, metrics and example questions is a paid model call of about {tokens} prompt tokens.",
+    "estimate": "Your {datasets} tables and views become marts. Drafting their descriptions, metrics and example questions is one model call of about {tokens} prompt tokens; the provider bills it unless the model is free or runs on this computer.",
     "build": "Build the pack",
     "modelMissing": "A model is needed before the pack can be drafted: {reason}",
     "failed": "{step} failed: {error}. Nothing changed for the questions you could ask before.",
@@ -480,7 +480,7 @@
     "documentsHint": "Policies, handbooks and glossaries help answer what a term means. Numbers always come from your data, never from documents.",
     "documentsOn": "Yes, use company documents",
     "documentsOff": "No documents",
-    "documentsUpload": "Upload documents now, or later on the Documents page. Every role of the pack may read them until you narrow it there.",
+    "documentsUpload": "Upload documents now, or later on the Documents page.",
     "documentsUploaded": "Uploaded documents",
     "documentsNoPack": "Upload documents on the Documents page once your data is connected.",
     "documentsKept": "{count} kept documents stay stored but are no longer searched.",
@@ -692,7 +692,8 @@
     "saveAndPrepare": "Save and prepare tables",
     "savedAndPreparing": "Selection saved. Preparing the tables…",
     "build": "Build the pack",
-    "buildOf": "Build the pack of {name}"
+    "buildOf": "Build the pack of {name}",
+    "savedAndPrepared": "Selection saved. The chosen tables are being prepared."
   },
   "owner": {
     "signInTitle": "Sign in to fitcher",

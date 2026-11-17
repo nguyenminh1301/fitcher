@@ -10,6 +10,7 @@ import { ALLOWED_EXTENSIONS, MAX_UPLOAD_BYTES, UploadDropzone } from "@/componen
 import { Button } from "@/components/ui/controls";
 import { WarningBanner } from "@/components/ui/feedback";
 import type { FitcherApi } from "@/lib/api/client";
+import { errorText } from "@/lib/api/errorText";
 import { useI18n } from "@/lib/i18n/react";
 
 export type DocumentsStepProps = {
@@ -44,7 +45,7 @@ export function DocumentsStep({ documents, packRoles, disabled, onDone, onSkip }
     } catch (cause) {
       const message = cause instanceof Error ? cause.message : String(cause);
       if (message.includes("409")) setKept((await documents.settings().catch(() => null))?.documents ?? 0);
-      else setError(message);
+      else setError(errorText(cause));
     } finally {
       setBusy(false);
     }
@@ -62,7 +63,7 @@ export function DocumentsStep({ documents, packRoles, disabled, onDone, onSkip }
           await documents.upload(file, roles ?? []);
           setUploaded((names) => [...names, file.name]);
         } catch (cause) {
-          setError(cause instanceof Error ? cause.message : String(cause));
+          setError(errorText(cause));
         }
       }
     }
