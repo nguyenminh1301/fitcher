@@ -53,9 +53,9 @@ Each company's access rules live in one policy file. Publishing the pack turns i
 | Data modelling | dbt |
 | Domain Packs | YAML checked against JSON Schema |
 
-## Where fitcher is going
+## Status
 
-fitcher now ships as one image that starts with a single `docker run` (Phase 16); the next phases set up data sources in the application instead of in files and build a first pack automatically: see the [assessment](docs/self-hosted-product-assessment.md) (in Vietnamese), the [decisions](docs/DECISIONS.md) and the [master plan](docs/MASTER_PLAN.md), Phases 13 to 21.
+fitcher 0.0.1 is the first release of the one-image product: one `docker run`, setup in the browser, data sources and a first pack built in the application, backup and restore, and the security review of [docs/security.md](docs/security.md). The [decisions](docs/DECISIONS.md) and the [master plan](docs/MASTER_PLAN.md) record how it got here.
 
 ## Quick start
 
@@ -65,7 +65,13 @@ You need Docker. Start fitcher with one command:
 docker run -d --name fitcher -p 127.0.0.1:3000:3000 -v fitcher-data:/data ghcr.io/nguyenminh1301/fitcher
 ```
 
-Open [localhost:3000](http://localhost:3000) and follow the setup: choose whether only you or a team uses the instance, then connect a model provider and its key, or a model server on this computer reached as `host.docker.internal` (on Linux add `--add-host=host.docker.internal:host-gateway` to the command). Everything is kept in the `fitcher-data` volume. [docs/install.md](docs/install.md) covers the data volume, settings, upgrades, jobs, local models, an external ClickHouse and measured memory use.
+Open [localhost:3000](http://localhost:3000) and follow the setup: choose whether only you or a team uses the instance, then connect a model provider and its key, or a model server on this computer reached as `host.docker.internal` (on Linux add `--add-host=host.docker.internal:host-gateway` to the command). Everything is kept in the `fitcher-data` volume.
+
+![The first setup step: who uses this instance](docs/media/setup.jpg)
+
+[docs/install.md](docs/install.md) covers the first start and the settings, [docs/operations.md](docs/operations.md) backup, restore, upgrades, limits and the load measurement, and [docs/security.md](docs/security.md) the threat model and hardening checklist. The install guide also covers jobs, local models and measured memory use.
+
+A demo of the web app on sample data, with no backend, starts with `docker run -p 127.0.0.1:3000:3000 ghcr.io/nguyenminh1301/fitcher-demo` once the Demo workflow has published it from `main`.
 
 To work on fitcher itself with the development datasets, the sample packs and separate services, follow the [development setup](CONTRIBUTING.md#development-setup).
 

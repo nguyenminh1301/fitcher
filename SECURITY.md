@@ -1,7 +1,10 @@
 # Security policy
 
-The latest `develop` and `main` receive best-effort fixes.
-There is no deployed production service or response-time guarantee yet.
+## Supported versions
+
+The latest released minor version receives security fixes as a new patch release; older versions do not. The latest `develop` receives best-effort fixes. There is no hosted service or response-time guarantee.
+
+The threat model, what each mode protects and the hardening checklist are in [docs/security.md](docs/security.md).
 
 ## Reporting
 
@@ -20,7 +23,7 @@ Model provider keys are entered in the application and stored encrypted in the a
 ## Automated checks
 
 CI validates repository files, Git policy and Actions workflows, runs the API/CLI suite on Linux, and checks/builds the web application.
-Dependabot is configured for GitHub Actions and targets `develop`, but automatic version-update PRs are paused because generated commit bodies violate the one-line commit policy.
+Dependency updates are manual and reviewed. Dependabot is configured for GitHub Actions and targets `develop`, but automatic version-update PRs are paused because generated commit bodies violate the one-line commit policy.
 Security-update behavior is controlled separately by GitHub repository settings; this bootstrap does not enable it.
 The Security workflow audits locked npm and Python dependencies, scans Git history with Gitleaks, rebuilds and scans the `api` and `web` images and the release image of the root `Dockerfile`, and scans the ClickHouse image by its pinned tag, all with checksum-verified Trivy through `scripts/scan_image.sh`. The Release workflow runs the same gate on the release image before it publishes a version tag; its report is kept for 90 days. It runs for PRs, pushes to integration/production branches, manual dispatch and weekly on the default branch. Tool failures fail their jobs; a scanner outage is not a clean result. Images fail for High/Critical advisories with available fixes. Complete reports, including unfixed findings, are retained as workflow artifacts for 14 days.
 
