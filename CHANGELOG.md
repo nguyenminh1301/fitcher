@@ -4,6 +4,7 @@
 
 ### Added
 
+- The api answers at most `limits.concurrent_questions` questions at once (4 by default); later questions wait in arrival order with a `queue` status event the chat shows as waiting, a question whose client leaves gives up its place, a source sync, a pack compile and an eval run never run at the same time, and each pack role's ClickHouse profile caps a user at 8 concurrent queries.
 - In individual mode, deleting a conversation removes it for good: its rows, its messages and the feedback on its answers are deleted from ClickHouse, while team mode still only hides it so an admin can read it.
 - Company documents can be turned off through `PUT /settings/documents` (`documents.enabled`, on by default; an admin answers the new last setup step, Documents): off answers 404 on every `/documents` endpoint, compiles `kb_docs` without chunks and lets `metadata_qa` answer from the glossary, metrics and datasets; turning it off while documents are kept needs confirmation and keeps the files, and turning it on again indexes them at the next compile.
 - The setup's Documents step turns company documents on or off, confirms when documents are kept, and uploads documents in place once a pack is active; the console hides the Documents page while documents are off.

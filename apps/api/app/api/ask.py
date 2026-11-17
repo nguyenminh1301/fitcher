@@ -33,8 +33,9 @@ from app.agent.nodes.screen import blocked_message
 from app.agent.state import AgentState, RunCancelled
 from app.api.agent import Agent, AgentRun
 from app.api.auth import current_principal, current_role
+from app.api.limits import QuestionGate
 from app.api.rate_limit import RateLimiter
-from app.api.runtime import get_agent, get_conversation_store, get_rate_limiter, unavailable
+from app.api.runtime import get_agent, get_conversation_store, get_question_gate, get_rate_limiter, unavailable
 from app.auth.principal import Principal
 from app.contracts.events import (
     AskRequest, BlockedEvent, ChartSpecEvent, ClarifyEvent, DenyEvent, DoneEvent, ErrorEvent, EventModel, ResultEvent,
@@ -185,7 +186,7 @@ class StoredTurn:
 
 async def event_stream(
     run: AgentRun, question: str, events: AnswerEvents, heartbeat_seconds: float = HEARTBEAT_SECONDS,
-    record: Record | None = None,
+    record: Record | None = None, gate: QuestionGate | None = None,
 ) -> AsyncIterator[str]:
     loop = asyncio.get_running_loop()
     queue: asyncio.Queue[EventModel | None] = asyncio.Queue()
@@ -208,8 +209,18 @@ async def event_stream(
             except Exception:  # noqa: BLE001 - the answer still reaches the client; the conversation lacks the turn
                 logger.exception("could not store the question of trace %s", events.trace_id)
 
+    def queued(phase: Literal["start", "end"]) -> None:
+        put(StatusEvent(trace_id=events.trace_id, node="queue", phase=phase))
+
     def work() -> None:
+        admitted = None
         try:
+            if gate is not None:
+                admitted = gate.enter(lambda: queued("start"), stopped.is_set)
+                if admitted is None:
+                    return
+                if admitted:
+                    queued("end")
             state = run.run(question, progress)
             closing = events.finish(state)
             if record is not None:
@@ -226,6 +237,8 @@ async def event_stream(
             for event in events.internal():
                 put(event)
         finally:
+            if gate is not None and admitted is not None:
+                gate.leave()
             put(None)
 
     loop.run_in_executor(None, work)
@@ -270,6 +283,7 @@ def ask(
     _: Annotated[None, Depends(rate_limited)],
     agent: Annotated[Agent, Depends(get_agent)],
     store: Annotated[ConversationStore, Depends(get_conversation_store)],
+    gate: Annotated[QuestionGate, Depends(get_question_gate)],
 ) -> StreamingResponse:
     try:
         today = reference_date(request.timezone)
@@ -293,7 +307,8 @@ def ask(
         logger.exception("cannot prepare a run as role %s", role)
         raise unavailable("the agent cannot reach its data store") from None
     return StreamingResponse(
-        event_stream(run, turn.question, AnswerEvents(role, unreviewed_metrics(run.deps.compiled)), record=StoredTurn(store, turn)),
+        event_stream(run, turn.question, AnswerEvents(role, unreviewed_metrics(run.deps.compiled)), record=StoredTurn(store, turn),
+                     gate=gate),
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no", "X-Conversation-Id": turn.conversation_id},
     )

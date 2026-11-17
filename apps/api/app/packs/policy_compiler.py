@@ -41,6 +41,8 @@ PROFILE_LIMITS = {
     "max_result_rows": (10_000, 100_000),
     "max_memory_usage": (2_000_000_000, 4_000_000_000),
 }
+# Queries one role user may run at once; the api's question limit keeps the total lower (app/api/limits.py).
+CONCURRENT_QUERIES_PER_USER = 8
 # QUERY_MAX_MEMORY_USAGE lowers the memory limits so a query stays below a small server's memory cap.
 MEMORY_CAP_SETTING = "QUERY_MAX_MEMORY_USAGE"
 _IDENTIFIER = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
@@ -269,7 +271,8 @@ def plan_statements(
     names = Names(pack.name)
     wanted = desired_objects(pack)
     limits = ", ".join(f"{name} = {default} MIN 1 MAX {maximum}" for name, (default, maximum) in profile_limits(memory_cap).items())
-    statements = [f"CREATE SETTINGS PROFILE OR REPLACE {quote(names.profile)} SETTINGS readonly = 2 CONST, {limits}"]
+    statements = [f"CREATE SETTINGS PROFILE OR REPLACE {quote(names.profile)} SETTINGS readonly = 2 CONST, "
+                  f"max_concurrent_queries_for_user = {CONCURRENT_QUERIES_PER_USER} CONST, {limits}"]
     statements += [f"CREATE ROLE IF NOT EXISTS {quote(role)}" for role in sorted(wanted.roles)]
     for role in pack.policies.roles:
         statements += [_view_sql(pack, names, role, grant) for grant in role.datasets if grant.aggregate_only]

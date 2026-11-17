@@ -55,6 +55,7 @@
     "stepsCount": "{n} steps",
     "stoppedTitle": "Stopped",
     "stoppedText": "You stopped this run before it finished. No result is shown.",
+    "step_queue": "Waiting for a free slot",
     "step_screen": "Checking the question",
     "step_understand": "Understanding the question",
     "step_dates": "Resolving dates",

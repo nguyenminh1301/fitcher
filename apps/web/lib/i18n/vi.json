@@ -55,6 +55,7 @@
     "stepsCount": "{n} bước",
     "stoppedTitle": "Đã dừng",
     "stoppedText": "Bạn đã dừng lượt chạy trước khi hoàn tất. Không có kết quả nào được hiển thị.",
+    "step_queue": "Đang chờ lượt",
     "step_screen": "Kiểm tra câu hỏi",
     "step_understand": "Hiểu câu hỏi",
     "step_dates": "Xác định khoảng thời gian",

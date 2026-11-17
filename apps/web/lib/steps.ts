@@ -1,6 +1,6 @@
 // Graph nodes (DECISIONS §6) -> the design's progress steps; labels are the `ui.step_<id>` strings.
 
-export type StepId = "screen" | "understand" | "dates" | "retrieve" | "plan" | "access" | "sql" | "repair" | "check" | "run" | "chart" | "summary";
+export type StepId = "queue" | "screen" | "understand" | "dates" | "retrieve" | "plan" | "access" | "sql" | "repair" | "check" | "run" | "chart" | "summary";
 
 export const NODE_ORDER = [
   "screen", "extract", "resolve_time", "retrieve", "build_spec", "gate", "generate_sql", "guard", "explain", "execute", "check",
@@ -8,6 +8,8 @@ export const NODE_ORDER = [
 ] as const;
 
 const STEP_OF_NODE: Record<string, StepId> = {
+  // Not a graph node: the api sends it while the question waits for a place (limits.concurrent_questions).
+  queue: "queue",
   screen: "screen",
   extract: "understand",
   resolve_time: "dates",
