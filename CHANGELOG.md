@@ -4,6 +4,7 @@
 
 ### Fixed
 
+- A model reply without content (a reasoning model that spent its reply on reasoning) is asked once more before the call fails with "returned an empty reply".
 - Drafted pack ids and the metric ids that examples and glossary terms refer to are turned into the pack's form (`sumIf_amount` becomes `sum_if_amount`), so one oddly named item from a model no longer fails the whole instant pack.
 - The setup and sign-in pages scroll when they are taller than the window (they were clipped by the chat shell's fixed height), and the chat follows a new answer to the bottom while it streams and when it ends unless the reader has scrolled up.
 - Saving the chosen tables of a source in the setup or on the Sources page also prepares them (live tables are attached and copies start), so the setup offers to build the pack right away instead of failing with a missing `src_<source>` database, its Continue button says it continues without a pack, and every source on the Sources page has a Build the pack action.

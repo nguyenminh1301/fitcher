@@ -155,7 +155,15 @@ def test_a_provider_error_raises_llm_error_without_the_providers_message(screene
 @pytest.mark.parametrize("content", [None, "", "   "])
 def test_an_empty_reply_raises_llm_error(screened, content):
     with pytest.raises(LLMError, match="empty reply"):
-        gateway(FakeSdk(chat_reply(content))).text("fast", PROMPT)
+        gateway(FakeSdk(chat_reply(content), chat_reply(content))).text("fast", PROMPT)
+
+
+def test_an_empty_reply_is_asked_once_more(screened):
+    # A reasoning model sometimes spends its whole reply on reasoning and returns no content.
+    sdk = FakeSdk(chat_reply(None), chat_reply('{"word": "forty-two", "count": 42}'))
+
+    assert gateway(sdk).structured("sql-gen", PROMPT, Answer).count == 42
+    assert len(sdk.calls) == 2
 
 
 def test_a_reply_that_does_not_match_the_schema_does_not_echo_it(screened):
