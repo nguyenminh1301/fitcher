@@ -316,3 +316,53 @@ def test_the_provider_key_reaches_no_response_log_line_or_admin_action(client, a
         client.post("/providers/openai/test", headers=ADMIN, json={}).text,
     ]
     assert all("endpoint-key-7777" not in text for text in [*bodies, caplog.text, repr(actions.records)])
+
+
+def test_an_ollama_provider_proposes_a_model_it_has_installed(client, fakes):
+    fakes.models = ["deepseek-r1:8b", "llama3.1:8b", "nomic-embed-text:latest", "qwen2.5:3b"]
+
+    assert client.post("/providers", headers=ADMIN, json={"kind": "ollama", "base_url": "http://host.docker.internal:11434"}).status_code == 201
+
+    tiers = client.get("/models/tiers", headers=ADMIN).json()
+    # The largest known model wins; a reasoning model of an unknown family is not proposed.
+    assert {tier["model"] for tier in tiers["tiers"]} == {"llama3.1:8b"}
+    assert tiers["embedding"]["model"] == "nomic-embed-text:latest"
+
+
+@pytest.mark.parametrize(("installed", "proposed"), [
+    (["qwen2.5:7b", "llama3.1:8b"], "llama3.1:8b"),
+    (["qwen2.5-coder:7b", "qwen2.5:7b"], "qwen2.5-coder:7b"),
+    (["phi4-mini:3.8b", "llama3.2:3b"], "phi4-mini:3.8b"),
+    (["deepseek-r1:8b"], "deepseek-r1:8b"),
+])
+def test_the_proposed_ollama_model_is_the_largest_of_the_best_family(installed, proposed):
+    from app.llm import defaults
+    assert defaults.installed_chat_model(installed) == proposed
+
+
+def test_an_ollama_provider_without_its_embedding_model_keeps_the_local_embedding(client, fakes):
+    fakes.models = ["llama3.1:8b"]
+
+    client.post("/providers", headers=ADMIN, json={"kind": "ollama", "base_url": "http://host.docker.internal:11434"})
+
+    tiers = client.get("/models/tiers", headers=ADMIN).json()
+    assert {tier["model"] for tier in tiers["tiers"]} == {"llama3.1:8b"}
+    assert tiers["embedding"]["backend"] == "local"
+
+
+def test_an_ollama_server_that_does_not_answer_is_not_added_and_the_reply_says_how_to_reach_it(client, fakes):
+    fakes.list_error = ModelListError("Ollama did not answer: ConnectError")
+
+    response = client.post("/providers", headers=ADMIN, json={"kind": "ollama", "base_url": "http://host.docker.internal:11434"})
+
+    assert response.status_code == 422
+    assert "OLLAMA_HOST=0.0.0.0" in response.json()["detail"] and "host-gateway" in response.json()["detail"]
+    assert client.get("/providers", headers=ADMIN).json() == []
+
+
+def test_an_ollama_server_without_a_chat_model_is_not_added(client, fakes):
+    fakes.models = ["nomic-embed-text:latest"]
+
+    response = client.post("/providers", headers=ADMIN, json={"kind": "ollama", "base_url": "http://host.docker.internal:11434"})
+
+    assert response.status_code == 422 and "ollama pull" in response.json()["detail"]

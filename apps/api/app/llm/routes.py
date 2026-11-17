@@ -159,13 +159,22 @@ class TierMapping:
         return used
 
 
-def fill_defaults(mapping: TierMapping, provider: Provider) -> None:
-    """Map every unmapped chat tier, and an embedding nobody chose, to the provider's proposed models."""
+def fill_defaults(mapping: TierMapping, provider: Provider, installed: list[str] | None = None) -> None:
+    """Map every unmapped chat tier, and an embedding nobody chose, to the provider's proposed models.
+
+    ``installed`` is what an Ollama server listed: its models are proposed only from those, because a model
+    the server does not have fails every question.
+    """
     current = mapping.tiers()
-    for tier, model in defaults.chat_models(provider.kind).items():
+    proposed = defaults.chat_models(provider.kind)
+    embedding_model = defaults.embedding_model(provider.kind)
+    if provider.kind == "ollama" and installed is not None:
+        chat = defaults.installed_chat_model(installed)
+        proposed = dict.fromkeys(proposed, chat) if chat else {}
+        embedding_model = defaults.installed_embedding_model(installed)
+    for tier, model in proposed.items():
         if tier not in current:
             mapping.set_tier(tier, provider.id, model)
-    embedding_model = defaults.embedding_model(provider.kind)
     if embedding_model and not mapping.embedding_chosen():
         mapping.set_embedding(provider.id, embedding_model, defaults.proposed_dimensions(embedding_model) or DEFAULT_DIMENSIONS)
 

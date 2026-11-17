@@ -4,6 +4,8 @@
 
 ### Fixed
 
+- A failed model call says what to do next for the common provider errors: a rate limit (a free model's daily or per-minute limit), a refused key, a missing model, a timeout, an unreachable or unavailable provider and a too-long request, still without the provider's own message, which can quote the key.
+- Adding an Ollama provider asks the server for its installed models first: the chat tiers are proposed from an installed model (instead of `qwen2.5-coder:7b`, which may not be there), `nomic-embed-text` is proposed only when it is installed, and a server that does not answer is refused with how to make Ollama reachable from the container on Linux, or with how to install a chat model when it has none.
 - An instant pack drops a glossary term or example that cites a metric, dataset or column the pack does not have, not only one citing a dropped metric, so a model naming a metric it never drafted no longer fails the compile.
 - A drafted glossary term, metric or example that breaks the pack schema (for example a metric target without its metric) is dropped and listed with the instant pack's dropped items instead of failing the whole pack; datasets still fail loudly because their marts already exist.
 - An instant pack whose model drafted no metric asks for the metrics once more and then gets a row count per dataset and a total per measure column, so the pack can answer questions about amounts instead of answering every one with "no metric matches".

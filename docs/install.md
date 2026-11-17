@@ -75,6 +75,8 @@ docker exec fitcher fitcher compile_pack --pack <name>
 
 A model server on the host (Ollama, LM Studio or any OpenAI-compatible endpoint) is reached as `host.docker.internal`, for example `http://host.docker.internal:11434` for Ollama. Docker Desktop provides that name; on Linux add `--add-host=host.docker.internal:host-gateway` to the `docker run` command.
 
+On Linux, Ollama listens on `127.0.0.1` only by default, which the container cannot reach. Start it with `OLLAMA_HOST=0.0.0.0`; for the system service, run `sudo systemctl edit ollama`, add `Environment="OLLAMA_HOST=0.0.0.0"` under `[Service]` and restart it. Adding an Ollama provider asks the server for its installed models first: the tiers are proposed from those models, and a server that does not answer or has no chat model installed is not added.
+
 ## External ClickHouse
 
 With `CLICKHOUSE_URL=http://<host>[:<port>]` (the HTTP interface) the embedded server does not start and the schema changes and the API use that server. It needs the fitcher users of [infra/clickhouse/users.d](../infra/clickhouse/users.d) with the passwords given to the container as `CLICKHOUSE_*_PASSWORD`, and an administrator in `CLICKHOUSE_ADMIN_USER` and `CLICKHOUSE_ADMIN_PASSWORD`. [deploy/compose.external-clickhouse.yaml](../deploy/compose.external-clickhouse.yaml) shows the layout:
