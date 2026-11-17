@@ -11,6 +11,8 @@ the vector size they are asked for; Ollama's ``nomic-embed-text`` always
 returns 768 floats.
 """
 
+import re
+
 _CHAT = {
     "openai": {"fast": "gpt-5.4-mini", "sql-small": "gpt-5.4-mini", "sql-gen": "gpt-5.4", "sql-gen-hard": "gpt-5.5"},
     "anthropic": {
@@ -33,6 +35,43 @@ _FIXED_DIMENSIONS = {"nomic-embed-text": 768}
 _PROPOSED_DIMENSIONS = {"text-embedding-3-large": 1024, "gemini-embedding-001": 768, **_FIXED_DIMENSIONS}
 
 
+# Ollama model families, best first, for proposing a chat model among the models a server has installed:
+# code-tuned and instruction-following models write SQL and structured replies best.
+OLLAMA_CHAT_FAMILIES = ("qwen2.5-coder", "qwen3-coder", "qwen3", "qwen2.5", "llama3.3", "llama3.1", "mistral-small",
+                        "mistral", "gemma3", "phi4", "phi4-mini", "llama3.2")
+# Ollama embedding model families; they cannot chat, so they are never proposed for a chat tier.
+OLLAMA_EMBEDDING_FAMILIES = ("nomic-embed-text", "mxbai-embed-large", "bge-m3", "snowflake-arctic-embed", "all-minilm")
+
+
+def _family(name: str) -> str:
+    return name.partition(":")[0].rpartition("/")[2]
+
+
+def _billions(name: str) -> float:
+    """The parameter count a tag names (``llama3.1:8b`` -> 8.0), or 0 when it names none."""
+    found = re.search(r":(\d+(?:\.\d+)?)b\b", name)
+    return float(found.group(1)) if found else 0.0
+
+
+def installed_chat_model(listed: list[str]) -> str | None:
+    """The Ollama chat model to propose among the installed ``listed`` models; None when only embedders are.
+
+    The largest model of a known family wins, then the family order: a 3B model often fails the structured
+    replies a pack draft needs where an 8B one of a lower-ranked family succeeds.
+    """
+    chat = [name for name in listed if _family(name) not in OLLAMA_EMBEDDING_FAMILIES]
+    known = [name for name in chat if _family(name) in OLLAMA_CHAT_FAMILIES]
+    if known:
+        return min(known, key=lambda name: (-_billions(name), OLLAMA_CHAT_FAMILIES.index(_family(name))))
+    return chat[0] if chat else None
+
+
+def installed_embedding_model(listed: list[str]) -> str | None:
+    """The proposed Ollama embedding model when the server has it installed."""
+    proposed = _EMBEDDING["ollama"]
+    return next((name for name in listed if _family(name) == proposed), None)
+
+
 def chat_models(kind: str) -> dict[str, str]:
     """The proposed model of each chat tier for a provider of ``kind``; empty when none can be proposed."""
     return dict(_CHAT.get(kind, {}))
@@ -44,7 +83,7 @@ def embedding_model(kind: str) -> str | None:
 
 def fixed_dimensions(model: str) -> int | None:
     """The only vector size ``model`` returns, or None when it returns the size it is asked for."""
-    return _FIXED_DIMENSIONS.get(model)
+    return _FIXED_DIMENSIONS.get(model) or _FIXED_DIMENSIONS.get(model.removesuffix(":latest"))
 
 
 def proposed_dimensions(model: str) -> int | None:

@@ -40,7 +40,7 @@ from app.llm.client import LLMError, Prompt
 from app.llm.eligibility import eligibility, ReportSummary
 from app.llm.gateway import Gateway, Route
 from app.llm.provider_models import list_models, ModelListError
-from app.llm.providers import key_name, Provider, ProviderError, ProviderNotFound, ProviderStore
+from app.llm.providers import check_fields, key_name, Provider, ProviderError, ProviderNotFound, ProviderStore
 from app.llm.clients import compiled_embedding
 from app.llm.routes import EmbeddingChoice, fill_defaults, TierMapping
 from app.llm.tiers import CHAT_TIERS, EMBED_TIER
@@ -159,14 +159,41 @@ def list_providers(_: Admin, store: Store, mapping: Mapping) -> list[ProviderVie
     return [_view(provider, in_use) for provider in store.list()]
 
 
+OLLAMA_UNREACHABLE = (
+    "{error}. The server must answer from inside the container: on Linux, Ollama listens only on 127.0.0.1 by "
+    "default, so start it with OLLAMA_HOST=0.0.0.0 (for the system service: `sudo systemctl edit ollama`, add "
+    "Environment=\"OLLAMA_HOST=0.0.0.0\" under [Service], then restart it) and start fitcher with "
+    "--add-host=host.docker.internal:host-gateway")
+OLLAMA_NO_CHAT_MODEL = "{name} has no chat model installed; install one first, for example `ollama pull qwen2.5:7b`"
+
+
+def _ollama_models(body: ProviderCreate, lister: Callable) -> list[str]:
+    """The models an Ollama server about to be added has installed; it is refused when it lists none to chat with."""
+    try:
+        server = Provider(id="ollama", name=body.name or "Ollama", kind="ollama",
+                          base_url=check_fields("ollama", base_url=body.base_url), key_set=False, key_last4=None)
+        installed = lister(server, None)
+    except ProviderError as error:
+        raise _refused(error) from None
+    except ModelListError as error:
+        raise _refused(ProviderError(OLLAMA_UNREACHABLE.format(error=error))) from None
+    if defaults.installed_chat_model(installed) is None:
+        raise _refused(ProviderError(OLLAMA_NO_CHAT_MODEL.format(name=server.name)))
+    return installed
+
+
 @router.post("/providers", status_code=status.HTTP_201_CREATED)
 def add_provider(body: ProviderCreate, admin: Admin, store: Store, mapping: Mapping, log: Log,
-                 db: Annotated[StateDb, Depends(get_state_db)]) -> ProviderView:
+                 db: Annotated[StateDb, Depends(get_state_db)],
+                 lister: Annotated[Callable, Depends(get_model_lister)]) -> ProviderView:
+    # An Ollama server is asked for its models first: the tiers are proposed only from installed models, and a
+    # server the container cannot reach is refused with how to reach it, instead of failing every question later.
+    installed = _ollama_models(body, lister) if body.kind == "ollama" else None
     try:
         provider = store.create(body.kind, name=body.name, api_key=body.api_key, base_url=body.base_url)
     except ProviderError as error:
         raise _refused(error) from None
-    fill_defaults(mapping, provider)
+    fill_defaults(mapping, provider, installed)
     setup.mark_done(db, "models")
     _record(log, admin, "provider_add", provider.id, "", _described(provider))
     return _view(provider, mapping.providers_in_use())
