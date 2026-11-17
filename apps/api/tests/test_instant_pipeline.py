@@ -272,3 +272,25 @@ def test_drafted_metrics_are_kept_without_a_second_draft(packs_dir):
     assert drafter.calls.count("metrics.yaml") == 1
     ids = [item["id"] for item in yaml.safe_load((packs_dir / "shop" / "metrics.yaml").read_text())["metrics"]]
     assert ids == ["revenue"]
+
+
+def test_a_drafted_item_the_schema_rejects_is_dropped_and_named_instead_of_failing_the_pack(packs_dir):
+    class BrokenTerm(FakeDrafter):
+        def draft(self, file, files, profile, chunks):
+            if file != "glossary.yaml":
+                return super().draft(file, files, profile, chunks)
+            self.calls.append(file)
+            term = {"term": "Revenue", "definition": "Money in.", "aliases": {"vi": ["doanh thu"], "en": ["sales"]},
+                    "evidence": [{"kind": "profile", "ref": "shop__sales"}], "confidence": 0.5, "status": "draft"}
+            return [{**term, "id": "revenue", "targets": [{"kind": "metric"}]},
+                    {**term, "id": "sale_amount", "term": "Sale amount",
+                     "targets": [{"kind": "column", "dataset": "shop__sales", "column": "sale_amount"}]}]
+
+    pipeline, _, _ = _pipeline(packs_dir, drafter=BrokenTerm())
+
+    job = pipeline.run(pipeline.new_job("shop", ["widgets", "sales"], started_by="owner"))
+
+    assert job.status == "succeeded", job.error
+    assert "glossary.revenue" in job.result["dropped"]
+    terms = [item["id"] for item in yaml.safe_load((packs_dir / "shop" / "glossary.yaml").read_text())["terms"]]
+    assert terms == ["sale_amount"]

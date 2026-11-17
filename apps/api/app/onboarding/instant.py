@@ -15,6 +15,7 @@ Jobs live in the api process; one runs at a time.
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
+import re
 import secrets
 import shutil
 import tempfile
@@ -28,8 +29,9 @@ from app.onboarding.instant_files import approve_generated, write_pack_files
 from app.onboarding.marts import (
     MARTS_DATABASE, MartTable, MartView, SourceColumn, mart_tables, plan_marts, source_marts,
 )
-from app.onboarding.pack_yaml import PackFiles
+from app.onboarding.pack_yaml import ITEM_LISTS, PackFiles
 from app.onboarding.profiler import profile_marts
+from app.packs.loader import file_issues
 from app.sources.attach import quote
 
 STEPS = ("marts", "profile", "files", "draft", "approve", "compile", "activate")
@@ -97,6 +99,34 @@ def wide_profiles(views: Sequence[MartView], profile: dict) -> dict:
             "sample_rows": [],
         }
     return {**profile, "tables": tables}
+
+
+# Drafted files whose rejected items are dropped; a dataset describes a mart that exists, so it is never dropped.
+DROPPABLE_FILES = ("glossary.yaml", "metrics.yaml", "examples.yaml")
+
+
+def drop_invalid_drafts(files: PackFiles, file: str) -> list[str]:
+    """Remove the drafted items of ``file`` that its schema rejects, and name them as ``<file>.<id>``.
+
+    A model can return an item that parses but breaks the pack schema (a glossary target of kind ``metric``
+    without its metric); without this one such item would fail the whole pack. Only drafts are removed: an
+    item that was approved before keeps failing loudly, and so does a dataset, whose mart already exists.
+    """
+    if file not in DROPPABLE_FILES:
+        return []
+    [key] = ITEM_LISTS[file]
+    dropped: list[str] = []
+    while True:
+        issues = file_issues(file, files.text(file), files.schema_dir)
+        items = files.items(file)
+        positions = sorted({int(match.group(1)) for issue in issues
+                            if (match := re.match(rf"{re.escape(key)}\[(\d+)\]", issue.path))}, reverse=True)
+        broken = [index for index in positions if index < len(items) and items[index].get("status") == "draft"]
+        if not broken:
+            return dropped
+        for index in broken:
+            dropped.append(f"{file.removesuffix('.yaml')}.{items[index].get('id')}")
+            del items[index]
 
 
 def fallback_metrics(datasets: Sequence[dict]) -> list[dict]:
@@ -249,10 +279,11 @@ class InstantPipeline:
                 files.merge_drafts(file, drafter.draft(file, files, state["profile"], []))
                 if not files.items(file):
                     files.merge_drafts(file, fallback_metrics(files.items("datasets.yaml")))
+            state.setdefault("invalid", []).extend(drop_invalid_drafts(files, file))
             files.save(file)
 
     def _step_approve(self, job: InstantJob, pack: str, building: Path, state: dict) -> None:
-        state["dropped"] = approve_generated(building, schema_dir=self._schema_dir)["dropped"]
+        state["dropped"] = [*state.get("invalid", []), *approve_generated(building, schema_dir=self._schema_dir)["dropped"]]
 
     def _step_compile(self, job: InstantJob, pack: str, building: Path, state: dict) -> None:
         target = self._packs_dir / pack

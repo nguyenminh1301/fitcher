@@ -4,6 +4,7 @@
 
 ### Fixed
 
+- A drafted glossary term, metric or example that breaks the pack schema (for example a metric target without its metric) is dropped and listed with the instant pack's dropped items instead of failing the whole pack; datasets still fail loudly because their marts already exist.
 - An instant pack whose model drafted no metric asks for the metrics once more and then gets a row count per dataset and a total per measure column, so the pack can answer questions about amounts instead of answering every one with "no metric matches".
 - A model reply without content (a reasoning model that spent its reply on reasoning) is asked once more before the call fails with "returned an empty reply".
 - Drafted pack ids and the metric ids that examples and glossary terms refer to are turned into the pack's form (`sumIf_amount` becomes `sum_if_amount`), so one oddly named item from a model no longer fails the whole instant pack.
