@@ -40,6 +40,7 @@ The application keeps its settings in `app.db`; these environment variables set 
 | --- | --- |
 | `FITCHER_SECRET_KEY` | The instance key instead of a generated `secret.key` |
 | `FITCHER_ALLOWED_HOSTS` | Comma-separated host names under which others reach the instance, for example behind a reverse proxy; without it only the local machine is answered |
+| `FITCHER_TRUSTED_PEERS` | Comma-separated addresses or networks (`10.0.2.0/24`) whose connections count as this machine. Only needed when a container runtime (rootless Docker, Podman) delivers the browser's connections from an address that is neither loopback nor the container's default gateway; the refusal names the address it saw |
 | `CLICKHOUSE_URL` | An external ClickHouse server instead of the embedded one (see below) |
 | `FITCHER_DATA_DIR` | The data directory inside the container (default `/data`) |
 | `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GEMINI_API_KEY`, `OLLAMA_URL` | Create that model provider on the first start that finds none; afterwards providers are managed on the Models page |

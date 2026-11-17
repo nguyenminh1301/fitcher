@@ -1,11 +1,14 @@
 """Individual mode: one owner without sign-in, reachable only through allowed hosts and same-origin changes."""
 
+from ipaddress import ip_address
+
 from fastapi.testclient import TestClient
 import pytest
 
 from agent_fixtures import compiled_fixture
 
 from app.api import runtime
+from app.auth import origin
 from app.main import app
 from app.state.db import shared_state
 from app.state.settings import Settings
@@ -17,10 +20,12 @@ PACK_ROLES = [role.id for role in compiled_fixture().pack.policies.roles]
 def client(monkeypatch):
     monkeypatch.delenv("FITCHER_ALLOWED_HOSTS", raising=False)
     monkeypatch.delenv("FITCHER_INTERNAL_HOSTS", raising=False)
+    monkeypatch.delenv("FITCHER_TRUSTED_PEERS", raising=False)
+    monkeypatch.setattr(origin, "default_gateways", lambda: frozenset({ip_address("172.17.0.1")}))
     Settings(shared_state()).set("instance", "mode", "individual")
     app.dependency_overrides[runtime.get_compiled] = compiled_fixture
     app.dependency_overrides[runtime.get_compiled_or_none] = compiled_fixture
-    with TestClient(app, base_url="http://localhost:3000") as test_client:
+    with TestClient(app, base_url="http://localhost:3000", client=("127.0.0.1", 50000)) as test_client:
         yield test_client
     app.dependency_overrides.clear()
 
@@ -114,3 +119,64 @@ def test_team_mode_checks_no_host(client):
 
     assert client.get("/pack", headers={"Host": "example.com"}).status_code == 200
     assert client.get("/me", headers={"Host": "example.com"}).status_code == 401
+
+
+@pytest.mark.parametrize("peer", ["127.0.0.1", "::1", "::ffff:127.0.0.1", "172.17.0.1", "::ffff:172.17.0.1"])
+def test_a_loopback_host_from_this_computer_is_accepted(client, peer):
+    assert client.get("/me", headers={"X-Fitcher-Peer": peer}).status_code == 200
+
+
+@pytest.mark.parametrize("peer", ["172.17.0.9", "192.168.1.50", "::ffff:10.0.0.4", "2001:db8::7", "not-an-address", ""])
+def test_a_loopback_host_claimed_by_another_machine_is_refused(client, peer):
+    response = client.get("/me", headers={"Host": "localhost:3000", "X-Fitcher-Peer": peer})
+
+    assert response.status_code == 403
+    assert "FITCHER_TRUSTED_PEERS" in response.json()["detail"]
+
+
+def test_a_loopback_host_behind_an_internal_forwarded_host_still_needs_a_local_peer(client, monkeypatch):
+    monkeypatch.setenv("FITCHER_INTERNAL_HOSTS", "api")
+    headers = {"Host": "localhost:8000", "X-Forwarded-Host": "api:8000", "X-Fitcher-Peer": "172.17.0.9"}
+
+    assert client.get("/me", headers=headers).status_code == 403
+    assert client.get("/me", headers={**headers, "X-Fitcher-Peer": "127.0.0.1"}).status_code == 200
+
+
+def test_without_a_forwarded_peer_the_connection_address_decides(monkeypatch):
+    monkeypatch.delenv("FITCHER_TRUSTED_PEERS", raising=False)
+    monkeypatch.setattr(origin, "default_gateways", lambda: frozenset())
+    Settings(shared_state()).set("instance", "mode", "individual")
+    app.dependency_overrides[runtime.get_compiled_or_none] = compiled_fixture
+    try:
+        with TestClient(app, base_url="http://localhost:3000", client=("172.18.0.5", 40000)) as remote:
+            assert remote.get("/me").status_code == 403
+            assert remote.post("/setup/steps/models/skip", headers={"Origin": "http://localhost:3000"}).status_code == 403
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_a_trusted_peer_network_is_accepted(client, monkeypatch):
+    monkeypatch.setenv("FITCHER_TRUSTED_PEERS", "10.0.2.0/24, fd00::1")
+
+    assert client.get("/me", headers={"X-Fitcher-Peer": "10.0.2.100"}).status_code == 200
+    assert client.get("/me", headers={"X-Fitcher-Peer": "fd00::1"}).status_code == 200
+    assert client.get("/me", headers={"X-Fitcher-Peer": "10.0.3.1"}).status_code == 403
+
+
+def test_an_allowed_host_is_reached_from_other_machines(client, monkeypatch):
+    monkeypatch.setenv("FITCHER_ALLOWED_HOSTS", "fitcher.lan")
+
+    assert client.get("/me", headers={"Host": "fitcher.lan", "X-Fitcher-Peer": "192.168.1.50"}).status_code == 200
+
+
+def test_the_default_gateway_is_read_from_the_route_table(tmp_path):
+    table = tmp_path / "route"
+    table.write_text(
+        "Iface\tDestination\tGateway \tFlags\tRefCnt\tUse\tMetric\tMask\t\tMTU\tWindow\tIRTT\n"
+        "eth0\t00000000\t010011AC\t0003\t0\t0\t0\t00000000\t0\t0\t0\n"
+        "eth0\t000011AC\t00000000\t0001\t0\t0\t0\t0000FFFF\t0\t0\t0\n"
+        "eth1\t00000000\t010013AC\t0003\t0\t0\t0\t00000000\t0\t0\t0\n"
+    )
+
+    assert origin.default_gateways.__wrapped__(table) == frozenset({ip_address("172.17.0.1"), ip_address("172.19.0.1")})
+    assert origin.default_gateways.__wrapped__(tmp_path / "missing") == frozenset()

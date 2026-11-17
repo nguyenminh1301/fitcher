@@ -44,15 +44,19 @@ export async function forwardBody(request: Request, path: string): Promise<Respo
 /**
  * The browser's own host and origin for the api's address checks (individual mode): the api sees this
  * server as its client, so the browser's Host travels as X-Forwarded-Host. A forwarded host the client
- * sent is ignored, because a page can set that header on its own requests. A proxy's X-Forwarded-Proto
- * is passed on; the api trusts it only when the instance lists its public hosts.
+ * sent is ignored, because a page can set that header on its own requests. X-Fitcher-Peer is the address
+ * of the browser's connection, which peer-address.cjs writes over any value the client sent, so the api
+ * refuses a loopback Host claimed from another machine. A proxy's X-Forwarded-Proto is passed on; the api
+ * trusts it only when the instance lists its public hosts.
  */
 export function browserHeaders(incoming: Headers): Headers {
   const forwarded = new Headers();
   const host = incoming.get("host");
   const origin = incoming.get("origin");
   const proto = incoming.get("x-forwarded-proto");
+  const peer = incoming.get("x-fitcher-peer");
   if (host) forwarded.set("x-forwarded-host", host);
+  if (peer !== null) forwarded.set("x-fitcher-peer", peer);
   if (origin) forwarded.set("origin", origin);
   if (proto) forwarded.set("x-forwarded-proto", proto);
   return forwarded;

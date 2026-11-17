@@ -170,6 +170,32 @@ class FailingVault:
         raise OSError("disk full")
 
 
+def test_a_new_base_url_of_a_keyed_provider_needs_the_key_again(state, store):
+    store.create("openai_compatible", name="Lab", base_url="https://models.example/v1", api_key=KEY)
+
+    with pytest.raises(ProviderError, match="key"):
+        store.update("openai-compatible", base_url="http://attacker.example/v1")
+
+    kept = store.get("openai-compatible")
+    assert (kept.base_url, kept.key_last4) == ("https://models.example/v1", "9876")
+
+
+def test_the_same_base_url_needs_no_key_and_a_keyless_provider_moves_freely(store):
+    store.create("openai_compatible", name="Lab", base_url="https://models.example/v1", api_key=KEY)
+    store.create("ollama", base_url="http://host.docker.internal:11434")
+
+    assert store.update("openai-compatible", name="Lab 2", base_url="https://models.example/v1").name == "Lab 2"
+    assert store.update("ollama", base_url="http://gpu-box:11434").base_url == "http://gpu-box:11434"
+
+
+def test_a_new_base_url_with_its_new_key_is_accepted(state, store):
+    store.create("openai_compatible", name="Lab", base_url="https://models.example/v1", api_key=KEY)
+
+    moved = store.update("openai-compatible", base_url="https://other.example/v1", api_key="sk-other-1111")
+
+    assert (moved.base_url, moved.key_last4) == ("https://other.example/v1", "1111")
+
+
 def test_a_provider_whose_key_is_not_stored_is_not_created(state):
     db, vault = state
     with pytest.raises(OSError):

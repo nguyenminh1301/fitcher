@@ -14,6 +14,12 @@ describe("headers the web server forwards to the api", () => {
     expect(Object.fromEntries(browserHeaders(new Headers({ host: "localhost:3000" })))).toEqual({ "x-forwarded-host": "localhost:3000" });
   });
 
+  it("passes the connection address the web server recorded, so the api knows where the browser is", () => {
+    const forwarded = browserHeaders(new Headers({ host: "localhost:3000", "x-fitcher-peer": "172.17.0.1" }));
+
+    expect(forwarded.get("x-fitcher-peer")).toBe("172.17.0.1");
+  });
+
   it("ignores a forwarded host sent by the client, which a page could set itself", () => {
     const forwarded = browserHeaders(new Headers({ host: "evil.example:3000", "x-forwarded-host": "localhost:3000" }));
 
