@@ -207,6 +207,7 @@ def render_server_config(out_dir: Path, profile: MemoryProfile, data_dir: Path, 
     <tmp_path>{clickhouse}tmp/</tmp_path>
     <user_files_path>{clickhouse}user_files/</user_files_path>
     <format_schema_path>{clickhouse}format_schemas/</format_schema_path>
+    <backups><allowed_path>{Path(data_dir) / 'backups' / 'clickhouse'}/</allowed_path></backups>
     <user_directories replace="replace">
         <users_xml><path>users.xml</path></users_xml>
         <local_directory><path>{clickhouse}access/</path></local_directory>
