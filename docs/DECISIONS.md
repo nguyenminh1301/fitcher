@@ -340,7 +340,7 @@ Principles:
 
 ## 10. Logging (ClickHouse `agent_logs`)
 
-Tables (MergeTree, 90-day TTL, ordered by `(trace_id, ts)`, `(user_id, ts)` or, for pack-level tables, `(pack, ts)`):
+Tables (MergeTree, 90-day TTL except the conversation tables and `feedback`, ordered by `(trace_id, ts)`, `(user_id, ts)` or, for pack-level tables, `(pack, ts)`):
 
 | Table | Contents |
 |---|---|
@@ -361,7 +361,7 @@ Tables (MergeTree, 90-day TTL, ordered by `(trace_id, ts)`, `(user_id, ts)` or, 
 - Log writer: async batches inside the `api` process. `trace_id` comes from the OpenTelemetry context.
 - JOIN with `system.query_log` through `log_comment`; no syncer needed.
 - Conversation state for follow-up questions is read back from `chat_messages`: for each turn the latest revision, without the turns that an edit or retry of an earlier turn replaced (§15).
-- `conversations` and `conversation_groups` are `ReplacingMergeTree` tables keyed by user and id with the update time as version, so a rename, pin, move or delete is a new row; they expire 90 days after their last update, like the messages.
+- `conversations` and `conversation_groups` are `ReplacingMergeTree` tables keyed by user and id with the update time as version, so a rename, pin, move or delete is a new row; they have no expiry, like the messages and feedback.
 
 ## 11. Onboarding a new company
 
@@ -419,7 +419,7 @@ Tables (MergeTree, 90-day TTL, ordered by `(trace_id, ts)`, `(user_id, ts)` or, 
 - Pack eval threshold (§11): execution match >= 80% of the active eval cases; below it `eval.py` exits 1. The threshold is a report, not a gate on using a pack or a model.
 - Live or copy (§4): a table is proposed as live below 1 million rows or 1 GB at the source, whichever the source reports, and as copy above; the user can override either way.
 - Search engine (§2): search moves into ClickHouse only if `retrieval_eval.py` shows no loss of recall against Qdrant on both development packs; otherwise Qdrant stays as a supervised process inside the container. Measured in [search-engine-report.md](eval/search-engine-report.md): on identical vectors ClickHouse's exact search matched or exceeded Qdrant's recall on every collection and language of both packs, and searching all six collections stayed under 180 ms at the 95th percentile, so search moves into ClickHouse.
-- Conversation retention: conversations and their messages are kept until deleted; run logs keep the 90-day TTL (§10). Settled when Phase 21 separates the two.
+- Conversation retention: conversations and their messages are kept until deleted; run logs keep the 90-day TTL (§10). Settled by the ClickHouse change `0007_keep_conversations`.
 - Screening thresholds (§9): `flag` from 0.5 and `block` from 0.9, tuned from the `screen_eval.py` report before enforcement.
 - SQL complexity rule (§6): simple means one metric, at most one dimension, one period, no comparison, no top N and one dataset; it can be widened only if the pack eval does not regress.
 - A provider passes for a tier when the pack eval run with that tier's alias on the provider meets the threshold and does not regress against the baseline.
@@ -431,7 +431,7 @@ The interface follows the Fitcher web app design, summarized in [design/web-app.
 - **Setup.** A new instance opens on a setup of four steps, each of which can be changed later in the console: who uses the instance (individual or team, creating the first admin for a team), models (pick a provider, enter a key or a base URL, test it, accept the proposed tier mapping), data (connect a source and choose tables, or skip) and documents (on by default, or off). The setup can be left after the models step; the chat then explains what is still missing.
 - **Sources page** (`admin`, or the owner in individual mode). Lists the sources with their kind, host, tables, mode and last sync. Adding a source asks for the kind and its connection fields (host, port, database, schema, user, password, TLS mode and certificate; a file upload for the file kind), tests the connection, lists the tables with their size and proposed mode, and saves. A saved password is never shown again.
 - **Two surfaces, one sign-in.** The Chat app is for every role. The workspace console is for console roles: `pack_reviewer` sees Review, Documents, Datasets, Feedback and Evaluation; `admin` sees Runs and trace, Audit, Costs, Evaluation, Models and Users. Navigation lists only the sections the user's roles allow, and the api enforces the same rule on every endpoint. A console role reaches the console from the account menu.
-- **Conversations.** A user can start, list, search, pin, rename and delete their own conversations and sort them into personal groups. The sidebar shows Pinned, Groups and Recent (today, past week, past month). A group is a folder only: conversations never share context, and there is no sharing or collaboration. A conversation's title is its first question cut to 80 characters; no LLM call names it. Search matches titles and the user's own questions, inside the user's conversations only. Delete only hides the conversation from its owner, at once: nothing is removed, and an `admin` can still read every conversation, deleted or not, with its messages and runs in the console's Runs and trace section. The rows expire with the 90-day log TTL, after which history is gone for everyone.
+- **Conversations.** A user can start, list, search, pin, rename and delete their own conversations and sort them into personal groups. The sidebar shows Pinned, Groups and Recent (today, past week, past month). A group is a folder only: conversations never share context, and there is no sharing or collaboration. A conversation's title is its first question cut to 80 characters; no LLM call names it. Search matches titles and the user's own questions, inside the user's conversations only. Delete only hides the conversation from its owner, at once: nothing is removed, and an `admin` can still read every conversation, deleted or not, with its messages and runs in the console's Runs and trace section. Conversations, their messages, groups and feedback have no expiry; run logs keep the 90-day TTL.
 - **Messages.** Under an answer: copy, like, dislike with an optional note, and retry. Under the user's own message: copy and edit. Edit and retry write a new revision of that turn and answer it again; the turns after it in the older revision leave the conversation and its context.
 - **Language.** The English/Vietnamese switch translates the interface only: navigation, labels, step names, notices the app raises, chart axes and number and date formats. User messages, answers and pack content keep the language they were written in (§6). The choice is kept per browser.
 - **Theme.** Light and dark, following the system setting unless the user picks one; the choice is kept per browser.
