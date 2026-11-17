@@ -105,11 +105,20 @@ def write_pack_files(pack_dir: Path, *, pack: str, display_name: str, source: st
 APPROVED_FILES = ("datasets.yaml", "metrics.yaml", "glossary.yaml", "examples.yaml", "policies.yaml", "relationships.yaml")
 
 
-def _cites(file: str, item: dict, dropped_metrics: set[str]) -> bool:
+def _cites_missing(file: str, item: dict, metrics: set[str], columns: dict[str, set[str]]) -> bool:
+    """Whether a glossary term or an example cites a metric, dataset or column the pack does not have."""
     if file == "glossary.yaml":
-        return any(target.get("metric") in dropped_metrics for target in item.get("targets") or [])
+        for target in item.get("targets") or []:
+            if target.get("kind") == "metric" and target.get("metric") not in metrics:
+                return True
+            if target.get("kind") in ("column", "value") and (
+                target.get("dataset") not in columns or target.get("column") not in columns[target["dataset"]]
+            ):
+                return True
+        return False
     if file == "examples.yaml":
-        return any(metric in dropped_metrics for metric in item.get("metrics") or [])
+        return (any(metric not in metrics for metric in item.get("metrics") or [])
+                or any(dataset not in columns for dataset in item.get("datasets") or []))
     return False
 
 
@@ -117,20 +126,23 @@ def approve_generated(pack_dir: Path, schema_dir: Path | None = None) -> dict:
     """Approve the pack's generated items as unreviewed (``reviewed: false``), as an instant pack does.
 
     A draft whose test-run failed (an ``error`` evidence) is dropped, and so is a glossary term or an example that
-    cites a dropped metric. Draft join paths stay drafts: a join the source does not declare needs a person.
+    cites a metric, dataset or column the pack does not have, a dropped metric included: a model can name a
+    metric it never drafted, and one such reference would fail the compile. Draft join paths stay drafts: a join
+    the source does not declare needs a person.
     """
     files = PackFiles(pack_dir, schema_dir=schema_dir)
     dropped: list[str] = []
-    dropped_metrics: set[str] = set()
+    columns = {item["id"]: {column["name"] for column in item.get("columns") or []} for item in files.items("datasets.yaml")}
+    metrics: set[str] = set()
     for file in APPROVED_FILES:
         for item in list(files.items(file)):
             failed = any(evidence.get("kind") == "error" for evidence in item.get("evidence") or [])
-            if failed or _cites(file, item, dropped_metrics):
+            if failed or _cites_missing(file, item, metrics, columns):
                 files.delete(file, item["id"])
                 dropped.append(f"{file.removesuffix('.yaml')}.{item['id']}")
-                if file == "metrics.yaml":
-                    dropped_metrics.add(item["id"])
                 continue
+            if file == "metrics.yaml":
+                metrics.add(item["id"])
             if file == "relationships.yaml" and item.get("status") != "approved":
                 continue
             files.approve(file, item["id"])["reviewed"] = False
