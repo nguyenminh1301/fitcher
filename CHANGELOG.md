@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 0.0.1 - 2026-11-17
+
+The first release of the one-image product.
+
 ### Added
 
 - The Demo workflow builds the web app with every feature on the sample data and no backend (`NEXT_PUBLIC_FITCHER_DEMO=1`), each page marked with the Sample data badge, and publishes it from `main` as `ghcr.io/<owner>/fitcher-demo`.
