@@ -1,5 +1,6 @@
 """The source endpoints over a temporary app state and a fake ClickHouse; only an admin reaches them (DECISIONS §9, §15)."""
 
+import logging
 import time
 
 from fastapi.testclient import TestClient
@@ -414,3 +415,13 @@ def test_drift_compares_the_catalog_with_the_columns_the_instant_pack_was_built_
     assert body["pack"] == "shop"
     assert body["changes"] == [{"table": built.name, "added": ["created_at"], "removed": ["gone"], "retyped": [], "missing": False}]
     assert client.get("/sources/shop/drift", headers=VIEWER).status_code == 403
+
+
+def test_the_source_password_reaches_no_response_log_line_or_admin_action(client, parts, caplog):
+    caplog.set_level(logging.DEBUG)
+    bodies = [client.post("/sources", headers=ADMIN, json={"name": "shop", **BODY}).text,
+              client.get("/sources", headers=ADMIN).text, client.get("/sources/shop", headers=ADMIN).text]
+    parts[2].fail_on = "pg_namespace"
+    parts[2].error = RuntimeError(f'FATAL:  password authentication failed for user "reader" {PASSWORD}')
+    bodies.append(client.post("/sources/test", headers=ADMIN, json=BODY).text)
+    assert all(PASSWORD not in text for text in [*bodies, caplog.text, repr(parts[3].records)])

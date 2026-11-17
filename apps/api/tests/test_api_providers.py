@@ -1,6 +1,7 @@
 """The provider and tier endpoints over a temporary app state; listing and the test call are fakes."""
 
 from fastapi.testclient import TestClient
+import logging
 import pytest
 
 from session_fixtures import SessionHeaders
@@ -293,3 +294,15 @@ def test_each_tier_shows_the_latest_eval_result_of_its_model_without_limiting_th
                                         "report_id": "r1", "report_ts": "2026-11-10T00:00:00Z"}
     assert tiers["fast"]["eval"]["evaluated"] is False
     assert client.put("/models/tiers/fast", headers=ADMIN, json={"provider_id": "openai", "model": "gpt-5.5"}).status_code == 200
+
+
+def test_the_provider_key_reaches_no_response_log_line_or_admin_action(client, actions, caplog):
+    caplog.set_level(logging.DEBUG)
+    bodies = [
+        client.post("/providers", headers=ADMIN, json={"kind": "openai", "api_key": KEY}).text,
+        client.get("/providers", headers=ADMIN).text,
+        client.patch("/providers/openai", headers=ADMIN, json={"api_key": KEY + "-new"}).text,
+        client.get("/providers/openai/models", headers=ADMIN).text,
+        client.post("/providers/openai/test", headers=ADMIN, json={}).text,
+    ]
+    assert all("endpoint-key-7777" not in text for text in [*bodies, caplog.text, repr(actions.records)])

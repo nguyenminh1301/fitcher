@@ -1,6 +1,7 @@
 """The in-process model gateway with a fake SDK call in place of a provider; no test sends a request."""
 
 from collections.abc import Iterator
+import logging
 import os
 from pathlib import Path
 import string
@@ -383,3 +384,14 @@ def test_loading_the_sdk_never_reads_a_dotenv_file(tmp_path):
     out = subprocess.run([sys.executable, "-c", code], cwd=tmp_path, env=env, capture_output=True, text=True, check=True)
 
     assert out.stdout.strip() == "unset"
+
+
+def test_a_provider_error_quoting_the_key_keeps_it_out_of_the_llm_calls_row_and_the_logs(screened, caplog):
+    caplog.set_level(logging.DEBUG)
+    rows, key = Rows(), "sk-live-abcdef-0123456789"
+    sdk = FakeSdk(litellm.AuthenticationError(f"Incorrect API key provided: {key}", "openai", "gpt-4.1-mini"))
+
+    with pytest.raises(LLMError) as raised:
+        gateway(sdk, call_log=rows).text("fast", PROMPT)
+
+    assert all(key not in text for text in [str(raised.value), repr(rows.records), caplog.text])

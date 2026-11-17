@@ -333,6 +333,7 @@
 
 ### Tests
 
+- Tests fail when a provider key, a source password, a session id or the instance secret key appears in an API response, a log line, an admin action or an `llm_calls` row, including when a provider or source error quotes it.
 - Check connecting sources on a running ClickHouse with the `sources` profile (`apps/api/tests/test_sources_connect_live.py`, `SOURCES_LIVE_TEST=1`): the fixture PostgreSQL and MySQL are connected through named collections and their tables listed with sizes and keys, a wrong password, host, port and database each fail with their own reason, one table is attached live and one copied, an incremental copy of a throwaway table adds only the rows above the cursor and not an updated row, no password is in the app state, `system.tables`, `system.query_log`, `system.processes` or `system.named_collections`, `source_admin` cannot override a collection's host or read its secrets, and a CSV and an XLSX load into `raw` with the confirmed types. The grants check of `test_sources_live.py` now names both source users.
 - Let two chat tests wait for the answer they started to finish, so a state update after the test environment is torn down no longer fails the web suite at random.
 - Prove company documents on a running Qdrant with `QDRANT_LIVE_URL` set: an uploaded document is found by search only for its roles and is gone once deleted, and a document whose only chunk carries a prompt injection from the screening attack set is marked failed and adds no chunk to `kb_docs`.
