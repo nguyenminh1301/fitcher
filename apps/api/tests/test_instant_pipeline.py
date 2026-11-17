@@ -5,6 +5,7 @@ import shutil
 
 from conftest import SCHEMA_DIR
 import pytest
+import yaml
 
 from app.onboarding.instant import STEPS, InstantPipeline, InstantRefused
 from app.sources.inspect import CatalogColumn, ForeignKey
@@ -236,3 +237,38 @@ def test_wide_views_are_profiled_from_their_tables_without_scanning_a_join():
                                "widgets_widget_name": {"type": "string", "distinct": 3, "top_values": [["A", 1]]}}
     assert wide["sample_rows"] == []
     assert set(profiled["tables"]) == {"shop__widgets", "shop__sales", "shop__sales__wide"}
+
+
+def test_a_draft_without_metrics_is_asked_once_more_then_gets_counts_and_totals(packs_dir):
+    drafter = FakeDrafter()
+    pipeline, _, _ = _pipeline(packs_dir, drafter=drafter)
+
+    job = pipeline.run(pipeline.new_job("shop", ["widgets", "sales"], started_by="owner"))
+
+    assert job.status == "succeeded"
+    assert drafter.calls.count("metrics.yaml") == 2
+    metrics = {item["id"]: item for item in yaml.safe_load((packs_dir / "shop" / "metrics.yaml").read_text())["metrics"]}
+    assert metrics["shop__sales_rows"]["sql_expr"] == "count()"
+    assert metrics["shop__sales_sale_amount_total"]["sql_expr"] == "sum(sale_amount)"
+    assert {item["status"] for item in metrics.values()} == {"approved"}
+    assert all(item["dataset"] in ("shop__widgets", "shop__sales", "shop__sales__wide") for item in metrics.values())
+
+
+def test_drafted_metrics_are_kept_without_a_second_draft(packs_dir):
+    class WithMetric(FakeDrafter):
+        def draft(self, file, files, profile, chunks):
+            if file != "metrics.yaml":
+                return super().draft(file, files, profile, chunks)
+            self.calls.append(file)
+            return [{"id": "revenue", "name": "Revenue", "description": "Sales.", "dataset": "shop__sales", "sql_expr": "sum(amount)",
+                     "grain": "day", "unit": "currency", "owner": "finance", "evidence": [{"kind": "profile", "ref": "shop__sales"}],
+                     "confidence": 0.6, "status": "draft"}]
+
+    drafter = WithMetric()
+    pipeline, _, _ = _pipeline(packs_dir, drafter=drafter)
+
+    pipeline.run(pipeline.new_job("shop", ["widgets", "sales"], started_by="owner"))
+
+    assert drafter.calls.count("metrics.yaml") == 1
+    ids = [item["id"] for item in yaml.safe_load((packs_dir / "shop" / "metrics.yaml").read_text())["metrics"]]
+    assert ids == ["revenue"]

@@ -22,7 +22,7 @@ import threading
 from pathlib import Path
 
 from app.observability.tracing import trusted_pack_calls
-from app.onboarding.drafter import DRAFT_FILES
+from app.onboarding.drafter import DRAFT_FILES, pack_id
 from app.onboarding.drift import write_snapshot
 from app.onboarding.instant_files import approve_generated, write_pack_files
 from app.onboarding.marts import (
@@ -97,6 +97,24 @@ def wide_profiles(views: Sequence[MartView], profile: dict) -> dict:
             "sample_rows": [],
         }
     return {**profile, "tables": tables}
+
+
+def fallback_metrics(datasets: Sequence[dict]) -> list[dict]:
+    """The metrics of a pack whose draft returned none: each dataset's row count and the total of each measure."""
+    metrics = []
+    for dataset in datasets:
+        base = {"dataset": dataset["id"], "grain": "day", "owner": "instant pack", "confidence": 0.3, "status": "draft",
+                "evidence": [{"kind": "profile", "ref": dataset["id"]}]}
+        metrics.append({**base, "id": pack_id(f"{dataset['id']}_rows"), "name": f"Rows of {dataset['id']}",
+                        "description": f"The number of rows of {dataset['id']}.", "sql_expr": "count()", "unit": "count"})
+        for column in dataset.get("columns") or []:
+            if column.get("role") == "measure":
+                plain = column["name"].isidentifier() and column["name"].isascii()
+                metrics.append({**base, "id": pack_id(f"{dataset['id']}_{column['name']}_total"),
+                                "name": f"Total {column['name']} of {dataset['id']}",
+                                "description": f"The sum of {column['name']} over the rows of {dataset['id']}.",
+                                "sql_expr": f"sum({column['name'] if plain else quote(column['name'])})", "unit": "number"})
+    return metrics
 
 
 def _first_line(error: BaseException) -> str:
@@ -225,6 +243,12 @@ class InstantPipeline:
         files = PackFiles(building, schema_dir=self._schema_dir)
         for file in DRAFT_FILES:
             files.merge_drafts(file, drafter.draft(file, files, state["profile"], []))
+            if file == "metrics.yaml" and not files.items(file):
+                # A model sometimes returns no metric at all, and a pack without metrics answers no question
+                # about amounts: it is asked once more, then the pack gets row counts and column totals.
+                files.merge_drafts(file, drafter.draft(file, files, state["profile"], []))
+                if not files.items(file):
+                    files.merge_drafts(file, fallback_metrics(files.items("datasets.yaml")))
             files.save(file)
 
     def _step_approve(self, job: InstantJob, pack: str, building: Path, state: dict) -> None:
