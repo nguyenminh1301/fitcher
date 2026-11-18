@@ -300,7 +300,7 @@ describe("setup data and start steps", () => {
       instantJob: vi.fn(),
       upload: vi.fn(async (file: File) => ({
         id: "u1", file_name: file.name, format: "csv", size_bytes: 2400,
-        columns: [{ name: "order_id", type: "UInt64" }, { name: "note", type: "Nullable(String)" }], sample: [["1", "a"], ["2", null]],
+        columns: [{ name: "ticket_no", type: "UInt64" }, { name: "note", type: "Nullable(String)" }], sample: [["1", "a"], ["2", null]],
       })),
       loadFile: vi.fn(async () => ({ ...CREATED, id: "sales", kind: "file" })),
       ...overrides,
@@ -323,18 +323,18 @@ describe("setup data and start steps", () => {
 
     expect(await screen.findByRole("heading", { name: "Connect your data" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Load the file" }).hasAttribute("disabled")).toBe(true);
-    await userEvent.upload(screen.getByLabelText("Choose a file"), new File(["order_id,note"], "Sales 2025.csv", { type: "text/csv" }));
+    await userEvent.upload(screen.getByLabelText("Choose a file"), new File(["ticket_no,note"], "Sales 2025.csv", { type: "text/csv" }));
     expect(await screen.findByText("Sales 2025.csv")).toBeTruthy();
 
     await userEvent.click(screen.getByRole("button", { name: /See the column types \(2\)/ }));
     expect((screen.getByLabelText("Source name") as HTMLInputElement).value).toBe("sales_2025");
-    expect((screen.getByLabelText("Type of order_id") as HTMLSelectElement).value).toBe("UInt64");
+    expect((screen.getByLabelText("Type of ticket_no") as HTMLSelectElement).value).toBe("UInt64");
     expect((screen.getByLabelText("note can be empty") as HTMLInputElement).checked).toBe(true);
-    await userEvent.selectOptions(screen.getByLabelText("Type of order_id"), "Int64");
+    await userEvent.selectOptions(screen.getByLabelText("Type of ticket_no"), "Int64");
     await userEvent.click(screen.getByLabelText("note can be empty"));
     await userEvent.click(screen.getByRole("button", { name: "Load the file" }));
 
-    expect(sources.loadFile).toHaveBeenCalledWith("u1", { name: "sales_2025", columns: [{ name: "order_id", type: "Int64" }, { name: "note", type: "String" }] });
+    expect(sources.loadFile).toHaveBeenCalledWith("u1", { name: "sales_2025", columns: [{ name: "ticket_no", type: "Int64" }, { name: "note", type: "String" }] });
     expect(await screen.findByRole("heading", { name: "Choose tables" })).toBeTruthy();
   });
 
