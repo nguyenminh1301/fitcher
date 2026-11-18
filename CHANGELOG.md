@@ -2,10 +2,6 @@
 
 ## Unreleased
 
-### Changed
-
-- The install guide explains how to reach a data source on the internet or local network, on the same computer, or in another Docker container (`docker network connect`, or `--network` on `docker run`).
-
 ## 0.0.2 - 2026-11-18
 
 ### Added
@@ -22,6 +18,7 @@
 
 ### Changed
 
+- The install guide explains how to reach a data source on the internet or local network, on the same computer, or in another Docker container (`docker network connect`, or `--network` on `docker run`).
 - The README and its diagrams describe the personal app: one owner with an optional password, packs that read only the approved datasets through one read-only database user, drafted items marked unreviewed, and one Docker image instead of Compose.
 
 ### Fixed

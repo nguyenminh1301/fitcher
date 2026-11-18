@@ -54,7 +54,7 @@ A pack reads only the datasets you approved. Publishing the pack gives its marts
 
 ## Status
 
-fitcher 0.0.2 makes it a personal app: no accounts or team mode, an optional owner password that is required before the app answers on another host name, packs that read every approved dataset through one read-only database user, a curated list of model providers with an in-app guide to an OpenRouter key and its free models, and a first-run setup that can go back to an answered step. It is on the `develop` branch and has not been published as an image yet; the published image is still 0.0.1, the first release of the one-image product: one `docker run`, setup in the browser, data sources and a first pack built in the application, backup and restore, and the security review of [docs/security.md](docs/security.md). The [decisions](docs/DECISIONS.md) and the [master plan](docs/MASTER_PLAN.md) record how it got here.
+fitcher 0.0.2 makes it a personal app: no accounts or team mode, an optional owner password that is required before the app answers on another host name, packs that read every approved dataset through one read-only database user, a curated list of model providers with an in-app guide to an OpenRouter key and its free models, and a first-run setup that can go back to an answered step. 0.0.1 was the first release of the one-image product: one `docker run`, setup in the browser, data sources and a first pack built in the application, backup and restore, and the security review of [docs/security.md](docs/security.md). The [decisions](docs/DECISIONS.md) and the [master plan](docs/MASTER_PLAN.md) record how it got here.
 
 ## Quick start
 
