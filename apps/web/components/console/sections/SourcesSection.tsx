@@ -1,50 +1,37 @@
 "use client";
 
-// Sources (DECISIONS §4, §15): the databases and files fitcher reads, with their kind, address, chosen tables
-// and the result of the last sync. An admin connects a source (the connection is tested and its tables listed
-// before it is saved), chooses tables and a mode for each, refreshes a source now or cancels a running sync,
-// replaces a password and deletes a source after typing its name. A saved password is never shown again; a
-// failure is shown as one fixed message, never as the database's own text.
+// Sources (DECISIONS §4, §15): the databases and files fitcher reads, one row each with the tables in use, the
+// last sync and its status. A row syncs now, cancels a running sync or retries a failed one; its menu edits the
+// connection, builds or rebuilds the pack, or deletes the source after its name is typed. A source whose pack no
+// longer matches its tables is named above the list with what changed. A saved password is never shown again, and
+// a failure is one fixed message, never the database's own text. Adding a source and building a pack open their
+// own pages, which reuse the setup's Data and Start steps.
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type MouseEvent } from "react";
 
+import { Icon } from "@/components/brand/Icon";
+import { useConsole } from "@/components/console/ConsoleLayout";
 import { ListPage } from "@/components/console/ListPage";
-import { ConnectionFields, connectionBody, SourceConnect, useFailure, type ConnectionValues } from "@/components/sources/SourceConnect";
-import { InstantPack } from "@/components/setup/InstantPack";
-import { TableChooser } from "@/components/sources/TableChooser";
-import { Button, TextField } from "@/components/ui/controls";
-import { WarningBanner } from "@/components/ui/feedback";
-import { Dialog } from "@/components/ui/overlay";
+import { DatabaseFields } from "@/components/setup/DataStep";
+import { connectionBody, useFailure, type ConnectionValues } from "@/components/sources/connection";
+import { TablesDialog } from "@/components/sources/TablesDialog";
+import { Dialog, Menu } from "@/components/ui/overlay";
 import type { FitcherApi } from "@/lib/api/client";
+import { SourceError } from "@/lib/api/http/sources";
 import { useChat } from "@/lib/chat/ChatContext";
 import { useLoad } from "@/lib/console/useLoad";
-import type { SourceDrift, SourcePatch, SourceView, TableDrift, TableView } from "@/lib/contracts";
+import type { SourceDrift, SourcePatch, SourceView, TableDrift } from "@/lib/contracts";
 import { useI18n } from "@/lib/i18n/react";
 
 const POLL_MS = 3000;
+const TONE: Record<string, string> = { succeeded: "fc-label-success", failed: "fc-label-danger", running: "fc-label-accent", cancelled: "" };
 
-function LastSync({ source, syncing }: { source: SourceView; syncing: boolean }) {
-  const { t, formatDate, formatNumber } = useI18n();
-  const sync = source.last_sync;
-  if (syncing || sync?.status === "running") return <span className="fc-muted">{t("sources.syncing")}</span>;
-  if (!sync) return <span className="fc-muted">{t("sources.never")}</span>;
-  const rows = sync.results.reduce((total, result) => total + (typeof result.rows === "number" ? result.rows : 0), 0);
-  return (
-    <span className="fc-muted">
-      {t(`sources.status_${sync.status}`)} · {formatDate(sync.finished_at ?? sync.started_at)}
-      {sync.status === "succeeded" ? ` · ${t("sources.rowsLoaded", { rows: formatNumber(rows) })}` : null}
-      {sync.error ? <> · {t(`sources.reason_${sync.error}`)}</> : null}
-    </span>
-  );
-}
-
-function EditForm({ sources, source, onDone }: { sources: FitcherApi["sources"]; source: SourceView; onDone: () => void }) {
+function EditDialog({ sources, source, onClose, onSaved }: { sources: FitcherApi["sources"]; source: SourceView; onClose: () => void; onSaved: () => void }) {
   const { t } = useI18n();
   const failure = useFailure();
   const [values, setValues] = useState<ConnectionValues>({
     kind: source.kind === "file" ? "postgres" : source.kind, name: source.id, host: source.host ?? "", port: source.port ? String(source.port) : "",
-    database: source.database ?? "", schema_name: source.schema_name ?? "", user: source.user ?? "", password: "", tls_mode: source.tls_mode,
-    ca_certificate: "",
+    database: source.database ?? "", schema_name: source.schema_name ?? "", user: source.user ?? "", password: "", tls_mode: source.tls_mode, ca_certificate: "",
   });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -56,203 +43,254 @@ function EditForm({ sources, source, onDone }: { sources: FitcherApi["sources"];
       const body = connectionBody(values);
       const patch: SourcePatch = { host: body.host, database: body.database, user: body.user, tls_mode: body.tls_mode };
       if (body.port) patch.port = body.port;
-      if (values.kind === "postgres" && body.schema_name) patch.schema_name = body.schema_name;
+      if (body.schema_name) patch.schema_name = body.schema_name;
       if (values.password) patch.password = values.password;
       if (values.ca_certificate.trim()) patch.ca_certificate = values.ca_certificate;
       await sources.update(source.id, patch);
-      setValues({ ...values, password: "", ca_certificate: "" });
-      onDone();
+      onSaved();
+      onClose();
     } catch (cause) {
       setError(failure(cause));
-    } finally {
       setBusy(false);
     }
   }
 
   return (
-    <form className="fc-stack" style={{ gap: "var(--base-size-12)" }} onSubmit={(event) => { event.preventDefault(); void save(); }}>
-      <ConnectionFields values={values} onChange={setValues} disabled={busy} editing />
-      {error ? <WarningBanner tone="danger">{error}</WarningBanner> : null}
-      <div className="fc-row" style={{ gap: "var(--base-size-8)" }}>
-        <Button type="submit" variant="primary" disabled={busy}>{t("sources.save")}</Button>
-        <Button disabled={busy} onClick={onDone}>{t("common.cancel")}</Button>
-      </div>
-    </form>
+    <Dialog open title={t("sourcesPage.editTitle", { name: source.id })} closeLabel={t("common.close")} onClose={onClose}
+      actions={<>
+        <button type="button" className="fc-btn" onClick={onClose}>{t("common.cancel")}</button>
+        <button type="button" className="fc-btn fc-btn-primary" disabled={busy} onClick={() => void save()}>{t("sources.save")}</button>
+      </>}>
+      <p className="fc-muted" style={{ margin: 0 }}>{t("onboarding.dbSub")}</p>
+      <DatabaseFields editing values={values} onChange={(patch) => setValues({ ...values, ...patch })} name={source.id} disabled={busy} invalid={Boolean(error)} />
+      {error ? <div className="fc-field-error" id="db-error" role="alert"><Icon name="alert" />{error}</div> : null}
+    </Dialog>
   );
 }
 
-function SourceRow({ sources, source, syncing, onSyncing, onChanged, onDelete }: {
-  sources: FitcherApi["sources"]; source: SourceView; syncing: boolean; onSyncing: (on: boolean) => void;
-  onChanged: () => Promise<void>; onDelete: () => void;
-}) {
+function DeleteDialog({ sources, source, onClose, onDeleted }: { sources: FitcherApi["sources"]; source: SourceView; onClose: () => void; onDeleted: () => void }) {
   const { t } = useI18n();
   const failure = useFailure();
-  const [panel, setPanel] = useState<"tables" | "edit" | null>(null);
-  const [tables, setTables] = useState<TableView[] | null>(null);
+  const [typed, setTyped] = useState("");
+  const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [drift, setDrift] = useState<SourceDrift | null>(null);
-  const [rebuild, setRebuild] = useState<string[] | null>(null);
-  const running = syncing || source.last_sync?.status === "running";
 
-  // Columns that changed since the source's instant pack was built (DECISIONS §11 step 0); nothing is re-drafted for it.
-  useEffect(() => {
-    sources.drift(source.id).then(setDrift).catch(() => setDrift(null));
-  }, [sources, source.id, source.last_sync?.id]);
-
-  async function startRebuild() {
-    try {
-      setRebuild((await sources.tables(source.id)).filter((table) => table.selected).map((table) => table.name));
-    } catch (cause) {
-      setError(failure(cause));
-    }
-  }
-
-  const changeLine = (change: TableDrift) => change.missing ? `${change.table}: ${t("sources.driftMissing")}` : `${change.table}: ${[
-    change.added.length ? t("sources.driftAdded", { columns: change.added.join(", ") }) : "",
-    change.removed.length ? t("sources.driftRemoved", { columns: change.removed.join(", ") }) : "",
-    ...change.retyped.map((item) => `${item.column} ${item.before} → ${item.after}`),
-  ].filter(Boolean).join("; ")}`;
-
-  async function toggleTables() {
-    if (panel === "tables") return setPanel(null);
-    setPanel("tables");
-    try {
-      setTables(await sources.tables(source.id));
-    } catch (cause) {
-      setError(failure(cause));
-    }
-  }
-
-  async function syncNow() {
+  async function remove() {
+    setBusy(true);
     setError(null);
     try {
-      await sources.sync(source.id);
-      onSyncing(true);
+      await sources.remove(source.id, typed);
+      onDeleted();
+      onClose();
     } catch (cause) {
-      setError(failure(cause));
+      setError(cause instanceof SourceError && cause.marts?.length ? t("sourcesPage.inUse", { marts: cause.marts.join(", ") }) : failure(cause));
+      setBusy(false);
     }
   }
 
-  async function cancel() {
-    try {
-      await sources.cancel(source.id);
-    } catch (cause) {
-      setError(failure(cause));
-    }
-  }
-
-  const address = source.kind === "file" ? t("sources.kind_file") : `${source.host}:${source.port} / ${source.database}`;
   return (
-    <li className="fc-stack" style={{ gap: "var(--base-size-8)", padding: "var(--base-size-12) var(--base-size-16)" }} aria-label={source.id}>
-      <div className="fc-row" style={{ justifyContent: "space-between", flexWrap: "wrap", gap: "var(--base-size-8)" }}>
-        <span>
-          <strong className="fc-mono">{source.id}</strong> <span className="fc-pill fc-pill-neutral">{t(`sources.kind_${source.kind}`)}</span>
-          <span className="fc-muted" style={{ display: "block" }}>
-            {address} · {t("sources.tablesOf", { selected: source.selected_count, count: source.table_count })}
-          </span>
-          <LastSync source={source} syncing={syncing} />
-        </span>
-        <span className="fc-row" style={{ gap: "var(--base-size-8)", flexWrap: "wrap" }}>
-          {source.kind !== "file" ? <Button size="sm" aria-label={t("sources.tablesButton", { name: source.id })} onClick={() => void toggleTables()}>{t("sources.tables")}</Button> : null}
-          {running ? (
-            <Button size="sm" aria-label={t("sources.cancelOf", { name: source.id })} onClick={() => void cancel()}>{t("sources.cancel")}</Button>
-          ) : (
-            <Button size="sm" aria-label={t("sources.syncOf", { name: source.id })} disabled={source.selected_count === 0} onClick={() => void syncNow()}>{t("sources.syncNow")}</Button>
-          )}
-          <Button size="sm" variant="primary" aria-label={t("sources.buildOf", { name: source.id })} disabled={source.selected_count === 0 || running}
-            onClick={() => void startRebuild()}>{t("sources.build")}</Button>
-          {source.kind !== "file" ? <Button size="sm" aria-label={t("sources.editOf", { name: source.id })} onClick={() => setPanel(panel === "edit" ? null : "edit")}>{t("sources.edit")}</Button> : null}
-          <Button size="sm" aria-label={t("sources.deleteOf", { name: source.id })} onClick={onDelete}>{t("sources.delete")}</Button>
-        </span>
+    <Dialog open tone="danger" title={t("sources.deleteTitle", { name: source.id })} closeLabel={t("common.close")} onClose={onClose}
+      actions={<>
+        <button type="button" className="fc-btn" onClick={onClose}>{t("common.cancel")}</button>
+        <button type="button" className="fc-btn fc-btn-danger" disabled={busy || typed !== source.id} onClick={() => void remove()}>{t("sources.delete")}</button>
+      </>}>
+      <p style={{ margin: 0 }}>{t("sourcesPage.deleteText")}</p>
+      <div className="fc-field">
+        <label className="fc-field-label" htmlFor="delete-name">{t("sources.sourceName")}</label>
+        <input id="delete-name" className="fc-input" autoComplete="off" value={typed} onChange={(event) => setTyped(event.target.value)} />
       </div>
-      {error ? <WarningBanner tone="danger">{error}</WarningBanner> : null}
-      {drift?.changes.length ? (
-        <WarningBanner tone="warning">
-          <span>{t("sources.driftTitle")}</span>
-          <ul style={{ margin: "var(--base-size-4) 0" }}>{drift.changes.map((change) => <li key={change.table}>{changeLine(change)}</li>)}</ul>
-          <Button size="sm" aria-label={t("sources.rebuildOf", { name: source.id })} onClick={() => void startRebuild()}>{t("sources.rebuild")}</Button>
-        </WarningBanner>
-      ) : null}
-      {rebuild?.length ? (
-        <InstantPack sources={sources} sourceId={source.id} tables={rebuild} onAsk={() => { setRebuild(null); void onChanged(); }} />
-      ) : null}
-      {panel === "tables" && tables ? (
-        <TableChooser sources={sources} id={source.id} tables={tables} copyOnly={source.kind === "sqlserver"} onSaved={() => void onChanged()}
-          onSynced={() => onSyncing(true)} />
-      ) : null}
-      {panel === "edit" ? <EditForm sources={sources} source={source} onDone={() => { setPanel(null); void onChanged(); }} /> : null}
-    </li>
+      {error ? <div className="fc-banner fc-banner-danger" role="alert"><Icon name="alert" /><div>{error}</div></div> : null}
+    </Dialog>
+  );
+}
+
+function LastSync({ source }: { source: SourceView }) {
+  const { t, formatDate, formatNumber } = useI18n();
+  const sync = source.last_sync;
+  if (!sync) return <span className="fc-muted">{t("sources.never")}</span>;
+  if (sync.status === "running") return <span>{t("sourcesPage.syncRunning")}</span>;
+  const rows = sync.results.reduce((total, result) => total + (typeof result.rows === "number" ? result.rows : 0), 0);
+  return (
+    <span>
+      {formatDate(sync.finished_at ?? sync.started_at, { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
+      {sync.status === "succeeded" ? ` · ${t("sources.rowsLoaded", { rows: formatNumber(rows) })}` : null}
+    </span>
   );
 }
 
 export function SourcesSection() {
   const { t } = useI18n();
   const { api } = useChat();
+  const { navigate } = useConsole();
   const sources = api.sources;
   const failure = useFailure();
   const { data, failed, reload } = useLoad(useCallback(() => sources.list(), [sources]));
+  const [drifts, setDrifts] = useState<Record<string, SourceDrift>>({});
+  const [menu, setMenu] = useState<{ anchor: HTMLElement; source: SourceView } | null>(null);
+  const [dialog, setDialog] = useState<{ kind: "tables" | "edit" | "delete"; source: SourceView } | null>(null);
   const [adding, setAdding] = useState(false);
-  const [syncing, setSyncing] = useState<Record<string, boolean>>({});
-  const [removing, setRemoving] = useState<SourceView | null>(null);
-  const [confirm, setConfirm] = useState("");
-  const [removeError, setRemoveError] = useState<string | null>(null);
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
-  const running = (data ?? []).some((source) => source.last_sync?.status === "running") || Object.values(syncing).some(Boolean);
+  // Columns that changed since a source's pack was built (DECISIONS §11 step 0).
+  const syncIds = (data ?? []).map((source) => `${source.id}:${source.last_sync?.id ?? ""}`).join(",");
+  useEffect(() => {
+    let live = true;
+    void Promise.all((data ?? []).map((source) => sources.drift(source.id).then((drift) => [source.id, drift] as const).catch(() => null)))
+      .then((pairs) => { if (live) setDrifts(Object.fromEntries(pairs.filter((pair): pair is readonly [string, SourceDrift] => Boolean(pair)))); });
+    return () => { live = false; };
+    // Read again when a sync finishes or the list changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sources, syncIds]);
+
+  const running = (data ?? []).some((source) => source.last_sync?.status === "running");
   useEffect(() => {
     if (!running) return;
-    const timer = setInterval(() => {
-      void reload().then(() => setSyncing({}));
-    }, POLL_MS);
+    const timer = setInterval(() => void reload(), POLL_MS);
     return () => clearInterval(timer);
   }, [running, reload]);
 
-  async function remove() {
-    if (!removing) return;
+  async function act(source: SourceView, action: () => Promise<unknown>) {
+    setErrors((current) => ({ ...current, [source.id]: "" }));
     try {
-      await sources.remove(removing.id, confirm);
-      setRemoving(null);
-      setConfirm("");
-      setRemoveError(null);
+      await action();
       await reload();
     } catch (cause) {
-      setRemoveError(failure(cause));
+      setErrors((current) => ({ ...current, [source.id]: failure(cause) }));
     }
   }
 
+  const changeLine = (change: TableDrift) => {
+    if (change.missing) return t("sourcesPage.driftMissing");
+    return [
+      change.added.length ? t("sourcesPage.driftAdded", { columns: change.added.join(", ") }) : "",
+      change.removed.length ? t("sourcesPage.driftRemoved", { columns: change.removed.join(", ") }) : "",
+      ...change.retyped.map((item) => t("sourcesPage.driftRetyped", { column: item.column, before: item.before, after: item.after })),
+    ].filter(Boolean).join(", ");
+  };
+  const build = (source: SourceView) => navigate(`/console/sources/${encodeURIComponent(source.id)}/pack`);
+  const drifted = (data ?? []).filter((source) => drifts[source.id]?.pack && drifts[source.id].changes.length);
+  const add = <button type="button" className="fc-btn fc-btn-primary" onClick={() => setAdding(true)}><Icon name="plus" />{t("sources.add")}</button>;
+
   return (
-    <ListPage section="sources" loading={!data} failed={failed}
-      actions={<Button variant="primary" icon="plus" onClick={() => setAdding(!adding)}>{t("sources.add")}</Button>}>
-      {adding ? (
-        <section className="fc-card" aria-label={t("sources.add")}>
-          <div className="fc-card-head"><h2 className="fc-card-title">{t("sources.add")}</h2></div>
-          <div className="fc-card-body fc-stack">
-            <SourceConnect sources={sources} onConnected={() => void reload()} onChosen={() => void reload()} onSynced={() => { setSyncing({}); void reload(); }} />
-            <div><Button onClick={() => setAdding(false)}>{t("sources.done")}</Button></div>
+    <ListPage section="sources" loading={!data} failed={failed} actions={data?.length ? add : undefined}>
+      {drifted.map((source) => (
+        <div key={source.id} className="fc-banner fc-banner-attention" role="status">
+          <Icon name="alert" />
+          <div style={{ flex: 1 }}>
+            <b>{t("sourcesPage.driftTitle", { pack: drifts[source.id].pack ?? "", name: source.id })}</b>
+            <ul className="drift-list">
+              {drifts[source.id].changes.map((change) => <li key={change.table}><span className="fc-mono">{change.table}</span>: {changeLine(change)}</li>)}
+            </ul>
+          </div>
+          <button type="button" className="fc-btn fc-btn-sm" aria-label={t("sources.rebuildOf", { name: source.id })} onClick={() => build(source)}>{t("sources.rebuild")}</button>
+        </div>
+      ))}
+      {data && !data.length ? (
+        <div className="box">
+          <div className="empty">
+            <div className="empty-icon"><Icon name="database" size="lg" /></div>
+            <p className="empty-title">{t("sourcesPage.emptyTitle")}</p>
+            <p className="empty-text">{t("sourcesPage.emptyText")}</p>
+            {add}
+          </div>
+        </div>
+      ) : null}
+      {data?.length ? (
+        <section className="box" aria-labelledby="sources-title">
+          <div className="box-head"><h2 id="sources-title" className="box-title">{t("sourcesPage.listTitle")}</h2></div>
+          <div style={{ overflowX: "auto" }}>
+            <table className="tbl tbl-cards">
+              <thead>
+                <tr>
+                  <th>{t("sourcesPage.source")}</th><th>{t("sourcesPage.tablesUsedHead")}</th><th>{t("sourcesPage.lastSync")}</th>
+                  <th>{t("ui.status")}</th><th><span className="fc-sr">{t("ui.actions")}</span></th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.map((source) => {
+                  const status = source.last_sync?.status;
+                  const syncError = source.last_sync?.error ? t(`sources.reason_${source.last_sync.error}`) : null;
+                  const rowError = errors[source.id] || null;
+                  return (
+                    <tr key={source.id} aria-label={source.id}>
+                      <td>
+                        <div className="src-cell">
+                          <Icon name={source.kind === "file" ? "fileText" : "database"} />
+                          <div style={{ minWidth: 0 }}>
+                            {source.kind === "file" ? <span className="fc-mono src-name">{source.id}</span> : (
+                              <button type="button" className="fc-mono src-name src-link" aria-label={t("sources.editOf", { name: source.id })}
+                                onClick={() => setDialog({ kind: "edit", source })}>{source.id}</button>
+                            )}
+                            <div className="fc-muted src-kind">{t(`sources.kind_${source.kind}`)}</div>
+                            {status === "failed" && syncError ? <div className="fc-field-error"><Icon name="alert" />{syncError}</div> : null}
+                            {rowError ? <div className="fc-field-error" role="alert"><Icon name="alert" />{rowError}</div> : null}
+                          </div>
+                        </div>
+                      </td>
+                      <td data-label={t("sourcesPage.tablesUsedHead")}>
+                        {source.kind === "file" ? t("sourcesPage.tableCount", { used: source.selected_count, total: source.table_count }) : (
+                          <button type="button" className="fc-link" aria-label={t("sources.tablesButton", { name: source.id })}
+                            onClick={() => setDialog({ kind: "tables", source })}>{t("sourcesPage.tableCount", { used: source.selected_count, total: source.table_count })}</button>
+                        )}
+                      </td>
+                      <td data-label={t("sourcesPage.lastSync")}><LastSync source={source} /></td>
+                      <td data-label={t("ui.status")}>
+                        {status ? (
+                          <span className={`fc-label ${TONE[status] ?? ""}`}>
+                            {status === "running" ? <span className="fc-spin fc-spinning" aria-hidden="true" /> : null}{t(`sources.status_${status}`)}
+                          </span>
+                        ) : <span className="fc-muted">{t("sources.never")}</span>}
+                      </td>
+                      <td className="row-actions">
+                        {status === "running" ? (
+                          <button type="button" className="fc-btn fc-btn-sm" aria-label={t("sources.cancelOf", { name: source.id })}
+                            onClick={() => void act(source, () => sources.cancel(source.id))}>{t("sources.cancel")}</button>
+                        ) : (
+                          <button type="button" className={status === "failed" ? "fc-btn fc-btn-sm" : "fc-btn fc-btn-ghost fc-btn-sm"} aria-label={t("sources.syncOf", { name: source.id })}
+                            disabled={source.selected_count === 0} onClick={() => void act(source, () => sources.sync(source.id))}>
+                            <Icon name="refresh" />{status === "failed" ? t("sourcesPage.retry") : t("sourcesPage.sync")}
+                          </button>
+                        )}
+                        <button type="button" className="fc-btn fc-btn-ghost fc-btn-icon fc-btn-sm" aria-label={t("sourcesPage.optionsOf", { name: source.id })} aria-haspopup="menu"
+                          onClick={(event: MouseEvent<HTMLButtonElement>) => setMenu({ anchor: event.currentTarget, source })}><Icon name="more" /></button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
         </section>
       ) : null}
-      <section className="fc-card">
-        {data && data.length ? (
-          <ul className="fc-list" aria-label={t("sources.list")}>
-            {data.map((source) => (
-              <SourceRow key={source.id} sources={sources} source={source} syncing={Boolean(syncing[source.id])}
-                onSyncing={(on) => setSyncing((current) => ({ ...current, [source.id]: on }))} onChanged={reload}
-                onDelete={() => { setRemoving(source); setConfirm(""); setRemoveError(null); }} />
+      {menu ? (
+        <Menu anchor={menu.anchor} align="end" width={200} label={t("sourcesPage.optionsOf", { name: menu.source.id })} onClose={() => setMenu(null)} items={[
+          ...(menu.source.kind === "file" ? [] : [{ icon: "pencil", label: t("sources.edit"), onSelect: () => setDialog({ kind: "edit", source: menu.source }) }]),
+          { icon: "refresh", label: drifts[menu.source.id]?.pack ? t("sources.rebuild") : t("sources.build"), disabled: menu.source.selected_count === 0, onSelect: () => build(menu.source) },
+          { separator: true },
+          { icon: "trash", label: t("sources.delete"), danger: true, onSelect: () => setDialog({ kind: "delete", source: menu.source }) },
+        ]} />
+      ) : null}
+      {adding ? (
+        <Dialog open title={t("sourcesPage.addTitle")} closeLabel={t("common.close")} onClose={() => setAdding(false)}
+          actions={<button type="button" className="fc-btn" onClick={() => setAdding(false)}>{t("common.cancel")}</button>}>
+          <p className="fc-muted" style={{ margin: 0 }}>{t("sourcesPage.readOnly")}</p>
+          <div className="opt-list">
+            {(["file", "database"] as const).map((kind) => (
+              <button key={kind} type="button" className="opt" onClick={() => navigate(`/console/sources/new?kind=${kind}`)}>
+                <span className="opt-icon"><Icon name={kind === "file" ? "upload" : "database"} /></span>
+                <span className="opt-body">
+                  <span className="opt-title">{t(kind === "file" ? "onboarding.fileCard" : "onboarding.dbCard")}</span>
+                  <span className="opt-desc">{t(kind === "file" ? "onboarding.fileDesc" : "onboarding.dbDesc")}</span>
+                </span>
+                <Icon name="chevronRight" />
+              </button>
             ))}
-          </ul>
-        ) : <p className="fc-muted" style={{ margin: 0, padding: "var(--base-size-16)" }}>{t("sources.empty")}</p>}
-      </section>
-      <Dialog open={removing !== null} title={t("sources.deleteTitle", { name: removing?.id ?? "" })} tone="danger" onClose={() => setRemoving(null)}
-        actions={<>
-          <Button onClick={() => setRemoving(null)}>{t("common.cancel")}</Button>
-          <Button variant="danger" disabled={confirm !== removing?.id} onClick={() => void remove()}>{t("sources.delete")}</Button>
-        </>}>
-        <div className="fc-stack">
-          <p style={{ margin: 0 }}>{t("sources.deleteText")}</p>
-          <TextField label={t("sources.sourceName")} value={confirm} onChange={(event) => setConfirm(event.target.value)} />
-          {removeError ? <WarningBanner tone="danger">{removeError}</WarningBanner> : null}
-        </div>
-      </Dialog>
+          </div>
+        </Dialog>
+      ) : null}
+      {dialog?.kind === "tables" ? <TablesDialog sources={sources} source={dialog.source} onClose={() => setDialog(null)} onSaved={() => void reload()} /> : null}
+      {dialog?.kind === "edit" ? <EditDialog sources={sources} source={dialog.source} onClose={() => setDialog(null)} onSaved={() => void reload()} /> : null}
+      {dialog?.kind === "delete" ? <DeleteDialog sources={sources} source={dialog.source} onClose={() => setDialog(null)} onDeleted={() => void reload()} /> : null}
     </ListPage>
   );
 }

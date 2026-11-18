@@ -84,13 +84,24 @@ export function Overlay({ open, onClose, className, role = "dialog", labelledBy,
   );
 }
 
-export function Dialog({ open, title, tone, actions, onClose, children }: { open: boolean; title: string; tone?: "danger"; actions?: ReactNode; onClose?: () => void; children?: ReactNode }) {
+/**
+ * A modal dialog: a title with a close button, the body and a row of actions. ``wide`` fits a table; on a
+ * phone every dialog fills the screen.
+ */
+export function Dialog({ open, title, tone, actions, onClose, wide, closeLabel = "Close", children }: {
+  open: boolean; title: string; tone?: "danger"; actions?: ReactNode; onClose?: () => void; wide?: boolean; closeLabel?: string; children?: ReactNode;
+}) {
   const titleId = useId();
   return (
-    <Overlay open={open} onClose={onClose} className="fc-dialog" role={tone === "danger" ? "alertdialog" : "dialog"} labelledBy={titleId}>
-      <h2 id={titleId}>{title}</h2>
-      {children ? <div className="fc-dialog-body">{children}</div> : null}
-      <div className="fc-dialog-actions">{actions}</div>
+    <Overlay open={open} onClose={onClose} className={cx("dlg", wide && "dlg-wide")} role={tone === "danger" ? "alertdialog" : "dialog"} labelledBy={titleId}>
+      <div className="dlg-head">
+        <h2 className="dlg-title" id={titleId}>{title}</h2>
+        {onClose ? (
+          <button type="button" className="fc-btn fc-btn-ghost fc-btn-icon fc-btn-sm" aria-label={closeLabel} onClick={onClose}><Icon name="x" /></button>
+        ) : null}
+      </div>
+      {children ? <div className="dlg-body">{children}</div> : null}
+      {actions ? <div className="dlg-foot">{actions}</div> : null}
     </Overlay>
   );
 }
