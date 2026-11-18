@@ -75,7 +75,7 @@ export function OwnerSignIn({ owner, onSignedIn }: { owner: FitcherApi["owner"];
             ) : null}
           </div>
           <button type="submit" className="fc-btn fc-btn-primary fc-btn-xl fc-btn-block" disabled={busy || !password} aria-busy={busy || undefined}>
-            {busy ? <><span className="fc-spin signin-spin" aria-hidden="true" />{t("owner.signingIn")}</> : t("owner.signIn")}
+            {busy ? <><span className="fc-spin fc-spinning" aria-hidden="true" />{t("owner.signingIn")}</> : t("owner.signIn")}
           </button>
           <p className="fc-muted signin-note">{t("owner.forgotten")}</p>
         </form>

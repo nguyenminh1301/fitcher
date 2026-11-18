@@ -56,12 +56,12 @@ function wrap(node: React.ReactNode) {
 }
 
 describe("setup screen", () => {
-  it("lists the steps with the current one open, and no step asks who uses the instance", async () => {
+  it("shows a bar per step, Model, Data and Start, with the current one marked", async () => {
     wrap(<SetupScreen sources={noSources} models={fakeModels()} setup={fakeSetup()} isAdmin onOpenChat={() => {}} />);
-    const steps = await screen.findByRole("list", { name: "Steps" });
-    expect(steps.textContent).toContain("Models");
-    expect(steps.textContent).not.toContain("Who uses this instance");
-    expect(screen.queryByRole("radio", { name: /A team/ })).toBeNull();
+    const steps = await screen.findByRole("list", { name: "Setup progress" });
+    expect(within(steps).getAllByRole("listitem").map((item) => item.textContent)).toEqual(["Step 1: Model", "Step 2: Data", "Step 3: Start"]);
+    expect(within(steps).getAllByRole("listitem")[0].getAttribute("aria-current")).toBe("step");
+    expect(screen.getByText("Step 1 of 3")).toBeTruthy();
   });
 
   it("offers to finish once every step is answered", async () => {
@@ -70,6 +70,12 @@ describe("setup screen", () => {
     await userEvent.click(await screen.findByRole("button", { name: "Finish setup" }));
     expect(setup.complete).toHaveBeenCalled();
     expect(await screen.findByRole("button", { name: "Open the chat" })).toBeTruthy();
+  });
+
+  it("opens an answered step again from its bar", async () => {
+    wrap(<SetupScreen sources={noSources} models={fakeModels()} setup={fakeSetup(ANSWERED)} isAdmin onOpenChat={() => {}} />);
+    await userEvent.click(await screen.findByRole("button", { name: "Open the Model step again" }));
+    expect(await screen.findByText("Choose the model that answers questions")).toBeTruthy();
   });
 
   it("does not let the sample-data demo answer", async () => {
@@ -83,58 +89,91 @@ describe("setup models step", () => {
     steps: [{ id: "models", state: "pending" }], complete: false,
   };
 
-  it("adds a provider with its key, tests it as a paid call and shows the proposed models", async () => {
+  it("checks a key in one go, says the check is billed, and shows the model chosen for each task", async () => {
     const setup = fakeSetup(MODELS_PENDING);
     const models = fakeModels();
     wrap(<SetupScreen sources={noSources} setup={setup} models={models} isAdmin onOpenChat={() => {}} />);
 
-    await userEvent.type(await screen.findByLabelText("API key"), "sk-test-0000-7777");
-    await userEvent.click(screen.getByRole("button", { name: "Add provider" }));
+    expect(await screen.findByText("The check sends one small request to OpenAI, and OpenAI bills it.")).toBeTruthy();
+    expect(screen.getByRole("radio", { name: /OpenAI/ }).getAttribute("aria-checked")).toBe("true");
+    expect(screen.getByRole("link", { name: /Get a key from OpenAI/ }).getAttribute("href")).toBe("https://platform.openai.com/api-keys");
+    await userEvent.type(screen.getByLabelText("API key"), "sk-test-0000-7777");
+    await userEvent.click(screen.getByRole("button", { name: "Check the key" }));
 
     expect(models.addProvider).toHaveBeenCalledWith({ kind: "openai", api_key: "sk-test-0000-7777" });
-    expect(await screen.findByText("The test sends one small request to OpenAI, which bills it.")).toBeTruthy();
-    await userEvent.click(screen.getByRole("button", { name: "Test" }));
-    expect(await screen.findByText("gpt-5.4-mini answered with structured output; 2 models listed.")).toBeTruthy();
-    const proposed = screen.getByLabelText("Proposed models");
-    expect(proposed.textContent).toContain("sql-gen");
-    expect(proposed.textContent).toContain("gpt-5.4");
-    await userEvent.click(screen.getByRole("button", { name: "Continue" }));
+    expect(models.testProvider).toHaveBeenCalledWith("openai");
+    expect(await screen.findByRole("heading", { name: "OpenAI is connected" })).toBeTruthy();
+    const table = screen.getByRole("table", { name: "Model for each kind of task" });
+    expect(table.textContent).toContain("gpt-5.4");
+    await userEvent.click(screen.getByRole("button", { name: "Go to the Data step" }));
     await waitFor(() => expect(setup.status).toHaveBeenCalledTimes(2));
   });
 
-  it("suggests a model server's usual address with the host hint, and takes no key", async () => {
+  it("removes the provider again when the check fails and says why under the key", async () => {
+    const models = {
+      ...fakeModels(),
+      testProvider: vi.fn(async () => ({ provider_id: "openai", models: [], model: null, structured_output: false, paid: true, error: "The key was refused." })),
+      removeProvider: vi.fn(async () => undefined),
+    } as unknown as FitcherApi["models"];
+    wrap(<SetupScreen sources={noSources} setup={fakeSetup(MODELS_PENDING)} models={models} isAdmin onOpenChat={() => {}} />);
+
+    await userEvent.type(await screen.findByLabelText("API key"), "sk-wrong");
+    await userEvent.click(screen.getByRole("button", { name: "Check the key" }));
+
+    expect((await screen.findByRole("alert")).textContent).toBe("The check failed: The key was refused.");
+    expect(models.removeProvider).toHaveBeenCalledWith("openai");
+    expect(screen.getByLabelText("API key").getAttribute("aria-invalid")).toBe("true");
+  });
+
+  it("removes the provider and goes back to the list when the provider is changed", async () => {
+    const models = { ...fakeModels(), removeProvider: vi.fn(async () => undefined) } as unknown as FitcherApi["models"];
+    wrap(<SetupScreen sources={noSources} setup={fakeSetup(MODELS_PENDING)} models={models} isAdmin onOpenChat={() => {}} />);
+
+    await userEvent.type(await screen.findByLabelText("API key"), "sk-test");
+    await userEvent.click(screen.getByRole("button", { name: "Check the key" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Change provider" }));
+
+    expect(models.removeProvider).toHaveBeenCalledWith("openai");
+    expect(await screen.findByRole("radiogroup", { name: "Provider" })).toBeTruthy();
+  });
+
+  it("suggests a model server's usual address with the Docker hint, takes no key and says nothing is billed", async () => {
     const models = fakeModels();
     wrap(<SetupScreen sources={noSources} setup={fakeSetup(MODELS_PENDING)} models={models} isAdmin onOpenChat={() => {}} />);
 
-    await userEvent.selectOptions(await screen.findByLabelText("Provider"), "ollama");
+    await userEvent.click(await screen.findByRole("radio", { name: /Ollama on this computer/ }));
 
     expect(screen.queryByLabelText("API key")).toBeNull();
-    expect(screen.getByText(/host\.docker\.internal:<port>/)).toBeTruthy();
-    const address = screen.getByLabelText("Base URL");
+    expect(screen.queryByText(/bills it/)).toBeNull();
+    expect(screen.getByText(/host\.docker\.internal\./)).toBeTruthy();
+    const address = screen.getByLabelText("Address");
     expect((address as HTMLInputElement).value).toBe("http://host.docker.internal:11434");
     await userEvent.clear(address);
     await userEvent.type(address, "http://192.168.1.20:11434");
-    await userEvent.click(screen.getByRole("button", { name: "Add provider" }));
+    await userEvent.click(screen.getByRole("button", { name: "Check the connection" }));
     expect(models.addProvider).toHaveBeenCalledWith({ kind: "ollama", base_url: "http://192.168.1.20:11434" });
   });
 
-  it("adds an OpenAI-compatible service from its preset, with a link to its key page and no address to type", async () => {
+  it("lists more providers by group, and adds a service from its preset with no address to type", async () => {
     const models = fakeModels();
     wrap(<SetupScreen sources={noSources} setup={fakeSetup(MODELS_PENDING)} models={models} isAdmin onOpenChat={() => {}} />);
 
-    await userEvent.selectOptions(await screen.findByLabelText("Provider"), "groq");
+    await userEvent.click(await screen.findByRole("button", { name: "More providers" }));
+    expect(screen.getByRole("group", { name: "Model services" })).toBeTruthy();
+    expect(screen.getByRole("group", { name: "On this computer" })).toBeTruthy();
+    await userEvent.click(screen.getByRole("radio", { name: /Groq/ }));
 
-    expect(screen.queryByLabelText("Base URL")).toBeNull();
+    expect(screen.queryByLabelText("Address")).toBeNull();
     expect(screen.getByRole("link", { name: /Get a key from Groq/ }).getAttribute("href")).toBe("https://console.groq.com/keys");
     expect(screen.queryByRole("region", { name: "How to get an OpenRouter key" })).toBeNull();
     await userEvent.type(screen.getByLabelText("API key"), "gsk-test-1234");
-    await userEvent.click(screen.getByRole("button", { name: "Add provider" }));
+    await userEvent.click(screen.getByRole("button", { name: "Check the key" }));
     expect(models.addProvider).toHaveBeenCalledWith({
       kind: "openai_compatible", name: "Groq", api_key: "gsk-test-1234", base_url: "https://api.groq.com/openai/v1",
     });
   });
 
-  it("walks through creating an OpenRouter key, then maps every tier to the chosen free model", async () => {
+  it("walks through creating an OpenRouter key, then maps every tier to the chosen free model and checks it", async () => {
     const OPENROUTER: ProviderView = {
       id: "openai-compatible", name: "OpenRouter", kind: "openai_compatible", base_url: "https://openrouter.ai/api/v1",
       key_set: true, key_last4: "abcd", hosted: false, in_use: false,
@@ -150,42 +189,43 @@ describe("setup models step", () => {
         provider_id: OPENROUTER.id, models: ["openai/gpt-5.4", "nvidia/nemotron-3-ultra-550b-a55b:free", "qwen/qwen3-coder:free"],
       })),
       setTier: vi.fn(async () => unmapped),
-      testProvider: vi.fn(),
+      testProvider: vi.fn(async () => ({ provider_id: OPENROUTER.id, models: ["qwen/qwen3-coder:free"], model: "qwen/qwen3-coder:free", structured_output: true, paid: false, error: null })),
     } as unknown as FitcherApi["models"];
     wrap(<SetupScreen sources={noSources} setup={fakeSetup(MODELS_PENDING)} models={models} isAdmin onOpenChat={() => {}} />);
 
-    await userEvent.selectOptions(await screen.findByLabelText("Provider"), "openrouter");
+    await userEvent.click(await screen.findByRole("radio", { name: /OpenRouter/ }));
+    expect(screen.queryByText(/bills it/)).toBeNull();
     const guide = screen.getByRole("region", { name: "How to get an OpenRouter key" });
-    expect(guide.textContent).toContain("Create a key named fitcher");
-    await userEvent.click(screen.getByRole("button", { name: /Copy the key/ }));
-    expect(screen.getByRole("button", { name: /Copy the key/ }).getAttribute("aria-current")).toBe("step");
-    expect(screen.getByRole("button", { name: "Play" })).toBeTruthy();
+    await userEvent.click(within(guide).getByRole("button", { name: /Copy the key/ }));
+    expect(within(guide).getByRole("button", { name: /Copy the key/ }).getAttribute("aria-current")).toBe("step");
+    expect(guide.textContent).toContain("Step 4 of 4");
+    expect(within(guide).getByRole("button", { name: "Play the guide" })).toBeTruthy();
 
     await userEvent.type(screen.getByLabelText("API key"), "sk-or-v1-test");
-    await userEvent.click(screen.getByRole("button", { name: "Add provider" }));
+    await userEvent.click(screen.getByRole("button", { name: "Check the key" }));
     expect(models.addProvider).toHaveBeenCalledWith({
       kind: "openai_compatible", name: "OpenRouter", api_key: "sk-or-v1-test", base_url: "https://openrouter.ai/api/v1",
     });
 
-    const chosen = await screen.findByLabelText("Model");
-    expect(screen.getByText("2 of 3 models shown")).toBeTruthy();
-    expect(chosen.textContent).not.toContain("openai/gpt-5.4");
+    const list = await screen.findByRole("radiogroup", { name: "Model" });
+    expect(screen.getByText("2 of 3 models")).toBeTruthy();
+    expect(list.textContent).not.toContain("openai/gpt-5.4");
     await userEvent.click(screen.getByRole("button", { name: /Free models only/ }));
-    expect(screen.getByText("3 of 3 models shown")).toBeTruthy();
-    await userEvent.selectOptions(chosen, "qwen/qwen3-coder:free");
+    expect(screen.getByText("3 of 3 models")).toBeTruthy();
+    await userEvent.click(within(screen.getByRole("radiogroup", { name: "Model" })).getByRole("radio", { name: "qwen/qwen3-coder:free" }));
     await userEvent.click(screen.getByRole("button", { name: "Use this model" }));
 
     await waitFor(() => expect(models.setTier).toHaveBeenCalledTimes(4));
     expect(models.setTier).toHaveBeenCalledWith("sql-gen-hard", { provider_id: OPENROUTER.id, model: "qwen/qwen3-coder:free" });
-    await userEvent.click(await screen.findByRole("button", { name: "Test" }));
     expect(models.testProvider).toHaveBeenCalledWith(OPENROUTER.id, "qwen/qwen3-coder:free");
+    expect(await screen.findByRole("heading", { name: "OpenRouter is connected" })).toBeTruthy();
   });
 
-  it("can be skipped", async () => {
+  it("can be left for later", async () => {
     const setup = fakeSetup(MODELS_PENDING);
     wrap(<SetupScreen sources={noSources} setup={setup} models={fakeModels()} isAdmin onOpenChat={() => {}} />);
 
-    await userEvent.click(await screen.findByRole("button", { name: "Skip for now" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Later" }));
 
     expect(setup.skip).toHaveBeenCalledWith("models");
   });
@@ -327,17 +367,17 @@ describe("setup data step", () => {
     wrap(<SetupScreen sources={fakeSources()} models={fakeModels()} setup={setup} isAdmin onOpenChat={() => {}} />);
     await screen.findByText("Which data should fitcher read?");
 
-    await userEvent.click(screen.getByRole("button", { name: "Back to Models" }));
+    await userEvent.click(screen.getByRole("button", { name: "Back to Model" }));
 
-    expect(await screen.findByText("Which models answer the questions?")).toBeTruthy();
-    const steps = screen.getByRole("list", { name: "Steps" });
-    expect(within(steps).getByText("Models").closest("li")?.getAttribute("aria-current")).toBe("step");
-    await userEvent.click(screen.getByRole("button", { name: "Keep my answer" }));
+    expect(await screen.findByText("Choose the model that answers questions")).toBeTruthy();
+    const steps = screen.getByRole("list", { name: "Setup progress" });
+    expect(within(steps).getAllByRole("listitem")[0].getAttribute("aria-current")).toBe("step");
+    await userEvent.click(screen.getByRole("button", { name: "Later" }));
 
     expect(await screen.findByText("Which data should fitcher read?")).toBeTruthy();
     expect(setup.skip).not.toHaveBeenCalled();
-    await userEvent.click(screen.getByRole("button", { name: "Open the Models step again" }));
-    expect(await screen.findByText("Which models answer the questions?")).toBeTruthy();
+    await userEvent.click(screen.getByRole("button", { name: "Open the Model step again" }));
+    expect(await screen.findByText("Choose the model that answers questions")).toBeTruthy();
   });
 
   it("does not let a user who is not an admin connect a source", async () => {

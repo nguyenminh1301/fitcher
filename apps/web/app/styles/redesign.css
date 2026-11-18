@@ -291,7 +291,7 @@
 }
 
 /* Sign-in page (artboards SignIn, SignInSending, SignInError): centred form on the plain page. */
-.signin { min-height: 100dvh; background: var(--bgColor-default); display: flex; flex-direction: column; }
+.signin { height: auto; overflow: visible; min-height: 100dvh; background: var(--bgColor-default); display: flex; flex-direction: column; }
 .signin-top { height: 64px; display: flex; align-items: center; justify-content: space-between; padding: 0 16px; gap: 8px; }
 .signin-main { flex: 1; display: flex; align-items: center; justify-content: center; padding: 32px 16px 96px; }
 .signin-form { width: min(360px, 100%); display: flex; flex-direction: column; gap: 20px; }
@@ -300,4 +300,27 @@
 .signin-title { margin: 0; font-size: 32px; line-height: 40px; font-weight: 600; letter-spacing: -.015em; }
 .signin-sub { margin: 0; font-size: 16px; line-height: 24px; }
 .signin-note { margin: 0; text-align: center; font-size: 13px; line-height: 20px; }
-.signin-spin { animation: fc-spin 1s linear infinite; }
+
+/* A spinning ring for busy buttons and loading lines (components.css .fc-spin gives the rotation). */
+.fc-spinning { width: 16px; height: 16px; border-radius: 9999px; border: 2px solid currentColor; border-right-color: transparent; display: inline-block; flex: none; }
+
+/* OpenRouter key guide: caption and the copied key row. */
+.guide-caption { margin: 0; padding: 8px 10px 0; font-size: 13px; line-height: 18px; }
+.guide-key { display: flex; gap: 6px; align-items: center; }
+
+/* Model chooser: at most eight rows, then the list scrolls. */
+.chooser-list { max-height: 352px; overflow: auto; }
+.chooser-loading { display: flex; align-items: center; gap: 8px; padding: 12px 16px; }
+
+/* A field label with a link on the right, such as "Get a key from OpenAI". */
+.field-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.field-link { font-size: 13px; display: inline-flex; gap: 4px; align-items: center; color: var(--fgColor-accent); }
+
+/* The setup page: the onboarding shell takes the window and scrolls with the page. */
+.fc-app.ob { height: auto; overflow: visible; flex-direction: column; }
+.ob-top .fc-logo { justify-self: start; }
+.ob-top-end { display: flex; justify-content: flex-end; }
+.guide-main > .sk { height: 10px; width: 75%; }
+.guide-main > .sk:nth-of-type(odd) { width: 60%; }
+.row-link > .sk { height: 12px; flex: 1; }
+.row-link > input[type="radio"], .row-link > input[type="checkbox"], .tbl input[type="checkbox"] { width: 16px; height: 16px; margin: 0; flex: none; accent-color: var(--fgColor-default); }

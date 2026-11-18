@@ -1,27 +1,31 @@
 "use client";
 
 // Choosing the model of a provider that proposes none (an OpenAI-compatible service or server, DECISIONS §2):
-// the provider's own model list, searchable, with OpenRouter's free models first and only them by default. The
-// chosen model answers every chat tier; each tier can be changed later on the Models page.
+// the provider's own model list, searchable, with only OpenRouter's free models shown by default. The chosen
+// model answers every chat tier; each tier can be changed later on the Models page. In the setup the action
+// sits in the step's footer with a way to choose later; on the Models page it is a plain button.
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 
+import { Icon } from "@/components/brand/Icon";
 import { FREE_SUFFIX, isOpenRouter } from "@/components/models/presets";
-import { Button, Chip, TextField } from "@/components/ui/controls";
-import { WarningBanner } from "@/components/ui/feedback";
 import type { FitcherApi } from "@/lib/api/client";
 import { errorText } from "@/lib/api/errorText";
 import type { ProviderView } from "@/lib/contracts";
 import { useI18n } from "@/lib/i18n/react";
 
-const message = errorText;
-
-export function ModelChooser({ models, provider, tiers, onChosen }: {
+export function ModelChooser({ models, provider, tiers, onChosen, onLater, meta, setup = false }: {
   models: FitcherApi["models"];
   provider: ProviderView;
   /** The chat tiers the chosen model answers. */
   tiers: string[];
-  onChosen: (model: string) => void;
+  /** Called once every tier uses the chosen model; it may run the provider's test and reject with its reason. */
+  onChosen: (model: string) => void | Promise<void>;
+  /** The setup's "Choose later". */
+  onLater?: () => void;
+  /** A line under the setup's footer, such as the step count. */
+  meta?: ReactNode;
+  setup?: boolean;
 }) {
   const { t } = useI18n();
   const [listed, setListed] = useState<string[] | null>(null);
@@ -35,7 +39,7 @@ export function ModelChooser({ models, provider, tiers, onChosen }: {
   useEffect(() => {
     models.providerModels(provider.id)
       .then((reply) => setListed([...reply.models].sort()))
-      .catch((cause) => setError(message(cause)));
+      .catch((cause) => setError(errorText(cause)));
   }, [models, provider.id]);
 
   const shown = useMemo(() => {
@@ -52,45 +56,69 @@ export function ModelChooser({ models, provider, tiers, onChosen }: {
     setError(null);
     try {
       for (const tier of tiers) await models.setTier(tier, { provider_id: provider.id, model });
-      onChosen(model);
+      await onChosen(model);
     } catch (cause) {
-      setError(message(cause));
+      setError(errorText(cause));
     } finally {
       setBusy(false);
     }
   }
 
+  const action = (
+    <button type="button" className={setup ? "fc-btn fc-btn-primary fc-btn-xl fc-btn-block" : "fc-btn fc-btn-primary"}
+      disabled={busy || !model} aria-busy={busy || undefined} onClick={() => void use()}>
+      {busy ? <span className="fc-spin fc-spinning" aria-hidden="true" /> : null}{t("onboarding.useModel")}
+    </button>
+  );
   return (
-    <div className="fc-stack" style={{ gap: "var(--base-size-12)" }}>
-      <p style={{ margin: 0 }}>{t("models.chooseHint", { name: provider.name })}</p>
-      {listed === null && !error ? <p className="fc-muted" role="status" style={{ margin: 0 }}>{t("models.loadingModels")}</p> : null}
-      {listed ? (
-        <>
-          <div className="fc-row" style={{ gap: "var(--base-size-8)", flexWrap: "wrap", alignItems: "flex-end" }}>
-            <div style={{ flex: "1 1 220px" }}>
-              <TextField label={t("models.searchModels")} value={search} onChange={(event) => setSearch(event.target.value)} />
-            </div>
-            {openRouter ? (
-              <Chip selected={freeOnly} icon={freeOnly ? "check" : undefined} onClick={() => setFreeOnly(!freeOnly)}>{t("models.freeOnly")}</Chip>
-            ) : null}
+    <>
+      <div className="box">
+        <div className="box-head">
+          <div className="fc-input-wrap" style={{ flex: 1 }}>
+            <Icon name="search" />
+            <input className="fc-input fc-input-sm" placeholder={t("onboarding.searchModels")} aria-label={t("onboarding.searchModels")}
+              value={search} disabled={listed === null} onChange={(event) => setSearch(event.target.value)} />
           </div>
-          <div className="fc-field">
-            <label className="fc-field-label" htmlFor="chosen-model">{t("models.tierModel")}</label>
-            <select id="chosen-model" className="fc-input" size={Math.min(8, Math.max(shown.length, 2))} style={{ height: "auto" }}
-              value={model} onChange={(event) => setModel(event.target.value)}>
-              {shown.map((name) => <option key={name} value={name}>{name}</option>)}
-            </select>
-            <span className="fc-field-help">
-              {shown.length ? t("models.shownCount", { shown: shown.length, total: listed.length }) : t("models.noneShown")}
-            </span>
+          {openRouter ? (
+            <button type="button" className="chip" aria-pressed={freeOnly} onClick={() => setFreeOnly(!freeOnly)}>
+              {freeOnly ? <Icon name="check" /> : null}{t("onboarding.freeOnly")}
+            </button>
+          ) : null}
+        </div>
+        {listed === null && !error ? (
+          <>
+            <div role="status" className="fc-muted chooser-loading"><span className="fc-spin fc-spinning" aria-hidden="true" />{t("onboarding.loadingModels")}</div>
+            {[0, 1, 2, 3].map((row) => <div key={row} className="row-link"><span className="sk" /></div>)}
+          </>
+        ) : null}
+        {listed && shown.length ? (
+          <div role="radiogroup" aria-label={t("onboarding.model")} className="chooser-list">
+            {shown.map((name) => (
+              <label key={name} className="row-link">
+                <input type="radio" name={`model-${provider.id}`} className="fc-check" checked={model === name} onChange={() => setModel(name)} />
+                <span className="fc-mono">{name}</span>
+              </label>
+            ))}
           </div>
-          {openRouter && freeOnly ? <p className="fc-field-help" style={{ margin: 0 }}>{t("guide.freeNote")}</p> : null}
-          <div>
-            <Button variant="primary" disabled={busy || !model} onClick={() => void use()}>{t("models.useForAll")}</Button>
+        ) : null}
+        {listed && !shown.length ? (
+          <div className="empty">
+            <div className="empty-icon"><Icon name="searchX" size="lg" /></div>
+            <p className="empty-title">{t("onboarding.noMatch")}</p>
+            <p className="empty-text">{openRouter && freeOnly ? t("onboarding.noMatchFree") : t("onboarding.noMatchPlain")}</p>
           </div>
-        </>
-      ) : null}
-      {error ? <WarningBanner tone="danger">{error}</WarningBanner> : null}
-    </div>
+        ) : null}
+        {listed ? <div className="pager"><span aria-live="polite">{t("onboarding.modelCount", { shown: shown.length, total: listed.length })}</span></div> : null}
+      </div>
+      {openRouter && freeOnly && !setup ? <p className="fc-field-help" style={{ margin: 0 }}>{t("guide.freeNote")}</p> : null}
+      {error ? <span className="fc-field-error" role="alert"><Icon name="alert" />{error}</span> : null}
+      {setup ? (
+        <div className="ob-foot">
+          {action}
+          {onLater ? <div><button type="button" className="fc-textlink" onClick={onLater}>{t("onboarding.chooseLater")}</button></div> : null}
+          {meta}
+        </div>
+      ) : <div>{action}</div>}
+    </>
   );
 }
