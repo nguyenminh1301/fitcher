@@ -1,5 +1,7 @@
 // The active pack's sample data for the sample-data mode (DECISIONS §15): only console.json and
-// scenarios.json of packs/<ACTIVE_PACK>/sample_data are served; anything else is a 404.
+// scenarios.json of packs/<ACTIVE_PACK>/sample_data are served; anything else is a 404. A pack without sample
+// scenarios (every pack built in the app, or no sample pack at all) has no suggested questions to offer, so
+// scenarios answers an empty list instead of a 404 the chat would log on every new conversation.
 
 import { readFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
@@ -14,16 +16,19 @@ function missing(): Response {
   return Response.json({ error: "sample_data_missing" }, { status: 404 });
 }
 
+const NO_SCENARIOS = { suggestions: [], scenarios: [] };
+
 export async function GET(_request: Request, { params }: { params: Promise<{ file: string }> }): Promise<Response> {
   const { file } = await params;
   const pack = process.env.ACTIVE_PACK ?? "";
-  if (!FILES.has(file) || !PACK_NAME.test(pack)) return missing();
+  if (!FILES.has(file)) return missing();
+  if (!PACK_NAME.test(pack)) return file === "scenarios" ? Response.json(NO_SCENARIOS) : missing();
   // `npm run dev` runs in apps/web; Compose mounts the packs and sets PACKS_DIR.
   const packs = process.env.PACKS_DIR ?? resolve(process.cwd(), "..", "..", "packs");
   try {
     const text = await readFile(join(packs, pack, "sample_data", `${file}.json`), "utf-8");
     return new Response(text, { headers: { "content-type": "application/json", "cache-control": "no-store" } });
   } catch {
-    return missing();
+    return file === "scenarios" ? Response.json(NO_SCENARIOS) : missing();
   }
 }
