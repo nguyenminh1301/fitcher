@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ConsoleLayout } from "@/components/console/ConsoleLayout";
+import { AddSourcePage, BuildPackPage } from "@/components/console/sections/SourceFlows";
 import { SourcesSection } from "@/components/console/sections/SourcesSection";
 import type { FitcherApi } from "@/lib/api/client";
 import { SourceError } from "@/lib/api/http/sources";
@@ -79,14 +80,16 @@ function fakeSources(initial: SourceView[] = [SHOP]) {
   return sources;
 }
 
-function show(sources: FitcherApi["sources"]) {
+let navigate = vi.fn();
+
+function show(sources: FitcherApi["sources"], page: React.ReactNode = <SourcesSection />) {
   window.localStorage.setItem("fitcher.demo.identity", "adm");
   const api = { ...createMockApi(), sources };
   render(
     <ThemeProvider>
       <I18nProvider initial="en">
         <ChatProvider api={api} navigate={vi.fn()} activeId={null} sources={{ auth: "mock", sources: "http" }}>
-          <ConsoleLayout section="sources" navigate={vi.fn()} onChat={vi.fn()}><SourcesSection /></ConsoleLayout>
+          <ConsoleLayout section="sources" navigate={navigate} onChat={vi.fn()}>{page}</ConsoleLayout>
         </ChatProvider>
       </I18nProvider>
     </ThemeProvider>,
@@ -94,6 +97,7 @@ function show(sources: FitcherApi["sources"]) {
 }
 
 beforeEach(() => {
+  navigate = vi.fn();
   window.localStorage.clear();
   vi.stubGlobal("fetch", vi.fn(async (url: string) =>
     url.endsWith("/console") ? new Response(JSON.stringify(CONSOLE)) : new Response(JSON.stringify({ suggestions: [], scenarios: [] }))));
@@ -103,259 +107,149 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-async function fillConnection(user: ReturnType<typeof userEvent.setup>, password = "s3cret-pass") {
-  await user.type(screen.getByLabelText("Name"), "erp");
-  await user.type(screen.getByLabelText("Host"), "host.docker.internal");
-  await user.type(screen.getByLabelText("Database"), "erp");
-  await user.type(screen.getByLabelText("User"), "reader");
-  await user.type(screen.getByLabelText("Password"), password);
-}
+const row = async (name: string) => (await screen.findByRole("row", { name })) as HTMLElement;
 
 describe("Sources page", () => {
-  it("lists each source with its kind, address, selected tables and last sync", async () => {
+  it("lists each source with its kind, tables in use, last sync and status", async () => {
     show(fakeSources());
+    const shop = await row("shop");
 
-    const row = await screen.findByRole("listitem", { name: "shop" });
-    expect(within(row).getByText("PostgreSQL")).toBeTruthy();
-    expect(within(row).getByText(/db\.internal:5432/)).toBeTruthy();
-    expect(within(row).getByText(/1 of 3 tables/)).toBeTruthy();
-    expect(within(row).getByText(/Succeeded/)).toBeTruthy();
-    expect(row.textContent).not.toMatch(/password/i);
+    expect(within(shop).getByText("PostgreSQL")).toBeTruthy();
+    expect(within(shop).getByRole("button", { name: "Tables of shop" }).textContent).toBe("1 of 3 tables");
+    expect(within(shop).getByText(/1,200 rows/)).toBeTruthy();
+    expect(within(shop).getByText("Succeeded")).toBeTruthy();
   });
 
-  it("shows an empty state when nothing is connected", async () => {
+  it("shows an empty state with a way to add a source", async () => {
     show(fakeSources([]));
-
-    expect(await screen.findByText(/No source yet/)).toBeTruthy();
+    expect(await screen.findByText("No source yet.")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Add source" }));
+    const dialog = screen.getByRole("dialog", { name: "Add a data source" });
+    fireEvent.click(within(dialog).getByRole("button", { name: /Connect a database/ }));
+    expect(navigate).toHaveBeenCalledWith("/console/sources/new?kind=database");
   });
 
-  it("asks for the connection of the kind, with the Docker host hint and a password field", async () => {
-    const user = userEvent.setup();
-    show(fakeSources([]));
-    await user.click(await screen.findByRole("button", { name: "Add source" }));
-
-    expect(screen.getByLabelText("Schema")).toBeTruthy();
-    expect(screen.getByText(/host\.docker\.internal/)).toBeTruthy();
-    expect((screen.getByLabelText("Password") as HTMLInputElement).type).toBe("password");
-    await user.selectOptions(screen.getByLabelText("Database type"), "mysql");
-    expect(screen.queryByLabelText("Schema")).toBeNull();
-    expect(screen.getByLabelText("TLS")).toBeTruthy();
-  });
-
-  it("tests the connection, lists the tables with sizes and the proposed mode, and connects", async () => {
-    const user = userEvent.setup();
-    const sources = fakeSources([]);
-    show(sources);
-    await user.click(await screen.findByRole("button", { name: "Add source" }));
-    await fillConnection(user);
-
-    await user.click(screen.getByRole("button", { name: "Test connection" }));
-
-    expect(sources.test).toHaveBeenCalledWith(expect.objectContaining({
-      kind: "postgres", host: "host.docker.internal", database: "erp", user: "reader", password: "s3cret-pass", tls_mode: "prefer",
-    }));
-    const orders = await screen.findByRole("row", { name: /orders/ });
-    expect(within(orders).getByText(/1,200/)).toBeTruthy();
-    expect(within(orders).getByText(/Live/)).toBeTruthy();
-    const events = screen.getByRole("row", { name: /events/ });
-    expect(within(events).getByText(/Copy/)).toBeTruthy();
-    expect(within(events).getByText(/above 1 million rows/)).toBeTruthy();
-    expect(within(events).getByText(/Read as text: payload/)).toBeTruthy();
-    expect(screen.getByText(/Estimates from the source's own statistics/)).toBeTruthy();
-
-    await user.click(screen.getByRole("button", { name: "Connect" }));
-
-    await waitFor(() => expect(sources.create).toHaveBeenCalledWith(expect.objectContaining({ name: "erp", password: "s3cret-pass" })));
-    expect(await screen.findByRole("listitem", { name: "erp" })).toBeTruthy();
-    expect(screen.queryByDisplayValue("s3cret-pass")).toBeNull();
-  });
-
-  it.each([
-    ["authentication", /user or password was refused/],
-    ["unreachable", /host could not be reached/],
-    ["tls", /TLS settings do not match/],
-    ["database_not_found", /database was not found/],
-  ] as const)("shows a failed test as one fixed message for %s, never the database's own text", async (reason, message) => {
-    const user = userEvent.setup();
-    const sources = fakeSources([]);
-    sources.test = vi.fn(async () => { throw new SourceError("The api answered 422", 422, reason); });
-    show(sources);
-    await user.click(await screen.findByRole("button", { name: "Add source" }));
-    await fillConnection(user);
-
-    await user.click(screen.getByRole("button", { name: "Test connection" }));
-
-    expect(await screen.findByText(message)).toBeTruthy();
-    expect(screen.queryByRole("button", { name: "Connect" })).toBeNull();
-  });
-
-  it("chooses tables, a mode, a refresh interval and a cursor, then saves and prepares them", async () => {
-    const user = userEvent.setup();
+  it("chooses tables, a mode, a refresh interval and a new-rows column, then saves and prepares them", async () => {
     const sources = fakeSources();
     show(sources);
-    await user.click(await screen.findByRole("button", { name: "Tables of shop" }));
+    fireEvent.click(within(await row("shop")).getByRole("button", { name: "Tables of shop" }));
+    const dialog = await screen.findByRole("dialog", { name: "Tables of shop" });
 
-    const events = await screen.findByRole("row", { name: /events/ });
-    await user.click(within(events).getByRole("checkbox", { name: "Use events" }));
-    await user.selectOptions(within(events).getByLabelText("Refresh events"), "3600");
-    await user.selectOptions(within(events).getByLabelText("Only new rows after events"), "created_at");
-    await user.click(screen.getByRole("button", { name: "Save and prepare tables" }));
+    await within(dialog).findByText("events");
+    expect(within(dialog).getByText("Proposed: Copy, because above 1 million rows")).toBeTruthy();
+    expect(within(dialog).getByText("payload")).toBeTruthy();
+    expect(within(dialog).getByText("Slow: joined with another live table")).toBeTruthy();
+    fireEvent.click(within(dialog).getByRole("checkbox", { name: "Use events" }));
+    fireEvent.change(within(dialog).getByRole("combobox", { name: "Refresh events" }), { target: { value: "3600" } });
+    fireEvent.change(within(dialog).getByRole("combobox", { name: "New rows only for events" }), { target: { value: "created_at" } });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Save the choice" }));
 
-    await waitFor(() => expect(sources.sync).toHaveBeenCalledWith("shop"));
-    const change = (sources.changeTables as ReturnType<typeof vi.fn>).mock.calls[0][1] as { tables: Record<string, unknown>[] };
-    expect(change.tables.find((item) => item.name === "events")).toMatchObject({
-      selected: true, mode: "copy", interval_seconds: 3600, cursor_column: "created_at",
+    await waitFor(() => expect(sources.changeTables).toHaveBeenCalled());
+    const change = (sources.changeTables as ReturnType<typeof vi.fn>).mock.calls[0][1];
+    expect(change.tables.find((item: { name: string }) => item.name === "events")).toEqual({
+      name: "events", selected: true, mode: "copy", interval_seconds: 3600, cursor_column: "created_at",
     });
-    expect(await screen.findByText("Selection saved. The chosen tables are being prepared.")).toBeTruthy();
-  });
-
-  it("builds the pack of a source with chosen tables from its row", async () => {
-    const user = userEvent.setup();
-    const sources = fakeSources();
-    show(sources);
-
-    await user.click(await screen.findByRole("button", { name: "Build the pack of shop" }));
-
-    expect(await screen.findByRole("region", { name: "Build the pack" })).toBeTruthy();
-    expect(sources.tables).toHaveBeenCalledWith("shop");
-  });
-
-  it("shows the columns that changed since the source's pack was built and offers to rebuild it", async () => {
-    const user = userEvent.setup();
-    const sources = fakeSources();
-    (sources.drift as ReturnType<typeof vi.fn>).mockResolvedValue({ pack: "shop", changes: [
-      { table: "orders", added: ["promo_code"], removed: ["note"], retyped: [{ column: "total", before: "integer", after: "numeric" }], missing: false },
-    ] });
-    (sources.syncs as ReturnType<typeof vi.fn>).mockResolvedValue([{ ...SYNC, status: "succeeded" }]);
-    show(sources);
-
-    const row = await screen.findByRole("listitem", { name: "shop" });
-    expect(await within(row).findByText(/orders: added promo_code; removed note; total integer → numeric/)).toBeTruthy();
-    expect(sources.drift).toHaveBeenCalledWith("shop");
-    await user.click(within(row).getByRole("button", { name: "Rebuild the pack of shop" }));
-
-    expect(await screen.findByRole("region", { name: "Build the pack" })).toBeTruthy();
-    expect(sources.instantEstimate).toHaveBeenCalledWith({ source_id: "shop", tables: ["items"] });
-  });
-
-  it("flags live tables joined with another live table as slow", async () => {
-    const user = userEvent.setup();
-    show(fakeSources());
-    await user.click(await screen.findByRole("button", { name: "Tables of shop" }));
-
-    const items = await screen.findByRole("row", { name: /items/ });
-
-    expect(within(items).getByText(/Slow: joined with another live table/)).toBeTruthy();
-  });
-
-  it("syncs now, shows it running and lets it be cancelled", async () => {
-    const user = userEvent.setup();
-    const sources = fakeSources();
-    show(sources);
-    await user.click(await screen.findByRole("button", { name: "Sync shop now" }));
-
     expect(sources.sync).toHaveBeenCalledWith("shop");
-    const row = await screen.findByRole("listitem", { name: "shop" });
-    await waitFor(() => expect(within(row).getByText(/Syncing/)).toBeTruthy());
-    await user.click(within(row).getByRole("button", { name: "Cancel sync of shop" }));
-    expect(sources.cancel).toHaveBeenCalledWith("shop");
+    expect(await within(dialog).findByText("Saved. Preparing the tables…")).toBeTruthy();
   });
 
-  it("shows a failed sync as its reason", async () => {
-    const sources = fakeSources([{ ...SHOP, last_sync: { ...SYNC, status: "failed", error: "refused", results: [] } }]);
+  it("shows what changed since the pack was built and opens the rebuild", async () => {
+    const sources = fakeSources();
+    sources.drift = vi.fn(async () => ({ pack: "shop", changes: [
+      { table: "orders", added: ["note_text"], removed: ["coupon"], retyped: [], missing: false },
+      { table: "returns", added: [], removed: [], retyped: [], missing: true },
+    ] }));
     show(sources);
 
-    const row = await screen.findByRole("listitem", { name: "shop" });
-
-    expect(within(row).getByText(/Failed/)).toBeTruthy();
-    expect(within(row).getByText(/refused the connection/)).toBeTruthy();
+    const banner = (await screen.findByText("The pack shop no longer matches source shop.")).closest(".fc-banner") as HTMLElement;
+    expect(banner.textContent).toContain("orders: added note_text, removed coupon");
+    expect(banner.textContent).toContain("returns: no longer in the source");
+    fireEvent.click(within(banner).getByRole("button", { name: "Rebuild the pack of shop" }));
+    expect(navigate).toHaveBeenCalledWith("/console/sources/shop/pack");
   });
 
-  it("replaces a password without showing the stored one", async () => {
-    const user = userEvent.setup();
+  it("syncs now, shows a running sync with a way to cancel it, and a failed one with its reason", async () => {
+    const sources = fakeSources([
+      SHOP,
+      { ...SHOP, id: "kho", last_sync: { ...SYNC, status: "running", finished_at: null } },
+      { ...SHOP, id: "crm", last_sync: { ...SYNC, status: "failed", error: "refused" } },
+    ]);
+    show(sources);
+
+    fireEvent.click(within(await row("shop")).getByRole("button", { name: "Sync shop now" }));
+    await waitFor(() => expect(sources.sync).toHaveBeenCalledWith("shop"));
+    fireEvent.click(within(await row("kho")).getByRole("button", { name: "Cancel sync of kho" }));
+    await waitFor(() => expect(sources.cancel).toHaveBeenCalledWith("kho"));
+    const crm = await row("crm");
+    expect(within(crm).getByText(/refused the connection/)).toBeTruthy();
+    expect(within(crm).getByRole("button", { name: "Sync crm now" }).textContent).toContain("Retry");
+  });
+
+  it("edits a connection and keeps the stored password when the field is left empty", async () => {
     const sources = fakeSources();
     show(sources);
-    await user.click(await screen.findByRole("button", { name: "Edit shop" }));
+    fireEvent.click(within(await row("shop")).getByRole("button", { name: "Edit shop" }));
+    const dialog = await screen.findByRole("dialog", { name: "Edit shop" });
 
-    const password = screen.getByLabelText("Password") as HTMLInputElement;
-    expect(password.value).toBe("");
-    expect(screen.getByText(/Leave empty to keep the stored password/)).toBeTruthy();
-    await user.type(password, "new-pass");
-    await user.click(screen.getByRole("button", { name: "Save" }));
+    expect((within(dialog).getByLabelText("Password") as HTMLInputElement).value).toBe("");
+    expect(within(dialog).getByText("Leave empty to keep the stored password.")).toBeTruthy();
+    fireEvent.change(within(dialog).getByLabelText("Host"), { target: { value: "db2.internal" } });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
 
-    await waitFor(() => expect(sources.update).toHaveBeenCalledWith("shop", expect.objectContaining({ password: "new-pass" })));
+    await waitFor(() => expect(sources.update).toHaveBeenCalledWith("shop", expect.objectContaining({ host: "db2.internal" })));
+    expect((sources.update as ReturnType<typeof vi.fn>).mock.calls[0][1]).not.toHaveProperty("password");
   });
 
-  it("deletes only after the name is typed and says which marts block it", async () => {
-    const user = userEvent.setup();
+  it("deletes only after the name is typed and says which analysis tables block it", async () => {
     const sources = fakeSources();
-    sources.remove = vi.fn(async () => { throw new SourceError("The api answered 409", 409, undefined, ["orders_mart"]); });
+    sources.remove = vi.fn(async () => { throw new SourceError("in use", 409, undefined, ["orders_mart"]); });
     show(sources);
-    await user.click(await screen.findByRole("button", { name: "Delete shop" }));
+    fireEvent.click(within(await row("shop")).getByRole("button", { name: "Options for shop" }));
+    fireEvent.click(await screen.findByRole("menuitem", { name: "Delete" }));
+    const dialog = await screen.findByRole("alertdialog", { name: "Delete shop?" });
 
-    const dialog = await screen.findByRole("alertdialog");
-    const confirm = within(dialog).getByRole("button", { name: "Delete" }) as HTMLButtonElement;
-    expect(confirm.disabled).toBe(true);
-    await user.type(within(dialog).getByLabelText("Source name"), "shop");
-    await user.click(confirm);
+    const remove = within(dialog).getByRole("button", { name: "Delete" });
+    expect(remove.hasAttribute("disabled")).toBe(true);
+    fireEvent.change(within(dialog).getByLabelText("Source name"), { target: { value: "shop" } });
+    fireEvent.click(remove);
 
+    expect(await within(dialog).findByText(/still read this source/)).toBeTruthy();
     expect(sources.remove).toHaveBeenCalledWith("shop", "shop");
-    expect(await screen.findByText(/Marts still read this source: orders_mart/)).toBeTruthy();
-  });
-
-  it("uploads a file, shows the inferred types for confirmation and loads it", async () => {
-    const user = userEvent.setup();
-    const sources = fakeSources([]);
-    show(sources);
-    await user.click(await screen.findByRole("button", { name: "Add source" }));
-    await user.click(screen.getByRole("tab", { name: "File" }));
-
-    const input = screen.getByLabelText("CSV, XLSX or Parquet file") as HTMLInputElement;
-    fireEvent.change(input, { target: { files: [new File(["id,amount\n1,2.5\n"], "orders.csv", { type: "text/csv" })] } });
-
-    await waitFor(() => expect(sources.upload).toHaveBeenCalled());
-    const amount = await screen.findByLabelText("Type of amount");
-    expect((amount as HTMLSelectElement).value).toBe("Nullable(Float64)");
-    await user.selectOptions(amount, "Nullable(Decimal(18, 2))");
-    await user.click(screen.getByRole("button", { name: "Load file" }));
-
-    await waitFor(() => expect(sources.loadFile).toHaveBeenCalledWith("up1", {
-      name: "orders", columns: [{ name: "id", type: "Nullable(Int64)" }, { name: "amount", type: "Nullable(Decimal(18, 2))" }],
-    }));
-  });
-
-  it("connects SQL Server with its own defaults: schema dbo, required encryption, no verification and copy only", async () => {
-    const user = userEvent.setup();
-    const sources = fakeSources([]);
-    sources.test = vi.fn(async () => ({ tables: [{ ...ORDERS, mode: "copy" as const, proposed_mode: "copy" as const, reason: "copy_only" }] }));
-    show(sources);
-    await user.click(await screen.findByRole("button", { name: "Add source" }));
-    await user.selectOptions(screen.getByLabelText("Database type"), "sqlserver");
-
-    expect((screen.getByLabelText("Port") as HTMLInputElement).placeholder).toBe("1433");
-    expect((screen.getByLabelText("Schema") as HTMLInputElement).placeholder).toBe("dbo");
-    expect((screen.getByLabelText("TLS") as HTMLSelectElement).value).toBe("require");
-    expect(screen.queryByRole("option", { name: /verify the server certificate/ })).toBeNull();
-    expect(screen.queryByLabelText("CA certificate (PEM)")).toBeNull();
-    expect(screen.getByText(/certificate of a SQL Server connection is not verified/)).toBeTruthy();
-    await fillConnection(user);
-    await user.click(screen.getByRole("button", { name: "Test connection" }));
-
-    expect(sources.test).toHaveBeenCalledWith(expect.objectContaining({ kind: "sqlserver", tls_mode: "require" }));
-    expect(await screen.findByText(/read through fitcher and copied only/)).toBeTruthy();
   });
 
   it("offers only the copy mode for the tables of a SQL Server source", async () => {
-    const user = userEvent.setup();
-    const sources = fakeSources([{ ...SHOP, id: "erp", kind: "sqlserver" }]);
-    sources.tables = vi.fn(async () => [{ ...ORDERS, mode: "copy" as const, proposed_mode: "copy" as const, reason: "copy_only" }]);
-    show(sources);
-    await user.click(await screen.findByRole("button", { name: "Tables of erp" }));
+    show(fakeSources([{ ...SHOP, kind: "sqlserver" }]));
+    fireEvent.click(within(await row("shop")).getByRole("button", { name: "Tables of shop" }));
+    const dialog = await screen.findByRole("dialog", { name: "Tables of shop" });
+    const mode = (await within(dialog).findByRole("combobox", { name: "How orders is read" })) as HTMLSelectElement;
 
-    const orders = await screen.findByRole("row", { name: /orders/ });
-    const mode = within(orders).getByLabelText("Mode orders") as HTMLSelectElement;
+    expect([...mode.options].map((option) => option.value)).toEqual(["copy"]);
+  });
+});
 
-    expect(within(mode).queryByRole("option", { name: "Live" })).toBeNull();
-    expect(within(orders).getByText(/copied only/)).toBeTruthy();
+describe("Source flows", () => {
+  it("adds a database from its own page with the setup's form and builds its pack", async () => {
+    const sources = fakeSources();
+    show(sources, <AddSourcePage kind="database" />);
+
+    fireEvent.change(await screen.findByLabelText("Host"), { target: { value: "db" } });
+    fireEvent.change(screen.getByLabelText("Database"), { target: { value: "erp" } });
+    fireEvent.change(screen.getByLabelText("User"), { target: { value: "reader" } });
+    fireEvent.change(screen.getByLabelText("Password"), { target: { value: "pw" } });
+    fireEvent.click(screen.getByRole("button", { name: "Check the connection" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Choose tables" }));
+    expect(sources.create).toHaveBeenCalledWith(expect.objectContaining({ name: "erp" }));
+    fireEvent.click(await screen.findByRole("button", { name: /Use 2 tables/ }));
+
+    // The saved choice comes back from the api; here it keeps one chosen table.
+    expect(await screen.findByRole("heading", { name: "Build the pack from 1 tables" })).toBeTruthy();
+  });
+
+  it("rebuilds a source's pack from the tables in use", async () => {
+    const sources = fakeSources();
+    show(sources, <BuildPackPage id="shop" />);
+
+    expect(await screen.findByRole("heading", { name: "Build the pack from 1 tables" })).toBeTruthy();
+    await waitFor(() => expect(sources.instantEstimate).toHaveBeenCalledWith({ source_id: "shop", tables: ["items"] }));
   });
 });

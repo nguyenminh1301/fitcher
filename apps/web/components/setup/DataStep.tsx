@@ -13,7 +13,7 @@ import { StepHead } from "@/components/setup/SetupShell";
 import { formatBytes, FILE_TYPES, tableNameOf } from "@/components/sources/format";
 import {
   connectionBody, DEFAULT_PORTS, DEFAULT_SCHEMAS, EMPTY_CONNECTION, KINDS, TLS, useFailure, type ConnectionValues,
-} from "@/components/sources/SourceConnect";
+} from "@/components/sources/connection";
 import { Segmented } from "@/components/ui/controls";
 import type { FitcherApi } from "@/lib/api/client";
 import type { FileUploadView, SourceDetail, TableView } from "@/lib/contracts";
@@ -27,16 +27,20 @@ type Props = {
   meta: ReactNode;
   disabled?: boolean;
   onBack?: () => void;
-  onSkip: () => void;
+  onSkip?: () => void;
   /** The tables are saved and their preparation has started. */
   onChosen: (chosen: Chosen) => void;
+  /** The screen to open on; the console's "Add a source" opens the database form directly. */
+  initial?: "choose" | "database";
 };
 
 export function DataStep(props: Props) {
-  const [screen, setScreen] = useState<"choose" | "database">("choose");
+  const [screen, setScreen] = useState<"choose" | "database">(props.initial ?? "choose");
   const [source, setSource] = useState<SourceDetail | null>(null);
   if (source) return <TablesScreen {...props} source={source} onBack={() => setSource(null)} />;
-  if (screen === "database") return <DatabaseScreen {...props} onBack={() => setScreen("choose")} onSaved={setSource} />;
+  if (screen === "database") {
+    return <DatabaseScreen {...props} onBack={props.initial === "database" ? props.onBack : () => setScreen("choose")} onSaved={setSource} />;
+  }
   return <ChooseScreen {...props} onDatabase={() => setScreen("database")} onLoaded={setSource} />;
 }
 
@@ -255,16 +259,14 @@ function ChooseScreen({ sources, meta, disabled, onBack, onSkip, onDatabase, onL
 
 // ---- Database connection -----------------------------------------------------------------------------------
 
-function DatabaseScreen({ sources, meta, disabled, onBack, onSaved }: Props & { onBack: () => void; onSaved: (source: SourceDetail) => void }) {
+function DatabaseScreen({ sources, meta, disabled, onBack, onSaved }: Props & { onBack?: () => void; onSaved: (source: SourceDetail) => void }) {
   const { t } = useI18n();
   const failure = useFailure();
   const [values, setValues] = useState<ConnectionValues>(EMPTY_CONNECTION);
   const [named, setNamed] = useState(false);
-  const [advanced, setAdvanced] = useState(false);
   const [found, setFound] = useState<number | null>(null);
   const [busy, setBusy] = useState<"test" | "save" | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const sqlserver = values.kind === "sqlserver";
   const name = named ? values.name : tableNameOf(values.database || "source");
 
   // A tested connection is no longer the one on the form once a field changes.
@@ -296,72 +298,11 @@ function DatabaseScreen({ sources, meta, disabled, onBack, onSaved }: Props & { 
   }
 
   const off = disabled || busy !== null;
-  const field = (id: keyof ConnectionValues, label: string, extra: { type?: string; placeholder?: string; inputMode?: "numeric" } = {}) => (
-    <div className="fc-field">
-      <label className="fc-field-label" htmlFor={`db-${id}`}>{label}</label>
-      <input id={`db-${id}`} className="fc-input" type={extra.type ?? "text"} value={values[id]} placeholder={extra.placeholder} inputMode={extra.inputMode}
-        autoComplete={id === "password" ? "new-password" : "off"} spellCheck={false} disabled={off}
-        aria-invalid={error ? true : undefined} aria-describedby={error ? "db-error" : undefined}
-        onChange={(event) => set({ [id]: event.target.value })} />
-    </div>
-  );
   return (
     <form style={{ display: "contents" }} onSubmit={(event) => { event.preventDefault(); if (found === null) void test(); else void save(); }}>
       <StepHead icon={<Icon name="database" size="xl" />} title={t("onboarding.dbTitle")}>{t("onboarding.dbSub")}</StepHead>
-      <div className="fc-field" role="group" aria-labelledby="db-kind">
-        <span className="fc-field-label" id="db-kind">{t("onboarding.dbKind")}</span>
-        <div style={{ alignSelf: "flex-start" }}>
-          <Segmented label={t("onboarding.dbKind")} value={values.kind}
-            onChange={(kind) => set({ kind: kind as ConnectionValues["kind"], tls_mode: kind === "sqlserver" && values.tls_mode === "verify" ? "require" : values.tls_mode })}
-            options={KINDS.map((kind) => [kind, t(`sources.kind_${kind}`)])} />
-        </div>
-        {sqlserver ? <span className="fc-field-help">{t("onboarding.sqlserverCopy")}</span> : null}
-      </div>
-      <div className="fields-port">
-        {field("host", t("onboarding.host"), { placeholder: "host.docker.internal" })}
-        {field("port", t("onboarding.port"), { placeholder: DEFAULT_PORTS[values.kind], inputMode: "numeric" })}
-      </div>
-      {field("database", t("onboarding.database"))}
-      <div className="fields-2">
-        {field("user", t("onboarding.user"))}
-        {field("password", t("onboarding.password"), { type: "password" })}
-      </div>
-      <span className="fc-field-help" style={{ marginTop: -8 }}>{t("onboarding.dockerHint")}</span>
-      <div className="fc-stack" style={{ gap: 12 }}>
-        <button type="button" className="fc-textlink" aria-expanded={advanced} style={{ alignSelf: "flex-start" }} onClick={() => setAdvanced(!advanced)}>
-          <Icon name={advanced ? "chevronUp" : "chevronDown"} />{advanced ? t("onboarding.hideAdvanced") : t("onboarding.advanced")}
-        </button>
-        {advanced ? (
-          <>
-            <div className="fc-field">
-              <label className="fc-field-label" htmlFor="db-source-name">{t("onboarding.sourceName")}</label>
-              <input id="db-source-name" className="fc-input" value={name} spellCheck={false} disabled={off} aria-describedby="db-source-name-help"
-                onChange={(event) => { setNamed(true); set({ name: event.target.value }); }} />
-              <span className="fc-field-help" id="db-source-name-help">{t("onboarding.sourceNameHelp")}</span>
-            </div>
-            {DEFAULT_SCHEMAS[values.kind] ? field("schema_name", t("onboarding.schema"), { placeholder: DEFAULT_SCHEMAS[values.kind] }) : null}
-            <div className="fc-field">
-              <label className="fc-field-label" htmlFor="db-tls">{t("onboarding.tls")}</label>
-              <div className="sel">
-                <select id="db-tls" className="fc-input" value={values.tls_mode} disabled={off}
-                  onChange={(event) => set({ tls_mode: event.target.value as ConnectionValues["tls_mode"] })}>
-                  {(sqlserver ? TLS.filter((mode) => mode !== "verify") : TLS).map((mode) => <option key={mode} value={mode}>{t(`sources.tls_${mode}`)}</option>)}
-                </select>
-                <Icon name="chevronDown" />
-              </div>
-              {sqlserver ? <span className="fc-field-help">{t("onboarding.sqlserverTls")}</span> : null}
-            </div>
-            {sqlserver ? null : (
-              <div className="fc-field">
-                <label className="fc-field-label" htmlFor="db-ca">{t("onboarding.caCert")}</label>
-                <textarea id="db-ca" className="fc-textarea" placeholder="-----BEGIN CERTIFICATE-----" value={values.ca_certificate} disabled={off}
-                  aria-describedby="db-ca-help" onChange={(event) => set({ ca_certificate: event.target.value })} />
-                <span className="fc-field-help" id="db-ca-help">{t("onboarding.caHelp")}</span>
-              </div>
-            )}
-          </>
-        ) : null}
-      </div>
+      <DatabaseFields values={values} onChange={set} name={name} onName={(next) => { setNamed(true); set({ name: next }); }}
+        disabled={off} invalid={Boolean(error)} />
       {error ? <div className="fc-field-error" id="db-error" role="alert"><Icon name="alert" />{error}</div> : null}
       {found !== null ? (
         <div className="fc-banner fc-banner-success" role="status"><Icon name="check" /><div>{t("onboarding.dbFound", { count: found })}</div></div>
@@ -384,6 +325,95 @@ function DatabaseScreen({ sources, meta, disabled, onBack, onSaved }: Props & { 
         {meta}
       </div>
     </form>
+  );
+}
+
+/**
+ * The fields of a database connection: the kind, host and port, database, user and password, then the source
+ * name, schema, TLS and CA certificate under "Advanced". Editing a saved source keeps its kind and name, and an
+ * empty password or certificate keeps the stored one.
+ */
+export function DatabaseFields({ values, onChange, name, onName, disabled, invalid, editing = false }: {
+  values: ConnectionValues;
+  onChange: (patch: Partial<ConnectionValues>) => void;
+  name: string;
+  onName?: (name: string) => void;
+  disabled?: boolean;
+  /** The last check failed; the fields point at the error line ``db-error``. */
+  invalid?: boolean;
+  editing?: boolean;
+}) {
+  const { t } = useI18n();
+  const [advanced, setAdvanced] = useState(editing);
+  const sqlserver = values.kind === "sqlserver";
+  const field = (id: keyof ConnectionValues, label: string, extra: { type?: string; placeholder?: string; inputMode?: "numeric"; help?: string } = {}) => (
+    <div className="fc-field">
+      <label className="fc-field-label" htmlFor={`db-${id}`}>{label}</label>
+      <input id={`db-${id}`} className="fc-input" type={extra.type ?? "text"} value={values[id]} placeholder={extra.placeholder} inputMode={extra.inputMode}
+        autoComplete={id === "password" ? "new-password" : "off"} spellCheck={false} disabled={disabled}
+        aria-invalid={invalid ? true : undefined}
+        aria-describedby={[invalid ? "db-error" : "", extra.help ? `db-${id}-help` : ""].filter(Boolean).join(" ") || undefined}
+        onChange={(event) => onChange({ [id]: event.target.value })} />
+      {extra.help ? <span className="fc-field-help" id={`db-${id}-help`}>{extra.help}</span> : null}
+    </div>
+  );
+  return (
+    <>
+      <div className="fc-field" role="group" aria-labelledby="db-kind">
+        <span className="fc-field-label" id="db-kind">{t("onboarding.dbKind")}</span>
+        <div style={{ alignSelf: "flex-start" }} aria-disabled={editing || undefined} className={editing ? "seg-locked" : undefined}>
+          <Segmented label={t("onboarding.dbKind")} value={values.kind}
+            onChange={(kind) => { if (!editing) onChange({ kind: kind as ConnectionValues["kind"], tls_mode: kind === "sqlserver" && values.tls_mode === "verify" ? "require" : values.tls_mode }); }}
+            options={KINDS.filter((kind) => !editing || kind === values.kind).map((kind) => [kind, t(`sources.kind_${kind}`)])} />
+        </div>
+        {sqlserver ? <span className="fc-field-help">{t("onboarding.sqlserverCopy")}</span> : null}
+      </div>
+      <div className="fields-port">
+        {field("host", t("onboarding.host"), { placeholder: "host.docker.internal" })}
+        {field("port", t("onboarding.port"), { placeholder: DEFAULT_PORTS[values.kind], inputMode: "numeric" })}
+      </div>
+      {field("database", t("onboarding.database"))}
+      <div className="fields-2">
+        {field("user", t("onboarding.user"))}
+        {field("password", t("onboarding.password"), editing ? { type: "password", placeholder: t("onboarding.keepPassword"), help: t("onboarding.keepPassword") } : { type: "password" })}
+      </div>
+      <span className="fc-field-help" style={{ marginTop: -8 }}>{t("onboarding.dockerHint")}</span>
+      <div className="fc-stack" style={{ gap: 12 }}>
+        <button type="button" className="fc-textlink" aria-expanded={advanced} style={{ alignSelf: "flex-start" }} onClick={() => setAdvanced(!advanced)}>
+          <Icon name={advanced ? "chevronUp" : "chevronDown"} />{advanced ? t("onboarding.hideAdvanced") : t("onboarding.advanced")}
+        </button>
+        {advanced ? (
+          <>
+            <div className="fc-field">
+              <label className="fc-field-label" htmlFor="db-source-name">{t("onboarding.sourceName")}</label>
+              <input id="db-source-name" className="fc-input" value={name} spellCheck={false} disabled={disabled || editing || !onName}
+                aria-describedby="db-source-name-help" onChange={(event) => onName?.(event.target.value)} />
+              <span className="fc-field-help" id="db-source-name-help">{editing ? t("onboarding.nameFixed") : t("onboarding.sourceNameHelp")}</span>
+            </div>
+            {DEFAULT_SCHEMAS[values.kind] ? field("schema_name", t("onboarding.schema"), { placeholder: DEFAULT_SCHEMAS[values.kind] }) : null}
+            <div className="fc-field">
+              <label className="fc-field-label" htmlFor="db-tls">{t("onboarding.tls")}</label>
+              <div className="sel">
+                <select id="db-tls" className="fc-input" value={values.tls_mode} disabled={disabled}
+                  onChange={(event) => onChange({ tls_mode: event.target.value as ConnectionValues["tls_mode"] })}>
+                  {(sqlserver ? TLS.filter((mode) => mode !== "verify") : TLS).map((mode) => <option key={mode} value={mode}>{t(`sources.tls_${mode}`)}</option>)}
+                </select>
+                <Icon name="chevronDown" />
+              </div>
+              {sqlserver ? <span className="fc-field-help">{t("onboarding.sqlserverTls")}</span> : null}
+            </div>
+            {sqlserver ? null : (
+              <div className="fc-field">
+                <label className="fc-field-label" htmlFor="db-ca">{t("onboarding.caCert")}</label>
+                <textarea id="db-ca" className="fc-textarea" placeholder="-----BEGIN CERTIFICATE-----" value={values.ca_certificate} disabled={disabled}
+                  aria-describedby="db-ca-help" onChange={(event) => onChange({ ca_certificate: event.target.value })} />
+                <span className="fc-field-help" id="db-ca-help">{editing ? `${t("onboarding.caHelp")} ${t("onboarding.keepCa")}` : t("onboarding.caHelp")}</span>
+              </div>
+            )}
+          </>
+        ) : null}
+      </div>
+    </>
   );
 }
 

@@ -43,9 +43,10 @@ button, input, textarea, select { font: inherit; color: inherit; }
 .fc-btn-ghost { background: transparent; border-color: transparent; }
 .fc-btn-ghost:hover:not(:disabled) { background: var(--control-transparent-bgColor-hover); }
 .fc-btn-ghost:disabled { background: transparent; border-color: transparent; }
-.fc-btn-danger { color: var(--fgColor-danger); }
+.fc-btn-danger { background: var(--fgColor-danger); border-color: transparent; color: #fff; }
 .fc-btn-danger .fc-icon { color: inherit; }
-.fc-btn-danger:hover:not(:disabled) { background: var(--button-danger-bgColor-hover); border-color: var(--button-danger-bgColor-hover); color: var(--fgColor-onEmphasis); }
+.fc-btn-danger:hover:not(:disabled) { background: var(--borderColor-danger-emphasis); color: #fff; }
+.fc-btn-danger:disabled { background: var(--bgColor-neutral-muted); color: var(--fgColor-disabled); }
 .fc-btn[aria-pressed="true"] { background: var(--bgColor-neutral-muted); }
 .fc-btn-sm { height: var(--control-small-size); padding: 0 var(--base-size-8); font-size: 12px; gap: var(--base-size-4); }
 .fc-btn-lg { height: var(--control-large-size); padding: 0 var(--base-size-16); }

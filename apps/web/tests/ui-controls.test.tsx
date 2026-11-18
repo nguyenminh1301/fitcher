@@ -29,7 +29,8 @@ describe("dialog", () => {
     fireEvent.click(opener);
 
     expect(screen.getByRole("dialog", { name: "Delete report.pdf?" })).toBeTruthy();
-    expect(document.activeElement).toBe(screen.getByRole("button", { name: "Delete" }));
+    // Focus starts on the close button, so Enter never confirms a destructive action by accident.
+    expect(document.activeElement).toBe(screen.getByRole("button", { name: "Close" }));
 
     fireEvent.keyDown(document, { key: "Escape" });
 
