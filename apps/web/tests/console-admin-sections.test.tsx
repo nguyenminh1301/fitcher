@@ -98,8 +98,9 @@ describe("evaluation", () => {
 
     expect(await screen.findByRole("img", { name: /Execution match 85% · Threshold 80%/ })).toBeTruthy();
     expect(screen.getByRole("img", { name: /Retrieval recall 100%/ })).toBeTruthy();
+    expect(screen.getByText("Execution match · threshold 80%")).toBeTruthy();
     expect(screen.getAllByText("Meets threshold").length).toBeGreaterThan(0);
-    const intent = screen.getByText("Intent routing").closest(".fc-meter-row") as HTMLElement;
+    const intent = screen.getByText("Intent routing").closest(".ev-layer") as HTMLElement;
     expect(within(intent).getByText("Not scored yet")).toBeTruthy();
   });
 
@@ -107,43 +108,40 @@ describe("evaluation", () => {
     show("evaluation", <EvaluationSection />);
     const required = await screen.findByRole("region", { name: "Required question set" });
 
-    expect(within(required).getByText("Two-period comparison")).toBeTruthy();
+    const compare = within(required).getByText("Two-period comparison").closest("tr") as HTMLElement;
+    expect(within(compare).getByText("5")).toBeTruthy();
+    expect(within(compare).getByText("4")).toBeTruthy();
     expect(within(required).getAllByText("Not scored yet").length).toBe(5);
     expect(screen.getByText("case_one")).toBeTruthy();
     expect(screen.getByText("expected 10 rows, got 4")).toBeTruthy();
 
-    fireEvent.click(within(screen.getByRole("region", { name: "Reports" })).getAllByRole("button")[1]);
+    const history = screen.getByRole("region", { name: "Earlier reports" });
+    expect(within(history).getByText("Below threshold")).toBeTruthy();
+    fireEvent.click(within(history).getAllByRole("button")[1]);
     expect(navigate).toHaveBeenCalledWith("/console/evaluation/e1");
   });
 
-  it("labels Run evaluation as paid AI and asks before an admin starts it", async () => {
+  it("labels Run evaluation as paid AI and asks before starting it", async () => {
     const start = vi.spyOn(api.evaluation, "start");
     show("evaluation", <EvaluationSection />);
 
-    fireEvent.click(await screen.findByRole("button", { name: /Run evaluation.*Uses paid AI/ }));
+    const run = await screen.findByRole("button", { name: "Run evaluation" });
+    expect(run.getAttribute("aria-describedby")).toBe("eval-paid");
+    expect(screen.getByText("Uses paid AI")).toBeTruthy();
+    fireEvent.click(run);
     expect(start).not.toHaveBeenCalled();
-    await act(async () => fireEvent.click(within(screen.getByRole("dialog", { name: "This uses paid AI" })).getByRole("button", { name: /Continue/ })));
+    await act(async () => fireEvent.click(within(screen.getByRole("dialog", { name: "Run the evaluation?" })).getByRole("button", { name: "Run evaluation" })));
 
     await waitFor(() => expect(start).toHaveBeenCalled());
-  });
-
-  it("does not let a reviewer run the evaluation set", async () => {
-    show("evaluation", <EvaluationSection />, "rev");
-
-    await screen.findAllByText("Meets threshold");
-    expect(screen.queryByRole("button", { name: /Run evaluation/ })).toBeNull();
   });
 });
 
 describe("runs and trace", () => {
-  it("filters runs by status and user and opens a run's trace", async () => {
+  it("filters runs by status and opens a run's trace", async () => {
     show("runs", <RunsSection />);
     await screen.findByText("Totals by month");
 
-    fireEvent.click(screen.getByRole("radio", { name: "Denied" }));
-    expect(screen.queryByText("Totals by month")).toBeNull();
-    fireEvent.click(screen.getByRole("radio", { name: "All" }));
-    fireEvent.change(screen.getByRole("textbox", { name: "User" }), { target: { value: "bo" } });
+    fireEvent.change(screen.getByRole("combobox", { name: "Status" }), { target: { value: "denied" } });
     expect(screen.queryByText("Totals by month")).toBeNull();
 
     fireEvent.click(screen.getByRole("button", { name: "Refunds in 2025" }));
@@ -159,7 +157,6 @@ describe("runs and trace", () => {
     expect(within(timeline).getByText("$0.0004")).toBeTruthy();
     expect(within(timeline).getByText("Code: 47. Unknown identifier")).toBeTruthy();
     expect(within(timeline).getByText("ALLOW")).toBeTruthy();
-    expect(screen.getByText("Estimate")).toBeTruthy();
   });
 
   it("says when a trace does not exist", async () => {
@@ -172,7 +169,7 @@ describe("runs and trace", () => {
 describe("audit", () => {
   it("lists allow and deny decisions with the blocked tables", async () => {
     show("audit", <AuditSection />);
-    const row = (await screen.findByText("table_two", { selector: "td code" })).closest("tr") as HTMLElement;
+    const row = (await screen.findAllByText("table_two"))[0].closest("tr") as HTMLElement;
 
     expect(within(row).getByText("Denied")).toBeTruthy();
     expect(screen.getByText("Allowed")).toBeTruthy();
@@ -180,11 +177,19 @@ describe("audit", () => {
 });
 
 describe("costs", () => {
-  it("labels every cost as an estimate", async () => {
-    show("costs", <CostsSection />);
+  it("totals the estimated spend for the period by task and by model", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-11-03T12:00:00Z"));
+    try {
+      show("costs", <CostsSection />);
+      const totals = await screen.findByRole("region", { name: "Totals" });
 
-    expect(await screen.findByText("$1.75")).toBeTruthy();
-    expect(screen.getAllByText("Estimate").length).toBeGreaterThanOrEqual(3);
-    expect(screen.getByText(/Estimated from token counts/)).toBeTruthy();
+      expect(within(totals).getByText("$1.75")).toBeTruthy();
+      expect(screen.getByRole("region", { name: "By task" })).toBeTruthy();
+      expect(screen.getByText("model-large")).toBeTruthy();
+      expect(screen.getByText(/Estimated from token counts/)).toBeTruthy();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

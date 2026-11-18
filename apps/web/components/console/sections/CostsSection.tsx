@@ -1,47 +1,50 @@
 "use client";
 
-// Costs (DECISIONS §10, §15): estimated LLM spend by day, model alias and model, in the chat's chart
-// style. Every figure is labelled as an estimate: it comes from token counts and list prices.
+// Costs (DECISIONS §10, §15): the estimated model spend for the last 24 hours, 7 days or 30 days, as totals,
+// one bar per day, and tables by task and by model. Every figure is an estimate from token counts and list
+// prices; the provider's invoice is the exact amount, and the page says so.
 
-import { useCallback } from "react";
+import { useCallback, useMemo, useState } from "react";
 
-import { ChartView } from "@/components/chat/ChartView";
+import { allRuns } from "@/components/console/sections/OverviewSection";
 import { ListPage } from "@/components/console/ListPage";
-import { StatusPill, WarningBanner } from "@/components/ui/feedback";
+import { Segmented } from "@/components/ui/controls";
 import type { CostRow } from "@/lib/contracts";
-import type { ChartSpec, ChartType } from "@/lib/contracts";
 import { useChat } from "@/lib/chat/ChatContext";
 import { useLoad } from "@/lib/console/useLoad";
-import type { Result } from "@/lib/contracts";
 import { useI18n } from "@/lib/i18n/react";
 
 import { useUsd } from "./RunsSection";
 
-/** Cost summed by one column of the cost rows, as a query result the chart can draw. */
-function costBy(rows: CostRow[], key: "day" | "alias" | "model", time: boolean): Result {
-  const totals = new Map<string, number>();
-  for (const row of rows) totals.set(row[key], (totals.get(row[key]) ?? 0) + row.cost_usd);
-  const entries = [...totals.entries()].sort(time ? ([a], [b]) => a.localeCompare(b) : ([, a], [, b]) => b - a);
-  return {
-    columns: [
-      { name: key, type: time ? "date" : "string", role: time ? "time" : "dimension" },
-      { name: "cost_usd", type: "number", role: "measure", format: "currency" },
-    ],
-    rows: entries.map(([name, cost]) => [name, Math.round(cost * 100) / 100]),
-    row_count: entries.length,
-  };
+type Range = "24h" | "7d" | "30d";
+const DAYS: Record<Range, number> = { "24h": 1, "7d": 7, "30d": 30 };
+
+function isoDay(date: Date): string {
+  return date.toISOString().slice(0, 10);
 }
 
-function CostChart({ title, result, type }: { title: string; result: Result; type: ChartType }) {
-  const spec: ChartSpec = { type, x: result.columns[0].name, y: ["cost_usd"], allowed_types: [type] };
+function sum<T extends string>(rows: CostRow[], key: (row: CostRow) => T): [T, { cost: number; calls: number }][] {
+  const totals = new Map<T, { cost: number; calls: number }>();
+  for (const row of rows) {
+    const current = totals.get(key(row)) ?? { cost: 0, calls: 0 };
+    totals.set(key(row), { cost: current.cost + row.cost_usd, calls: current.calls + row.calls });
+  }
+  return [...totals.entries()].sort(([, a], [, b]) => b.cost - a.cost);
+}
+
+function Bars({ days, label }: { days: [string, number][]; label: string }) {
+  const { formatNumber } = useI18n();
+  const max = Math.max(...days.map(([, cost]) => cost), 0);
+  const top = max > 0 ? max : 1;
+  const ticks = [top, (top * 2) / 3, top / 3, 0];
   return (
-    <section className="fc-card" aria-label={title}>
-      <div className="fc-card-head">
-        <h2 className="fc-card-title">{title}</h2>
-        <span style={{ marginRight: "var(--base-size-8)" }}><StatusPill status="estimate" /></span>
+    <div className="bars" role="img" aria-label={label}>
+      <div className="bars-y" aria-hidden="true">{ticks.map((tick, index) => <span key={index}>{formatNumber(tick, { maximumFractionDigits: tick < 1 ? 2 : 0 })}</span>)}</div>
+      <div className="bars-plot">
+        {days.map(([day, cost]) => <span key={day} title={`${day}: ${formatNumber(cost, { maximumFractionDigits: 4 })}`} style={{ height: `${(cost / top) * 100}%` }} />)}
       </div>
-      <div style={{ padding: "var(--base-size-16)" }}><ChartView spec={spec} result={result} /></div>
-    </section>
+      <div className="bars-x" aria-hidden="true">{days.map(([day]) => <span key={day}>{Number(day.slice(8, 10))}</span>)}</div>
+    </div>
   );
 }
 
@@ -49,33 +52,63 @@ export function CostsSection() {
   const { t, formatNumber } = useI18n();
   const { api } = useChat();
   const usd = useUsd();
-  const { data, failed } = useLoad(useCallback(async () => ({ costs: await api.costs.list(), runs: await api.runs.list() }), [api]));
-  const costs = data?.costs ?? [];
-  const total = costs.reduce((sum, row) => sum + row.cost_usd, 0);
-  const runs = data?.runs.length ?? 0;
-  const stat = (label: string, value: string, estimate: boolean) => (
-    <div className="fc-card fc-stat">
-      <span className="fc-stat-label">{label}{estimate ? <StatusPill status="estimate" /> : null}</span>
-      <span className="fc-stat-value">{value}</span>
-    </div>
-  );
+  const [range, setRange] = useState<Range>("7d");
+  const [today] = useState(() => new Date());
+  const from30 = isoDay(new Date(today.getTime() - 29 * 86_400_000));
+  const { data, failed } = useLoad(useCallback(async () => ({ costs: await api.costs.list(), runs: await allRuns(api, from30) }), [api, from30]));
+
+  const start = isoDay(new Date(today.getTime() - (DAYS[range] - 1) * 86_400_000));
+  const costs = useMemo(() => (data?.costs ?? []).filter((row) => row.day >= start), [data, start]);
+  const runs = (data?.runs ?? []).filter((run) => run.ts.slice(0, 10) >= start).length;
+  const total = costs.reduce((total_, row) => total_ + row.cost_usd, 0);
+  // One bar per day of the period, a day without calls included.
+  const days: [string, number][] = Array.from({ length: DAYS[range] }, (_, index) => {
+    const day = isoDay(new Date(today.getTime() - (DAYS[range] - 1 - index) * 86_400_000));
+    return [day, costs.filter((row) => row.day === day).reduce((total_, row) => total_ + row.cost_usd, 0)];
+  });
+
   return (
-    <ListPage section="costs" loading={!data} failed={failed} skeleton="page">
-      <WarningBanner tone="info">{t("ui.costsNote")}</WarningBanner>
-      <div className="fc-stat-grid">
-        {stat(t("ui.costTotal"), usd(total, 2), true)}
-        {stat(t("ui.runsTotal"), formatNumber(runs), false)}
-        {stat(t("ui.avgCost"), runs ? usd(total / runs) : "—", true)}
+    <ListPage section="costs" loading={!data} failed={failed} skeleton="page"
+      actions={<Segmented label={t("overview.period")} value={range} onChange={(value) => setRange(value as Range)}
+        options={[["24h", t("overview.range_24h")], ["7d", t("overview.range_7d")], ["30d", t("overview.range_30d")]]} />}>
+      <section className="stats stats-3" aria-label={t("costsPage.totals")}>
+        <div className="stat"><span className="stat-label">{t("overview.cost")}</span><span className="stat-value">{usd(total, 2)}</span></div>
+        <div className="stat"><span className="stat-label">{t("costsPage.runs")}</span><span className="stat-value">{formatNumber(runs)}</span></div>
+        <div className="stat"><span className="stat-label">{t("ui.avgCost")}</span><span className="stat-value">{runs ? usd(total / runs) : "—"}</span></div>
+      </section>
+      <section className="box" aria-labelledby="by-day-title">
+        <div className="box-head"><h2 id="by-day-title" className="box-title">{t("costsPage.byDay")}</h2></div>
+        <div className="box-pad"><Bars days={days} label={t("costsPage.byDayLabel", { n: DAYS[range] })} /></div>
+      </section>
+      <div className="split">
+        <div className="split-main">
+          <section className="box" aria-labelledby="by-task-title">
+            <div className="box-head"><h2 id="by-task-title" className="box-title">{t("costsPage.byTask")}</h2></div>
+            <table className="tbl">
+              <thead><tr><th>{t("modelsPage.task")}</th><th className="num">{t("costsPage.calls")}</th><th className="num">{t("overview.cost")}</th></tr></thead>
+              <tbody>
+                {sum(costs, (row) => row.tier || row.alias).map(([tier, value]) => (
+                  <tr key={tier}><td><span className="fc-mono">{tier}</span></td><td className="num">{formatNumber(value.calls)}</td><td className="num">{usd(value.cost, 2)}</td></tr>
+                ))}
+              </tbody>
+            </table>
+          </section>
+        </div>
+        <div className="split-side">
+          <section className="box" aria-labelledby="by-model-title">
+            <div className="box-head"><h2 id="by-model-title" className="box-title">{t("costsPage.byModel")}</h2></div>
+            <table className="tbl">
+              <thead><tr><th>{t("models.tierModel")}</th><th className="num">{t("overview.cost")}</th></tr></thead>
+              <tbody>
+                {sum(costs, (row) => row.model).map(([model, value]) => (
+                  <tr key={model}><td><span className="fc-mono">{model}</span></td><td className="num">{usd(value.cost, 2)}</td></tr>
+                ))}
+              </tbody>
+            </table>
+          </section>
+        </div>
       </div>
-      {costs.length ? (
-        <>
-          <CostChart title={t("ui.costByDay")} result={costBy(costs, "day", true)} type="line" />
-          <div className="fc-chart-grid">
-            <CostChart title={t("ui.costByModel")} result={costBy(costs, "model", false)} type="pie" />
-            <CostChart title={t("ui.costByAlias")} result={costBy(costs, "alias", false)} type="bar" />
-          </div>
-        </>
-      ) : null}
+      <p className="fc-field-help" style={{ margin: 0 }}>{t("ui.costsNote")}</p>
     </ListPage>
   );
 }

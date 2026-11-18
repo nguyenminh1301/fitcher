@@ -6,7 +6,7 @@
 import { useCallback } from "react";
 
 import { ListPage, RecordTable } from "@/components/console/ListPage";
-import { StatusPill } from "@/components/ui/feedback";
+import { StatusLabel } from "@/components/console/kit";
 import { useChat } from "@/lib/chat/ChatContext";
 import { useLoad } from "@/lib/console/useLoad";
 import { useI18n } from "@/lib/i18n/react";
@@ -19,18 +19,18 @@ export function AuditSection() {
     <ListPage section="audit" loading={!data} failed={failed} skeleton="table">
       <RecordTable
         label={t("ui.nav_audit")}
+        empty={t("auditPage.empty")}
         rows={data ?? []}
         rowKey={(row) => `${row.trace_id}|${row.ts}|${row.dataset}`}
         columns={[
           { key: "ts", label: t("ui.time"), nowrap: true, render: (row) => formatDate(row.ts, { dateStyle: "medium", timeStyle: "medium" }) },
-          { key: "user_id", label: t("ui.user"), mono: true },
-          { key: "role", label: t("ui.role"), mono: true },
-          { key: "decision", label: t("ui.decision"), render: (row) => <StatusPill status={row.decision === "DENY" ? "deny" : "allow"} /> },
-          { key: "dataset", label: t("ui.tables"), mono: true },
+          { key: "decision", label: t("ui.decision"), render: (row) => (row.decision === "DENY"
+            ? <StatusLabel tone="danger">{t("ui.deny")}</StatusLabel> : <StatusLabel tone="success">{t("ui.allow")}</StatusLabel>) },
+          { key: "dataset", label: t("auditPage.dataset"), mono: true },
           { key: "blocked_tables", label: t("ui.blockedTables"), render: (row) => (row.blocked_tables.length
-            ? <span className="fc-row" style={{ gap: "var(--base-size-4)" }}>{row.blocked_tables.map((table) => <code key={table} className="fc-code">{table}</code>)}</span>
-            : <span className="fc-muted">—</span>) },
-          { key: "reason", label: t("ui.reason") },
+            ? <span className="fc-mono">{row.blocked_tables.join(", ")}</span>
+            : <span className="fc-muted">{t("auditPage.none")}</span>) },
+          { key: "reason", label: t("ui.reason"), render: (row) => <span className="fc-muted">{row.reason}</span> },
         ]}
       />
     </ListPage>

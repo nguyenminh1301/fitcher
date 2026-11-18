@@ -36,7 +36,8 @@ type Data = {
   drifted: string[];
 };
 
-async function allRuns(api: FitcherApi, from: string): Promise<RunRow[]> {
+/** Every run since ``from`` (an ISO day), read 50 a page up to RUN_PAGES pages. */
+export async function allRuns(api: FitcherApi, from: string): Promise<RunRow[]> {
   const rows: RunRow[] = [];
   for (let page = 1; page <= RUN_PAGES; page += 1) {
     const batch = await api.runs.list({ from, page });
