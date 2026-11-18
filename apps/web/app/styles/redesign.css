@@ -324,3 +324,22 @@
 .guide-main > .sk:nth-of-type(odd) { width: 60%; }
 .row-link > .sk { height: 12px; flex: 1; }
 .row-link > input[type="radio"], .row-link > input[type="checkbox"], .tbl input[type="checkbox"] { width: 16px; height: 16px; margin: 0; flex: none; accent-color: var(--fgColor-default); }
+
+/* Setup Data step: a tooltip shows on hover or focus only; field grids. */
+.tip-wrap > .tip { display: none; }
+.tip-wrap:hover > .tip, .tip-wrap:focus-within > .tip { display: block; }
+.fields-2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.fields-port { display: grid; grid-template-columns: minmax(0, 1fr) 104px; gap: 12px; }
+.ob-links { display: flex; gap: 4px; justify-content: center; flex-wrap: wrap; }
+.filerow-body { flex: 1; min-width: 0; }
+.filerow-name { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.drop input[type="file"] { display: none; }
+.cols-box { max-height: 360px; overflow: auto; }
+.tables-box { max-height: 420px; overflow: auto; }
+@media (max-width: 760px) { .fields-2, .fields-port { grid-template-columns: 1fr; } }
+.chips { display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
+.prog-dot[data-state="failed"] { background: var(--fgColor-danger); border-color: var(--fgColor-danger); color: #fff; }
+.prog-failed { color: var(--fgColor-danger); font-weight: 500; }
+.ob-step-body { display: flex; flex-direction: column; gap: 24px; }
+/* The column types and the table list need the wide column; the rest of the setup stays narrow. */
+.ob-col:has(.cols-box, .tables-box) { width: min(560px, 100%); }
