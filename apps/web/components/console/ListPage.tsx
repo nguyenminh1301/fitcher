@@ -1,8 +1,8 @@
 "use client";
 
 // The console's list pages (docs/design/web-app.md, Workspace console): a page head with the section's
-// title, description and Sample data badge, a page skeleton while loading, list rows that open a detail
-// page, and tables of 20 rows a page that become cards on phones.
+// title, description and Sample data badge, a page skeleton while loading, and tables of 20 rows a page
+// that become cards on phones.
 
 import { useState, type ReactNode } from "react";
 
@@ -63,24 +63,6 @@ export function ListPage({ section, actions, loading, failed, skeleton = "list",
       </div>
       {body}
     </div>
-  );
-}
-
-/** One row of a list card; the whole row opens its detail page. */
-export function ListRow({ title, sub, side, mono, titleLang, subLang, onOpen }: {
-  title: ReactNode; sub?: ReactNode; side?: ReactNode; mono?: boolean; titleLang?: string; subLang?: string; onOpen: () => void;
-}) {
-  return (
-    <li>
-      <button type="button" className="fc-list-row" onClick={onOpen}>
-        <span className="fc-list-main">
-          <span className={cx("fc-list-title", mono && "fc-mono")} lang={titleLang}>{title}</span>
-          {sub ? <span className="fc-list-sub" lang={subLang}>{sub}</span> : null}
-        </span>
-        {side ? <span className="fc-list-side">{side}</span> : null}
-        <Icon name="chevronRight" />
-      </button>
-    </li>
   );
 }
 
