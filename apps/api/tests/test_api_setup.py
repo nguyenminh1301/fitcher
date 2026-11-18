@@ -25,8 +25,8 @@ def test_status_of_a_new_instance(client):
 
     body = client.get("/setup/status").json()
 
-    assert body == {"steps": [{"id": "models", "state": "pending"}, {"id": "data", "state": "pending"},
-                              {"id": "documents", "state": "pending"}], "complete": False}
+    assert body == {"steps": [{"id": "models", "state": "pending"}, {"id": "data", "state": "pending"}],
+                    "complete": False}
 
 
 def test_skip_and_unknown_step(client):
@@ -34,6 +34,7 @@ def test_skip_and_unknown_step(client):
     assert client.post("/setup/steps/nope/skip").status_code == 404
     # Who uses the instance is no longer a step: fitcher is a personal app.
     assert client.post("/setup/steps/mode/skip").status_code == 404
+    assert client.post("/setup/steps/documents/skip").status_code == 404
     assert client.put("/setup/mode", json={"mode": "team"}).status_code in (404, 405)
 
 
@@ -43,7 +44,7 @@ def test_complete_needs_every_step_answered(client):
     refused = client.post("/setup/complete")
     assert refused.status_code == 409 and "models" in refused.json()["detail"]
 
-    for step in ("models", "data", "documents"):
+    for step in ("models", "data"):
         client.post(f"/setup/steps/{step}/skip")
     done = client.post("/setup/complete")
 

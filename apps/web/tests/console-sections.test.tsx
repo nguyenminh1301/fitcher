@@ -257,6 +257,25 @@ describe("documents", () => {
 
     expect(await screen.findByText("Merged header cells.")).toBeTruthy();
   });
+
+  it("turns documents on, and asks before turning them off while documents are stored", async () => {
+    const settings = vi.spyOn(api.documents, "settings").mockResolvedValue({ enabled: false, documents: 2 });
+    const setEnabled = vi.spyOn(api.documents, "setEnabled").mockImplementation(async (enabled) => ({ enabled, documents: 2 }));
+    show("documents", <DocumentsSection />);
+
+    expect(await screen.findByText(/Numbers always come from your data/)).toBeTruthy();
+    await act(async () => fireEvent.click(screen.getByRole("switch", { name: "Use company documents" })));
+    expect(setEnabled).toHaveBeenLastCalledWith(true, false);
+    await screen.findByText("Handbook.pdf");
+
+    await act(async () => fireEvent.click(screen.getByRole("switch", { name: "Use company documents" })));
+    const dialog = screen.getByRole("dialog", { name: "Turn documents off?" });
+    expect(within(dialog).getByText("2 documents stay stored but are no longer searched.")).toBeTruthy();
+    await act(async () => fireEvent.click(within(dialog).getByRole("button", { name: "Turn documents off" })));
+    expect(setEnabled).toHaveBeenLastCalledWith(false, true);
+    settings.mockRestore();
+    setEnabled.mockRestore();
+  });
 });
 
 describe("datasets", () => {

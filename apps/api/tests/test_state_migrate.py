@@ -73,3 +73,52 @@ def test_shipped_changes_create_the_state_tables(tmp_path):
     migrate.apply_pending(db)
     tables = {r[0] for r in db.connection().execute("SELECT name FROM sqlite_master WHERE type='table'")}
     assert {"schema_changes", "settings", "secrets", "setup_steps"} <= tables
+
+
+def _state_before(tmp_path, number):
+    """A store with the shipped changes up to ``number`` applied, as an older release left it."""
+    older = tmp_path / "older"
+    older.mkdir()
+    for change in migrate.discover(migrate.CHANGES_DIR):
+        if change.number <= number:
+            (older / change.path.name).write_text(change.path.read_text(encoding="utf-8"), encoding="utf-8")
+    db = StateDb(tmp_path / "app.db")
+    migrate.apply_pending(db, older)
+    return db
+
+
+def _documents_setting(db):
+    row = db.connection().execute(
+        "SELECT value FROM settings WHERE group_name = 'documents' AND key = 'enabled'"
+    ).fetchone()
+    return None if row is None else row[0]
+
+
+def test_an_instance_set_up_before_documents_left_the_setup_keeps_them_on(tmp_path):
+    db = _state_before(tmp_path, 9)
+    with db.write() as conn:
+        conn.execute("INSERT INTO setup_steps (id, state, updated_at) VALUES ('models', 'done', 'x')")
+        conn.execute("INSERT INTO setup_steps (id, state, updated_at) VALUES ('documents', 'skipped', 'x')")
+
+    migrate.apply_pending(db)
+
+    assert _documents_setting(db) == "true"
+    steps = [row[0] for row in db.connection().execute("SELECT id FROM setup_steps")]
+    assert steps == ["models"]
+
+
+def test_documents_turned_off_before_the_change_stay_off(tmp_path):
+    db = _state_before(tmp_path, 9)
+    with db.write() as conn:
+        conn.execute("INSERT INTO setup_steps (id, state, updated_at) VALUES ('documents', 'done', 'x')")
+        conn.execute("INSERT INTO settings (group_name, key, value, updated_at) VALUES ('documents', 'enabled', 'false', 'x')")
+
+    migrate.apply_pending(db)
+
+    assert _documents_setting(db) == "false"
+
+
+def test_a_new_instance_stores_no_documents_setting(tmp_path):
+    db = StateDb(tmp_path / "app.db")
+    migrate.apply_pending(db)
+    assert _documents_setting(db) is None

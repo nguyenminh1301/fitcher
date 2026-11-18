@@ -1,4 +1,4 @@
-import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -12,10 +12,10 @@ import { ThemeProvider } from "@/lib/theme";
 afterEach(cleanup);
 
 const NEW: SetupStatus = {
-  steps: [{ id: "models", state: "pending" }, { id: "data", state: "pending" }, { id: "documents", state: "pending" }], complete: false,
+  steps: [{ id: "models", state: "pending" }, { id: "data", state: "pending" }], complete: false,
 };
 const ANSWERED: SetupStatus = {
-  steps: [{ id: "models", state: "done" }, { id: "data", state: "skipped" }, { id: "documents", state: "done" }], complete: false,
+  steps: [{ id: "models", state: "done" }, { id: "data", state: "skipped" }], complete: false,
 };
 
 function fakeSetup(initial: SetupStatus = NEW) {
@@ -51,35 +51,13 @@ function fakeModels() {
 
 const noSources = {} as FitcherApi["sources"];
 
-function fakeDocuments(kept = 0) {
-  let enabled = true;
-  return {
-    settings: vi.fn(async () => ({ enabled, documents: kept })),
-    setEnabled: vi.fn(async (next: boolean, confirm = false) => {
-      if (!next && enabled && kept && !confirm) throw new Error("The api answered 409: 1 document stays stored");
-      enabled = next;
-      return { enabled, documents: kept };
-    }),
-    upload: vi.fn(async (file: File) => ({ id: "d1", name: file.name })),
-  } as unknown as FitcherApi["documents"];
-}
-
-function documentProps(documents = fakeDocuments(), roles: string[] | null = null) {
-  return { documents, packRoles: () => (roles ? Promise.resolve(roles) : Promise.reject(new Error("no active pack"))) };
-}
-
-const DOCUMENTS_PENDING: SetupStatus = {
-  complete: false,
-  steps: [{ id: "models", state: "done" }, { id: "data", state: "done" }, { id: "documents", state: "pending" }],
-};
-
 function wrap(node: React.ReactNode) {
   return render(<ThemeProvider><I18nProvider initial="en">{node}</I18nProvider></ThemeProvider>);
 }
 
 describe("setup screen", () => {
   it("lists the steps with the current one open, and no step asks who uses the instance", async () => {
-    wrap(<SetupScreen {...documentProps()} sources={noSources} models={fakeModels()} setup={fakeSetup()} isAdmin onOpenChat={() => {}} />);
+    wrap(<SetupScreen sources={noSources} models={fakeModels()} setup={fakeSetup()} isAdmin onOpenChat={() => {}} />);
     const steps = await screen.findByRole("list", { name: "Steps" });
     expect(steps.textContent).toContain("Models");
     expect(steps.textContent).not.toContain("Who uses this instance");
@@ -88,14 +66,14 @@ describe("setup screen", () => {
 
   it("offers to finish once every step is answered", async () => {
     const setup = fakeSetup(ANSWERED);
-    wrap(<SetupScreen {...documentProps()} sources={noSources} models={fakeModels()} setup={setup} isAdmin onOpenChat={() => {}} />);
+    wrap(<SetupScreen sources={noSources} models={fakeModels()} setup={setup} isAdmin onOpenChat={() => {}} />);
     await userEvent.click(await screen.findByRole("button", { name: "Finish setup" }));
     expect(setup.complete).toHaveBeenCalled();
     expect(await screen.findByRole("button", { name: "Open the chat" })).toBeTruthy();
   });
 
   it("does not let the sample-data demo answer", async () => {
-    wrap(<SetupScreen {...documentProps()} sources={noSources} models={fakeModels()} setup={fakeSetup()} isAdmin={false} onOpenChat={() => {}} />);
+    wrap(<SetupScreen sources={noSources} models={fakeModels()} setup={fakeSetup()} isAdmin={false} onOpenChat={() => {}} />);
     expect(await screen.findByText("Only an admin can set up this instance.")).toBeTruthy();
   });
 });
@@ -108,7 +86,7 @@ describe("setup models step", () => {
   it("adds a provider with its key, tests it as a paid call and shows the proposed models", async () => {
     const setup = fakeSetup(MODELS_PENDING);
     const models = fakeModels();
-    wrap(<SetupScreen {...documentProps()} sources={noSources} setup={setup} models={models} isAdmin onOpenChat={() => {}} />);
+    wrap(<SetupScreen sources={noSources} setup={setup} models={models} isAdmin onOpenChat={() => {}} />);
 
     await userEvent.type(await screen.findByLabelText("API key"), "sk-test-0000-7777");
     await userEvent.click(screen.getByRole("button", { name: "Add provider" }));
@@ -126,7 +104,7 @@ describe("setup models step", () => {
 
   it("suggests a model server's usual address with the host hint, and takes no key", async () => {
     const models = fakeModels();
-    wrap(<SetupScreen {...documentProps()} sources={noSources} setup={fakeSetup(MODELS_PENDING)} models={models} isAdmin onOpenChat={() => {}} />);
+    wrap(<SetupScreen sources={noSources} setup={fakeSetup(MODELS_PENDING)} models={models} isAdmin onOpenChat={() => {}} />);
 
     await userEvent.selectOptions(await screen.findByLabelText("Provider"), "ollama");
 
@@ -142,7 +120,7 @@ describe("setup models step", () => {
 
   it("adds an OpenAI-compatible service from its preset, with a link to its key page and no address to type", async () => {
     const models = fakeModels();
-    wrap(<SetupScreen {...documentProps()} sources={noSources} setup={fakeSetup(MODELS_PENDING)} models={models} isAdmin onOpenChat={() => {}} />);
+    wrap(<SetupScreen sources={noSources} setup={fakeSetup(MODELS_PENDING)} models={models} isAdmin onOpenChat={() => {}} />);
 
     await userEvent.selectOptions(await screen.findByLabelText("Provider"), "groq");
 
@@ -174,7 +152,7 @@ describe("setup models step", () => {
       setTier: vi.fn(async () => unmapped),
       testProvider: vi.fn(),
     } as unknown as FitcherApi["models"];
-    wrap(<SetupScreen {...documentProps()} sources={noSources} setup={fakeSetup(MODELS_PENDING)} models={models} isAdmin onOpenChat={() => {}} />);
+    wrap(<SetupScreen sources={noSources} setup={fakeSetup(MODELS_PENDING)} models={models} isAdmin onOpenChat={() => {}} />);
 
     await userEvent.selectOptions(await screen.findByLabelText("Provider"), "openrouter");
     const guide = screen.getByRole("region", { name: "How to get an OpenRouter key" });
@@ -205,7 +183,7 @@ describe("setup models step", () => {
 
   it("can be skipped", async () => {
     const setup = fakeSetup(MODELS_PENDING);
-    wrap(<SetupScreen {...documentProps()} sources={noSources} setup={setup} models={fakeModels()} isAdmin onOpenChat={() => {}} />);
+    wrap(<SetupScreen sources={noSources} setup={setup} models={fakeModels()} isAdmin onOpenChat={() => {}} />);
 
     await userEvent.click(await screen.findByRole("button", { name: "Skip for now" }));
 
@@ -276,7 +254,7 @@ describe("setup data step", () => {
 
   it("asks which data to read and can be skipped", async () => {
     const setup = fakeSetup(DATA_PENDING);
-    wrap(<SetupScreen {...documentProps()} sources={fakeSources()} models={fakeModels()} setup={setup} isAdmin onOpenChat={() => {}} />);
+    wrap(<SetupScreen sources={fakeSources()} models={fakeModels()} setup={setup} isAdmin onOpenChat={() => {}} />);
 
     expect(await screen.findByText("Which data should fitcher read?")).toBeTruthy();
     expect(screen.getByLabelText("Host")).toBeTruthy();
@@ -288,7 +266,7 @@ describe("setup data step", () => {
   it("connects a database, saves and prepares its tables and continues without a pack", async () => {
     const setup = fakeSetup(DATA_PENDING);
     const sources = fakeSources();
-    wrap(<SetupScreen {...documentProps()} sources={sources} models={fakeModels()} setup={setup} isAdmin onOpenChat={() => {}} />);
+    wrap(<SetupScreen sources={sources} models={fakeModels()} setup={setup} isAdmin onOpenChat={() => {}} />);
     await screen.findByText("Which data should fitcher read?");
 
     await userEvent.type(screen.getByLabelText("Name"), "erp");
@@ -322,7 +300,7 @@ describe("setup data step", () => {
       instantStart: vi.fn(async () => ({ job: ready })),
     } as unknown as FitcherApi["sources"];
     const onOpenChat = vi.fn();
-    wrap(<SetupScreen {...documentProps()} sources={sources} models={fakeModels()} setup={setup} isAdmin onOpenChat={onOpenChat} />);
+    wrap(<SetupScreen sources={sources} models={fakeModels()} setup={setup} isAdmin onOpenChat={onOpenChat} />);
     await screen.findByText("Which data should fitcher read?");
     await userEvent.type(screen.getByLabelText("Name"), "erp");
     await userEvent.type(screen.getByLabelText("Host"), "db");
@@ -340,13 +318,13 @@ describe("setup data step", () => {
     await userEvent.click(await screen.findByRole("button", { name: "Orders per month?" }));
 
     await waitFor(() => expect(onOpenChat).toHaveBeenCalledWith("Orders per month?"));
-    expect(setup.skip).toHaveBeenCalledWith("documents");
+    expect(setup.skip).not.toHaveBeenCalled();
     expect(setup.complete).toHaveBeenCalled();
   });
 
   it("goes back to the answered Models step and returns without changing its answer", async () => {
     const setup = fakeSetup(DATA_PENDING);
-    wrap(<SetupScreen {...documentProps()} sources={fakeSources()} models={fakeModels()} setup={setup} isAdmin onOpenChat={() => {}} />);
+    wrap(<SetupScreen sources={fakeSources()} models={fakeModels()} setup={setup} isAdmin onOpenChat={() => {}} />);
     await screen.findByText("Which data should fitcher read?");
 
     await userEvent.click(screen.getByRole("button", { name: "Back to Models" }));
@@ -363,42 +341,9 @@ describe("setup data step", () => {
   });
 
   it("does not let a user who is not an admin connect a source", async () => {
-    wrap(<SetupScreen {...documentProps()} sources={fakeSources()} models={fakeModels()} setup={fakeSetup(DATA_PENDING)} isAdmin={false} onOpenChat={() => {}} />);
+    wrap(<SetupScreen sources={fakeSources()} models={fakeModels()} setup={fakeSetup(DATA_PENDING)} isAdmin={false} onOpenChat={() => {}} />);
 
     expect(await screen.findByText("Only an admin can set up this instance.")).toBeTruthy();
     expect(screen.queryByLabelText("Host")).toBeNull();
-  });
-
-  it("turns documents off from the Documents step, confirming when documents are kept", async () => {
-    const documents = fakeDocuments(1);
-    const setup = fakeSetup(DOCUMENTS_PENDING);
-    wrap(<SetupScreen {...documentProps(documents)} sources={noSources} models={fakeModels()} setup={setup} isAdmin onOpenChat={() => {}} />);
-
-    await userEvent.click(await screen.findByRole("radio", { name: "No documents" }));
-    await userEvent.click(screen.getByRole("button", { name: "Continue" }));
-    expect(await screen.findByText(/1 kept documents stay stored/)).toBeTruthy();
-    expect(setup.status).toHaveBeenCalledTimes(1);
-
-    await userEvent.click(screen.getByRole("button", { name: "Turn documents off" }));
-    await waitFor(() => expect(documents.setEnabled).toHaveBeenLastCalledWith(false, true));
-    await waitFor(() => expect(setup.status).toHaveBeenCalledTimes(2));
-  });
-
-  it("uploads documents in place when a pack is active", async () => {
-    const documents = fakeDocuments();
-    wrap(<SetupScreen {...documentProps(documents, ["analyst", "sales"])} sources={noSources} models={fakeModels()} setup={fakeSetup(DOCUMENTS_PENDING)} isAdmin onOpenChat={() => {}} />);
-
-    const file = new File(["# Returns"], "returns.md", { type: "text/markdown" });
-    await screen.findByText(/Upload documents now/);
-    await act(async () => fireEvent.change(document.querySelector("input[type=file]")!, { target: { files: [file] } }));
-
-    await waitFor(() => expect(documents.upload).toHaveBeenCalledWith(file, ["analyst", "sales"]));
-    expect(await screen.findByText("returns.md")).toBeTruthy();
-  });
-
-  it("points to the Documents page when no pack is active yet", async () => {
-    wrap(<SetupScreen {...documentProps()} sources={noSources} models={fakeModels()} setup={fakeSetup(DOCUMENTS_PENDING)} isAdmin onOpenChat={() => {}} />);
-
-    expect(await screen.findByText(/once your data is connected/)).toBeTruthy();
   });
 });

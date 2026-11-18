@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Changed
+
+- The setup no longer asks about company documents: a new instance starts with them off, the console always lists the Documents page, and that page turns them on or off with a switch, asking before turning them off while documents are stored. App-state change 0010 keeps documents on for an instance set up before this change and drops the answer to the removed step.
+
 ## 0.0.2 - 2026-11-18
 
 ### Added

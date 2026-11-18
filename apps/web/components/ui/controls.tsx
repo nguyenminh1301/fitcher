@@ -76,6 +76,17 @@ export function Checkbox({ label, checked, disabled, onChange }: { label: ReactN
 export type ChipProps = ButtonHTMLAttributes<HTMLButtonElement> & { selected?: boolean; size?: "sm"; icon?: string; count?: ReactNode };
 
 /** A toggle or suggestion pill; a selected chip shows a check mark, never colour alone. */
+/** An on/off switch; the label names what is turned on. */
+export function Switch({ label, checked, disabled, onChange }: { label: string; checked: boolean; disabled?: boolean; onChange: (checked: boolean) => void }) {
+  return (
+    <label className="fc-switch">
+      <button type="button" role="switch" className="fc-switch-track" aria-checked={checked} disabled={disabled}
+        onClick={() => onChange(!checked)} />
+      {label}
+    </label>
+  );
+}
+
 export function Chip({ selected, size, icon, count, className, children, ...rest }: ChipProps) {
   return (
     <button type="button" aria-pressed={selected === undefined ? undefined : selected} {...rest} className={cx("fc-chip", size === "sm" && "fc-chip-sm", className)}>

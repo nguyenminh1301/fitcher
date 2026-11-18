@@ -71,6 +71,13 @@ textarea.fc-input { height: auto; min-height: 80px; padding: var(--base-size-8) 
 
 /* Checkbox */
 .fc-check { display: inline-flex; align-items: center; gap: var(--base-size-8); font-size: 14px; cursor: pointer; min-height: 28px; }
+.fc-switch { display: inline-flex; align-items: center; gap: 10px; cursor: pointer; font-size: 14px; font-weight: 500; }
+.fc-switch-track { width: 36px; height: 20px; border-radius: 9999px; background: var(--borderColor-emphasis); position: relative; flex: none; border: 0; padding: 0; cursor: pointer; transition: background-color 120ms; }
+.fc-switch-track::after { content: ""; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 9999px; background: #fff; box-shadow: 0 1px 2px #0003; transition: left 120ms; }
+.fc-switch-track[aria-checked="true"] { background: var(--fgColor-default); }
+.fc-switch-track[aria-checked="true"]::after { left: 18px; background: var(--bgColor-default); }
+.fc-switch-track:disabled { opacity: .5; cursor: not-allowed; }
+@media (prefers-reduced-motion: reduce) { .fc-switch-track, .fc-switch-track::after { transition: none; } }
 .fc-check input { width: 16px; height: 16px; margin: 0; accent-color: var(--fgColor-default); }
 
 /* Chip: pill toggles and suggestion pills */
