@@ -31,6 +31,7 @@
 
 ### Security
 
+- The Node dependency audit fails on every advisory except those listed in `.github/npm-audit-exceptions.json`, each with a reason and an expiry date (`scripts/check_npm_audit.py`); the only entry accepts GHSA-fc5q-39xc-vjpf, a `picomatch` ReDoS with no patched release that only development tooling reaches, until 2026-12-31 or until a fix is published.
 - In individual mode the api accepts a loopback `Host` only from a connection on this machine: the web server records each connection's address in `X-Fitcher-Peer` over any value the client sent, and a request from another machine or container claiming `Host: localhost` is refused (`FITCHER_TRUSTED_PEERS` adds addresses for container runtimes that deliver local connections from elsewhere).
 - Changing a provider's base URL now requires its API key in the same change when a key is stored, so a changed address never receives the key that was entered for the old one.
 

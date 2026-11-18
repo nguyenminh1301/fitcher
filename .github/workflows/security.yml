@@ -37,7 +37,7 @@ jobs:
           uv export --project apps/api --frozen --no-emit-project --no-hashes --output-file "$RUNNER_TEMP/requirements.txt"
           uv tool run pip-audit==2.10.1 --disable-pip --no-deps -r "$RUNNER_TEMP/requirements.txt"
       - name: Audit locked Node dependencies
-        run: npm --prefix apps/web audit --package-lock-only
+        run: python scripts/check_npm_audit.py
 
   secrets:
     name: Git secret scan
