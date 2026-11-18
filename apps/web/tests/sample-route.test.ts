@@ -30,8 +30,17 @@ describe("sample data route", () => {
     expect(await response.json()).toEqual({ pack: { name: "shop" } });
   });
 
-  it("is a 404 when the pack has no such sample file", async () => {
+  it("answers no suggestions, not a 404, when the pack has no sample scenarios", async () => {
     const response = await call("scenarios");
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ suggestions: [], scenarios: [] });
+  });
+
+  it("is a 404 when the pack has no sample console", async () => {
+    process.env.ACTIVE_PACK = "other";
+
+    const response = await call("console");
 
     expect(response.status).toBe(404);
     expect(await response.json()).toEqual({ error: "sample_data_missing" });
@@ -42,9 +51,10 @@ describe("sample data route", () => {
     expect((await call("console.json")).status).toBe(404);
   });
 
-  it("is a 404 when no pack is active", async () => {
+  it("is a 404 for the console and no suggestions when no pack is active", async () => {
     delete process.env.ACTIVE_PACK;
 
     expect((await call("console")).status).toBe(404);
+    expect(await (await call("scenarios")).json()).toEqual({ suggestions: [], scenarios: [] });
   });
 });
