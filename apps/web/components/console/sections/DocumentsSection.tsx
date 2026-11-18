@@ -6,13 +6,12 @@
 
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 
+import { Icon } from "@/components/brand/Icon";
 import { useConsole } from "@/components/console/ConsoleLayout";
-import { DocumentRow } from "@/components/console/DocumentRow";
+import { Empty, StatusLabel } from "@/components/console/kit";
 import { ListPage } from "@/components/console/ListPage";
-import { PaidAiConfirm } from "@/components/console/PaidAiConfirm";
 import { ALLOWED_EXTENSIONS, MAX_UPLOAD_BYTES, UploadDropzone } from "@/components/console/UploadDropzone";
-import { Button, Switch } from "@/components/ui/controls";
-import { WarningBanner } from "@/components/ui/feedback";
+import { Switch } from "@/components/ui/controls";
 import { Dialog } from "@/components/ui/overlay";
 import type { DocumentSettings, DocumentView as Document } from "@/lib/contracts";
 import { useChat } from "@/lib/chat/ChatContext";
@@ -60,32 +59,33 @@ function DocumentsSwitch({ settings, onChange }: { settings: DocumentSettings; o
     <>
       {settings.enabled ? <DocumentList actions={toggle} /> : (
         <ListPage section="documents" loading={false}>
-          <div className="fc-card"><div className="fc-card-body fc-stack">
+          <section className="box"><div className="box-body">
             <p style={{ margin: 0 }}>{t("ui.documentsAbout")}</p>
             <div>{toggle}</div>
-          </div></div>
+          </div></section>
         </ListPage>
       )}
-      {error ? <WarningBanner tone="danger" onDismiss={() => setError(null)}>{error}</WarningBanner> : null}
-      <Dialog open={confirming} title={t("ui.documentsOffTitle")} onClose={() => setConfirming(false)}
+      {error ? <div className="fc-banner fc-banner-danger" role="alert"><Icon name="alert" /><div>{error}</div></div> : null}
+      <Dialog open={confirming} title={t("ui.documentsOffTitle")} closeLabel={t("common.close")} onClose={() => setConfirming(false)}
         actions={
           <>
-            <Button onClick={() => setConfirming(false)}>{t("ui.cancel")}</Button>
-            <Button variant="primary" disabled={busy} onClick={() => void set(false, true)}>{t("ui.documentsOffButton")}</Button>
+            <button type="button" className="fc-btn" onClick={() => setConfirming(false)}>{t("ui.cancel")}</button>
+            <button type="button" className="fc-btn fc-btn-primary" disabled={busy} onClick={() => void set(false, true)}>{t("ui.documentsOffButton")}</button>
           </>
         }>
-        {t("ui.documentsOffText", { n: settings.documents })}
+        <p style={{ margin: 0 }}>{t("ui.documentsOffText", { n: settings.documents })}</p>
       </Dialog>
     </>
   );
 }
 
 function DocumentList({ actions }: { actions: ReactNode }) {
-  const { t } = useI18n();
+  const { t, formatNumber } = useI18n();
   const { api } = useChat();
   const { toast } = useConsole();
   const { data, failed, reload } = useLoad(useCallback(() => api.documents.list(), [api]));
-  const [error, setError] = useState<string | null>(null);
+  // One line per file that was refused or failed, kept until the next upload.
+  const [errors, setErrors] = useState<string[]>([]);
   const [draftRunning, setDraftRunning] = useState(false);
   const [deleting, setDeleting] = useState<Document | null>(null);
   const [drafting, setDrafting] = useState<Document | null>(null);
@@ -101,21 +101,21 @@ function DocumentList({ actions }: { actions: ReactNode }) {
   }, [processing, reload]);
 
   async function upload(files: File[]) {
+    const refused: string[] = [];
     for (const file of files) {
       const extension = file.name.split(".").pop()?.toLowerCase() ?? "";
-      if (!ALLOWED_EXTENSIONS.includes(extension)) setError(t("ui.badType", { name: file.name }));
-      else if (file.size > MAX_UPLOAD_BYTES) setError(t("ui.tooBig", { name: file.name }));
+      if (!ALLOWED_EXTENSIONS.includes(extension)) refused.push(t("ui.badType", { name: file.name }));
+      else if (file.size > MAX_UPLOAD_BYTES) refused.push(t("ui.tooBig", { name: file.name }));
       else {
-        setError(null);
         try {
-          // Every pack role may read a new document until the reviewer narrows it with the role chips.
           await api.documents.upload(file, []);
           toast(t("ui.uploaded", { name: file.name }));
         } catch (reason) {
-          setError(reason instanceof Error ? reason.message : String(reason));
+          refused.push(reason instanceof Error ? reason.message : String(reason));
         }
       }
     }
+    setErrors(refused);
     await reload();
   }
 
@@ -125,43 +125,71 @@ function DocumentList({ actions }: { actions: ReactNode }) {
     try {
       await api.documents.draft(document.id);
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : String(reason));
+      setErrors([reason instanceof Error ? reason.message : String(reason)]);
     } finally {
       setDraftRunning(false);
     }
   }
 
+  const size = (bytes: number) => bytes >= 1024 * 1024
+    ? `${formatNumber(bytes / 1024 / 1024, { maximumFractionDigits: 1 })} MB`
+    : `${formatNumber(Math.max(1, Math.round(bytes / 1024)))} KB`;
   return (
     <ListPage section="documents" actions={actions} loading={!data} failed={failed}>
-      {compiling ? <WarningBanner tone="info" icon="loader">{t("ui.compiling")}</WarningBanner> : null}
+      {compiling ? <div className="fc-banner fc-banner-info" role="status"><Icon name="loader" /><div>{t("ui.compiling")}</div></div> : null}
       <UploadDropzone disabled={compiling} onFiles={(files) => void upload(files)} />
-      {error ? <WarningBanner tone="danger" onDismiss={() => setError(null)}>{error}</WarningBanner> : null}
-      <div className="fc-docs">
-        <div className="fc-docs-head">{t("ui.files", { n: documents.length })}</div>
-        <div role="list">
-          {documents.map((document) => (
-            <DocumentRow key={document.id} document={document} compiling={compiling}
-              onDraft={() => setDrafting(document)}
-              onDelete={() => setDeleting(document)} />
-          ))}
-        </div>
-      </div>
-      <PaidAiConfirm open={!!drafting} text={t("ui.draftConfirmText", { name: drafting?.name ?? "" })}
-        onClose={() => setDrafting(null)} onConfirm={() => drafting && void draft(drafting)} />
-      <Dialog open={!!deleting} tone="danger" title={t("ui.deleteDocTitle", { name: deleting?.name ?? "" })} onClose={() => setDeleting(null)}
+      {errors.map((line, index) => <div key={index} className="fc-field-error" role="alert"><Icon name="alert" />{line}</div>)}
+      <section className="box files-box" aria-labelledby="documents-title">
+        <div className="box-head"><h2 id="documents-title" className="box-title">{t("ui.nav_documents")}</h2><span className="fc-muted">{t("ui.files", { n: documents.length })}</span></div>
+        {documents.length ? (
+          <div style={{ overflowX: "auto" }}>
+            <table className="tbl tbl-cards">
+              <thead><tr><th>{t("ui.name")}</th><th>{t("documentsPage.size")}</th><th>{t("ui.status")}</th><th><span className="fc-sr">{t("ui.actions")}</span></th></tr></thead>
+              <tbody>
+                {documents.map((document) => (
+                  <tr key={document.id} aria-label={document.name}>
+                    <td><span className="src-cell"><Icon name="fileText" /><span className="doc-name">{document.name}</span></span></td>
+                    <td data-label={t("documentsPage.size")}>{size(document.size)}</td>
+                    <td data-label={t("ui.status")}>
+                      <StatusLabel status={document.status}>{t(`documentsPage.status_${document.status}`)}</StatusLabel>
+                      {document.status === "failed" && document.error ? <div className="fc-field-help">{document.error}</div> : null}
+                    </td>
+                    <td className="row-actions">
+                      <button type="button" className="fc-btn fc-btn-sm" disabled={document.status !== "indexed" || compiling}
+                        aria-describedby="paid-note" onClick={() => setDrafting(document)}>{t("ui.draftItems")}</button>
+                      <span className="fc-paid" aria-hidden="true">{t("ui.paidAi")}</span>
+                      <button type="button" className="fc-btn fc-btn-ghost fc-btn-icon fc-btn-sm" aria-label={`${t("ui.del")} ${document.name}`}
+                        onClick={() => setDeleting(document)}><Icon name="trash" /></button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <span id="paid-note" className="fc-sr">{t("ui.paidAi")}</span>
+          </div>
+        ) : <Empty icon="fileText" title={t("documentsPage.empty")} />}
+      </section>
+      <Dialog open={!!drafting} title={t("documentsPage.draftTitle", { name: drafting?.name ?? "" })} closeLabel={t("common.close")} onClose={() => setDrafting(null)}
+        actions={<>
+          <button type="button" className="fc-btn" onClick={() => setDrafting(null)}>{t("ui.cancel")}</button>
+          <button type="button" className="fc-btn fc-btn-primary" onClick={() => { const target = drafting; setDrafting(null); if (target) void draft(target); }}>{t("documentsPage.draftButton")}</button>
+        </>}>
+        <p style={{ margin: 0 }}>{t("documentsPage.draftText")}</p>
+      </Dialog>
+      <Dialog open={!!deleting} tone="danger" title={t("ui.deleteDocTitle", { name: deleting?.name ?? "" })} closeLabel={t("common.close")} onClose={() => setDeleting(null)}
         actions={
           <>
-            <Button onClick={() => setDeleting(null)}>{t("ui.cancel")}</Button>
-            <Button variant="danger" icon="trash" onClick={async () => {
+            <button type="button" className="fc-btn" onClick={() => setDeleting(null)}>{t("ui.cancel")}</button>
+            <button type="button" className="fc-btn fc-btn-danger" onClick={async () => {
               if (!deleting) return;
               await api.documents.remove(deleting.id);
               toast(t("ui.deletedName", { name: deleting.name }));
               setDeleting(null);
               await reload();
-            }}>{t("ui.del")}</Button>
+            }}>{t("ui.del")}</button>
           </>
         }>
-        {t("ui.deleteDocText")}
+        <p style={{ margin: 0 }}>{t("ui.deleteDocText")}</p>
       </Dialog>
     </ListPage>
   );

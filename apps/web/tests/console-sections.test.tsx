@@ -94,9 +94,12 @@ describe("review", () => {
     expect(navigate).toHaveBeenCalledWith("/console/review/g1");
   });
 
-  it("moves an approved item from draft to approved", async () => {
+  it("moves an approved item from draft to approved, once its formula is test-run", async () => {
     show("review", <ReviewDetail id="m1" />);
     const approve = await screen.findByRole("button", { name: "Approve" });
+    expect(approve.hasAttribute("disabled")).toBe(true);
+    fireEvent.click(screen.getByRole("button", { name: "Test run" }));
+    await waitFor(() => expect(approve.hasAttribute("disabled")).toBe(false));
     await act(async () => fireEvent.click(approve));
     await screen.findByText("metric_one approved");
     cleanup();
@@ -111,12 +114,14 @@ describe("review", () => {
 
   it("labels an item approved without a person as unreviewed until a reviewer confirms it", async () => {
     show("review", <ReviewSection />);
-    const row = (await screen.findByText("metric_generated")).closest("li") as HTMLElement;
+    const row = (await screen.findByText("metric_generated")).closest("tr") as HTMLElement;
     expect(within(row).getByText("Unreviewed")).toBeTruthy();
     cleanup();
 
     show("review", <ReviewDetail id="u1" />);
     const confirm = await screen.findByRole("button", { name: "Confirm" });
+    fireEvent.click(screen.getByRole("button", { name: "Test run" }));
+    await waitFor(() => expect(confirm.hasAttribute("disabled")).toBe(false));
     await act(async () => fireEvent.click(confirm));
     await screen.findByText("metric_generated approved");
     expect(screen.queryByRole("button", { name: "Confirm" })).toBeNull();
@@ -147,7 +152,7 @@ describe("review", () => {
     show("review", <ReviewDetail id="g1" />);
 
     expect(await screen.findByText(/Evidence cites a deleted document/)).toBeTruthy();
-    expect(screen.getByText("Nothing to run")).toBeTruthy();
+    expect(screen.getByText(/checked against their evidence, not run/)).toBeTruthy();
   });
 
   it("approves a proposal only after its masked values are replaced and it is test-run", async () => {
@@ -225,7 +230,7 @@ describe("documents", () => {
     Object.defineProperty(big, "size", { value: 21 * 1024 * 1024 });
     fireEvent.change(input, { target: { files: [big] } });
     expect(await screen.findByText("big.pdf is larger than 20 MB.")).toBeTruthy();
-    expect(screen.queryByText("big.pdf", { selector: ".fc-doc-name" })).toBeNull();
+    expect(screen.queryByText("big.pdf", { selector: ".doc-name" })).toBeNull();
   });
 
   it("shows an accepted file as processing, then indexed", async () => {
@@ -234,7 +239,7 @@ describe("documents", () => {
 
     await act(async () => fireEvent.change(document.querySelector("input[type=file]")!, { target: { files: [new File(["x"], "notes.md")] } }));
 
-    const row = (await screen.findByText("notes.md", { selector: ".fc-doc-name" })).closest(".fc-doc") as HTMLElement;
+    const row = (await screen.findByText("notes.md", { selector: ".doc-name" })).closest("tr") as HTMLElement;
     expect(within(row).getByText("Processing")).toBeTruthy();
     await waitFor(() => expect(within(row).getByText("Indexed")).toBeTruthy());
   });
@@ -242,12 +247,15 @@ describe("documents", () => {
   it("labels Draft pack items as paid AI and asks before drafting", async () => {
     const draft = vi.spyOn(api.documents, "draft");
     show("documents", <DocumentsSection />);
-    const row = (await screen.findByText("Handbook.pdf")).closest(".fc-doc") as HTMLElement;
+    const row = (await screen.findByText("Handbook.pdf")).closest("tr") as HTMLElement;
 
-    fireEvent.click(within(row).getByRole("button", { name: /Draft pack items.*Uses paid AI/ }));
-    const dialog = screen.getByRole("dialog", { name: "This uses paid AI" });
+    const button = within(row).getByRole("button", { name: "Draft pack items" });
+    expect(document.getElementById(button.getAttribute("aria-describedby") ?? "")?.textContent).toBe("Uses paid AI");
+    fireEvent.click(button);
+    const dialog = screen.getByRole("dialog", { name: "Draft pack items from Handbook.pdf?" });
+    expect(within(dialog).getByText(/The provider bills each call/)).toBeTruthy();
     expect(draft).not.toHaveBeenCalled();
-    await act(async () => fireEvent.click(within(dialog).getByRole("button", { name: /Continue/ })));
+    await act(async () => fireEvent.click(within(dialog).getByRole("button", { name: "Draft items" })));
 
     await waitFor(() => expect(draft).toHaveBeenCalledWith("d1"));
   });
