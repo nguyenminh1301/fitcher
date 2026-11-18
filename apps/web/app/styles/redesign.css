@@ -407,3 +407,18 @@ a.stat:hover { background: var(--bgColor-muted); }
 .tables-edit .sel { min-width: 128px; }
 .tables-edit td .fc-muted { white-space: nowrap; }
 .tables-edit td:nth-child(5) .fc-field-help { display: block; max-width: 180px; margin-top: 4px; }
+
+/* Security and Models pages */
+.box-body { padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+.box-body > .fc-field { max-width: 420px; }
+.notice-ok { margin: 0; display: flex; gap: 6px; align-items: center; color: var(--fgColor-success); font-weight: 500; }
+.forgot-line { margin: 0; display: flex; gap: 6px; align-items: center; }
+.prov-row { display: flex; gap: 12px; align-items: flex-start; padding: 12px 16px; border-bottom: 1px solid var(--borderColor-muted); flex-wrap: wrap; }
+.prov-row:last-child { border-bottom: 0; }
+.prov-main { flex: 1; min-width: 200px; }
+.prov-name { display: flex; gap: 8px; align-items: center; font-weight: 500; }
+.prov-extra { flex-basis: 100%; display: flex; flex-direction: column; gap: 8px; padding-left: 48px; }
+.prov-key { display: flex; gap: 8px; align-items: flex-end; flex-wrap: wrap; }
+.prov-models { max-height: 160px; overflow: auto; font-family: var(--font-mono); font-size: 12px; line-height: 18px; color: var(--fgColor-muted); margin: 0; padding: 8px 12px; background: var(--bgColor-muted); border-radius: 8px; }
+.tier-table .sel { min-width: 160px; }
+.box-note { margin: 0; padding: 10px 16px; border-top: 1px solid var(--borderColor-muted); }

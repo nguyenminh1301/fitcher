@@ -81,25 +81,24 @@ describe("models", () => {
 
   it("does not offer to remove a provider in use and asks before removing another", async () => {
     show();
-    const openai = await screen.findByRole("listitem", { name: "OpenAI" });
-    expect((within(openai).getByRole("button", { name: "Remove" }) as HTMLButtonElement).disabled).toBe(true);
+    const openai = await screen.findByRole("group", { name: "OpenAI" });
+    expect((within(openai).getByRole("button", { name: "Remove OpenAI" }) as HTMLButtonElement).disabled).toBe(true);
 
-    fireEvent.click(within(screen.getByRole("listitem", { name: "Gemini" })).getByRole("button", { name: "Remove" }));
+    fireEvent.click(within(screen.getByRole("group", { name: "Gemini" })).getByRole("button", { name: "Remove Gemini" }));
     expect(api.models.removeProvider).not.toHaveBeenCalled();
-    await act(async () => fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Remove" })));
+    await act(async () => fireEvent.click(within(screen.getByRole("alertdialog")).getByRole("button", { name: "Remove" })));
 
     await waitFor(() => expect(api.models.removeProvider).toHaveBeenCalledWith("gemini"));
   });
 
-  it("shows each tier's model with its eval result, which never blocks a change", async () => {
+  it("shows each task's model with its evaluation, and saves a new model as soon as it is picked", async () => {
     show();
-    const fast = await screen.findByRole("region", { name: "fast" });
-    const sqlGen = screen.getByRole("region", { name: "sql-gen" });
+    const table = await screen.findByRole("table");
+    await waitFor(() => expect(within(table).getAllByRole("option", { name: "gpt-5.5" }).length).toBeGreaterThan(0));
 
-    expect(within(fast).getByText("Not evaluated")).toBeTruthy();
-    expect(within(sqlGen).getByText("Passed the pack eval")).toBeTruthy();
-    fireEvent.change(within(fast).getByLabelText("Model"), { target: { value: "gpt-5.5" } });
-    await act(async () => fireEvent.click(within(fast).getByRole("button", { name: "Use this model" })));
+    expect(within(table).getByText("Not evaluated")).toBeTruthy();
+    expect(within(table).getByText("Passed the pack evaluation")).toBeTruthy();
+    await act(async () => fireEvent.change(within(table).getByRole("combobox", { name: "Model for fast" }), { target: { value: "gpt-5.5" } }));
 
     await waitFor(() => expect(api.models.setTier).toHaveBeenCalledWith("fast", { provider_id: "openai", model: "gpt-5.5" }));
   });
@@ -107,14 +106,12 @@ describe("models", () => {
   it("asks to confirm the reindex before changing the embedding", async () => {
     show();
     const embedding = await screen.findByRole("region", { name: "Embedding" });
-    expect(within(embedding).getByText(/Runs inside fitcher/)).toBeTruthy();
+    expect(within(embedding).getByText("Inside fitcher")).toBeTruthy();
 
-    fireEvent.change(within(embedding).getByLabelText("Embedding model"), {
-      target: { value: "sentence-transformers/paraphrase-multilingual-mpnet-base-v2" },
-    });
     fireEvent.click(within(embedding).getByRole("button", { name: "Change the embedding model" }));
-    expect(api.models.setEmbedding).not.toHaveBeenCalled();
-    await act(async () => fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Change the embedding model" })));
+    const dialog = screen.getByRole("dialog", { name: "Change the embedding model?" });
+    fireEvent.change(within(dialog).getByLabelText("Model"), { target: { value: "sentence-transformers/paraphrase-multilingual-mpnet-base-v2" } });
+    await act(async () => fireEvent.click(within(dialog).getByRole("button", { name: "Change model" })));
 
     await waitFor(() => expect(api.models.setEmbedding).toHaveBeenCalledWith({
       backend: "local", model: "sentence-transformers/paraphrase-multilingual-mpnet-base-v2", confirm_reindex: true,
@@ -123,9 +120,26 @@ describe("models", () => {
 
   it("says how to fetch the classifier before it can be turned on", async () => {
     show();
-    const classifier = await screen.findByRole("region", { name: "Prompt-injection classifier" });
+    const classifier = await screen.findByRole("region", { name: "Prompt-injection filter" });
 
     expect(within(classifier).getByText(/docker compose run --rm guard-model/)).toBeTruthy();
-    expect((within(classifier).getByRole("button", { name: "Turn on" }) as HTMLButtonElement).disabled).toBe(true);
+    expect((within(classifier).getByRole("switch", { name: "Prompt-injection filter" }) as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it("adds a provider from the cards, checks it, and removes it again when the check fails", async () => {
+    Object.assign(api.models, {
+      addProvider: vi.fn(async () => GEMINI),
+      testProvider: vi.fn(async () => ({ provider_id: "gemini", models: [], model: null, structured_output: false, paid: true, error: "The key was refused." })),
+    });
+    show();
+    fireEvent.click(await screen.findByRole("button", { name: "Add a provider" }));
+    const dialog = screen.getByRole("dialog", { name: "Add a provider" });
+    fireEvent.click(within(dialog).getByRole("radio", { name: /Gemini/ }));
+    fireEvent.change(within(dialog).getByLabelText("API key"), { target: { value: "AIza-test" } });
+    await act(async () => fireEvent.click(within(dialog).getByRole("button", { name: "Check and add" })));
+
+    expect(api.models.addProvider).toHaveBeenCalledWith({ kind: "gemini", api_key: "AIza-test" });
+    expect((await within(dialog).findByRole("alert")).textContent).toContain("The key was refused.");
+    expect(api.models.removeProvider).toHaveBeenCalledWith("gemini");
   });
 });
