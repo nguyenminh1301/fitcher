@@ -16,19 +16,19 @@ Everything fitcher knows about a company comes from its Domain Pack: a set of re
 | Ask about data | Ask for rankings, trends, comparisons between periods and filtered totals. Relative periods such as "last quarter" use the company's fiscal calendar and your time zone. |
 | Hold a conversation | Ask a follow-up and it reuses the previous query. Ask to see the answer as a line chart and it redraws without querying again. Ask what a term means and it answers from the glossary and company documents. |
 | Get asked back | When a question is unclear, fitcher asks which meaning you intended and offers the options. |
-| See only your data | Each user works under a role. A question about data the role may not read is refused before any SQL is written, and the database enforces the same rules. |
+| Read only what you approved | A pack lists the tables and columns you approved. A question about other data is refused before any SQL is written, and the database user the agent runs as can read only the pack's marts. |
 | Stay safe | Every question is screened for prompt injection before it reaches an AI model. For now the screener records its verdict and lets the question through; blocking is switched on once it is accurate enough in both languages. |
-| Check the work | Each answer shows the SQL it ran and the steps it took, and admins can open the full trace of any run. |
-| Add a new company | fitcher profiles the company's tables, reads its documents and drafts a pack. A reviewer approves each item before it goes live. |
-| Measure quality | Each pack has a set of test questions with known answers. A pack goes live only when at least 80% of them return the right result. |
+| Check the work | Each answer shows the SQL it ran and the steps it took, and the console opens the full trace of any run. |
+| Add a new company | fitcher profiles the company's tables, reads its documents and drafts a pack. Drafted items answer at once, marked unreviewed until you approve them. |
+| Measure quality | Each pack has a set of test questions with known answers, and the console shows whether at least 80% of them return the right result with the chosen models. |
 
-The web app has a chat for everyone and a workspace console for reviewers and admins, in English and Vietnamese, light and dark themes, on desktop and phone.
+The web app has a chat and a workspace console, in English and Vietnamese, light and dark themes, on desktop and phone.
 
 ## How it works
 
 ![How the pieces fit together](docs/architecture/system.svg)
 
-The user talks to the web app, which streams answers from the API. fitcher is a personal app: there are no accounts or sign-in, and the API answers only the machine it runs on. The API runs the agent: it looks up the company's terms in the search index, sends language tasks to the AI models connected in the app, and runs SQL in ClickHouse as a read-only role. Models are called by task (fast replies, simple SQL, harder SQL), any task can use any model of a connected provider, and the pack's test results are shown next to each model. Search uses the provider's embedding model, or a local one when the provider has none. All of these services run together with Docker Compose on one machine.
+The user talks to the web app, which streams answers from the API. fitcher is a personal app: there are no accounts, and the API answers only the machine it runs on unless an owner password is set and the browser signs in with it. The API runs the agent: it looks up the company's terms in the search index, sends language tasks to the AI models connected in the app, and runs SQL in ClickHouse as a read-only role. Models are called by task (fast replies, simple SQL, harder SQL), any task can use any model of a connected provider, and the pack's test results are shown next to each model. Search uses the provider's embedding model, or a local one when the provider has none. All of these services run together in one Docker image on one machine.
 
 ![How a question is answered](docs/architecture/question-flow.svg)
 
@@ -38,9 +38,9 @@ The recording below shows one question in the app going through these steps, eac
 
 ![A question in the app going through the steps of the diagram, then its SQL and a chart change](docs/media/fitcher-question-flow.gif)
 
-![Who can see what](docs/architecture/access-control.svg)
+![What the agent can read](docs/architecture/access-control.svg)
 
-Each company's access rules live in one policy file. Publishing the pack turns it into database roles, column grants, row filters and aggregate-only views, so the database itself stops a role from reading what it should not. Every allow and deny decision goes to the audit log. The role-aware search only keeps the AI's context small and relevant; the database's own grants and row filters are what enforce access.
+A pack reads only the datasets you approved. Publishing the pack gives its marts to one read-only database user, which is the user every query runs as, so the database itself stops a query from reading anything else. A question about other data is refused before any SQL is written, and every query and refusal goes to the audit log. The pack's search only keeps the AI's context small and relevant; the database user's grants are what enforce it.
 
 | Component | Technology |
 | --- | --- |
