@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.0.2 - 2026-11-18
+
 ### Added
 
 - An optional owner password, set, changed and removed on the console's new Security page from this machine: once set, every browser signs in on `/sign-in` (Argon2id hash, server-side sessions in an `HttpOnly`, `SameSite=Strict` cookie, slowed down after repeated wrong passwords) and the account menu offers Sign out; an instance reachable through a `FITCHER_ALLOWED_HOSTS` name refuses requests until a password is set and keeps it while the name is listed.
