@@ -19,10 +19,10 @@ import { useI18n } from "@/lib/i18n/react";
 
 type Kind = SourceConnection["kind"];
 type Tls = NonNullable<SourceConnection["tls_mode"]>;
-const KINDS: Kind[] = ["postgres", "mysql", "sqlserver"];
-const TLS: Tls[] = ["prefer", "require", "verify"];
-const DEFAULT_PORTS: Record<Kind, string> = { postgres: "5432", mysql: "3306", sqlserver: "1433" };
-const DEFAULT_SCHEMAS: Partial<Record<Kind, string>> = { postgres: "public", sqlserver: "dbo" };
+export const KINDS: Kind[] = ["postgres", "mysql", "sqlserver"];
+export const TLS: Tls[] = ["prefer", "require", "verify"];
+export const DEFAULT_PORTS: Record<Kind, string> = { postgres: "5432", mysql: "3306", sqlserver: "1433" };
+export const DEFAULT_SCHEMAS: Partial<Record<Kind, string>> = { postgres: "public", sqlserver: "dbo" };
 
 /** One fixed message for a failure: the api's reason when it gave one, else its own message. */
 export function useFailure() {

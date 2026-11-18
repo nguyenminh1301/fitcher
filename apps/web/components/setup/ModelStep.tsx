@@ -44,7 +44,7 @@ export function ModelStep({ models, meta, onNext, onSkip, disabled = false }: {
   const preset = presetById(presetId);
   const name = presetName(preset, t);
   // Each phase starts at the top of the page, like a new step.
-  useEffect(() => { if (typeof window.scrollTo === "function") window.scrollTo({ top: 0 }); }, [phase.kind]);
+  useEffect(() => { document.scrollingElement?.scrollTo?.({ top: 0 }); }, [phase.kind]);
 
   function choose(id: string) {
     setPresetId(id);
