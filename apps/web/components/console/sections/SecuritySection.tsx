@@ -1,14 +1,14 @@
 "use client";
 
 // The Security page (DECISIONS §9, §15): set, change or remove the optional owner password. Without one the
-// instance answers this computer only; with one every browser signs in, and an instance reachable from other
-// machines (FITCHER_ALLOWED_HOSTS) needs one and keeps it.
+// instance answers this computer only; with one every browser signs in. An instance reachable from other machines
+// (FITCHER_ALLOWED_HOSTS) needs a password, says so until one is set, and keeps it while it stays reachable. A
+// forgotten password cannot be recovered, and the page says so.
 
 import { type FormEvent, useCallback, useState } from "react";
 
+import { Icon } from "@/components/brand/Icon";
 import { ListPage } from "@/components/console/ListPage";
-import { Button, TextField } from "@/components/ui/controls";
-import { WarningBanner } from "@/components/ui/feedback";
 import { errorText } from "@/lib/api/errorText";
 import { useChat } from "@/lib/chat/ChatContext";
 import { useLoad } from "@/lib/console/useLoad";
@@ -16,7 +16,20 @@ import { useI18n } from "@/lib/i18n/react";
 
 const MIN_LENGTH = 8;
 
-const message = errorText;
+function Field({ id, label, value, onChange, autoComplete, disabled, help, error }: {
+  id: string; label: string; value: string; onChange: (value: string) => void; autoComplete: string; disabled?: boolean; help?: string; error?: string;
+}) {
+  const described = [help ? `${id}-help` : "", error ? `${id}-error` : ""].filter(Boolean).join(" ") || undefined;
+  return (
+    <div className="fc-field">
+      <label className="fc-field-label" htmlFor={id}>{label}</label>
+      <input id={id} className="fc-input" type="password" autoComplete={autoComplete} value={value} disabled={disabled}
+        aria-invalid={error ? true : undefined} aria-describedby={described} onChange={(event) => onChange(event.target.value)} />
+      {help ? <span className="fc-field-help" id={`${id}-help`}>{help}</span> : null}
+      {error ? <span className="fc-field-error" id={`${id}-error`} role="alert"><Icon name="alert" />{error}</span> : null}
+    </div>
+  );
+}
 
 export function SecuritySection() {
   const { t } = useI18n();
@@ -26,7 +39,7 @@ export function SecuritySection() {
   const [next, setNext] = useState("");
   const [again, setAgain] = useState("");
   const [busy, setBusy] = useState(false);
-  const [notice, setNotice] = useState<{ tone: "success" | "danger"; text: string } | null>(null);
+  const [notice, setNotice] = useState<{ ok: boolean; text: string } | null>(null);
 
   const mismatch = again.length > 0 && next !== again;
   const short = next.length > 0 && next.length < MIN_LENGTH;
@@ -39,10 +52,10 @@ export function SecuritySection() {
       setCurrent("");
       setNext("");
       setAgain("");
-      setNotice({ tone: "success", text: done });
+      setNotice({ ok: true, text: done });
       await reload();
     } catch (cause) {
-      setNotice({ tone: "danger", text: message(cause) });
+      setNotice({ ok: false, text: errorText(cause) });
     } finally {
       setBusy(false);
     }
@@ -54,49 +67,53 @@ export function SecuritySection() {
       status?.password_set ? t("owner.changed") : t("owner.set"));
   }
 
+  const set = Boolean(status?.password_set);
+  const title = set ? t("owner.changeTitle") : t("owner.setTitle");
+  const line = notice ? (
+    <p role={notice.ok ? "status" : "alert"} className={notice.ok ? "notice-ok" : "fc-field-error"}>
+      <Icon name={notice.ok ? "check" : "alert"} />{notice.text}
+    </p>
+  ) : null;
   return (
     <ListPage section="security" loading={!status} failed={failed}>
       {status ? (
-        <div className="fc-stack" style={{ gap: "var(--base-size-16)" }}>
-          {status.exposed && !status.password_set ? <WarningBanner tone="warning">{t("owner.exposedNeedsPassword")}</WarningBanner> : null}
-          <WarningBanner tone={status.password_set ? "success" : "info"}>
-            {status.password_set ? t("owner.statusOn") : t("owner.statusOff")}
-          </WarningBanner>
-          {notice ? <WarningBanner tone={notice.tone}>{notice.text}</WarningBanner> : null}
-          <form className="fc-card" aria-label={status.password_set ? t("owner.changeTitle") : t("owner.setTitle")} onSubmit={save}>
-            <div className="fc-card-head"><h2 className="fc-card-title">{status.password_set ? t("owner.changeTitle") : t("owner.setTitle")}</h2></div>
-            <div className="fc-card-body fc-stack" style={{ gap: "var(--base-size-12)" }}>
-              {status.password_set ? (
-                <TextField label={t("owner.currentPassword")} type="password" autoComplete="current-password" value={current}
-                  disabled={busy} onChange={(event) => setCurrent(event.target.value)} />
-              ) : null}
-              <TextField label={t("owner.newPassword")} type="password" autoComplete="new-password" value={next} disabled={busy}
-                help={t("owner.rule", { count: MIN_LENGTH })} error={short ? t("owner.tooShort", { count: MIN_LENGTH }) : undefined}
-                onChange={(event) => setNext(event.target.value)} />
-              <TextField label={t("owner.repeatPassword")} type="password" autoComplete="new-password" value={again} disabled={busy}
-                error={mismatch ? t("owner.mismatch") : undefined} onChange={(event) => setAgain(event.target.value)} />
+        <>
+          {status.exposed && !set ? (
+            <div className="fc-banner fc-banner-danger" role="alert"><Icon name="alert" /><div>{t("owner.exposedNeedsPassword")}</div></div>
+          ) : null}
+          <p style={{ margin: 0 }}>{set ? t("owner.statusOn") : t("owner.statusOff")}</p>
+          <form className="box" aria-labelledby="password-title" onSubmit={save}>
+            <div className="box-head"><h2 id="password-title" className="box-title">{title}</h2></div>
+            <div className="box-body">
+              {set ? <Field id="owner-current" label={t("owner.currentPassword")} autoComplete="current-password" value={current} disabled={busy} onChange={setCurrent} /> : null}
+              <Field id="owner-new" label={t("owner.newPassword")} autoComplete="new-password" value={next} disabled={busy}
+                help={t("owner.rule", { count: MIN_LENGTH })} error={short ? t("owner.tooShort", { count: MIN_LENGTH }) : undefined} onChange={setNext} />
+              <Field id="owner-again" label={t("owner.repeatPassword")} autoComplete="new-password" value={again} disabled={busy}
+                error={mismatch ? t("owner.mismatch") : undefined} onChange={setAgain} />
               <div>
-                <Button type="submit" variant="primary"
-                  disabled={busy || next.length < MIN_LENGTH || next !== again || (status.password_set && !current)}>
-                  {status.password_set ? t("owner.change") : t("owner.setButton")}
-                </Button>
+                <button type="submit" className="fc-btn fc-btn-primary" disabled={busy || next.length < MIN_LENGTH || next !== again || (set && !current)}>
+                  {set ? t("owner.change") : t("owner.setButton")}
+                </button>
               </div>
+              {line}
             </div>
           </form>
-          {status.password_set ? (
-            <section className="fc-card" aria-label={t("owner.removeTitle")}>
-              <div className="fc-card-head"><h2 className="fc-card-title">{t("owner.removeTitle")}</h2></div>
-              <div className="fc-card-body fc-stack" style={{ gap: "var(--base-size-12)" }}>
+          {set ? (
+            <section className="box" aria-labelledby="remove-title">
+              <div className="box-head"><h2 id="remove-title" className="box-title">{t("owner.removeTitle")}</h2></div>
+              <div className="box-body">
                 <p className="fc-muted" style={{ margin: 0 }}>{t("owner.removeHint")}</p>
                 <div>
-                  <Button disabled={busy || !current} onClick={() => void run(() => api.owner.removePassword(current), t("owner.removed"))}>
-                    {t("owner.remove")}
-                  </Button>
+                  <button type="button" className="fc-btn" disabled={busy || !current || status.exposed}
+                    aria-describedby={status.exposed ? "remove-why" : undefined}
+                    onClick={() => void run(() => api.owner.removePassword(current), t("owner.removed"))}>{t("owner.remove")}</button>
+                  {status.exposed ? <span className="fc-field-help" id="remove-why" style={{ marginLeft: 8 }}>{t("owner.removeExposed")}</span> : null}
                 </div>
               </div>
             </section>
           ) : null}
-        </div>
+          <p className="fc-field-help forgot-line"><Icon name="info" />{t("owner.forgottenConsole")}</p>
+        </>
       ) : null}
     </ListPage>
   );

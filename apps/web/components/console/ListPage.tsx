@@ -52,7 +52,7 @@ export function ListPage({ section, actions, loading, failed, skeleton = "list",
             <h1 className="page-title">{t(`ui.nav_${section}`)}</h1>
             {feature ? <SampleDataBadge feature={feature} sources={sources} /> : null}
           </div>
-          <p className="page-desc">{t(`ui.desc_${section}`)}</p>
+          {t(`ui.desc_${section}`) !== `ui.desc_${section}` ? <p className="page-desc">{t(`ui.desc_${section}`)}</p> : null}
         </div>
         {loading || failed ? null : actions ?? null}
       </div>
