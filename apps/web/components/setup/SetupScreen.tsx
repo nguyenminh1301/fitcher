@@ -6,8 +6,8 @@
 // The Models step adds a provider, tests it and shows the models proposed for each tier, or lets the admin
 // choose one among the provider's models when it proposes none; adding the provider answers the step, and the
 // setup can be left after it. The Data step connects a database or a
-// file and chooses its tables; it can be skipped and repeated later on the Sources page. The Documents step
-// that follows turns company documents on or off and uploads them in place once a pack is active.
+// file and chooses its tables; it can be skipped and repeated later on the Sources page. Company documents are
+// not a step: they are off until the owner turns them on on the Documents page.
 
 import { useCallback, useEffect, useState } from "react";
 
@@ -15,7 +15,6 @@ import { Icon } from "@/components/brand/Icon";
 import { Logo } from "@/components/brand/Logo";
 import { ModelChooser } from "@/components/models/ModelChooser";
 import { ProviderForm, ProviderTestButton, TestOutcome } from "@/components/models/ProviderForm";
-import { DocumentsStep } from "@/components/setup/DocumentsStep";
 import { InstantPack } from "@/components/setup/InstantPack";
 import { SourceConnect } from "@/components/sources/SourceConnect";
 import { Button } from "@/components/ui/controls";
@@ -29,9 +28,6 @@ export type SetupScreenProps = {
   setup: FitcherApi["setup"];
   models: FitcherApi["models"];
   sources: FitcherApi["sources"];
-  documents: FitcherApi["documents"];
-  /** The active pack's roles, for documents uploaded in the Documents step; rejects without an active pack. */
-  packRoles: () => Promise<string[]>;
   /** Whether the owner may answer the steps; false only on the sample-data demo. */
   isAdmin: boolean;
   /** Open the chat, asking `question` there when one was picked. */
@@ -137,7 +133,7 @@ function DataStep({ sources, disabled, answered, onDone, onSkip, onAsk }: {
   );
 }
 
-export function SetupScreen({ setup, models, sources, documents, packRoles, isAdmin, onOpenChat }: SetupScreenProps) {
+export function SetupScreen({ setup, models, sources, isAdmin, onOpenChat }: SetupScreenProps) {
   const { t } = useI18n();
   const [status, setStatus] = useState<SetupStatus | null>(null);
   const [error, setError] = useState<"load" | "save" | null>(null);
@@ -238,15 +234,11 @@ export function SetupScreen({ setup, models, sources, documents, packRoles, isAd
               ) : current?.id === "models" ? (
                 <ModelsStep models={models} disabled={!isAdmin || busy} answered={answered}
                   onDone={close} onSkip={() => skip("models")} />
-              ) : current?.id === "documents" ? (
-                <DocumentsStep documents={documents} packRoles={packRoles} disabled={!isAdmin || busy} answered={answered}
-                  onDone={close} onSkip={() => skip("documents")} />
               ) : current?.id === "data" ? (
                 <DataStep sources={sources} disabled={!isAdmin || busy} answered={answered}
-                  // Asking at once leaves company documents on, their default, and answers that step as skipped.
                   onAsk={(question) => {
                     setOpen(null);
-                    void run(async () => { await setup.skip("documents"); return setup.complete(); }).then(() => onOpenChat(question));
+                    void run(() => setup.complete()).then(() => onOpenChat(question));
                   }}
                   onDone={close} onSkip={() => skip("data")} />
               ) : (

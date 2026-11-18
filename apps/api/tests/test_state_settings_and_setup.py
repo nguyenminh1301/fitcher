@@ -40,7 +40,7 @@ def test_settings_can_register_a_typed_setting(db):
 def test_a_new_instance_has_every_step_pending_and_is_incomplete(db):
     status = setup.status(db)
     assert not status.complete
-    assert [step.id for step in status.steps] == ["models", "data", "documents"]
+    assert [step.id for step in status.steps] == ["models", "data"]
     assert status.steps and all(step.state == "pending" for step in status.steps)
 
 
@@ -49,6 +49,9 @@ def test_an_unknown_step_is_rejected(db):
         setup.skip(db, "nope")
     with pytest.raises(setup.UnknownStep):
         setup.skip(db, "mode")
+    # Company documents are turned on or off on the Documents page, not in the setup.
+    with pytest.raises(setup.UnknownStep):
+        setup.skip(db, "documents")
 
 
 def test_skip_marks_a_step_skipped(db):
@@ -63,8 +66,9 @@ def test_complete_needs_every_step_decided(db):
     with pytest.raises(setup.SetupError, match="data"):
         setup.complete(db)
     setup.skip(db, "data")
-    with pytest.raises(setup.SetupError, match="documents"):
-        setup.complete(db)
-    setup.mark_done(db, "documents")
     setup.complete(db)
     assert setup.status(db).complete
+
+
+def test_company_documents_are_off_on_a_new_instance(db):
+    assert Settings(db).get("documents", "enabled") is False

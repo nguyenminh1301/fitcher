@@ -41,15 +41,11 @@ type Props = {
 
 export function ConsoleLayout({ section, navigate, onChat, children }: Props) {
   const { t } = useI18n();
-  const { identity, pack, api } = useChat();
+  const { identity, pack } = useChat();
   const [drawer, setDrawer] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
-  // Company documents turned off hide the Documents page (DECISIONS §15); until the answer comes it shows.
-  const [documentsOn, setDocumentsOn] = useState(true);
-  useEffect(() => {
-    api.documents.settings().then((settings) => setDocumentsOn(settings.enabled)).catch(() => null);
-  }, [api]);
-  const allowed = identity ? allowedSections(identity.roles, documentsOn ? [] : ["documents"]) : [];
+  // The Documents page always shows: it is where company documents are turned on.
+  const allowed = identity ? allowedSections(identity.roles) : [];
   const current = allowed.find((item) => item.key === section);
   const firstAllowed = allowed[0]?.path;
 
