@@ -1,25 +1,19 @@
 "use client";
 
-// The workspace console (docs/design/web-app.md, Workspace console): a top bar with the pack, the
-// navigation grouped by Knowledge, Observe, Quality and Administration, and the open section in a
-// panel. The navigation lists only the sections the signed-in roles allow and re-checks them when
-// the identity changes; below 768px it becomes a drawer.
+// The console (DECISIONS §15): the sidebar on the grey page with the active pack, the pages grouped as Data,
+// Quality, Activity and Settings, a link back to the chat and the owner's menu, and the open page on a paper
+// panel. Review and Feedback show how many items wait. Below 760px the sidebar becomes a drawer opened from a
+// small header. fitcher is a personal app, so every page is listed.
 
 import { createContext, Fragment, useCallback, useContext, useEffect, useState, type MouseEvent, type ReactNode } from "react";
 
 import { Icon } from "@/components/brand/Icon";
 import { Logo } from "@/components/brand/Logo";
 import { AccountMenu } from "@/components/chat/AccountMenu";
-import { Button } from "@/components/ui/controls";
-import { Skeleton, Toast } from "@/components/ui/feedback";
-import { ExposureBanner } from "@/components/ui/ExposureBanner";
+import { Toast } from "@/components/ui/feedback";
 import { useChat } from "@/lib/chat/ChatContext";
-import { allowedSections, type SectionGroup } from "@/lib/console/sections";
+import { GROUPS, SECTIONS } from "@/lib/console/sections";
 import { useI18n } from "@/lib/i18n/react";
-
-const GROUP_LABEL: Record<SectionGroup, string> = {
-  knowledge: "ui.group_knowledge", observe: "ui.group_observe", quality: "ui.group_quality", administration: "ui.group_admin",
-};
 
 type Navigate = (path: string, options?: { replace: boolean }) => void;
 
@@ -32,8 +26,8 @@ export function useConsole(): ConsoleState {
 }
 
 type Props = {
-  /** The section key from the URL, or null for ``/console``. */
-  section: string | null;
+  /** The section key from the URL; "overview" for ``/console``. */
+  section: string;
   navigate: Navigate;
   onChat: () => void;
   children: ReactNode;
@@ -41,19 +35,19 @@ type Props = {
 
 export function ConsoleLayout({ section, navigate, onChat, children }: Props) {
   const { t } = useI18n();
-  const { identity, pack } = useChat();
+  const { api, pack } = useChat();
   const [drawer, setDrawer] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
-  // The Documents page always shows: it is where company documents are turned on.
-  const allowed = identity ? allowedSections(identity.roles) : [];
-  const current = allowed.find((item) => item.key === section);
-  const firstAllowed = allowed[0]?.path;
-
+  // How many items wait in Review (drafts) and Feedback (dislikes); a count of 0 shows no badge.
+  const [waiting, setWaiting] = useState<Record<string, number>>({});
   useEffect(() => {
-    if (!identity) return;
-    if (!firstAllowed) onChat();
-    else if (!current) navigate(firstAllowed, { replace: true });
-  }, [identity, current, firstAllowed, navigate, onChat]);
+    let live = true;
+    void Promise.all([
+      api.review.items().then((items) => items.filter((item) => item.status === "draft").length).catch(() => 0),
+      api.feedbackReview.list().then((rows) => rows.filter((row) => row.rating === "dislike" && !row.proposal).length).catch(() => 0),
+    ]).then(([review, feedback]) => { if (live) setWaiting({ review, feedback }); });
+    return () => { live = false; };
+  }, [api, section]);
 
   useEffect(() => {
     if (!message) return;
@@ -69,52 +63,58 @@ export function ConsoleLayout({ section, navigate, onChat, children }: Props) {
     go();
   }
 
-  const groups = [...new Set(allowed.map((item) => item.group))];
+  const link = (key: string) => {
+    const item = SECTIONS.find((entry) => entry.key === key);
+    if (!item) return null;
+    const count = waiting[key] ?? 0;
+    return (
+      <li key={key}>
+        <a href={item.path} className="nav-item" aria-current={key === section ? "page" : undefined} onClick={(event) => follow(event, () => navigate(item.path))}>
+          <Icon name={item.icon} />
+          <span className="nav-text">{t(`ui.nav_${key}`)}</span>
+          {count ? <span className="fc-count">{count}<span className="fc-sr"> {t("console.waiting")}</span></span> : null}
+        </a>
+      </li>
+    );
+  };
+
   return (
     <ConsoleContext.Provider value={{ toast, navigate }}>
-      <div className="fc-app fc-console" data-drawer={drawer ? "open" : undefined}>
-        <div className="fc-cgrid">
-          <header className="fc-ctop">
-            <Button variant="ghost" iconOnly icon="menu" label={t("ui.menu")} className="fc-drawer-only" aria-expanded={drawer} onClick={() => setDrawer(true)} />
-            <Logo variant="symbol" height={22} className="fc-desk-only" />
-            <div className="fc-crumb">
-              <span className="fc-crumb-btn" title={t("ui.activePack")}>
-                <Icon name="database" />
-                <span className="fc-navitem-text">{pack?.display_name ?? ""}</span>
-              </span>
-            </div>
-            <Button variant="ghost" icon="message" className="fc-hide-sm" onClick={onChat}>{t("ui.chatApp")}</Button>
-            <AccountMenu compact onChat={onChat} />
-          </header>
-          <nav className="fc-cnav" aria-label={t("ui.consoleLabel")}>
-            <div className="fc-drawer-only fc-cnav-head">
-              <Logo height={20} />
-              <Button variant="ghost" iconOnly icon="x" label={t("common.close")} onClick={() => setDrawer(false)} />
-            </div>
-            {groups.map((group) => (
-              <Fragment key={group}>
-                <div className="fc-navgroup">{t(GROUP_LABEL[group])}</div>
-                <ul className="fc-navlist">
-                  {allowed.filter((item) => item.group === group).map((item) => (
-                    <li key={item.key}>
-                      <a href={item.path} className="fc-navitem" aria-current={item.key === section ? "page" : undefined} onClick={(event) => follow(event, () => navigate(item.path))}>
-                        <Icon name={item.icon} />
-                        <span className="fc-navitem-text">{t(`ui.nav_${item.key}`)}</span>
-                      </a>
-                    </li>
-                  ))}
-                </ul>
-              </Fragment>
-            ))}
-            <div style={{ flex: 1 }} />
-            <a href="/" className="fc-navitem" onClick={(event) => follow(event, onChat)}>
-              <Icon name="message" />
-              <span className="fc-navitem-text">{t("ui.openChat")}</span>
+      <div className="fc-app cs" data-drawer={drawer ? "open" : "closed"}>
+        <header className="cs-mhead">
+          <button type="button" className="fc-btn fc-btn-ghost fc-btn-icon" aria-label={t("console.openMenu")} aria-expanded={drawer}
+            onClick={() => setDrawer(true)}><Icon name="menu" /></button>
+          <Logo height={18} />
+        </header>
+        <nav className="cs-nav" aria-label={t("ui.consoleLabel")}>
+          <div className="cs-navtop">
+            <a className="cs-switch" href="/console/datasets" title={t("console.activePack")}
+              onClick={(event) => follow(event, () => navigate("/console/datasets"))}>
+              <Logo variant="symbol" height={20} />
+              <span className="cs-pack">{pack?.display_name || pack?.name || t("console.noPack")}</span>
             </a>
-          </nav>
-          <main className="fc-panel"><ExposureBanner identity={identity} />{current ? children : <div className="fc-page"><Skeleton variant="page" /></div>}</main>
-        </div>
-        {drawer ? <div className="fc-drawer-scrim" onClick={() => setDrawer(false)} /> : null}
+            <span className="cs-navclose">
+              <button type="button" className="fc-btn fc-btn-ghost fc-btn-icon fc-btn-sm" aria-label={t("console.closeMenu")} onClick={() => setDrawer(false)}>
+                <Icon name="x" />
+              </button>
+            </span>
+          </div>
+          <ul className="nav-list">{link("overview")}</ul>
+          {GROUPS.map((group) => (
+            <Fragment key={group}>
+              <p className="nav-group">{t(`console.group_${group}`)}</p>
+              <ul className="nav-list">{SECTIONS.filter((item) => item.group === group).map((item) => link(item.key))}</ul>
+            </Fragment>
+          ))}
+          <div className="cs-navspace" />
+          <a href="/" className="nav-item" onClick={(event) => follow(event, onChat)}>
+            <Icon name="message" />
+            <span className="nav-text">{t("console.chat")}</span>
+          </a>
+          <AccountMenu onChat={onChat} onConsole={() => navigate("/console")} onSecurity={() => navigate("/console/security")} />
+        </nav>
+        <div className="cs-scrim" aria-hidden="true" onClick={() => setDrawer(false)} />
+        <main className="cs-main">{children}</main>
         {message ? (
           <div className="fc-toast-wrap">
             <Toast icon="check" onClose={() => setMessage(null)}>{message}</Toast>

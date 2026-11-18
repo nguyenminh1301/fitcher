@@ -1,49 +1,39 @@
-// The workspace console's sections and which console role opens each (DECISIONS §15). The api
-// enforces the same rule on every endpoint; this list only decides what the navigation shows.
+// The console's pages in navigation order (DECISIONS §15). fitcher is a personal app, so the owner sees every
+// page; the groups follow what a page is about: the data, its quality, what happened, and the settings.
 
 import type { Feature } from "@/lib/api/client";
 
-export type SectionGroup = "knowledge" | "observe" | "quality" | "administration";
+export type SectionGroup = "data" | "quality" | "activity" | "settings";
 
 export type Section = {
   key: string;
-  group: SectionGroup;
+  /** No group for the Overview, which sits above the groups. */
+  group: SectionGroup | null;
   path: string;
   icon: string;
-  roles: string[];
   /** The api feature the section reads, which decides its Sample data badge. */
-  feature: Feature;
+  feature: Feature | null;
 };
 
-const REVIEWER = "pack_reviewer";
-const ADMIN = "admin";
-
-/** In navigation order; groups appear in this order too. */
 export const SECTIONS: Section[] = [
-  { key: "review", group: "knowledge", path: "/console/review", icon: "clipboardCheck", roles: [REVIEWER], feature: "review" },
-  { key: "documents", group: "knowledge", path: "/console/documents", icon: "fileText", roles: [REVIEWER], feature: "documents" },
-  { key: "datasets", group: "knowledge", path: "/console/datasets", icon: "table", roles: [REVIEWER], feature: "datasets" },
-  { key: "feedback", group: "knowledge", path: "/console/feedback", icon: "thumbsUp", roles: [REVIEWER], feature: "feedbackReview" },
-  { key: "runs", group: "observe", path: "/console/runs", icon: "activity", roles: [ADMIN], feature: "runs" },
-  { key: "audit", group: "observe", path: "/console/audit", icon: "shieldCheck", roles: [ADMIN], feature: "audit" },
-  { key: "costs", group: "observe", path: "/console/costs", icon: "coins", roles: [ADMIN], feature: "costs" },
-  { key: "evaluation", group: "quality", path: "/console/evaluation", icon: "gauge", roles: [REVIEWER, ADMIN], feature: "evaluation" },
-  { key: "sources", group: "administration", path: "/console/sources", icon: "database", roles: [ADMIN], feature: "sources" },
-  { key: "models", group: "administration", path: "/console/models", icon: "compass", roles: [ADMIN], feature: "models" },
-  { key: "security", group: "administration", path: "/console/security", icon: "lock", roles: [ADMIN], feature: "owner" },
+  { key: "overview", group: null, path: "/console", icon: "home", feature: null },
+  { key: "sources", group: "data", path: "/console/sources", icon: "database", feature: "sources" },
+  { key: "datasets", group: "data", path: "/console/datasets", icon: "table", feature: "datasets" },
+  { key: "documents", group: "data", path: "/console/documents", icon: "fileText", feature: "documents" },
+  { key: "review", group: "quality", path: "/console/review", icon: "clipboardCheck", feature: "review" },
+  { key: "feedback", group: "quality", path: "/console/feedback", icon: "thumbsUp", feature: "feedbackReview" },
+  { key: "evaluation", group: "quality", path: "/console/evaluation", icon: "gauge", feature: "evaluation" },
+  { key: "runs", group: "activity", path: "/console/runs", icon: "activity", feature: "runs" },
+  { key: "costs", group: "activity", path: "/console/costs", icon: "coins", feature: "costs" },
+  { key: "audit", group: "activity", path: "/console/audit", icon: "shieldCheck", feature: "audit" },
+  { key: "models", group: "settings", path: "/console/models", icon: "cpu", feature: "models" },
+  { key: "security", group: "settings", path: "/console/security", icon: "lock", feature: "owner" },
 ];
 
-/**
- * The sections these roles may open, in navigation order; empty for a role without console access.
- * ``hidden`` leaves out sections the instance turned off, such as Documents when company documents are off.
- */
-export function allowedSections(roles: string[], hidden: string[] = []): Section[] {
-  return SECTIONS.filter((section) => section.roles.some((role) => roles.includes(role))
-    && !hidden.includes(section.key));
-}
+export const GROUPS: SectionGroup[] = ["data", "quality", "activity", "settings"];
 
-/** The section key of a console path such as ``/console/runs/abc``, or null for ``/console``. */
-export function sectionOf(pathname: string): string | null {
+/** The section key of a console path such as ``/console/runs/abc``; ``/console`` itself is the Overview. */
+export function sectionOf(pathname: string): string {
   const match = /^\/console\/([^/]+)/.exec(pathname);
-  return match ? match[1] : null;
+  return match ? match[1] : "overview";
 }
