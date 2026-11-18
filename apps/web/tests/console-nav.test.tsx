@@ -5,7 +5,7 @@ import { ConsoleLayout } from "@/components/console/ConsoleLayout";
 import { createMockApi } from "@/lib/api/mock";
 import type { ConsoleFile } from "@/lib/api/provisional";
 import { ChatProvider } from "@/lib/chat/ChatContext";
-import { allowedSections } from "@/lib/console/sections";
+import { sectionOf, SECTIONS } from "@/lib/console/sections";
 import { I18nProvider } from "@/lib/i18n/react";
 import { ThemeProvider } from "@/lib/theme";
 
@@ -20,7 +20,7 @@ const CONSOLE: Partial<ConsoleFile> = {
   conversations: [],
 };
 
-function renderConsole(user: string, section: string | null) {
+function renderConsole(user: string, section: string) {
   window.localStorage.setItem("fitcher.demo.identity", user);
   const navigate = vi.fn();
   const onChat = vi.fn();
@@ -52,77 +52,60 @@ afterEach(() => {
 });
 
 describe("console sections", () => {
-  it("gives each console role exactly its sections (DECISIONS §15)", () => {
-    expect(allowedSections(["pack_reviewer"]).map((section) => section.key)).toEqual(["review", "documents", "datasets", "feedback", "evaluation"]);
-    expect(allowedSections(["admin"]).map((section) => section.key)).toEqual(["runs", "audit", "costs", "evaluation", "sources", "models", "security"]);
-    expect(allowedSections(["analyst", "marketing"])).toEqual([]);
-    expect(allowedSections(["pack_reviewer"], ["documents"]).map((section) => section.key)).not.toContain("documents");
-  });
-
-  it("lists a section once for a user with both console roles", () => {
-    const keys = allowedSections(["admin", "pack_reviewer"]).map((section) => section.key);
-    expect(keys.filter((key) => key === "evaluation")).toHaveLength(1);
-    expect(keys).toHaveLength(11);
+  it("lists every page for the owner, with the Overview first", () => {
+    expect(SECTIONS.map((section) => section.key)).toEqual([
+      "overview", "sources", "datasets", "documents", "review", "feedback", "evaluation", "runs", "costs", "audit", "models", "security",
+    ]);
+    expect(sectionOf("/console")).toBe("overview");
+    expect(sectionOf("/console/runs/abc")).toBe("runs");
   });
 });
 
 describe("console layout", () => {
-  it("shows a reviewer only the reviewer's sections, grouped, with the open one current", async () => {
+  it("shows every page grouped as Data, Quality, Activity and Settings, with the open one current", async () => {
     renderConsole("rev", "documents");
 
-    await waitFor(() => expect(links()).toEqual(["Review", "Documents", "Datasets", "Feedback", "Evaluation", "Back to chat"]));
-    expect(within(nav()).getByText("Knowledge")).toBeTruthy();
-    expect(within(nav()).queryByText("Observe")).toBeNull();
+    await waitFor(() => expect(links()).toEqual([
+      "Shop", "Overview", "Sources", "Datasets", "Documents", "Review", "Feedback", "Evaluation", "Runs", "Costs", "Query log", "Models", "Security", "Chat",
+    ]));
+    for (const group of ["Data", "Quality", "Activity", "Settings"]) expect(within(nav()).getByText(group)).toBeTruthy();
     expect(within(nav()).getByRole("link", { name: "Documents" }).getAttribute("aria-current")).toBe("page");
     expect(screen.getByText("section page")).toBeTruthy();
   });
 
-  it("sends a user without a console role to the chat app", async () => {
-    const { onChat } = renderConsole("ana", "review");
+  it("names the active pack at the top, and opening it shows the datasets", async () => {
+    const { navigate } = renderConsole("rev", "overview");
+    const packLink = await within(nav()).findByRole("link", { name: /Shop/ });
 
-    await waitFor(() => expect(onChat).toHaveBeenCalled());
-    expect(screen.queryByText("section page")).toBeNull();
+    fireEvent.click(packLink);
+    expect(navigate).toHaveBeenCalledWith("/console/datasets");
   });
 
-  it("opens the first allowed section when none or a forbidden one is asked for", async () => {
-    const { navigate } = renderConsole("adm", "review");
-
-    await waitFor(() => expect(navigate).toHaveBeenCalledWith("/console/runs", { replace: true }));
-    expect(screen.queryByText("section page")).toBeNull();
-  });
-
-  it("re-checks access when the identity changes on an open section", async () => {
-    const { navigate } = renderConsole("rev", "review");
-    await waitFor(() => expect(links()).toContain("Review"));
-
-    fireEvent.click(screen.getByRole("button", { name: /Account menu: Rae Reviewer/ }));
-    await act(async () => fireEvent.click(screen.getByRole("menuitem", { name: /Ada Admin/ })));
-
-    await waitFor(() => expect(navigate).toHaveBeenCalledWith("/console/runs", { replace: true }));
-    expect(links()).toEqual(["Runs", "Audit", "Costs", "Evaluation", "Sources", "Models", "Security", "Back to chat"]);
-  });
-
-  it("opens the navigation as a drawer and closes it after a section is picked", async () => {
+  it("opens the navigation as a drawer and closes it after a page is picked", async () => {
     const { navigate } = renderConsole("rev", "review");
     await waitFor(() => expect(links()).toContain("Datasets"));
-    const app = document.querySelector(".fc-console");
+    const app = document.querySelector(".cs");
 
-    fireEvent.click(screen.getByRole("button", { name: "Menu" }));
+    fireEvent.click(screen.getByRole("button", { name: "Open the menu" }));
     expect(app?.getAttribute("data-drawer")).toBe("open");
     fireEvent.click(within(nav()).getByRole("link", { name: "Datasets" }));
 
     expect(navigate).toHaveBeenCalledWith("/console/datasets");
-    expect(app?.getAttribute("data-drawer")).toBeNull();
+    expect(app?.getAttribute("data-drawer")).toBe("closed");
   });
 
-  it("offers the chat app instead of the console from the account menu inside the console", async () => {
-    const { onChat } = renderConsole("rev", "review");
+  it("offers the chat and the Security page from the owner menu, and no sign-out without a password", async () => {
+    const { onChat, navigate } = renderConsole("rev", "review");
     await waitFor(() => expect(links()).toContain("Review"));
 
-    fireEvent.click(screen.getByRole("button", { name: /Account menu: Rae Reviewer/ }));
-    fireEvent.click(screen.getByRole("menuitem", { name: "Chat" }));
+    fireEvent.click(await within(nav()).findByRole("button", { name: "Owner menu" }));
+    expect(screen.getByRole("radiogroup", { name: "Theme" })).toBeTruthy();
+    expect(screen.queryByRole("menuitem", { name: "Sign out" })).toBeNull();
+    fireEvent.click(screen.getByRole("menuitem", { name: "Security and owner password" }));
+    expect(navigate).toHaveBeenCalledWith("/console/security");
 
+    fireEvent.click(within(nav()).getByRole("button", { name: "Owner menu" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Chat" }));
     expect(onChat).toHaveBeenCalled();
-    expect(screen.queryByRole("menuitem", { name: "Workspace console" })).toBeNull();
   });
 });

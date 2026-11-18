@@ -131,7 +131,7 @@ export function createMockApi(options: { latencyMs?: number; identity?: () => Pr
       },
     },
     runs: {
-      list: async () => wait((await load()).console.runs),
+      list: async (query) => wait((query?.page ?? 1) > 1 ? [] : (await load()).console.runs),
       trace: async (traceId) => {
         const { console } = await load();
         const run = console.runs.find((item) => item.trace_id === traceId);

@@ -45,15 +45,17 @@ export function ListPage({ section, actions, loading, failed, skeleton = "list",
   } else if (failed) body = <div className="fc-card"><EmptyState icon="alert" title={t("ui.loadFailed")} /></div>;
   else if (loading) body = <Skeleton variant={skeleton} rows={8} />;
   return (
-    <div className="fc-page">
-      <div className="fc-page-head">
-        <div className="fc-row">
-          <h1>{t(`ui.nav_${section}`)}</h1>
-          {feature ? <SampleDataBadge feature={feature} sources={sources} /> : null}
+    <div className="cs-page">
+      <div className="page-head">
+        <div style={{ minWidth: 0 }}>
+          <div className="fc-row">
+            <h1 className="page-title">{t(`ui.nav_${section}`)}</h1>
+            {feature ? <SampleDataBadge feature={feature} sources={sources} /> : null}
+          </div>
+          <p className="page-desc">{t(`ui.desc_${section}`)}</p>
         </div>
         {loading || failed ? null : actions ?? null}
       </div>
-      <p className="fc-page-desc">{t(`ui.desc_${section}`)}</p>
       {body}
     </div>
   );

@@ -343,3 +343,38 @@
 .ob-step-body { display: flex; flex-direction: column; gap: 24px; }
 /* The column types and the table list need the wide column; the rest of the setup stays narrow. */
 .ob-col:has(.cols-box, .tables-box) { width: min(560px, 100%); }
+
+/* Console shell in the app: the page scrolls, the sidebar stays in view. */
+.fc-app.cs { height: auto; min-height: 100dvh; overflow: visible; flex-wrap: nowrap; }
+.cs > .cs-nav { position: sticky; top: 0; align-self: flex-start; height: 100dvh; overflow-y: auto; }
+.cs-navtop { display: flex; align-items: center; gap: 4px; }
+.cs-navtop > .cs-switch { flex: 1; min-width: 0; text-decoration: none; }
+.cs-pack { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cs-navspace { flex: 1; min-height: 24px; }
+.acct .avatar, .menu-who .avatar { background: var(--bgColor-neutral-muted); color: var(--fgColor-default); }
+.acct-text { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.acct-name { font-weight: 500; }
+.acct-sub { font-size: 12px; line-height: 16px; color: var(--fgColor-muted); }
+
+/* Overview page */
+.page-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap; }
+.gs-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.gs-head > .sect-title { flex: 1; }
+.gs-head > .fc-muted { font-size: 13px; }
+.gs-name { font-weight: 500; }
+.gs-note { font-size: 13px; }
+.gs-action { align-self: flex-start; margin-top: auto; }
+a.stat { color: inherit; text-decoration: none; }
+a.stat:hover { background: var(--bgColor-muted); }
+.stat-note { font-size: 12px; }
+.row-title { color: inherit; font-weight: 500; text-decoration: none; }
+.row-title:hover { text-decoration: underline; }
+.row-sub { display: block; font-size: 12px; }
+.box-empty { margin: 0; padding: 16px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+
+/* Owner menu header */
+.menu-who { display: flex; gap: 10px; align-items: center; padding: 8px 10px; }
+.menu-row { display: flex; justify-content: space-between; align-items: center; padding: 6px 10px; font-size: 13px; }
+.gs-action { white-space: normal; height: auto; min-height: 28px; padding-top: 4px; padding-bottom: 4px; text-align: left; }
+.stat-value.fc-muted { font-size: 15px; line-height: 22px; font-weight: 500; }
+@media (max-width: 760px) { .gs-item { min-height: 0; } }

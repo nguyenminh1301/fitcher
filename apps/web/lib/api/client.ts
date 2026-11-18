@@ -118,7 +118,8 @@ export interface FitcherApi {
     start(): Promise<EvalRunStarted>;
   };
   runs: {
-    list(): Promise<RunRow[]>;
+    /** Runs newest first, 50 a page; ``from`` and ``to`` are ISO days and ``to`` is exclusive. */
+    list(query?: { from?: string; to?: string; page?: number }): Promise<RunRow[]>;
     trace(traceId: string): Promise<{ run: RunRow; items: TraceItem[] } | null>;
   };
   audit: { list(): Promise<AuditRow[]> };

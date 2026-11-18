@@ -270,7 +270,7 @@ export function ChatLayout({ children, onConsole }: { children: ReactNode; onCon
           </section>
         </div>
         <div className="fc-side-foot">
-          <AccountMenu onConsole={onConsole ?? (() => window.location.assign("/console"))} />
+          <AccountMenu onConsole={onConsole ?? (() => window.location.assign("/console"))} onSecurity={() => window.location.assign("/console/security")} />
         </div>
         <div
           className="fc-side-resize fc-desk-only"

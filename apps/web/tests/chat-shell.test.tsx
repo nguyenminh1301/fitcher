@@ -116,7 +116,7 @@ describe("chat sidebar", () => {
 
 describe("account menu", () => {
   async function openAccount() {
-    fireEvent.click(await screen.findByRole("button", { name: /Account menu/ }));
+    fireEvent.click(await screen.findByRole("button", { name: "Owner menu" }));
     return screen.findByRole("menu");
   }
 
@@ -141,16 +141,14 @@ describe("account menu", () => {
     expect(within(menu).queryByRole("menuitem", { name: /Rae Reviewer/ })).toBeNull();
   });
 
-  it("shows the console entry only to console roles", async () => {
+  it("offers the console and the Security page to the owner, with the theme in the menu header", async () => {
     renderShell();
     await screen.findByText("Sales today");
-    let menu = await openAccount();
-    expect(within(menu).queryByRole("menuitem", { name: "Workspace console" })).toBeNull();
+    const menu = await openAccount();
 
-    await act(async () => fireEvent.click(within(menu).getByRole("menuitem", { name: /Rae Reviewer/ })));
-    menu = await openAccount();
-
-    expect(within(menu).getByRole("menuitem", { name: "Workspace console" })).toBeTruthy();
+    expect(within(menu).getByRole("menuitem", { name: "Console" })).toBeTruthy();
+    expect(within(menu).getByRole("menuitem", { name: "Security and owner password" })).toBeTruthy();
+    expect(within(menu).getByRole("radiogroup", { name: "Theme" })).toBeTruthy();
   });
 });
 
