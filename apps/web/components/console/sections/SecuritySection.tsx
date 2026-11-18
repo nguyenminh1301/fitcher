@@ -9,15 +9,14 @@ import { type FormEvent, useCallback, useState } from "react";
 import { ListPage } from "@/components/console/ListPage";
 import { Button, TextField } from "@/components/ui/controls";
 import { WarningBanner } from "@/components/ui/feedback";
+import { errorText } from "@/lib/api/errorText";
 import { useChat } from "@/lib/chat/ChatContext";
 import { useLoad } from "@/lib/console/useLoad";
 import { useI18n } from "@/lib/i18n/react";
 
 const MIN_LENGTH = 8;
 
-function message(cause: unknown): string {
-  return cause instanceof Error ? cause.message.replace(/^The api answered \d+: /, "") : String(cause);
-}
+const message = errorText;
 
 export function SecuritySection() {
   const { t } = useI18n();

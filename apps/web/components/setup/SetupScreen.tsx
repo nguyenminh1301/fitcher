@@ -1,6 +1,7 @@
 "use client";
 
-// First-run setup (DECISIONS §15): the steps as a list with the current one open. A step that has no
+// First-run setup (DECISIONS §15): the steps as a list with the current one open; an answered step can be
+// opened again from the list or with Back, and leaving it keeps its answer. A step that has no
 // implementation yet is not listed (the api lists the steps it knows). Only an admin can answer a step.
 // The Models step adds a provider, tests it and shows the models proposed for each tier, or lets the admin
 // choose one among the provider's models when it proposes none; adding the provider answers the step, and the
@@ -10,6 +11,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 
+import { Icon } from "@/components/brand/Icon";
 import { Logo } from "@/components/brand/Logo";
 import { ModelChooser } from "@/components/models/ModelChooser";
 import { ProviderForm, ProviderTestButton, TestOutcome } from "@/components/models/ProviderForm";
@@ -32,12 +34,15 @@ export type SetupScreenProps = {
   packRoles: () => Promise<string[]>;
   /** Whether the owner may answer the steps; false only on the sample-data demo. */
   isAdmin: boolean;
-  onOpenChat: () => void;
+  /** Open the chat, asking `question` there when one was picked. */
+  onOpenChat: (question?: string) => void;
 };
 
-function ModelsStep({ models, disabled, onDone, onSkip }: {
+function ModelsStep({ models, disabled, answered, onDone, onSkip }: {
   models: FitcherApi["models"];
   disabled: boolean;
+  /** The step was answered before and is open again: leaving it keeps that answer. */
+  answered: boolean;
   onDone: () => void;
   onSkip: () => void;
 }) {
@@ -55,7 +60,7 @@ function ModelsStep({ models, disabled, onDone, onSkip }: {
   const proposed = tiers?.tiers.some((tier) => tier.provider_id === provider?.id && tier.model) ?? false;
   const choosing = Boolean(provider && tiers && !proposed && !chosen);
   return (
-    <section className="fc-card fc-enter" aria-label={t("setup.step_models")}>
+    <section className="fc-card" aria-label={t("setup.step_models")}>
       <div className="fc-card-head"><h2 className="fc-card-title">{t("setup.modelsQuestion")}</h2></div>
       <div className="fc-card-body fc-stack">
         <p className="fc-muted" style={{ margin: 0 }}>{t("setup.modelsHint")}</p>
@@ -90,7 +95,7 @@ function ModelsStep({ models, disabled, onDone, onSkip }: {
         ) : disabled ? null : (
           <>
             <ProviderForm models={models} onAdded={(next) => void added(next)} />
-            <div><Button onClick={onSkip}>{t("setup.skip")}</Button></div>
+            <div><Button onClick={onSkip}>{answered ? t("setup.keepAnswer") : t("setup.skip")}</Button></div>
           </>
         )}
       </div>
@@ -98,10 +103,10 @@ function ModelsStep({ models, disabled, onDone, onSkip }: {
   );
 }
 
-function DataStep({ sources, disabled, onDone, onSkip, onAsk }: {
-  sources: FitcherApi["sources"]; disabled: boolean; onDone: () => void; onSkip: () => void;
-  /** The pack is ready: finish the setup and open the chat. */
-  onAsk: () => void;
+function DataStep({ sources, disabled, answered, onDone, onSkip, onAsk }: {
+  sources: FitcherApi["sources"]; disabled: boolean; answered: boolean; onDone: () => void; onSkip: () => void;
+  /** The pack is ready: finish the setup and open the chat, asking `question` when one was picked. */
+  onAsk: (question?: string) => void;
 }) {
   const { t } = useI18n();
   const [connected, setConnected] = useState<string | null>(null);
@@ -120,7 +125,7 @@ function DataStep({ sources, disabled, onDone, onSkip, onAsk }: {
           )}
           <div className="fc-row" style={{ gap: "var(--base-size-8)" }}>
             {connected ? <Button onClick={onDone}>{t("setup.continueWithoutPack")}</Button> : null}
-            {connected || disabled ? null : <Button onClick={onSkip}>{t("setup.skip")}</Button>}
+            {connected || disabled ? null : <Button onClick={onSkip}>{answered ? t("setup.keepAnswer") : t("setup.skip")}</Button>}
           </div>
         </div>
       </section>
@@ -155,17 +160,27 @@ export function SetupScreen({ setup, models, sources, documents, packRoles, isAd
     }
   };
 
-  const [modelsOpen, setModelsOpen] = useState(false);
-  const [dataOpen, setDataOpen] = useState(false);
+  // The open step: the first one to answer, or one opened again from the step list or with Back. The Models
+  // step stays open after a provider is added, and the Data step after a source is connected, until the admin
+  // has seen the test, the tiers or the tables.
+  const [open, setOpen] = useState<string | null>(null);
   const pending = status?.steps.find((step) => step.state === "pending");
-  // The Models step stays open after a provider is added, and the Data step after a source is connected,
-  // until the admin has seen the test, the tiers or the tables.
-  const current = modelsOpen ? { id: "models", state: "pending" as const }
-    : dataOpen ? { id: "data", state: "pending" as const } : pending;
+  const currentId = open ?? pending?.id;
+  const current = status?.steps.find((step) => step.id === currentId);
+  const answered = current ? current.state !== "pending" : false;
+  const position = status && current ? status.steps.indexOf(current) : -1;
+  const previous = position > 0 ? status?.steps[position - 1] : undefined;
   useEffect(() => {
-    if (pending?.id === "models") setModelsOpen(true);
-    if (pending?.id === "data") setDataOpen(true);
+    if (pending?.id === "models" || pending?.id === "data") setOpen(pending.id);
   }, [pending?.id]);
+  const close = () => { setOpen(null); void run(() => setup.status()); };
+  // Leaving a step that was answered before keeps its answer; leaving a new one skips it.
+  const skip = (id: string) => {
+    if (answered) return close();
+    setOpen(null);
+    void run(() => setup.skip(id));
+  };
+  const canOpen = (state: string) => isAdmin && !busy && !status?.complete && state !== "pending";
   return (
     <div className="fc-app fc-flow">
       <header style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "var(--base-size-16)", padding: "var(--base-size-24) var(--base-size-24) 0" }}>
@@ -182,37 +197,58 @@ export function SetupScreen({ setup, models, sources, documents, packRoles, isAd
           {!isAdmin ? <WarningBanner tone="info">{t("setup.adminOnly")}</WarningBanner> : null}
           {status ? (
             <>
-              <ol aria-label={t("setup.steps")} className="fc-stack" style={{ listStyle: "none", margin: 0, padding: 0, gap: "var(--base-size-8)" }}>
-                {status.steps.map((step) => (
-                  <li key={step.id} className="fc-row" aria-current={step.id === current?.id ? "step" : undefined}
-                    style={{ justifyContent: "space-between", fontWeight: step.id === current?.id ? 600 : 400 }}>
-                    <span>{t(`setup.step_${step.id}`)}</span>
-                    <span className="fc-muted">{t(`setup.state_${step.state}`)}</span>
-                  </li>
-                ))}
+              <ol aria-label={t("setup.steps")} className="fc-setup-steps">
+                {status.steps.map((step, index) => {
+                  const here = step.id === current?.id && !status.complete;
+                  const body = (
+                    <>
+                      <span className="fc-setup-num" data-state={step.state}>
+                        {step.state === "done" ? <Icon name="check" /> : index + 1}
+                      </span>
+                      <span className="fc-setup-name">{t(`setup.step_${step.id}`)}</span>
+                      <span className="fc-muted">{t(`setup.state_${step.state}`)}</span>
+                    </>
+                  );
+                  return (
+                    <li key={step.id} aria-current={here ? "step" : undefined}>
+                      {!here && canOpen(step.state) ? (
+                        <button type="button" className="fc-setup-step" aria-label={t("setup.reopen", { step: t(`setup.step_${step.id}`) })}
+                          onClick={() => setOpen(step.id)}>{body}</button>
+                      ) : <span className="fc-setup-step">{body}</span>}
+                    </li>
+                  );
+                })}
               </ol>
+              {previous && !status.complete && isAdmin ? (
+                <div>
+                  <Button variant="ghost" size="sm" icon="arrowLeft" disabled={busy} onClick={() => setOpen(previous.id)}>
+                    {t("setup.back", { step: t(`setup.step_${previous.id}`) })}
+                  </Button>
+                </div>
+              ) : null}
               {error === "save" ? <WarningBanner tone="danger">{t("setup.failed")}</WarningBanner> : null}
+              <div key={status.complete ? "complete" : current?.id ?? "finish"} className="fc-enter fc-stack" style={{ gap: "var(--base-size-24)" }}>
               {status.complete ? (
                 <section className="fc-card" aria-label={t("setup.finished")}>
                   <div className="fc-card-body fc-stack">
                     <p style={{ margin: 0 }}>{t("setup.finished")}</p>
-                    <div><Button variant="primary" onClick={onOpenChat}>{t("setup.openChat")}</Button></div>
+                    <div><Button variant="primary" onClick={() => onOpenChat()}>{t("setup.openChat")}</Button></div>
                   </div>
                 </section>
               ) : current?.id === "models" ? (
-                <ModelsStep models={models} disabled={!isAdmin || busy}
-                  onDone={() => { setModelsOpen(false); void run(() => setup.status()); }}
-                  onSkip={() => { setModelsOpen(false); void run(() => setup.skip("models")); }} />
+                <ModelsStep models={models} disabled={!isAdmin || busy} answered={answered}
+                  onDone={close} onSkip={() => skip("models")} />
               ) : current?.id === "documents" ? (
-                <DocumentsStep documents={documents} packRoles={packRoles} disabled={!isAdmin || busy}
-                  onDone={() => void run(() => setup.status())}
-                  onSkip={() => void run(() => setup.skip("documents"))} />
+                <DocumentsStep documents={documents} packRoles={packRoles} disabled={!isAdmin || busy} answered={answered}
+                  onDone={close} onSkip={() => skip("documents")} />
               ) : current?.id === "data" ? (
-                <DataStep sources={sources} disabled={!isAdmin || busy}
+                <DataStep sources={sources} disabled={!isAdmin || busy} answered={answered}
                   // Asking at once leaves company documents on, their default, and answers that step as skipped.
-                  onAsk={() => { setDataOpen(false); void run(async () => { await setup.skip("documents"); return setup.complete(); }).then(onOpenChat); }}
-                  onDone={() => { setDataOpen(false); void run(() => setup.status()); }}
-                  onSkip={() => { setDataOpen(false); void run(() => setup.skip("data")); }} />
+                  onAsk={(question) => {
+                    setOpen(null);
+                    void run(async () => { await setup.skip("documents"); return setup.complete(); }).then(() => onOpenChat(question));
+                  }}
+                  onDone={close} onSkip={() => skip("data")} />
               ) : (
                 <section className="fc-card" aria-label={t("setup.finish")}>
                   <div className="fc-card-body fc-stack">
@@ -223,6 +259,7 @@ export function SetupScreen({ setup, models, sources, documents, packRoles, isAd
                   </div>
                 </section>
               )}
+              </div>
             </>
           ) : null}
         </div>

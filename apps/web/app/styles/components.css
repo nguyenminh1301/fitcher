@@ -670,3 +670,14 @@ button.fc-avatar { cursor: pointer; }
 .fc-guide-step[aria-current="step"] { color: var(--fgColor-default); border-color: var(--borderColor-emphasis); background: var(--bgColor-default); }
 .fc-guide-num { flex: none; display: inline-grid; place-items: center; width: 20px; height: 20px; border-radius: var(--borderRadius-full); background: var(--bgColor-neutral-muted); font-weight: 600; }
 .fc-guide-step[aria-current="step"] .fc-guide-num { background: var(--button-primary-bgColor-rest); color: var(--button-primary-fgColor-rest); }
+
+/* The setup's step list: a number (a check once done), the name and the state; answered steps open again. */
+.fc-setup-steps { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--base-size-4); }
+.fc-setup-step { display: flex; align-items: center; gap: var(--base-size-12); width: 100%; min-height: 40px; padding: var(--base-size-4) var(--base-size-8); border: 1px solid transparent; border-radius: var(--borderRadius-medium); background: transparent; color: var(--fgColor-default); font: inherit; text-align: left; }
+button.fc-setup-step { cursor: pointer; transition: background-color 120ms; }
+button.fc-setup-step:hover { background: var(--control-transparent-bgColor-hover); }
+.fc-setup-steps li[aria-current="step"] .fc-setup-step { border-color: var(--borderColor-default); background: var(--bgColor-muted); font-weight: 600; }
+.fc-setup-name { flex: 1; min-width: 0; }
+.fc-setup-num { flex: none; display: inline-grid; place-items: center; width: 24px; height: 24px; border-radius: var(--borderRadius-full); background: var(--bgColor-neutral-muted); font-size: 12px; font-weight: 600; transition: background-color 120ms, color 120ms; }
+.fc-setup-num[data-state="done"] { background: var(--button-primary-bgColor-rest); color: var(--button-primary-fgColor-rest); }
+.fc-setup-steps li[aria-current="step"] .fc-setup-num { box-shadow: 0 0 0 2px var(--bgColor-default), 0 0 0 4px var(--borderColor-emphasis); }

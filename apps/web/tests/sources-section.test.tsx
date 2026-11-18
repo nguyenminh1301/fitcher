@@ -206,7 +206,7 @@ describe("Sources page", () => {
     expect(change.tables.find((item) => item.name === "events")).toMatchObject({
       selected: true, mode: "copy", interval_seconds: 3600, cursor_column: "created_at",
     });
-    expect(screen.getByText("Selection saved. Preparing the tables…")).toBeTruthy();
+    expect(await screen.findByText("Selection saved. The chosen tables are being prepared.")).toBeTruthy();
   });
 
   it("builds the pack of a source with chosen tables from its row", async () => {

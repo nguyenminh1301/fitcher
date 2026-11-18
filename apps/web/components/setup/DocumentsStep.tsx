@@ -10,6 +10,7 @@ import { ALLOWED_EXTENSIONS, MAX_UPLOAD_BYTES, UploadDropzone } from "@/componen
 import { Button } from "@/components/ui/controls";
 import { WarningBanner } from "@/components/ui/feedback";
 import type { FitcherApi } from "@/lib/api/client";
+import { errorText } from "@/lib/api/errorText";
 import { useI18n } from "@/lib/i18n/react";
 
 export type DocumentsStepProps = {
@@ -19,9 +20,11 @@ export type DocumentsStepProps = {
   disabled: boolean;
   onDone: () => void;
   onSkip: () => void;
+  /** The step was answered before and is open again: leaving it keeps that answer. */
+  answered?: boolean;
 };
 
-export function DocumentsStep({ documents, packRoles, disabled, onDone, onSkip }: DocumentsStepProps) {
+export function DocumentsStep({ documents, packRoles, disabled, onDone, onSkip, answered = false }: DocumentsStepProps) {
   const { t } = useI18n();
   const [enabled, setEnabled] = useState(true);
   const [roles, setRoles] = useState<string[] | null>(null);
@@ -44,7 +47,7 @@ export function DocumentsStep({ documents, packRoles, disabled, onDone, onSkip }
     } catch (cause) {
       const message = cause instanceof Error ? cause.message : String(cause);
       if (message.includes("409")) setKept((await documents.settings().catch(() => null))?.documents ?? 0);
-      else setError(message);
+      else setError(errorText(cause));
     } finally {
       setBusy(false);
     }
@@ -62,7 +65,7 @@ export function DocumentsStep({ documents, packRoles, disabled, onDone, onSkip }
           await documents.upload(file, roles ?? []);
           setUploaded((names) => [...names, file.name]);
         } catch (cause) {
-          setError(cause instanceof Error ? cause.message : String(cause));
+          setError(errorText(cause));
         }
       }
     }
@@ -106,7 +109,7 @@ export function DocumentsStep({ documents, packRoles, disabled, onDone, onSkip }
         {error ? <WarningBanner tone="danger">{error}</WarningBanner> : null}
         <div className="fc-row" style={{ gap: "var(--base-size-8)" }}>
           <Button variant="primary" disabled={locked} onClick={() => void save()}>{t("setup.continue")}</Button>
-          {disabled ? null : <Button onClick={onSkip}>{t("setup.skip")}</Button>}
+          {disabled ? null : <Button onClick={onSkip}>{answered ? t("setup.keepAnswer") : t("setup.skip")}</Button>}
         </div>
       </div>
     </section>

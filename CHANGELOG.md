@@ -6,6 +6,7 @@
 
 - An optional owner password, set, changed and removed on the console's new Security page from this machine: once set, every browser signs in on `/sign-in` (Argon2id hash, server-side sessions in an `HttpOnly`, `SameSite=Strict` cookie, slowed down after repeated wrong passwords) and the account menu offers Sign out; an instance reachable through a `FITCHER_ALLOWED_HOSTS` name refuses requests until a password is set and keeps it while the name is listed.
 - Adding a model provider offers a curated list (OpenAI, Anthropic, Gemini; OpenRouter, Groq, Mistral, DeepSeek, xAI, Together AI, Fireworks, Cerebras; Ollama, LM Studio, vLLM; any other OpenAI-compatible endpoint) that fills in the service's endpoint or the usual local address and links to the page where its key is created; OpenRouter shows a short animated walkthrough of creating a key, and in the setup a provider that proposes no models lets the owner search its model list (OpenRouter's free models first) and use the chosen one for every chat tier.
+- The setup lists its steps with a number and a check mark once done, and an answered step can be opened again from that list or with Back, keeping its answer unless it is changed; a suggested question picked after the first pack is built opens the chat and asks it.
 
 ### Removed
 
@@ -15,6 +16,7 @@
 
 ### Fixed
 
+- The setup no longer says "Preparing the tables…" forever after saving the chosen tables, no longer calls every pack draft a paid call (free and local models cost nothing), no longer mentions pack roles for uploaded documents, and shows the api's reason without the raw "The api answered 422:" prefix.
 - The web server's `/api/pack` route forwards the browser's session and address headers like every other route, and a signed-out `/api/pack` no longer stops the page from reaching the sign-in page.
 - A failed model call says what to do next for the common provider errors: a rate limit (a free model's daily or per-minute limit), a refused key, a missing model, a timeout, an unreachable or unavailable provider and a too-long request, still without the provider's own message, which can quote the key.
 - Adding an Ollama provider asks the server for its installed models first: the chat tiers are proposed from an installed model (instead of `qwen2.5-coder:7b`, which may not be there), `nomic-embed-text` is proposed only when it is installed, and a server that does not answer is refused with how to make Ollama reachable from the container on Linux, or with how to install a chat model when it has none.

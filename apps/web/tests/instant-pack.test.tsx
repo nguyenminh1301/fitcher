@@ -44,7 +44,7 @@ describe("instant pack", () => {
     const onAsk = show(sources);
 
     expect(await screen.findByText(/about 3,080 prompt tokens/)).toBeTruthy();
-    expect(screen.getByText(/paid model call/)).toBeTruthy();
+    expect(screen.getByText(/the provider bills it unless the model is free or runs on this computer/)).toBeTruthy();
     expect(sources.instantStart).not.toHaveBeenCalled();
     await userEvent.click(screen.getByRole("button", { name: "Build the pack" }));
 

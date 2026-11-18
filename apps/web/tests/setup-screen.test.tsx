@@ -1,4 +1,4 @@
-import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -339,9 +339,27 @@ describe("setup data step", () => {
     expect(sources.instantStart).toHaveBeenCalledWith({ source_id: "erp", tables: ["orders"], confirm_billable: true });
     await userEvent.click(await screen.findByRole("button", { name: "Orders per month?" }));
 
-    await waitFor(() => expect(onOpenChat).toHaveBeenCalled());
+    await waitFor(() => expect(onOpenChat).toHaveBeenCalledWith("Orders per month?"));
     expect(setup.skip).toHaveBeenCalledWith("documents");
     expect(setup.complete).toHaveBeenCalled();
+  });
+
+  it("goes back to the answered Models step and returns without changing its answer", async () => {
+    const setup = fakeSetup(DATA_PENDING);
+    wrap(<SetupScreen {...documentProps()} sources={fakeSources()} models={fakeModels()} setup={setup} isAdmin onOpenChat={() => {}} />);
+    await screen.findByText("Which data should fitcher read?");
+
+    await userEvent.click(screen.getByRole("button", { name: "Back to Models" }));
+
+    expect(await screen.findByText("Which models answer the questions?")).toBeTruthy();
+    const steps = screen.getByRole("list", { name: "Steps" });
+    expect(within(steps).getByText("Models").closest("li")?.getAttribute("aria-current")).toBe("step");
+    await userEvent.click(screen.getByRole("button", { name: "Keep my answer" }));
+
+    expect(await screen.findByText("Which data should fitcher read?")).toBeTruthy();
+    expect(setup.skip).not.toHaveBeenCalled();
+    await userEvent.click(screen.getByRole("button", { name: "Open the Models step again" }));
+    expect(await screen.findByText("Which models answer the questions?")).toBeTruthy();
   });
 
   it("does not let a user who is not an admin connect a source", async () => {
