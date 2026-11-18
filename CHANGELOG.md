@@ -14,6 +14,10 @@
 - The Documents and Datasets pages no longer show or choose pack roles, and the account menu shows roles only among the sample-data identities.
 - fitcher is a personal app without accounts: team mode, local accounts and their sessions and sign-in throttle, OpenID Connect sign-in, the sign-in page, the Users page, the setup's "Who uses this instance" step and the development accounts are removed; app-state change 0008 drops their tables, settings and secret, every request acts as the owner, and deleting a conversation always removes it for good.
 
+### Changed
+
+- The README and its diagrams describe the personal app: one owner with an optional password, packs that read only the approved datasets through one read-only database user, drafted items marked unreviewed, and one Docker image instead of Compose.
+
 ### Fixed
 
 - The setup no longer says "Preparing the tables…" forever after saving the chosen tables, no longer calls every pack draft a paid call (free and local models cost nothing), no longer mentions pack roles for uploaded documents, and shows the api's reason without the raw "The api answered 422:" prefix.

@@ -169,9 +169,9 @@ def flow():
     s.box("safety", c[1], r[1], W, H, "shield", "Safety check", "Screens for prompt\ninjection first", "green")
     s.box("understand", c[2], r[1], W, H, "bulb", "Understand", "What is measured,\nfor which period", "orange")
     s.box("terms", c[3], r[1], W, H, "book", "Match terms", "Maps words to the\ncompany's metrics", "pink")
-    s.box("perm", c[4], r[1], W, H, "shieldcheck", "Permission check", "Is the question clear,\nand may this role see it?", "green")
+    s.box("perm", c[4], r[1], W, H, "shieldcheck", "Scope check", "Is the question clear,\nand about the pack's data?", "green")
     s.box("sql", c[4], r[2], W, H, "code", "Write SQL", "One read-only query", "orange")
-    s.box("run", c[3], r[2], W, H, "play", "Check and run", "Validated, then run\nas the user's role", "teal")
+    s.box("run", c[3], r[2], W, H, "play", "Check and run", "Validated, then run\nas a read-only user", "teal")
     s.box("chart", c[2], r[2], W, H, "chart", "Pick a chart", "Chosen by rules\nfrom the result shape", "blue")
     s.box("summary", c[1], r[2], W, H, "lines", "Summarize", "Explains the rows in\nthe question's language", "orange")
     s.box("answer", c[0], r[2], W, H, "check", "Answer", "SQL, table, chart\nand summary", "green")
@@ -191,20 +191,20 @@ def flow():
 
 
 def access():
-    s = Section("access-control", "3. Who can see what", 1280)
+    s = Section("access-control", "3. What the agent can read", 1280)
     W, H = 184, 130
     c = grid(6, W, 35)
     r = [60, 260, 460]
-    s.box("rules", c[3], r[0], c[4] + W - c[3], 125, "file", "Access rules", "One policy file per company sets each role's\n"
-                                                                   "tables, columns and rows", "yellow")
-    s.box("user", c[0], r[1], W, H, "user", "Signed-in user", "Asks with one\nof their roles", "yellow")
+    s.box("rules", c[3], r[0], c[4] + W - c[3], 125, "file", "Approved data", "The pack lists the tables and columns\n"
+                                                                   "you approved for questions", "yellow")
+    s.box("user", c[0], r[1], W, H, "user", "You", "On this computer,\nor signed in", "yellow")
     s.box("l0", c[1], r[1], W, H, "shield", "Safety screen", "Layer 0: before\nany AI model call", "green")
-    s.box("l1", c[2], r[1], W, H, "search", "Role-aware search", "Layer 1: context\nlimited to the role", "pink")
-    s.box("l2", c[3], r[1], W, H, "shieldcheck", "Permission check", "Layer 2: refuses\nbefore any SQL", "green")
-    s.box("l3", c[4], r[1], W, H, "lock", "Database rules", "Layer 3: the real\nsecurity boundary", "teal")
-    s.box("data", c[5], r[1], W, H, "database", "Data", "Only what the\nrole may read", "teal")
-    s.box("audit", c[3], r[2], c[4] + W - c[3], 125, "eye", "Audit log", "Every allow and deny is recorded\n"
-                                                                "and shown to admins", "violet")
+    s.box("l1", c[2], r[1], W, H, "search", "Pack search", "Layer 1: context\nfrom the pack only", "pink")
+    s.box("l2", c[3], r[1], W, H, "shieldcheck", "Scope check", "Layer 2: refuses other\ndata before any SQL", "green")
+    s.box("l3", c[4], r[1], W, H, "lock", "Read-only user", "Layer 3: the database\nallows only the marts", "teal")
+    s.box("data", c[5], r[1], W, H, "database", "Data", "Only the approved\ntables and columns", "teal")
+    s.box("audit", c[3], r[2], c[4] + W - c[3], 125, "eye", "Audit log", "Every query and refusal is recorded\n"
+                                                                "and shown in the console", "violet")
     for a, b in [("user", "l0"), ("l0", "l1"), ("l1", "l2"), ("l2", "l3"), ("l3", "data")]:
         s.arrow(a, b)
     rules, audit = s.boxes["rules"], s.boxes["audit"]
@@ -225,8 +225,8 @@ def onboarding():
         ("profile", "pulse", "Profile", "Measure tables,\ndates and values", "gray"),
         ("docs", "file", "Add documents", "Manuals, policies,\nglossaries", "pink"),
         ("draft", "pen", "Draft the pack", "AI proposes terms\nand metrics", "orange"),
-        ("review", "users", "Review", "A person approves\neach item", "violet"),
-        ("publish", "package", "Publish", "Search index and\npermissions", "blue"),
+        ("review", "users", "Review", "You approve\neach item", "violet"),
+        ("publish", "package", "Publish", "Search index and\nread-only user", "blue"),
         ("test", "flask", "Test", "Must answer 80%\nof eval questions", "green"),
     ]
     for i, (id_, icon, title, sub, color) in enumerate(steps):
