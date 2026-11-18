@@ -77,6 +77,20 @@ A model server on the host (Ollama, LM Studio or any OpenAI-compatible endpoint)
 
 On Linux, Ollama listens on `127.0.0.1` only by default, which the container cannot reach. Start it with `OLLAMA_HOST=0.0.0.0`; for the system service, run `sudo systemctl edit ollama`, add `Environment="OLLAMA_HOST=0.0.0.0"` under `[Service]` and restart it. Adding an Ollama provider asks the server for its installed models first: the tiers are proposed from those models, and a server that does not answer or has no chat model installed is not added.
 
+## Data sources
+
+The setup's Data step and the Sources page connect to a database by host name. The container reaches the same addresses the machine does, with three cases to know:
+
+- **A database on the internet or the local network** is reached by its usual host name or IP address. Choose the TLS mode the server requires.
+- **A database installed on this computer** is reached as `host.docker.internal`, with the same `--add-host=host.docker.internal:host-gateway` on Linux as for [local models](#local-models). PostgreSQL and MySQL often listen on `127.0.0.1` only: make the server listen on an address the container can reach (`listen_addresses` in PostgreSQL, `bind-address` in MySQL) and allow the Docker bridge network, usually `172.17.0.0/16`, in its access rules (`pg_hba.conf` in PostgreSQL).
+- **A database in another Docker container** is reached by its container name only when both containers share a Docker network; the default network does not resolve names. Find the database's network with `docker inspect -f '{{range $name, $_ := .NetworkSettings.Networks}}{{$name}} {{end}}' <database-container>`, then join fitcher to it and use the container name as the host:
+
+```bash
+docker network connect <network> fitcher
+```
+
+`docker network connect` lasts until the container is removed; to keep it across an upgrade, add `--network <network>` to the `docker run` command instead. Alternatively, publish the database's port on the host and connect to `host.docker.internal` as above.
+
 ## External ClickHouse
 
 With `CLICKHOUSE_URL=http://<host>[:<port>]` (the HTTP interface) the embedded server does not start and the schema changes and the API use that server. It needs the fitcher users of [infra/clickhouse/users.d](../infra/clickhouse/users.d) with the passwords given to the container as `CLICKHOUSE_*_PASSWORD`, and an administrator in `CLICKHOUSE_ADMIN_USER` and `CLICKHOUSE_ADMIN_PASSWORD`. [deploy/compose.external-clickhouse.yaml](../deploy/compose.external-clickhouse.yaml) shows the layout:
