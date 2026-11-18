@@ -89,3 +89,30 @@ export function isOpenRouter(baseUrl: string | null | undefined): boolean {
 }
 
 export const FREE_SUFFIX = ":free";
+
+/** Where a check of the provider is billed: by the provider, never, or only if the endpoint bills requests. */
+export function billing(preset: ProviderPreset): "billed" | "free" | "maybe" {
+  if (preset.group === "local" || preset.id === "openrouter") return "free";
+  if (preset.group === "other") return "maybe";
+  return "billed";
+}
+
+/** Whether the preset asks for the address of its server. */
+export function asksAddress(preset: ProviderPreset): boolean {
+  return !preset.baseUrl && preset.kind !== "openai" && preset.kind !== "anthropic" && preset.kind !== "gemini";
+}
+
+/** The api request that adds the preset with what the person typed. */
+export function providerCreate(preset: ProviderPreset, apiKey: string, address: string): ProviderCreate {
+  const body: ProviderCreate = { kind: preset.kind };
+  if (preset.name) body.name = preset.name;
+  if (apiKey && preset.key !== "none") body.api_key = apiKey;
+  if (preset.baseUrl) body.base_url = preset.baseUrl;
+  else if (asksAddress(preset)) body.base_url = address.trim();
+  return body;
+}
+
+/** Whether something the preset needs is still empty. */
+export function presetIncomplete(preset: ProviderPreset, apiKey: string, address: string): boolean {
+  return (preset.key === "required" && !apiKey.trim()) || (asksAddress(preset) && !address.trim());
+}

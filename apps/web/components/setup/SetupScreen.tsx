@@ -1,27 +1,22 @@
 "use client";
 
-// First-run setup (DECISIONS §15): the steps as a list with the current one open; an answered step can be
-// opened again from the list or with Back, and leaving it keeps its answer. A step that has no
-// implementation yet is not listed (the api lists the steps it knows). Only an admin can answer a step.
-// The Models step adds a provider, tests it and shows the models proposed for each tier, or lets the admin
-// choose one among the provider's models when it proposes none; adding the provider answers the step, and the
-// setup can be left after it. The Data step connects a database or a
-// file and chooses its tables; it can be skipped and repeated later on the Sources page. Company documents are
-// not a step: they are off until the owner turns them on on the Documents page.
+// First-run setup (DECISIONS §15) in three steps: Model, Data and Start. A bar per step sits at the top; an
+// answered step is a button that opens it again, and leaving it keeps its answer. Only the owner can answer a
+// step (the sample-data demo cannot). The Models step adds a provider and checks it at once (ModelStep);
+// adding the provider answers the step. The Data step connects a database or a file and chooses its tables;
+// it can be skipped and repeated later on the Sources page. Company documents are not a step: they are off
+// until the owner turns them on on the Documents page.
 
 import { useCallback, useEffect, useState } from "react";
 
-import { Icon } from "@/components/brand/Icon";
-import { Logo } from "@/components/brand/Logo";
-import { ModelChooser } from "@/components/models/ModelChooser";
-import { ProviderForm, ProviderTestButton, TestOutcome } from "@/components/models/ProviderForm";
 import { InstantPack } from "@/components/setup/InstantPack";
+import { ModelStep } from "@/components/setup/ModelStep";
+import { SetupShell, type ShellStep } from "@/components/setup/SetupShell";
 import { SourceConnect } from "@/components/sources/SourceConnect";
 import { Button } from "@/components/ui/controls";
 import { WarningBanner } from "@/components/ui/feedback";
-import { Preferences } from "@/components/ui/Preferences";
 import type { FitcherApi } from "@/lib/api/client";
-import type { ModelTiersView, ProviderTestResult, ProviderView, SetupStatus } from "@/lib/contracts";
+import type { SetupStatus } from "@/lib/contracts";
 import { useI18n } from "@/lib/i18n/react";
 
 export type SetupScreenProps = {
@@ -33,71 +28,6 @@ export type SetupScreenProps = {
   /** Open the chat, asking `question` there when one was picked. */
   onOpenChat: (question?: string) => void;
 };
-
-function ModelsStep({ models, disabled, answered, onDone, onSkip }: {
-  models: FitcherApi["models"];
-  disabled: boolean;
-  /** The step was answered before and is open again: leaving it keeps that answer. */
-  answered: boolean;
-  onDone: () => void;
-  onSkip: () => void;
-}) {
-  const { t } = useI18n();
-  const [provider, setProvider] = useState<ProviderView | null>(null);
-  const [tiers, setTiers] = useState<ModelTiersView | null>(null);
-  const [chosen, setChosen] = useState<string | null>(null);
-  const [test, setTest] = useState<{ result: ProviderTestResult | null; error?: string } | null>(null);
-
-  const added = async (next: ProviderView) => {
-    setProvider(next);
-    setTiers(await models.tiers().catch(() => null));
-  };
-  // An OpenAI-compatible provider proposes no model, so its model is chosen from the ones it lists.
-  const proposed = tiers?.tiers.some((tier) => tier.provider_id === provider?.id && tier.model) ?? false;
-  const choosing = Boolean(provider && tiers && !proposed && !chosen);
-  return (
-    <section className="fc-card" aria-label={t("setup.step_models")}>
-      <div className="fc-card-head"><h2 className="fc-card-title">{t("setup.modelsQuestion")}</h2></div>
-      <div className="fc-card-body fc-stack">
-        <p className="fc-muted" style={{ margin: 0 }}>{t("setup.modelsHint")}</p>
-        {provider ? (
-          <>
-            <p style={{ margin: 0 }}>{t("models.added", { name: provider.name })}</p>
-            {choosing && tiers ? (
-              <ModelChooser models={models} provider={provider} tiers={tiers.tiers.map((tier) => tier.tier)}
-                onChosen={(model) => { setChosen(model); void models.tiers().then(setTiers).catch(() => undefined); }} />
-            ) : (
-              <>
-                <ProviderTestButton models={models} provider={provider} model={chosen ?? undefined}
-                  onResult={(result, error) => setTest({ result, error })} />
-                {test?.result ? <TestOutcome result={test.result} /> : null}
-                {test?.error ? <WarningBanner tone="danger">{t("models.testFailed", { reason: test.error })}</WarningBanner> : null}
-                {tiers ? (
-                  <dl className="fc-kv" aria-label={t("models.proposed")}>
-                    {tiers.tiers.map((tier) => (
-                      <div key={tier.tier} style={{ display: "contents" }}>
-                        <dt className="fc-mono">{tier.tier}</dt>
-                        <dd>{tier.model ?? t("models.notMapped")}</dd>
-                      </div>
-                    ))}
-                  </dl>
-                ) : null}
-              </>
-            )}
-            <div className="fc-row" style={{ gap: "var(--base-size-8)" }}>
-              <Button variant={choosing ? "secondary" : "primary"} onClick={onDone}>{choosing ? t("setup.chooseLater") : t("setup.continue")}</Button>
-            </div>
-          </>
-        ) : disabled ? null : (
-          <>
-            <ProviderForm models={models} onAdded={(next) => void added(next)} />
-            <div><Button onClick={onSkip}>{answered ? t("setup.keepAnswer") : t("setup.skip")}</Button></div>
-          </>
-        )}
-      </div>
-    </section>
-  );
-}
 
 function DataStep({ sources, disabled, answered, onDone, onSkip, onAsk }: {
   sources: FitcherApi["sources"]; disabled: boolean; answered: boolean; onDone: () => void; onSkip: () => void;
@@ -177,85 +107,56 @@ export function SetupScreen({ setup, models, sources, isAdmin, onOpenChat }: Set
     void run(() => setup.skip(id));
   };
   const canOpen = (state: string) => isAdmin && !busy && !status?.complete && state !== "pending";
+  // The bars: the api's steps, then Start, which is current once every step is answered.
+  const finishing = Boolean(status && (status.complete || !current));
+  const shellSteps: ShellStep[] = status ? [
+    ...status.steps.map((step): ShellStep => ({
+      id: step.id,
+      state: step.id === current?.id && !finishing ? "current" : step.state === "pending" ? "todo" : "done",
+      onOpen: step.id !== current?.id && canOpen(step.state) ? () => setOpen(step.id) : undefined,
+    })),
+    { id: "start", state: finishing ? "current" : "todo" },
+  ] : [];
+  const meta = (n: number) => <p className="ob-meta">{t("onboarding.stepOf", { n, total: shellSteps.length })}</p>;
   return (
-    <div className="fc-app fc-flow">
-      <header style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "var(--base-size-16)", padding: "var(--base-size-24) var(--base-size-24) 0" }}>
-        <Logo height={24} />
-        <Preferences />
-      </header>
-      <main style={{ flex: 1, display: "flex", justifyContent: "center", padding: "var(--base-size-32) var(--base-size-16)" }}>
-        <div className="fc-stack" style={{ width: "min(640px, 100%)", gap: "var(--base-size-24)" }}>
-          <div>
-            <h1 style={{ margin: 0, fontSize: 32, lineHeight: "44px", fontWeight: 600, letterSpacing: "-.01em" }}>{t("setup.title")}</h1>
-            <p style={{ margin: "var(--base-size-8) 0 0", color: "var(--fgColor-muted)", fontSize: 16, lineHeight: "24px" }}>{t("setup.intro")}</p>
-          </div>
-          {error === "load" ? <WarningBanner tone="danger">{t("setup.loadFailed")}</WarningBanner> : null}
-          {!isAdmin ? <WarningBanner tone="info">{t("setup.adminOnly")}</WarningBanner> : null}
-          {status ? (
+    <SetupShell steps={shellSteps} wide={current?.id === "data"}>
+      {error === "load" ? <WarningBanner tone="danger">{t("setup.loadFailed")}</WarningBanner> : null}
+      {!isAdmin ? <WarningBanner tone="info">{t("setup.adminOnly")}</WarningBanner> : null}
+      {error === "save" ? <WarningBanner tone="danger">{t("setup.failed")}</WarningBanner> : null}
+      {status ? (
+        <div key={finishing ? "finish" : current?.id} className="fc-enter fc-stack" style={{ gap: "var(--base-size-24)" }}>
+          {finishing ? (
+            <section className="fc-card" aria-label={t("setup.finish")}>
+              <div className="fc-card-body fc-stack">
+                {status.complete ? <p style={{ margin: 0 }}>{t("setup.finished")}</p> : <p className="fc-muted" style={{ margin: 0 }}>{t("setup.backupNote")}</p>}
+                <div>
+                  {status.complete ? <Button variant="primary" onClick={() => onOpenChat()}>{t("setup.openChat")}</Button> : (
+                    <Button variant="primary" disabled={!isAdmin || busy} onClick={() => void run(() => setup.complete())}>{t("setup.finish")}</Button>
+                  )}
+                </div>
+              </div>
+            </section>
+          ) : current?.id === "models" ? (
+            <ModelStep models={models} disabled={!isAdmin || busy} meta={meta(1)} onNext={close} onSkip={() => skip("models")} />
+          ) : current?.id === "data" ? (
             <>
-              <ol aria-label={t("setup.steps")} className="fc-setup-steps">
-                {status.steps.map((step, index) => {
-                  const here = step.id === current?.id && !status.complete;
-                  const body = (
-                    <>
-                      <span className="fc-setup-num" data-state={step.state}>
-                        {step.state === "done" ? <Icon name="check" /> : index + 1}
-                      </span>
-                      <span className="fc-setup-name">{t(`setup.step_${step.id}`)}</span>
-                      <span className="fc-muted">{t(`setup.state_${step.state}`)}</span>
-                    </>
-                  );
-                  return (
-                    <li key={step.id} aria-current={here ? "step" : undefined}>
-                      {!here && canOpen(step.state) ? (
-                        <button type="button" className="fc-setup-step" aria-label={t("setup.reopen", { step: t(`setup.step_${step.id}`) })}
-                          onClick={() => setOpen(step.id)}>{body}</button>
-                      ) : <span className="fc-setup-step">{body}</span>}
-                    </li>
-                  );
-                })}
-              </ol>
-              {previous && !status.complete && isAdmin ? (
+              {previous && isAdmin ? (
                 <div>
                   <Button variant="ghost" size="sm" icon="arrowLeft" disabled={busy} onClick={() => setOpen(previous.id)}>
-                    {t("setup.back", { step: t(`setup.step_${previous.id}`) })}
+                    {t("setup.back", { step: t(`onboarding.step_${previous.id}`) })}
                   </Button>
                 </div>
               ) : null}
-              {error === "save" ? <WarningBanner tone="danger">{t("setup.failed")}</WarningBanner> : null}
-              <div key={status.complete ? "complete" : current?.id ?? "finish"} className="fc-enter fc-stack" style={{ gap: "var(--base-size-24)" }}>
-              {status.complete ? (
-                <section className="fc-card" aria-label={t("setup.finished")}>
-                  <div className="fc-card-body fc-stack">
-                    <p style={{ margin: 0 }}>{t("setup.finished")}</p>
-                    <div><Button variant="primary" onClick={() => onOpenChat()}>{t("setup.openChat")}</Button></div>
-                  </div>
-                </section>
-              ) : current?.id === "models" ? (
-                <ModelsStep models={models} disabled={!isAdmin || busy} answered={answered}
-                  onDone={close} onSkip={() => skip("models")} />
-              ) : current?.id === "data" ? (
-                <DataStep sources={sources} disabled={!isAdmin || busy} answered={answered}
-                  onAsk={(question) => {
-                    setOpen(null);
-                    void run(() => setup.complete()).then(() => onOpenChat(question));
-                  }}
-                  onDone={close} onSkip={() => skip("data")} />
-              ) : (
-                <section className="fc-card" aria-label={t("setup.finish")}>
-                  <div className="fc-card-body fc-stack">
-                    <p className="fc-muted" style={{ margin: 0 }}>{t("setup.backupNote")}</p>
-                    <div>
-                      <Button variant="primary" disabled={!isAdmin || busy} onClick={() => void run(() => setup.complete())}>{t("setup.finish")}</Button>
-                    </div>
-                  </div>
-                </section>
-              )}
-              </div>
+              <DataStep sources={sources} disabled={!isAdmin || busy} answered={answered}
+                onAsk={(question) => {
+                  setOpen(null);
+                  void run(() => setup.complete()).then(() => onOpenChat(question));
+                }}
+                onDone={close} onSkip={() => skip("data")} />
             </>
           ) : null}
         </div>
-      </main>
-    </div>
+      ) : null}
+    </SetupShell>
   );
 }

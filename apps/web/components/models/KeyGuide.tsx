@@ -1,13 +1,13 @@
 "use client";
 
-// A short animated walkthrough of creating an OpenRouter key, shown next to the key field so nobody has to leave
-// the setup for a help page. A small drawing of the OpenRouter pages marks what to click at each step; the steps
-// advance on their own unless the person pauses them, picks one, or asked the system for reduced motion.
+// A short animated walkthrough of creating an OpenRouter key, shown under the key field so nobody has to leave
+// the setup for a help page. A plain drawing of a browser marks what to click at each step; it is not
+// OpenRouter's own page, and its labels stay in English like the site's. The steps advance on their own unless
+// the person pauses them, picks one, or asked the system for reduced motion.
 
 import { useEffect, useState } from "react";
 
 import { Icon } from "@/components/brand/Icon";
-import { Button } from "@/components/ui/controls";
 import { useI18n } from "@/lib/i18n/react";
 
 const STEPS = ["signIn", "keys", "create", "paste"] as const;
@@ -24,49 +24,31 @@ function reducedMotion(): boolean {
     && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 }
 
-/** The drawing of one step; its labels are OpenRouter's own and stay in English. */
 function Screen({ step }: { step: Step }) {
   if (step === "signIn") {
-    return (
-      <div className="fc-guide-bar">
-        <span className="fc-guide-brand">OpenRouter</span>
-        <span className="fc-guide-chip">Models</span>
-        <span className="fc-guide-chip fc-guide-target">Sign in</span>
-      </div>
-    );
+    return <><div><span className="fc-btn fc-btn-sm guide-ring">Sign in</span></div><span className="sk" /><span className="sk" /><span className="sk" /></>;
   }
-  if (step === "keys") {
-    return (
-      <div className="fc-guide-split">
-        <ul className="fc-guide-nav">
-          <li>Credits</li>
-          <li className="fc-guide-target">Keys</li>
-          <li>Activity</li>
-          <li>Preferences</li>
-        </ul>
-        <div className="fc-guide-lines"><span /><span /><span /></div>
-      </div>
-    );
-  }
+  if (step === "keys") return <><span>API Keys</span><span className="sk" /><span className="sk" /></>;
   if (step === "create") {
     return (
-      <div className="fc-guide-form">
-        <span className="fc-guide-field">Name: fitcher</span>
-        <span className="fc-guide-field fc-guide-muted">Credit limit: (empty)</span>
-        <span className="fc-guide-button fc-guide-target">Create</span>
-      </div>
+      <>
+        <span>Create key</span>
+        <span className="fc-input fc-input-sm">fitcher</span>
+        <span className="fc-input fc-input-sm">Credit limit (empty)</span>
+        <span className="fc-btn fc-btn-primary fc-btn-sm guide-ring">Create</span>
+      </>
     );
   }
   return (
-    <div className="fc-guide-form">
-      <span className="fc-guide-field fc-guide-mono">sk-or-v1-••••••••••••</span>
-      <span className="fc-guide-button fc-guide-target"><Icon name="copy" /> Copy</span>
-      <span className="fc-guide-arrow"><Icon name="arrowLeft" /> fitcher</span>
-    </div>
+    <>
+      <span>Your new key</span>
+      <span className="guide-key"><span className="fc-input fc-input-sm fc-mono">sk-or-v1-••••••••••••</span><span className="fc-btn fc-btn-sm guide-ring">Copy</span></span>
+      <span className="fc-muted">Shown only once</span>
+    </>
   );
 }
 
-export function OpenRouterKeyGuide({ intervalMs = 4000 }: { intervalMs?: number }) {
+export function OpenRouterKeyGuide({ intervalMs = 3500 }: { intervalMs?: number }) {
   const { t } = useI18n();
   const [index, setIndex] = useState(0);
   const [playing, setPlaying] = useState(() => !reducedMotion());
@@ -80,26 +62,29 @@ export function OpenRouterKeyGuide({ intervalMs = 4000 }: { intervalMs?: number 
 
   const pick = (next: number) => { setPlaying(false); setIndex(next); };
   return (
-    <section className="fc-guide" aria-label={t("guide.title")}>
-      <div className="fc-guide-head">
-        <strong>{t("guide.title")}</strong>
-        <Button size="sm" variant="ghost" onClick={() => setPlaying(!playing)}>{playing ? t("guide.pause") : t("guide.play")}</Button>
+    <section className="guide" aria-label={t("guide.title")}>
+      <div className="guide-bar"><span className="fc-sr">{t("guide.browser")}</span><span className="guide-url">{ADDRESS[step]}</span></div>
+      <div className="guide-view" aria-hidden="true">
+        <div className="guide-side">
+          <span>Home</span><span>Models</span><span>Settings</span><span className={step === "keys" ? "guide-ring" : undefined}>Keys</span>
+        </div>
+        <div className="guide-main" key={step}><Screen step={step} /></div>
       </div>
-      <div className="fc-guide-window" aria-hidden="true">
-        <div className="fc-guide-address"><Icon name="lock" /> {ADDRESS[step]}</div>
-        <div className="fc-guide-screen" key={step}><Screen step={step} /></div>
-      </div>
-      <ol className="fc-guide-steps">
-        {STEPS.map((id, position) => (
-          <li key={id}>
-            <button type="button" className="fc-guide-step" aria-current={position === index ? "step" : undefined} onClick={() => pick(position)}>
-              <span className="fc-guide-num">{position + 1}</span>
-              <span>{t(`guide.step_${id}`)}</span>
+      <p className="guide-caption" aria-live="polite">{t("guide.caption", { n: index + 1, text: t(`guide.step_${step}`) })}</p>
+      <div className="guide-foot">
+        <button type="button" className="fc-btn fc-btn-ghost fc-btn-icon fc-btn-sm" aria-label={playing ? t("guide.pause") : t("guide.play")}
+          onClick={() => setPlaying(!playing)}>
+          <Icon name={playing ? "pause" : "play"} />
+        </button>
+        <div className="guide-dots" role="group" aria-label={t("guide.pick")}>
+          {STEPS.map((id, position) => (
+            <button key={id} type="button" className="guide-dot" aria-current={position === index ? "step" : undefined}
+              aria-label={`${t("guide.stepN", { n: position + 1 })}: ${t(`guide.step_${id}`)}`} onClick={() => pick(position)}>
+              {position + 1}
             </button>
-          </li>
-        ))}
-      </ol>
-      <p className="fc-field-help" style={{ margin: 0 }}>{t("guide.freeNote")}</p>
+          ))}
+        </div>
+      </div>
     </section>
   );
 }
