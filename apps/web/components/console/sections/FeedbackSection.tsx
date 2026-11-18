@@ -7,8 +7,9 @@ import { useCallback, useState } from "react";
 
 import { useConsole } from "@/components/console/ConsoleLayout";
 import { ListPage, RecordTable } from "@/components/console/ListPage";
-import { Button, Segmented } from "@/components/ui/controls";
-import { StatusPill } from "@/components/ui/feedback";
+import { Icon } from "@/components/brand/Icon";
+import { StatusLabel } from "@/components/console/kit";
+import { Segmented } from "@/components/ui/controls";
 import type { FeedbackRow } from "@/lib/contracts";
 import { useChat } from "@/lib/chat/ChatContext";
 import { useLoad } from "@/lib/console/useLoad";
@@ -20,38 +21,47 @@ const proposable = (row: FeedbackRow) => !row.proposal && (row.rating === "disli
 export function FeedbackSection() {
   const { t, formatDate } = useI18n();
   const { api } = useChat();
-  const { toast } = useConsole();
+  const { toast, navigate } = useConsole();
   const { data, failed, reload } = useLoad(useCallback(() => api.feedbackReview.list(), [api]));
-  const [filter, setFilter] = useState("dislike");
+  const [filter, setFilter] = useState("all");
   const rows = (data ?? []).filter((row) => filter === "all" || row.rating === filter);
 
   return (
     <ListPage section="feedback" loading={!data} failed={failed} skeleton="table">
-      <div className="fc-toolbar">
-        <Segmented label={t("ui.rating")} value={filter} onChange={setFilter}
-          options={[["dislike", t("ui.disliked")], ["like", t("ui.liked")], ["all", t("ui.all")]]} />
+      <div className="toolbar">
+        <Segmented label={t("feedbackPage.filter")} value={filter} onChange={setFilter}
+          options={[["all", t("ui.all")], ["like", t("ui.liked")], ["dislike", t("ui.disliked")]]} />
       </div>
       <RecordTable
         key={filter}
         label={t("ui.nav_feedback")}
+        empty={t("feedbackPage.empty")}
         rows={rows}
         rowKey={(row) => row.trace_id}
         columns={[
           { key: "ts", label: t("ui.time"), nowrap: true, render: (row) => formatDate(row.ts, { dateStyle: "medium", timeStyle: "short" }) },
-          { key: "user_id", label: t("ui.user"), mono: true },
           { key: "question", label: t("ui.question"), render: (row) => <span lang={langOf(row.question)}>{row.question}</span> },
-          { key: "rating", label: t("ui.rating"), render: (row) => <StatusPill status={row.rating === "like" ? "liked" : "disliked"} /> },
-          { key: "note", label: t("ui.note"), render: (row) => (row.note ? <span lang={langOf(row.note)}>{row.note}</span> : <span className="fc-muted">—</span>) },
-          { key: "trace_id", label: t("ui.trace"), mono: true, render: (row) => <code className="fc-code" title={row.trace_id}>{row.trace_id.slice(0, 8)}</code> },
-          { key: "status", label: t("ui.status"), render: (row) => <StatusPill status={row.proposal ?? "fb_new"} /> },
+          { key: "rating", label: t("ui.rating"), render: (row) => (
+            <span className={row.rating === "like" ? "rating-up" : "rating-down"} role="img" aria-label={row.rating === "like" ? t("ui.liked") : t("ui.disliked")}>
+              <Icon name={row.rating === "like" ? "thumbsUp" : "thumbsDown"} />
+            </span>
+          ) },
+          { key: "note", label: t("ui.note"), render: (row) => (row.note ? <span className="fc-muted" lang={langOf(row.note)}>{row.note}</span> : <span className="fc-muted">—</span>) },
+          { key: "run_status", label: t("feedbackPage.run"), render: (row) => <StatusLabel status={row.run_status}>{t(`ui.${row.run_status}`)}</StatusLabel> },
           {
-            key: "actions", label: t("ui.actions"), render: (row) => (proposable(row) ? (
-              <Button size="sm" icon="clipboardCheck" onClick={async () => {
-                await api.feedbackReview.propose(row.trace_id);
-                toast(t("ui.proposedName", { question: row.question }));
-                await reload();
-              }}>{t("ui.proposeExample")}</Button>
-            ) : <span className="fc-muted">—</span>),
+            key: "actions", label: t("ui.actions"), render: (row) => (
+              <span className="row-actions">
+                {proposable(row) ? (
+                  <button type="button" className="fc-btn fc-btn-sm" onClick={async () => {
+                    await api.feedbackReview.propose(row.trace_id);
+                    toast(t("ui.proposedName", { question: row.question }));
+                    await reload();
+                  }}>{t("ui.proposeExample")}</button>
+                ) : row.proposal ? <StatusLabel tone={null}>{t("feedbackPage.proposed")}</StatusLabel> : null}
+                <button type="button" className="fc-btn fc-btn-ghost fc-btn-sm" aria-label={t("feedbackPage.openRun")}
+                  onClick={() => navigate(`/console/runs/${encodeURIComponent(row.trace_id)}`)}>{t("feedbackPage.open")}</button>
+              </span>
+            ),
           },
         ]}
       />

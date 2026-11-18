@@ -439,3 +439,36 @@ a.stat:hover { background: var(--bgColor-muted); }
 .row-actions .fc-paid { margin-left: 6px; }
 .file-title { display: flex; align-items: center; gap: 8px; }
 .src-link.plain { font-family: var(--font-sans); font-weight: 500; }
+
+/* Runs */
+.filters { align-items: flex-end; }
+.filters .fc-field { min-width: 150px; }
+.link-button { border: 0; background: none; padding: 0; cursor: pointer; text-align: left; font: inherit; }
+.tl-name { font-weight: 500; }
+.tl-fill { flex: 1; }
+.tl-ms { min-width: 56px; text-align: right; font-variant-numeric: tabular-nums; }
+.tl-meta { display: flex; flex-wrap: wrap; gap: 4px 12px; }
+.trace-id { font-size: 12px; overflow-wrap: anywhere; }
+.stats-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+@media (max-width: 760px) { .stats-3 { grid-template-columns: 1fr; } .stats-3 .stat { border-right: 0; border-bottom: 1px solid var(--borderColor-default); } }
+.rating-up { color: var(--fgColor-success); display: inline-flex; }
+.rating-down { color: var(--fgColor-danger); display: inline-flex; }
+
+/* Evaluation report */
+.ev-report { display: flex; flex-direction: column; gap: 16px; }
+.ev-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.ev-score { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.ev-score-value { font-size: 32px; line-height: 40px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.ev-layers { display: flex; flex-direction: column; gap: 10px; }
+.ev-layer { display: grid; grid-template-columns: minmax(140px, 220px) 1fr 96px; align-items: center; gap: 16px; font-size: 14px; }
+.ev-layer > .fc-muted { text-align: right; font-variant-numeric: tabular-nums; }
+.ev-layer-bar { position: relative; margin-top: 0; }
+.ev-layer-bar.stat-bar { overflow: visible; }
+.ev-layer-bar > span.ev-low { background: var(--fgColor-danger); }
+.ev-mark { position: absolute; top: -3px; width: 2px; height: 12px; margin-left: -1px; background: var(--fgColor-default); border-radius: 1px; }
+.ev-running { display: flex; align-items: center; gap: 12px; }
+@media (max-width: 640px) {
+  .ev-layer { grid-template-columns: 1fr auto; gap: 4px 12px; }
+  .ev-layer > .ev-layer-bar { grid-column: 1 / -1; grid-row: 2; }
+}
+.split-side .tbl th, .split-side .tbl td { padding-left: 12px; padding-right: 12px; }
