@@ -16,6 +16,7 @@
 
 ### Fixed
 
+- A console page whose data arrives after it was closed no longer updates its state, which could fail a web test run with an unhandled `window is not defined` once the test environment had shut down.
 - A new conversation no longer logs a 404 for `/api/sample/scenarios` when the active pack has no sample scenarios, which is every pack built in the app: the route answers an empty list of suggestions instead.
 - The setup no longer says "Preparing the tables…" forever after saving the chosen tables, no longer calls every pack draft a paid call (free and local models cost nothing), no longer mentions pack roles for uploaded documents, and shows the api's reason without the raw "The api answered 422:" prefix.
 - The web server's `/api/pack` route forwards the browser's session and address headers like every other route, and a signed-out `/api/pack` no longer stops the page from reaching the sign-in page.
