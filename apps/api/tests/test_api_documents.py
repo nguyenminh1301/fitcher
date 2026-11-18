@@ -14,6 +14,8 @@ from test_documents_service import WordScreener
 from app.api import runtime
 from app.main import app
 from app.onboarding.documents import DocumentService, InMemoryDocumentRegistry, compile_lock_path
+from app.state.db import shared_state
+from app.state.settings import Settings
 
 NOW = datetime(2026, 11, 5, 8, 0, tzinfo=UTC)
 REVIEWER = SessionHeaders(['pack_reviewer'])
@@ -38,6 +40,8 @@ def client(service):
     app.dependency_overrides[runtime.get_compiled_or_none] = lambda: compiled_fixture()
     app.dependency_overrides[runtime.get_document_service] = lambda: service
     app.dependency_overrides[runtime.get_document_service_or_none] = lambda: service
+    # Company documents are off on a new instance; these tests use them, so the owner has turned them on.
+    Settings(shared_state()).set("documents", "enabled", True)
     with TestClient(app) as test_client:
         yield test_client
     app.dependency_overrides.clear()
@@ -157,7 +161,15 @@ def test_draft_needs_an_indexed_document(client, drafting):
 ADMIN = SessionHeaders(["admin"])
 
 
-def test_documents_are_on_by_default_and_off_needs_confirmation_while_documents_exist(client):
+def test_documents_are_off_on_a_new_instance(client):
+    with shared_state().write() as conn:
+        conn.execute("DELETE FROM settings WHERE group_name = 'documents'")
+
+    assert client.get("/settings/documents", headers=REVIEWER).json() == {"enabled": False, "documents": 0}
+    assert client.get("/documents", headers=REVIEWER).status_code == 404
+
+
+def test_turning_documents_off_needs_confirmation_while_documents_exist(client):
     upload(client)
     assert client.get("/settings/documents", headers=REVIEWER).json() == {"enabled": True, "documents": 1}
 
@@ -181,8 +193,8 @@ def test_with_documents_off_no_document_endpoint_answers_and_the_files_are_kept(
     assert [item["id"] for item in client.get("/documents", headers=REVIEWER).json()["documents"]] == [record["id"]]
 
 
-def test_turning_documents_off_marks_the_setup_step_done(client):
+def test_turning_documents_on_or_off_is_not_a_setup_step(client):
     client.put("/settings/documents", headers=ADMIN, json={"enabled": False})
 
-    steps = {step["id"]: step["state"] for step in client.get("/setup/status", headers=ADMIN).json()["steps"]}
-    assert steps["documents"] == "done"
+    steps = [step["id"] for step in client.get("/setup/status", headers=ADMIN).json()["steps"]]
+    assert steps == ["models", "data"]

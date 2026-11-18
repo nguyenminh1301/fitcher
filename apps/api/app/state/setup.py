@@ -11,7 +11,7 @@ from datetime import UTC, datetime
 from app.state.db import StateDb
 from app.state.settings import Settings
 
-STEPS = ("models", "data", "documents")
+STEPS = ("models", "data")
 
 
 class SetupError(ValueError):

@@ -1,19 +1,20 @@
 "use client";
 
-// Documents (DECISIONS §5, §11): upload, list and delete company documents, choose the pack roles that
-// may see each one, and draft pack items from an indexed document, which uses paid AI.
+// Documents (DECISIONS §5, §11): turn company documents on or off (off on a new instance), upload, list and
+// delete them, and draft pack items from an indexed document, which uses paid AI. Turning them off while some
+// are stored asks first: the files stay but are no longer searched.
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 
 import { useConsole } from "@/components/console/ConsoleLayout";
 import { DocumentRow } from "@/components/console/DocumentRow";
 import { ListPage } from "@/components/console/ListPage";
 import { PaidAiConfirm } from "@/components/console/PaidAiConfirm";
 import { ALLOWED_EXTENSIONS, MAX_UPLOAD_BYTES, UploadDropzone } from "@/components/console/UploadDropzone";
-import { Button } from "@/components/ui/controls";
+import { Button, Switch } from "@/components/ui/controls";
 import { WarningBanner } from "@/components/ui/feedback";
 import { Dialog } from "@/components/ui/overlay";
-import type { DocumentView as Document } from "@/lib/contracts";
+import type { DocumentSettings, DocumentView as Document } from "@/lib/contracts";
 import { useChat } from "@/lib/chat/ChatContext";
 import { useLoad } from "@/lib/console/useLoad";
 import { useI18n } from "@/lib/i18n/react";
@@ -22,8 +23,66 @@ import { useI18n } from "@/lib/i18n/react";
 const POLL_MS = 1000;
 
 export function DocumentsSection() {
+  const { api } = useChat();
+  const [settings, setSettings] = useState<DocumentSettings | null>(null);
+  const [settingsFailed, setSettingsFailed] = useState(false);
+  useEffect(() => {
+    api.documents.settings().then(setSettings).catch(() => setSettingsFailed(true));
+  }, [api]);
+  if (settingsFailed) return <ListPage section="documents" loading={false} failed />;
+  if (!settings) return <ListPage section="documents" loading />;
+  return <DocumentsSwitch settings={settings} onChange={setSettings} />;
+}
+
+function DocumentsSwitch({ settings, onChange }: { settings: DocumentSettings; onChange: (next: DocumentSettings) => void }) {
   const { t } = useI18n();
-  const { api, pack } = useChat();
+  const { api } = useChat();
+  const [busy, setBusy] = useState(false);
+  const [confirming, setConfirming] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  async function set(enabled: boolean, confirm = false) {
+    setBusy(true);
+    setError(null);
+    try {
+      onChange(await api.documents.setEnabled(enabled, confirm));
+      setConfirming(false);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : String(reason));
+    } finally {
+      setBusy(false);
+    }
+  }
+  const toggle = (
+    <Switch label={t("ui.documentsUse")} checked={settings.enabled} disabled={busy}
+      onChange={(enabled) => (!enabled && settings.documents > 0 ? setConfirming(true) : void set(enabled))} />
+  );
+  return (
+    <>
+      {settings.enabled ? <DocumentList actions={toggle} /> : (
+        <ListPage section="documents" loading={false}>
+          <div className="fc-card"><div className="fc-card-body fc-stack">
+            <p style={{ margin: 0 }}>{t("ui.documentsAbout")}</p>
+            <div>{toggle}</div>
+          </div></div>
+        </ListPage>
+      )}
+      {error ? <WarningBanner tone="danger" onDismiss={() => setError(null)}>{error}</WarningBanner> : null}
+      <Dialog open={confirming} title={t("ui.documentsOffTitle")} onClose={() => setConfirming(false)}
+        actions={
+          <>
+            <Button onClick={() => setConfirming(false)}>{t("ui.cancel")}</Button>
+            <Button variant="primary" disabled={busy} onClick={() => void set(false, true)}>{t("ui.documentsOffButton")}</Button>
+          </>
+        }>
+        {t("ui.documentsOffText", { n: settings.documents })}
+      </Dialog>
+    </>
+  );
+}
+
+function DocumentList({ actions }: { actions: ReactNode }) {
+  const { t } = useI18n();
+  const { api } = useChat();
   const { toast } = useConsole();
   const { data, failed, reload } = useLoad(useCallback(() => api.documents.list(), [api]));
   const [error, setError] = useState<string | null>(null);
@@ -73,7 +132,7 @@ export function DocumentsSection() {
   }
 
   return (
-    <ListPage section="documents" loading={!data} failed={failed}>
+    <ListPage section="documents" actions={actions} loading={!data} failed={failed}>
       {compiling ? <WarningBanner tone="info" icon="loader">{t("ui.compiling")}</WarningBanner> : null}
       <UploadDropzone disabled={compiling} onFiles={(files) => void upload(files)} />
       {error ? <WarningBanner tone="danger" onDismiss={() => setError(null)}>{error}</WarningBanner> : null}

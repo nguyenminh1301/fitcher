@@ -38,7 +38,6 @@ from app.onboarding.drafter import Drafter, DraftError, draft_files
 from app.onboarding.pack_yaml import PackFiles
 from app.onboarding.profiler import read_profile
 from app.packs.loader import PackValidationError
-from app.state import setup
 from app.state.db import StateDb
 from app.state.settings import Settings, documents_enabled
 
@@ -172,7 +171,7 @@ def get_document_settings(
 def put_document_settings(
     change: DocumentSettingsChange, _: Annotated[Principal, Depends(require_admin)], db: State, service: OptionalService,
 ) -> DocumentSettings:
-    """Turn documents on or off and answer the setup's Documents step; off with documents kept needs ``confirm``."""
+    """Turn documents on or off; off with documents kept needs ``confirm``."""
     kept = _kept_documents(service)
     if not change.enabled and documents_enabled(db) and not change.confirm and kept != 0:
         held = "the documents" if kept is None else f"{kept} document{'s' if kept != 1 else ''}"
@@ -181,5 +180,4 @@ def put_document_settings(
             detail=f"{held} stay stored but are no longer searched; confirm to turn company documents off",
         )
     Settings(db).set("documents", "enabled", change.enabled)
-    setup.mark_done(db, "documents")
     return DocumentSettings(enabled=change.enabled, documents=kept or 0)

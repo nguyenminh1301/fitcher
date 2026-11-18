@@ -16,7 +16,7 @@ This document states the target. §16 lists each decision that differs from the 
 - Uber Finch is only a source of ideas. Uber/taxi data is not reproduced.
 - It is an **open-source, self-hosted product** for developers who run it on their own machine or server: one image, one container, one data volume and one published port (§3). The reference machine is a laptop with 8 GB of memory.
 - It is a **personal app**: one owner, no accounts, sign-in or user management (§9).
-- A first-run setup (§15) asks which models to use, which data to connect and whether to add company documents. Nothing requires editing a file.
+- A first-run setup (§15) asks which models to use and which data to connect. Company documents are off until the owner turns them on on the Documents page. Nothing requires editing a file.
 
 ### Out of scope
 
@@ -425,7 +425,7 @@ Tables (MergeTree, 90-day TTL except the conversation tables and `feedback`, ord
 
 The interface follows the Fitcher web app design, summarized in [design/web-app.md](design/web-app.md); its component names are the names used in `apps/web`.
 
-- **Setup.** A new instance opens on a setup of three steps, each of which can be changed later in the console: models (pick a provider, enter a key or a base URL, test it, accept the proposed tier mapping), data (connect a source and choose tables, or skip) and documents (on by default, or off). The setup can be left after the models step; the chat then explains what is still missing.
+- **Setup.** A new instance opens on a setup of two steps, each of which can be changed later in the console: models (pick a provider, enter a key or a base URL, test it, accept the proposed tier mapping) and data (connect a source and choose tables, or skip). Company documents are not a step: they are off on a new instance and turned on or off on the Documents page, which is always listed; an instance set up before this change keeps them on. The setup can be left after the models step; the chat then explains what is still missing.
 - **Sources page** (`admin`, which the owner holds). Lists the sources with their kind, host, tables, mode and last sync. Adding a source asks for the kind and its connection fields (host, port, database, schema, user, password, TLS mode and certificate; a file upload for the file kind), tests the connection, lists the tables with their size and proposed mode, and saves. A saved password is never shown again.
 - **Two surfaces.** The Chat app and the workspace console. The console's sections belong to console roles, which the owner holds: `pack_reviewer` for Review, Documents, Datasets, Feedback and Evaluation, `admin` for Runs and trace, Audit, Costs, Evaluation, Sources and Models. The owner reaches the console from the account menu.
 - **Conversations.** A user can start, list, search, pin, rename and delete their own conversations and sort them into personal groups. The sidebar shows Pinned, Groups and Recent (today, past week, past month). A group is a folder only: conversations never share context, and there is no sharing or collaboration. A conversation's title is its first question cut to 80 characters; no LLM call names it. Search matches titles and the user's own questions, inside the user's conversations only. Delete removes the conversation, its messages and the feedback on its answers for good. Conversations, their messages, groups and feedback have no expiry; run logs keep the 90-day TTL.

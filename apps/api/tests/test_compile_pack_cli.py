@@ -135,6 +135,7 @@ def test_compile_waits_for_documents_still_processing(packs_dir, services, tmp_p
         uploaded_by="u", allowed_roles=["reader"], status="processing", uploaded_at=now, updated_at=now,
     ))
     monkeypatch.setattr(cli, "UPLOAD_WAIT_SECONDS", 0)
+    monkeypatch.setattr(cli, "documents_enabled", lambda db: True)
     try:
         assert cli.main(["--pack", "minimal", "--packs-dir", str(packs_dir)]) == 1
     finally:

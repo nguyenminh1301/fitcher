@@ -160,7 +160,7 @@ export function createMockApi(options: { latencyMs?: number; identity?: () => Pr
     // The demo is an instance that was set up already, so it never redirects to the setup.
     setup: {
       status: async () => ({
-        steps: [{ id: "models", state: "done" }, { id: "data", state: "done" }, { id: "documents", state: "done" }], complete: true,
+        steps: [{ id: "models", state: "done" }, { id: "data", state: "done" }], complete: true,
       }),
       skip: () => Promise.reject(new Error("The setup needs the api; it has no sample data.")),
       complete: () => Promise.reject(new Error("The setup needs the api; it has no sample data.")),

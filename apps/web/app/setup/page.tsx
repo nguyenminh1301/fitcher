@@ -7,8 +7,6 @@ import { SetupScreen } from "@/components/setup/SetupScreen";
 import { api } from "@/lib/api";
 import { keepQuestion } from "@/lib/chat/pendingQuestion";
 
-const packRoles = async () => (await api.auth.pack())?.roles ?? [];
-
 // The first-run setup of this personal app; the owner answers every step, signed in when a password is set.
 export default function SetupPage() {
   const router = useRouter();
@@ -21,6 +19,6 @@ export default function SetupPage() {
     }).catch(() => setIsAdmin(true));
   }, [router]);
   if (isAdmin === null) return null;
-  return <SetupScreen setup={api.setup} models={api.models} sources={api.sources} documents={api.documents} packRoles={packRoles}
+  return <SetupScreen setup={api.setup} models={api.models} sources={api.sources}
     isAdmin={isAdmin} onOpenChat={(question) => { if (question) keepQuestion(question); router.push("/"); }} />;
 }

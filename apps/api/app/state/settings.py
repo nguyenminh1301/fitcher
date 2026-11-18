@@ -38,9 +38,10 @@ SPECS: dict[tuple[str, str], SettingSpec] = {
     ("llm.embedding", "provider_id"): SettingSpec(str),
     ("llm.embedding", "model"): SettingSpec(str),
     ("llm.embedding", "dimensions"): SettingSpec(int),
-    # Company documents (DECISIONS §5, §15): off hides the Documents page and its endpoints, and the compiler
-    # indexes no chunks; the stored files and the registry are kept.
-    ("documents", "enabled"): SettingSpec(bool, True),
+    # Company documents (DECISIONS §5, §15), off until the owner turns them on on the Documents page: off makes
+    # the documents endpoints answer 404 and the compiler index no chunks; the stored files and the registry are
+    # kept.
+    ("documents", "enabled"): SettingSpec(bool, False),
     # Questions answered at once by the one api process; the rest wait in order (app/api/limits.py).
     ("limits", "concurrent_questions"): SettingSpec(int, 4),
     # The pack an instant pack made active; ACTIVE_PACK wins when set (app/packs/active.py).
