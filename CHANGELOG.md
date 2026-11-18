@@ -5,6 +5,7 @@
 ### Changed
 
 - The setup no longer asks about company documents: a new instance starts with them off, the console always lists the Documents page, and that page turns them on or off with a switch, asking before turning them off while documents are stored. App-state change 0010 keeps documents on for an instance set up before this change and drops the answer to the removed step.
+- The sign-in page follows the new design: a centred "Open fitcher" form without a card, a button that shows or hides the password, the reason a password was refused under the field (which is cleared, unless the api could not be reached), and a line saying a forgotten owner password cannot be recovered. The language and theme switches are compact, with icon-only theme buttons. The design's stylesheet (`app/styles/redesign.css`) is added for the pages that move to it.
 
 ## 0.0.2 - 2026-11-18
 

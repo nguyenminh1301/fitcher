@@ -35,8 +35,8 @@ describe("owner sign-in page", () => {
     const onSignedIn = vi.fn();
     wrap(<OwnerSignIn owner={owner} onSignedIn={onSignedIn} />);
 
-    await userEvent.type(await screen.findByLabelText("Password"), "correct horse battery");
-    await userEvent.click(screen.getByRole("button", { name: "Sign in" }));
+    await userEvent.type(await screen.findByLabelText("Owner password"), "correct horse battery");
+    await userEvent.click(screen.getByRole("button", { name: "Unlock" }));
 
     expect(owner.signIn).toHaveBeenCalledWith("correct horse battery");
     expect(onSignedIn).toHaveBeenCalled();
@@ -47,11 +47,37 @@ describe("owner sign-in page", () => {
       const owner = fakeOwner({ password_set: true, signed_in: false, exposed: false }, vi.fn(async () => { throw new OwnerSignInError(reason); }));
       wrap(<OwnerSignIn owner={owner} onSignedIn={vi.fn()} />);
 
-      await userEvent.type(await screen.findByLabelText("Password"), "nope nope nope");
-      await userEvent.click(screen.getByRole("button", { name: "Sign in" }));
+      await userEvent.type(await screen.findByLabelText("Owner password"), "nope nope nope");
+      await userEvent.click(screen.getByRole("button", { name: "Unlock" }));
 
-      expect(await screen.findByText(text)).toBeTruthy();
+      expect(await screen.findByRole("alert")).toHaveProperty("textContent", text);
+      const field = screen.getByLabelText("Owner password") as HTMLInputElement;
+      expect(field.value).toBe("");
+      expect(field.getAttribute("aria-invalid")).toBe("true");
+      expect(field.getAttribute("aria-describedby")).toBe(screen.getByRole("alert").id);
     });
+
+  it("keeps the typed password when the api could not be reached", async () => {
+    const owner = fakeOwner({ password_set: true, signed_in: false, exposed: false }, vi.fn(async () => { throw new OwnerSignInError("unavailable"); }));
+    wrap(<OwnerSignIn owner={owner} onSignedIn={vi.fn()} />);
+
+    await userEvent.type(await screen.findByLabelText("Owner password"), "kept password");
+    await userEvent.click(screen.getByRole("button", { name: "Unlock" }));
+
+    expect((await screen.findByRole("alert")).textContent).toBe("Signing in did not work. Try again.");
+    expect((screen.getByLabelText("Owner password") as HTMLInputElement).value).toBe("kept password");
+  });
+
+  it("shows and hides the password, and says a forgotten password cannot be recovered", async () => {
+    wrap(<OwnerSignIn owner={fakeOwner({ password_set: true, signed_in: false, exposed: false })} onSignedIn={vi.fn()} />);
+    const field = (await screen.findByLabelText("Owner password")) as HTMLInputElement;
+    expect(field.type).toBe("password");
+
+    await userEvent.click(screen.getByRole("button", { name: "Show password" }));
+    expect(field.type).toBe("text");
+    expect(screen.getByRole("button", { name: "Hide password" }).getAttribute("aria-pressed")).toBe("true");
+    expect(screen.getByText(/no way to recover it/)).toBeTruthy();
+  });
 });
 
 describe("http owner client", () => {

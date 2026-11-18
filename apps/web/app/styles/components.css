@@ -20,6 +20,7 @@ button, input, textarea, select { font: inherit; color: inherit; }
 /* Icon (Lucide geometry) */
 .fc-icon { width: 16px; height: 16px; flex: none; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .fc-icon-lg { width: 20px; height: 20px; stroke-width: 1.75; }
+.fc-icon-xl { width: 24px; height: 24px; stroke-width: 1.75; }
 .fc-spin { animation: fc-spin 1s linear infinite; }
 @keyframes fc-spin { to { transform: rotate(360deg); } }
 

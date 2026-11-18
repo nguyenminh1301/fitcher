@@ -135,12 +135,17 @@ export function Tabs({ tabs, value, onChange, label }: { tabs: Tab[]; value: str
   );
 }
 
-/** A segmented control: one choice of a few, as radio buttons. */
-export function Segmented({ options, value, onChange, label, size }: { options: [string, ReactNode][]; value: string; onChange: (value: string) => void; label?: string; size?: "sm" }) {
+/**
+ * A segmented control: one choice of a few, as radio buttons. An option may carry a third entry, its accessible
+ * name, when its content is only an icon; ``iconOnly`` makes those buttons square.
+ */
+export function Segmented({ options, value, onChange, label, size, iconOnly }: {
+  options: [string, ReactNode, string?][]; value: string; onChange: (value: string) => void; label?: string; size?: "sm"; iconOnly?: boolean;
+}) {
   return (
-    <div className={cx("fc-seg", size === "sm" && "fc-seg-sm")} role="radiogroup" aria-label={label}>
-      {options.map(([key, content]) => (
-        <button key={key} type="button" role="radio" aria-checked={value === key} className="fc-seg-btn" onClick={() => onChange(key)}>
+    <div className={cx("fc-seg", size === "sm" && "fc-seg-sm", iconOnly && "fc-seg-icon")} role="radiogroup" aria-label={label}>
+      {options.map(([key, content, name]) => (
+        <button key={key} type="button" role="radio" aria-checked={value === key} aria-label={name} className="fc-seg-btn" onClick={() => onChange(key)}>
           {content}
         </button>
       ))}

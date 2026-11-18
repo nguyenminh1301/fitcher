@@ -2,14 +2,14 @@ import { cx } from "@/lib/cx";
 
 import { ICONS } from "./geometry";
 
-export type IconProps = { name: string; size?: "lg"; spin?: boolean; label?: string; className?: string };
+export type IconProps = { name: string; size?: "lg" | "xl"; spin?: boolean; label?: string; className?: string };
 
 /** A Lucide line icon from the design system; decorative unless it has a label. */
 export function Icon({ name, size, spin, label, className }: IconProps) {
   const parts = ICONS[name] ?? ICONS.circle;
   return (
     <svg
-      className={cx("fc-icon", size === "lg" && "fc-icon-lg", spin && "fc-spin", className)}
+      className={cx("fc-icon", size === "lg" && "fc-icon-lg", size === "xl" && "fc-icon-xl", spin && "fc-spin", className)}
       viewBox="0 0 24 24"
       aria-hidden={label ? undefined : true}
       role={label ? "img" : undefined}
