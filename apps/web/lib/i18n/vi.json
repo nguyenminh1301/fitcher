@@ -699,14 +699,13 @@
     "savedAndPrepared": "Đã lưu lựa chọn. Các bảng đã chọn đang được chuẩn bị."
   },
   "owner": {
-    "signInTitle": "Đăng nhập fitcher",
-    "signInHint": "Instance này được bảo vệ bằng mật khẩu chủ.",
-    "password": "Mật khẩu",
-    "signIn": "Đăng nhập",
+    "signInTitle": "Mở fitcher",
+    "signInHint": "Nhập mật khẩu chủ.",
+    "signIn": "Mở khoá",
     "signOut": "Đăng xuất",
     "signIn_wrong": "Mật khẩu không đúng.",
-    "signIn_throttled": "Nhập sai quá nhiều lần. Hãy đợi vài phút rồi thử lại.",
-    "signIn_unavailable": "Không đăng nhập được. Hãy thử lại.",
+    "signIn_throttled": "Nhập sai quá nhiều lần. Đợi vài phút rồi thử lại.",
+    "signIn_unavailable": "Không đăng nhập được. Thử lại.",
     "statusOn": "Instance này được bảo vệ bằng mật khẩu chủ: mọi trình duyệt phải đăng nhập.",
     "statusOff": "Chưa có mật khẩu chủ: instance này chỉ trả lời máy tính này, không cần đăng nhập.",
     "exposedNeedsPassword": "Instance này truy cập được từ máy khác. Hãy đặt mật khẩu chủ trên máy này trước khi người khác mở nó.",
@@ -725,7 +724,12 @@
     "removeTitle": "Gỡ mật khẩu chủ",
     "removeHint": "Nhập mật khẩu hiện tại ở trên để gỡ. Sau đó instance chỉ trả lời máy tính này, không cần đăng nhập.",
     "remove": "Gỡ mật khẩu",
-    "removed": "Đã gỡ mật khẩu chủ."
+    "removed": "Đã gỡ mật khẩu chủ.",
+    "ownerPassword": "Mật khẩu chủ",
+    "signingIn": "Đang mở khoá",
+    "showPassword": "Hiện mật khẩu",
+    "hidePassword": "Ẩn mật khẩu",
+    "forgotten": "Quên mật khẩu thì không mở được fitcher: app không có cách lấy lại."
   },
   "guide": {
     "title": "Cách lấy khoá OpenRouter",

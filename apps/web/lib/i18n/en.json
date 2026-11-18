@@ -699,10 +699,9 @@
     "savedAndPrepared": "Selection saved. The chosen tables are being prepared."
   },
   "owner": {
-    "signInTitle": "Sign in to fitcher",
-    "signInHint": "This instance is protected with an owner password.",
-    "password": "Password",
-    "signIn": "Sign in",
+    "signInTitle": "Open fitcher",
+    "signInHint": "Enter the owner password.",
+    "signIn": "Unlock",
     "signOut": "Sign out",
     "signIn_wrong": "The password is not right.",
     "signIn_throttled": "Too many wrong passwords. Wait a few minutes and try again.",
@@ -725,7 +724,12 @@
     "removeTitle": "Remove the owner password",
     "removeHint": "Enter the current password above to remove it. The instance then answers this computer only, without signing in.",
     "remove": "Remove password",
-    "removed": "The owner password is removed."
+    "removed": "The owner password is removed.",
+    "ownerPassword": "Owner password",
+    "signingIn": "Unlocking",
+    "showPassword": "Show password",
+    "hidePassword": "Hide password",
+    "forgotten": "If you forget the password you cannot open fitcher: the app has no way to recover it."
   },
   "guide": {
     "title": "How to get an OpenRouter key",
