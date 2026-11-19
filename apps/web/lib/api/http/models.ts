@@ -34,6 +34,8 @@ export function createHttpModels(fetcher: Fetcher = (...args) => fetch(...args))
     testProvider: (id, model) => json(fetcher, `${provider(id)}/test`, send("POST", model ? { model } : {})),
     tiers: () => json(fetcher, "/api/models/tiers"),
     setTier: (tier, change) => json(fetcher, `/api/models/tiers/${encodeURIComponent(tier)}`, send("PUT", change)),
+    catalog: (id) => json(fetcher, `/api/models/catalog?provider=${encodeURIComponent(id)}`),
+    setMode: (mode) => json(fetcher, "/api/models/mode", send("PUT", { mode })),
     setEmbedding: (change) => json(fetcher, "/api/models/embedding", send("PUT", change)),
     classifier: () => json(fetcher, "/api/screening/classifier"),
     setClassifier: (enabled) => json(fetcher, "/api/screening/classifier", send(enabled ? "POST" : "DELETE")),

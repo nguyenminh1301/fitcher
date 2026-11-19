@@ -6,7 +6,7 @@ import { ModelsSection } from "@/components/console/sections/ModelsSection";
 import { createMockApi, type MockApi } from "@/lib/api/mock";
 import type { ConsoleFile } from "@/lib/api/provisional";
 import { ChatProvider } from "@/lib/chat/ChatContext";
-import type { ClassifierStatus, ModelTiersView, ProviderView } from "@/lib/contracts";
+import type { CatalogEntry, ClassifierStatus, ModelTiersView, ProviderView } from "@/lib/contracts";
 import { I18nProvider } from "@/lib/i18n/react";
 import { ThemeProvider } from "@/lib/theme";
 
@@ -29,8 +29,21 @@ const TIERS: ModelTiersView = {
     { tier: "fast", provider_id: "openai", model: "gpt-5.4-mini", eval: { evaluated: false, passed: false, reason: "no eval report ran fast with openai/gpt-5.4-mini" } },
     { tier: "sql-gen", provider_id: "openai", model: "gpt-5.4", eval: { evaluated: true, passed: true, reason: "passed", report_id: "r1", report_ts: "2026-11-10T08:00:00Z" } },
   ],
+  mode: "manual",
   embedding: { backend: "local", provider_id: null, model: "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2", dimensions: 384, needs_reindex: false },
 };
+function entry(provider_id: string, id: string, change: Partial<CatalogEntry> = {}): CatalogEntry {
+  return { id, provider_id, kind: "chat", free: "none", input_price: 1.25, output_price: 10, context: 400000,
+           structured_output: true, benchmark: 50, median_latency_ms: null, ...change };
+}
+
+const CATALOG: CatalogEntry[] = [
+  entry("openai", "gpt-5.5", { benchmark: 70 }),
+  entry("openai", "gpt-5.4-mini", { benchmark: 40, input_price: 0.25, output_price: 2 }),
+  entry("openai", "text-embedding-3-large", { kind: "embedding" }),
+  entry("gemini", "gemini-flash-lite-latest", { free: "free_tier", benchmark: 35, median_latency_ms: 800, input_price: null, output_price: null }),
+  entry("gemini", "gemini-3.8-flash", { free: "free_tier", benchmark: 60, input_price: null, output_price: null }),
+];
 const CLASSIFIER: ClassifierStatus = { enabled: false, model_present: false, version: null };
 
 let api: MockApi;
@@ -60,6 +73,8 @@ beforeEach(() => {
     providerModels: vi.fn(async () => ({ provider_id: "openai", models: ["gpt-5.4", "gpt-5.5"] })),
     setTier: vi.fn(async (tier: string, change: { provider_id: string; model: string }) => ({ tier, ...change, eval: null })),
     setEmbedding: vi.fn(async () => TIERS.embedding),
+    setMode: vi.fn(async () => ({ ...TIERS, mode: "auto_free" })),
+    catalog: vi.fn(async (id: string) => ({ provider_id: id, models: CATALOG.filter((entry) => entry.provider_id === id) })),
     removeProvider: vi.fn(async () => undefined),
     setClassifier: vi.fn(async () => CLASSIFIER),
   });
@@ -92,16 +107,43 @@ describe("models", () => {
     await waitFor(() => expect(api.models.removeProvider).toHaveBeenCalledWith("openai"));
   });
 
-  it("shows each task's model with its evaluation, and saves a new model as soon as it is picked", async () => {
+  it("shows each task's chain with its evaluation and builds a new chain from a searchable, filtered picker", async () => {
     show();
-    const table = await screen.findByRole("table");
-    await waitFor(() => expect(within(table).getAllByRole("option", { name: "gpt-5.5" }).length).toBeGreaterThan(0));
+    const fast = await screen.findByRole("listitem", { name: "Quick" });
+    expect(within(fast).getByText("gpt-5.4-mini")).toBeTruthy();
+    expect(within(fast).getByText("Not evaluated")).toBeTruthy();
+    expect(screen.getByText("Passed the pack evaluation")).toBeTruthy();
 
-    expect(within(table).getByText("Not evaluated")).toBeTruthy();
-    expect(within(table).getByText("Passed the pack evaluation")).toBeTruthy();
-    await act(async () => fireEvent.change(within(table).getByRole("combobox", { name: "Model for fast" }), { target: { value: "gpt-5.5" } }));
+    const change = within(fast).getByRole("button", { name: "Change the models of Quick" });
+    await waitFor(() => expect((change as HTMLButtonElement).disabled).toBe(false));
+    fireEvent.click(change);
+    const dialog = await screen.findByRole("dialog", { name: "Models for Quick" });
+    const list = within(dialog).getByRole("list", { name: "Models of your providers" });
+    // Only chat models are listed, the small free one first and recommended.
+    expect(within(list).queryByText("text-embedding-3-large")).toBeNull();
+    expect(within(list).getAllByRole("listitem")[0].textContent).toContain("gemini-flash-lite-latest");
+    expect(within(within(list).getAllByRole("listitem")[0]).getByText("Recommended")).toBeTruthy();
 
-    await waitFor(() => expect(api.models.setTier).toHaveBeenCalledWith("fast", { provider_id: "openai", model: "gpt-5.5" }));
+    fireEvent.click(within(dialog).getByRole("button", { name: "Free" }));
+    expect(within(list).queryByText("gpt-5.5")).toBeNull();
+    fireEvent.click(within(dialog).getByRole("button", { name: "Free" }));
+    fireEvent.change(within(dialog).getByRole("textbox", { name: "Search models" }), { target: { value: "lite" } });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Add gemini-flash-lite-latest" }));
+    fireEvent.click(within(dialog).getByRole("button", { name: "Move gemini-flash-lite-latest up" }));
+    await act(async () => fireEvent.click(within(dialog).getByRole("button", { name: "Save order" })));
+
+    await waitFor(() => expect(api.models.setTier).toHaveBeenCalledWith("fast", { chain: [
+      { provider_id: "gemini", model: "gemini-flash-lite-latest" }, { provider_id: "openai", model: "gpt-5.4-mini" },
+    ] }));
+  });
+
+  it("switches how the models are chosen", async () => {
+    show();
+    const mode = await screen.findByRole("radiogroup", { name: "How the models are chosen" });
+
+    await act(async () => fireEvent.click(within(mode).getByRole("radio", { name: "Free models, automatic" })));
+
+    await waitFor(() => expect(api.models.setMode).toHaveBeenCalledWith("auto_free"));
   });
 
   it("asks to confirm the reindex before changing the embedding", async () => {
