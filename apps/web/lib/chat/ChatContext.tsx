@@ -16,6 +16,7 @@ import { langOf } from "@/lib/text";
 
 // A conversation's title is its first question cut to 80 characters (DECISIONS §15).
 const TITLE_LENGTH = 80;
+const FOLLOW_MS = 2000;
 
 export type AskOptions = { conversationId?: string; editOf?: number; retryOf?: number };
 
@@ -40,7 +41,8 @@ export type ChatState = {
   loadThread: (id: string) => Promise<ConversationThread | null>;
   /** Ask in a conversation (a new one without ``conversationId``); edit or retry replace that turn and the ones after it. */
   ask: (question: string, options?: AskOptions) => Promise<string>;
-  stop: () => void;
+  /** Stop the answer of a conversation, the one streaming here by default. */
+  stop: (conversationId?: string) => void;
   /** The pack (one per data source) a new conversation is answered from; null for the one used last. */
   chosenPack: string | null;
   choosePack: (name: string | null) => void;
@@ -110,14 +112,39 @@ export function ChatProvider({ api, navigate, activeId, sources = currentSources
     setThreads(threadsRef.current);
   }, []);
 
+  // A conversation the api is still answering, after this page was left and opened again, is read again until the
+  // answer is stored.
+  const followed = useRef(new Set<string>());
+  const follow = useCallback((id: string) => {
+    if (followed.current.has(id)) return;
+    followed.current.add(id);
+    const tick = async () => {
+      try {
+        const fresh = await api.conversations.get(id);
+        if (fresh && busyRef.current !== id) putThread(fresh);
+        if (fresh?.running) {
+          setTimeout(() => void tick(), FOLLOW_MS);
+          return;
+        }
+      } catch {
+        setTimeout(() => void tick(), FOLLOW_MS);
+        return;
+      }
+      followed.current.delete(id);
+      await refresh();
+    };
+    setTimeout(() => void tick(), FOLLOW_MS);
+  }, [api, putThread, refresh]);
+
   const loadThread = useCallback(
     async (id: string) => {
       if (threadsRef.current[id]) return threadsRef.current[id];
       const thread = await api.conversations.get(id);
       if (thread) putThread(thread);
+      if (thread?.running && busyRef.current !== id) follow(id);
       return thread;
     },
-    [api, putThread],
+    [api, putThread, follow],
   );
 
   const ask = useCallback(
@@ -202,7 +229,11 @@ export function ChatProvider({ api, navigate, activeId, sources = currentSources
     [api, loadThread, navigate, now, putThread, refresh, chosenPack, pack],
   );
 
-  const stop = useCallback(() => controller.current?.abort(), []);
+  const stop = useCallback((conversationId?: string) => {
+    const target = conversationId ?? busyRef.current;
+    if (target) void api.chat.stop(target).catch(() => undefined);
+    if (!conversationId || conversationId === busyRef.current) controller.current?.abort();
+  }, [api]);
 
   const switchIdentity = useCallback(
     async (userId: string) => {

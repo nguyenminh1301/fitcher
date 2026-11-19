@@ -95,6 +95,8 @@ export function createMockChat(
   const stepMs = options.stepMs ?? 280;
   return {
     suggestions: async () => (await load()).scenarios.suggestions,
+    // The sample chat streams in the page, so aborting the stream is the stop.
+    stop: async () => undefined,
     async *ask(request, signal) {
       const data = await load();
       const events = plan(matchScenario(request.question, data.scenarios.scenarios), request.question, await identity());
