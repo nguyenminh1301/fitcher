@@ -21,6 +21,13 @@ deliver them from elsewhere). The peer is the connection's address, or the
 connection's address on every request (``apps/web/peer-address.cjs``); the api
 listens on loopback or on the Compose network, so only the web server reaches it.
 
+A reverse proxy or tunnel on this computer connects to the published port like a local browser does, and a
+stock nginx ``proxy_pass`` even rewrites ``Host`` to the loopback address it forwards to, so the internet it
+relays would pass for this computer. The same hook therefore writes ``X-Fitcher-Proxy``: the signs that a proxy
+relayed the request (forwarding headers, ``Connection: close``, HTTP/1.0). A request carrying any of them whose
+browser host is a loopback name is refused; a proxy must send the public name, which ``FITCHER_ALLOWED_HOSTS``
+lists and which needs the owner password.
+
 A listed ``FITCHER_ALLOWED_HOSTS`` name makes the instance reachable by others,
 which ``/me`` reports as ``exposed`` so the interface can warn.
 
@@ -47,6 +54,7 @@ from app.state.db import shared_state
 LOOPBACK = frozenset({"localhost", "127.0.0.1", "::1"})
 SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
 PEER_HEADER = "x-fitcher-peer"
+PROXY_HEADER = "x-fitcher-proxy"
 ROUTE_TABLE = Path("/proc/net/route")
 
 
@@ -129,14 +137,19 @@ def https_forwarded(headers: Mapping[str, str]) -> bool:
     return bool(allowed_hosts()) and headers.get("x-forwarded-proto", "").strip().lower() == "https"
 
 
-def refusal(method: str, host: str, forwarded: str | None, origin: str | None, peer: str | None = None) -> str | None:
-    """Why a request is refused, or None when it is accepted."""
+def refusal(method: str, host: str, forwarded: str | None, origin: str | None, peer: str | None = None,
+            proxy: str | None = None) -> str | None:
+    """Why a request is refused, or None when it is accepted; ``proxy`` lists the signs of a relaying proxy."""
     accepted = LOOPBACK | allowed_hosts() | internal_hosts()
     browser_host = forwarded if forwarded is not None else host
     for value in (host, browser_host):
         if not value or hostname(value) not in accepted:
             return (f"the host {value!r} is not allowed; reach the instance through localhost or list the name "
                     "in FITCHER_ALLOWED_HOSTS")
+    if (proxy or "").strip() and hostname(browser_host) in LOOPBACK:
+        return (f"the request names {browser_host!r} but came through a reverse proxy ({proxy.strip()}), so it is not "
+                "this computer; make the proxy send the public host name (nginx: proxy_set_header Host $host), "
+                "list it in FITCHER_ALLOWED_HOSTS and set an owner password")
     claimed = next((value for value in (browser_host, host) if hostname(value) in LOOPBACK), None)
     if claimed is not None and not local_peer(peer):
         return (f"the request names {claimed!r} but comes from {peer!r}, which is not this computer; "
@@ -196,7 +209,8 @@ class HostOriginGuard:
         client = scope.get("client")
         peer = headers.get(PEER_HEADER, client[0] if client else None)
         forwarded = headers.get("x-forwarded-host")
-        reason = refusal(scope["method"], headers.get("host", ""), forwarded, headers.get("origin"), peer)
+        reason = refusal(scope["method"], headers.get("host", ""), forwarded, headers.get("origin"), peer,
+                         headers.get(PROXY_HEADER))
         refused = (403, reason) if reason is not None else owner_refusal(
             scope["method"], scope["path"], forwarded if forwarded is not None else headers.get("host", ""), headers.get("cookie"))
         if refused is None:
