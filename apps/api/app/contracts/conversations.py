@@ -41,6 +41,8 @@ class ConversationTurn(ContractModel):
 class ConversationThread(ContractModel):
     conversation: Conversation
     turns: list[ConversationTurn]
+    # Whether a question of the conversation is still being answered, by a stream the client may have left.
+    running: bool = False
 
 
 class ConversationPatch(ContractModel):

@@ -16,6 +16,7 @@ import pytest
 from app.agent.state import RunCancelled
 from app.api import ask as ask_api, runtime
 from app.api.agent import GraphRun, QueryIds
+from app.api.live_runs import LiveRuns
 from app.api.ask import AnswerEvents, event_stream
 from app.api.rate_limit import RateLimiter
 from app.contracts.events import AskEvent
@@ -278,7 +279,58 @@ def test_a_slow_node_sends_heartbeat_comments():
     assert kinds(parse("".join(chunks))) == ["done"]
 
 
-def test_a_client_disconnect_stops_the_run_and_kills_its_query():
+class Answers:
+    def __init__(self):
+        self.stored = threading.Event()
+
+    def question(self):
+        pass
+
+    def answer(self, state, events):
+        self.stored.set()
+
+
+def test_a_conversation_keeps_answering_after_its_page_is_left_and_stores_the_answer():
+    run = ScriptedRun(nodes=("execute", "check"), state={"result": object()}, pause=0.1)
+    live, answers = LiveRuns(), Answers()
+
+    async def first_event_then_leave():
+        stream = event_stream(run, QUESTION, AnswerEvents("reader"), record=answers, live=(live, "owner", "c1"))
+        first = await anext(stream)
+        await stream.aclose()
+        return first
+
+    asyncio.run(first_event_then_leave())
+
+    assert live.running("owner", "c1") and not live.running("someone-else", "c1")
+    assert answers.stored.wait(3) and not run.cancelled.is_set()
+    deadline = time.monotonic() + 2
+    while live.running("owner", "c1") and time.monotonic() < deadline:
+        time.sleep(0.01)
+    assert not live.running("owner", "c1")
+
+
+def test_a_stop_request_stops_the_run_of_a_conversation_and_kills_its_query():
+    run = ScriptedRun(nodes=("execute", "check", "shape_result"), state={"result": object()}, pause=0.2)
+    live = LiveRuns()
+
+    async def start_then_stop():
+        stream = event_stream(run, QUESTION, AnswerEvents("reader"), live=(live, "owner", "c1"))
+        await anext(stream)
+        assert not live.stop("someone-else", "c1")
+        assert live.stop("owner", "c1")
+        await stream.aclose()
+
+    asyncio.run(start_then_stop())
+
+    assert run.cancelled.wait(2)
+    deadline = time.monotonic() + 2
+    while run.stopped_by is None and time.monotonic() < deadline:
+        time.sleep(0.01)
+    assert isinstance(run.stopped_by, RunCancelled)
+
+
+def test_a_client_disconnect_stops_a_run_no_conversation_can_find_again():
     run = ScriptedRun(nodes=("execute", "check", "shape_result"), state={"result": object()}, pause=0.2)
 
     async def first_event_then_disconnect():
