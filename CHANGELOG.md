@@ -9,6 +9,7 @@
 
 ### Fixed
 
+- A tab separated CSV file loads; ClickHouse refused it before, so the load failed after the columns were confirmed.
 - Before building a pack, the setup says how many analysis tables the pack gets and that some join related tables, instead of a count that did not match the tables chosen.
 - Runs where fitcher asked a question back, or that were blocked or stopped, show "Asked back", "Blocked" or "Stopped" on the Runs and Overview pages instead of an untranslated key, and the Runs filter offers them.
 - Run evaluation on a pack without evaluation questions, such as one built from a source, says so on the page; before, the run was accepted and failed in the background with only a log line.

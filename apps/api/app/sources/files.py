@@ -399,6 +399,14 @@ class FileService:
             self._client.raw_insert(loading, insert_block=block, fmt="CSV", settings=settings)
             return
         delimiter, _ = _read_csv_head(path)
+        if delimiter == "\t":
+            # ClickHouse refuses a tab as the CSV delimiter, so the rows are rewritten with commas as they stream.
+            with path.open(encoding="utf-8-sig", newline="") as text:
+                reader = csv.reader(text, delimiter="\t")
+                header = next(reader, [])
+                self._client.raw_insert(loading, insert_block=_csv_chunks(header, reader), fmt="CSV",
+                                        settings={"input_format_csv_skip_first_lines": 1})
+            return
         settings = {"input_format_csv_skip_first_lines": 1, "format_csv_delimiter": delimiter,
                     "input_format_csv_use_best_effort_in_schema_inference": 1}
         with path.open("rb") as handle:
