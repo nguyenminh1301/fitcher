@@ -27,6 +27,7 @@
 ### Fixed
 
 - The Sources page reads a pack that is being built again every few seconds, so a finished or failed build shows without reloading the page, and a failed build shows its reason. Before, "Getting ready…" kept spinning after the build had failed.
+- Building a pack with a Gemini embedding no longer fails with HTTP 400: embeddings go in batches of at most 100 texts, the most Gemini accepts. A provider's per-minute embedding limit is waited out for the delay it gives, and a limit that does not reset soon fails the build with a message that says to choose the local embedding model.
 - The image serves the web app's static files (`apps/web/public`), so the browser tab icon and the provider logos load instead of returning 404.
 - A Vietnamese question now gets its clarifying question, summary and refusals in Vietnamese even when the model reports the question as English; Vietnamese letters in the question decide the reply language first.
 - Models measured on this application to misread questions (Groq's `qwen/qwen3.8-27b`, which asked again for the measure and the period of a clear question) go after every other model of an automatic chain, whatever their published benchmark says.

@@ -225,6 +225,38 @@ def test_an_embedding_provider_error_raises_embedding_error(screened):
     assert "10.0.0.5" not in str(raised.value)
 
 
+def gemini_rate_limit(delay: str) -> litellm.RateLimitError:
+    body = '{"error": {"code": 429, "details": [{"retryDelay": "%s"}]}}' % delay
+    return litellm.RateLimitError(f"geminiException - {body}", "gemini", "gemini-embedding-001")
+
+
+def test_embeddings_go_in_batches_of_at_most_100_texts(screened):
+    sdk = FakeSdk(embedding_reply([[1.0]] * 100), embedding_reply([[1.0]] * 50))
+
+    GatewayEmbeddings(Routes(), dimensions=1, embedding=sdk).embed(["text"] * 150)
+
+    assert [len(call["input"]) for call in sdk.calls] == [100, 50]
+
+
+def test_a_per_minute_embedding_limit_is_waited_out_for_the_delay_the_provider_gives(screened):
+    sdk = FakeSdk(gemini_rate_limit("47s"), embedding_reply([[0.5]]))
+    waited = []
+
+    vectors = GatewayEmbeddings(Routes(), dimensions=1, embedding=sdk, sleep=waited.append).embed(["a"])
+
+    assert vectors == [[0.5]]
+    assert waited == [48.0]
+
+
+def test_an_embedding_limit_that_does_not_reset_soon_says_to_choose_the_local_model(screened):
+    sdk = FakeSdk(gemini_rate_limit("3600s"))
+    waited = []
+
+    with pytest.raises(EmbeddingError, match="choose the local embedding model"):
+        GatewayEmbeddings(Routes(), dimensions=1, embedding=sdk, sleep=waited.append).embed(["a"])
+    assert waited == []
+
+
 # Screening at the gateway (DECISIONS §9): closes code paths that forgot to screen.
 
 
