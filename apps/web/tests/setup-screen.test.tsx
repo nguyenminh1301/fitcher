@@ -180,6 +180,22 @@ describe("setup models step", () => {
     });
   });
 
+  it("offers Z.ai as a model service with its fixed endpoint and key page", async () => {
+    const models = fakeModels();
+    wrap(<SetupScreen sources={noSources} setup={fakeSetup(MODELS_PENDING)} models={models} {...exits()} />);
+
+    await userEvent.click(await screen.findByRole("button", { name: "More providers" }));
+    await userEvent.click(within(screen.getByRole("group", { name: "Model services" })).getByRole("radio", { name: /Z\.ai/ }));
+
+    expect(screen.queryByLabelText("Address")).toBeNull();
+    expect(screen.getByRole("link", { name: /Get a key from Z\.ai/ }).getAttribute("href")).toBe("https://z.ai/manage-apikey/apikey-list");
+    await userEvent.type(screen.getByLabelText("API key"), "zai-test-1234");
+    await userEvent.click(screen.getByRole("button", { name: "Check the key" }));
+    expect(models.addProvider).toHaveBeenCalledWith({
+      kind: "openai_compatible", name: "Z.ai", api_key: "zai-test-1234", base_url: "https://api.z.ai/api/paas/v4",
+    });
+  });
+
   it("shows OpenRouter's free-model note, then maps every tier to the chosen free model and checks it", async () => {
     const OPENROUTER: ProviderView = {
       id: "openai-compatible", name: "OpenRouter", kind: "openai_compatible", base_url: "https://openrouter.ai/api/v1",

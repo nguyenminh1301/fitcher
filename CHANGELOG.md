@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Added
+
+- Z.ai is offered among the model services when adding a provider, with its OpenAI-compatible endpoint and a link to its key page.
+
 ### Changed
 
 - The owner menu names the Security page "Security" ("Bảo mật" in Vietnamese) instead of "Security and owner password".
