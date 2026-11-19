@@ -434,7 +434,8 @@
     "modelTitle": "The model did not answer",
     "modelText": "The model provider did not answer this time. It may be limiting requests, which free models do, or be out of reach. Try again in a moment, or choose another model on the Models page.",
     "providerMessage": "Provider message",
-    "chooseSource": "Data source of a new conversation"
+    "chooseSource": "Data source of a new conversation",
+    "chooseSourceOf": "Source: {name}. Choose another"
   },
   "setup": {
     "failed": "The setup could not be saved. Try again.",
@@ -638,7 +639,10 @@
     "buildOf": "Build the pack of {name}",
     "savedAndPrepared": "Selection saved. The chosen tables are being prepared.",
     "tested_one": "Connected. {count} table found.",
-    "tablesOf_one": "{selected} of {count} table"
+    "tablesOf_one": "{selected} of {count} table",
+    "datasetCount": "{count} datasets",
+    "manage": "Manage sources",
+    "answerFrom": "Answer from"
   },
   "owner": {
     "signInTitle": "Open fitcher",
@@ -1101,7 +1105,9 @@
     "steps": "Steps",
     "summary": "Summary",
     "pack": "Pack",
-    "trace": "Trace id"
+    "trace": "Trace id",
+    "source": "Source",
+    "allSources": "All sources"
   },
   "costsPage": {
     "totals": "Totals",

@@ -201,8 +201,8 @@ export function SourcesSection() {
   };
   const build = (source: SourceView) => navigate(`/console/sources/${encodeURIComponent(source.id)}/pack`);
   // A new conversation answered from this source's pack.
-  const askFrom = (source: SourceView) => {
-    choosePack(source.pack?.name ?? source.id);
+  const askFrom = async (source: SourceView) => {
+    await choosePack(source.pack?.name ?? source.id);
     window.location.assign("/");
   };
   const drifted = (data ?? []).filter((source) => drifts[source.id]?.pack && drifts[source.id].changes.length);
@@ -289,7 +289,7 @@ export function SourcesSection() {
                         ) : <span className="fc-muted">{t("sources.never")}</span>}
                       </td>
                       <td data-label={t("sourcesPage.answersHead")}>
-                        <Answers source={source} onBuild={() => build(source)} onAsk={() => askFrom(source)} />
+                        <Answers source={source} onBuild={() => build(source)} onAsk={() => void askFrom(source)} />
                       </td>
                       <td className="row-actions">
                         {status === "running" ? (

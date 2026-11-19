@@ -66,19 +66,31 @@ describe("console layout", () => {
     renderConsole("rev", "documents");
 
     await waitFor(() => expect(links()).toEqual([
-      "Shop", "Overview", "Sources", "Datasets", "Documents", "Review", "Feedback", "Evaluation", "Runs", "Costs", "Query log", "Models", "Security", "Chat",
+      "Overview", "Sources", "Datasets", "Documents", "Review", "Feedback", "Evaluation", "Runs", "Costs", "Query log", "Models", "Security", "Chat",
     ]));
     for (const group of ["Data", "Quality", "Activity", "Settings"]) expect(within(nav()).getByText(group)).toBeTruthy();
     expect(within(nav()).getByRole("link", { name: "Documents" }).getAttribute("aria-current")).toBe("page");
     expect(screen.getByText("section page")).toBeTruthy();
   });
 
-  it("names the active pack at the top, and opening it shows the datasets", async () => {
-    const { navigate } = renderConsole("rev", "overview");
-    const packLink = await within(nav()).findByRole("link", { name: /Shop/ });
+  it("names the current source at the top, and its menu chooses another one for every page", async () => {
+    const api = createMockApi();
+    Object.assign(api.sources, { list: vi.fn(async () => [
+      { id: "shop", kind: "postgres", pack: { name: "shop", status: "ready", datasets: 2, error: null } },
+      { id: "crm", kind: "file", pack: { name: "crm", status: "ready", datasets: 1, error: null } },
+    ]) });
+    const choose = vi.spyOn(api.auth, "choosePack").mockResolvedValue({ name: "crm", display_name: "Crm", roles: ["analyst"] });
+    const { navigate } = renderConsole("rev", "overview", api);
 
-    fireEvent.click(packLink);
-    expect(navigate).toHaveBeenCalledWith("/console/datasets");
+    fireEvent.click(await within(nav()).findByRole("button", { name: "Source: shop. Choose another" }));
+    const menu = await screen.findByRole("menu");
+    await act(async () => fireEvent.click(within(menu).getByRole("menuitem", { name: /crm/ })));
+    expect(choose).toHaveBeenCalledWith("crm");
+    expect(await within(nav()).findByRole("button", { name: "Source: crm. Choose another" })).toBeTruthy();
+
+    fireEvent.click(within(nav()).getByRole("button", { name: "Source: crm. Choose another" }));
+    fireEvent.click(within(await screen.findByRole("menu")).getByRole("menuitem", { name: "Manage sources" }));
+    expect(navigate).toHaveBeenCalledWith("/console/sources");
   });
 
   it("opens the navigation as a drawer and closes it after a page is picked", async () => {

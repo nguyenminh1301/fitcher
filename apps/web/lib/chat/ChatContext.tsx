@@ -43,7 +43,8 @@ export type ChatState = {
   stop: () => void;
   /** The pack (one per data source) a new conversation is answered from; null for the one used last. */
   chosenPack: string | null;
-  choosePack: (name: string | null) => void;
+  /** Choose the source a new conversation starts on; it resolves once the api made its pack the current one. */
+  choosePack: (name: string | null) => Promise<void>;
 };
 
 const ChatContext = createContext<ChatState | null>(null);
@@ -66,10 +67,12 @@ export function ChatProvider({ api, navigate, activeId, sources = currentSources
   const [chosenPack, setChosenPack] = useState<string | null>(null);
   // Read after the first render: the server has no browser storage.
   useEffect(() => setChosenPack(readChosenPack()), []);
-  const choosePack = useCallback((name: string | null) => {
+  // Choosing a source makes its pack the current one on the api too, so the console and a new chat agree on it.
+  const choosePack = useCallback(async (name: string | null) => {
     keepChosenPack(name);
     setChosenPack(name);
-  }, []);
+    if (name) await api.auth.choosePack(name).then(setPack).catch(() => undefined);
+  }, [api]);
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [groups, setGroups] = useState<ConversationGroup[]>([]);
   const [loaded, setLoaded] = useState(false);

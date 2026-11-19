@@ -492,3 +492,10 @@ a.stat:hover { background: var(--bgColor-muted); }
 .fc-composer-pick { position: relative; cursor: pointer; }
 .fc-composer-pick select { appearance: none; background: transparent; border: 0; color: inherit; font: inherit; padding: 0 2px; cursor: pointer; }
 .fc-composer-pick select:focus-visible { outline: 2px solid var(--focus-outlineColor, currentColor); outline-offset: 2px; }
+/* The source switcher: a chip in the composer and the console sidebar's first row. */
+.src-switch { cursor: pointer; max-width: 100%; }
+.src-switch > .fc-icon:last-child { margin-left: auto; color: var(--fgColor-muted); }
+.src-switch-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+button.fc-composer-pack.src-switch:hover { background: var(--control-transparent-bgColor-hover); }
+.cs-navtop > .src-switch { flex: 1; min-width: 0; }
+.fc-menu-hint { margin-left: auto; padding-left: 8px; font-size: 12px; color: var(--fgColor-muted); white-space: nowrap; }

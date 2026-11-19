@@ -63,6 +63,11 @@ export function createMockApi(options: { latencyMs?: number; identity?: () => Pr
         const { console } = await load();
         return { ...console.pack, roles: console.pack_roles };
       },
+      // The sample data has one pack, so choosing a source keeps it.
+      choosePack: async () => {
+        const { console } = await load();
+        return { ...console.pack, roles: console.pack_roles };
+      },
     },
     chat: createMockChat(load, identity),
     conversations: createMockConversations(load, identity),

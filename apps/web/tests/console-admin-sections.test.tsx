@@ -160,6 +160,22 @@ describe("runs and trace", () => {
     expect(navigate).toHaveBeenCalledWith("/console/runs/t2");
   });
 
+  it("lists every source's runs together, with a Source column and filter", async () => {
+    const list = vi.fn(async () => [
+      { trace_id: "t1", pack: "shop", ts: "2026-11-02T08:15:00Z", user_id: "ana", role: "analyst", question: "Totals by month", intent: "data_query", status: "succeeded", latency_ms: 10, cost_usd: 0 },
+      { trace_id: "t3", pack: "crm", ts: "2026-11-02T10:15:00Z", user_id: "ana", role: "analyst", question: "Leads per country", intent: "data_query", status: "succeeded", latency_ms: 10, cost_usd: 0 },
+    ]);
+    Object.assign(api.runs, { list });
+    show("runs", <RunsSection />);
+    await screen.findByText("Leads per country");
+
+    expect(list).toHaveBeenCalledWith({ all: true });
+    expect(screen.getByRole("columnheader", { name: "Source" })).toBeTruthy();
+    fireEvent.change(screen.getByRole("combobox", { name: "Source" }), { target: { value: "crm" } });
+    expect(screen.queryByText("Totals by month")).toBeNull();
+    expect(screen.getByText("Leads per country")).toBeTruthy();
+  });
+
   it("lists the trace's steps with durations, LLM calls by alias, SQL errors and the access decision", async () => {
     show("runs", <RunDetail traceId="t1" />);
     const timeline = await screen.findByRole("list", { name: "Trace" });

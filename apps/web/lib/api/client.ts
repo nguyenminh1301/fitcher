@@ -68,6 +68,8 @@ export interface FitcherApi {
     switchTo(userId: string): Promise<Identity>;
     /** The active pack, or null while no pack is active (a new instance before its first pack is built). */
     pack(): Promise<{ name: string; display_name: string; roles: string[] } | null>;
+    /** Make a ready source's pack the current one: the console reads it and a new conversation starts on it. */
+    choosePack(name: string): Promise<{ name: string; display_name: string; roles: string[] }>;
   };
   chat: {
     /** Stream an answer; ``onConversation`` learns the id the api gave a conversation the request started. */
@@ -122,8 +124,8 @@ export interface FitcherApi {
     start(): Promise<EvalRunStarted>;
   };
   runs: {
-    /** Runs newest first, 50 a page; ``from`` and ``to`` are ISO days and ``to`` is exclusive. */
-    list(query?: { from?: string; to?: string; page?: number }): Promise<RunRow[]>;
+    /** Runs newest first, 50 a page; ``from`` and ``to`` are ISO days and ``to`` is exclusive; ``all`` reads every source's. */
+    list(query?: { from?: string; to?: string; page?: number; all?: boolean }): Promise<RunRow[]>;
     trace(traceId: string): Promise<{ run: RunRow; items: TraceItem[] } | null>;
   };
   audit: { list(): Promise<AuditRow[]> };

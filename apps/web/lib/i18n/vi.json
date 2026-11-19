@@ -434,7 +434,8 @@
     "modelTitle": "Model không phản hồi",
     "modelText": "Nhà cung cấp model không trả lời lần này. Có thể họ đang giới hạn số yêu cầu (model miễn phí hay bị vậy) hoặc không kết nối được. Thử lại sau ít phút, hoặc chọn model khác ở trang Model.",
     "providerMessage": "Thông báo của nhà cung cấp",
-    "chooseSource": "Nguồn dữ liệu của hội thoại mới"
+    "chooseSource": "Nguồn dữ liệu của hội thoại mới",
+    "chooseSourceOf": "Nguồn: {name}. Chọn nguồn khác"
   },
   "setup": {
     "failed": "Không lưu được thiết lập. Hãy thử lại.",
@@ -638,7 +639,10 @@
     "buildOf": "Tạo gói của {name}",
     "savedAndPrepared": "Đã lưu lựa chọn. Các bảng đã chọn đang được chuẩn bị.",
     "tested_one": "Đã kết nối. Tìm thấy {count} bảng.",
-    "tablesOf_one": "{selected} trên {count} bảng"
+    "tablesOf_one": "{selected} trên {count} bảng",
+    "datasetCount": "{count} dataset",
+    "manage": "Quản lý nguồn dữ liệu",
+    "answerFrom": "Trả lời từ"
   },
   "owner": {
     "signInTitle": "Mở fitcher",
@@ -1101,7 +1105,9 @@
     "steps": "Các bước",
     "summary": "Tóm tắt",
     "pack": "Gói",
-    "trace": "Mã lượt chạy"
+    "trace": "Mã lượt chạy",
+    "source": "Nguồn",
+    "allSources": "Tất cả nguồn"
   },
   "costsPage": {
     "totals": "Tổng",

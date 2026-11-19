@@ -137,7 +137,7 @@ describe("Sources page", () => {
 
     fireEvent.click(within(await row("ready_shop")).getByRole("button", { name: "Ask about ready_shop" }));
     expect(window.sessionStorage.getItem("fitcher.chosenPack")).toBe("ready_shop");
-    expect(assign).toHaveBeenCalledWith("/");
+    await waitFor(() => expect(assign).toHaveBeenCalledWith("/"));
   });
 
   it("reads a building pack again until it ends, and shows why it failed", async () => {

@@ -32,6 +32,9 @@ export function createHttpAuth(fetcher: typeof fetch = (...args) => fetch(...arg
       const response = await fetcher("/api/pack", { cache: "no-store" });
       return response.status === 503 || response.status === 401 ? null : json(response);
     },
+    choosePack: async (name) => json(await fetcher("/api/pack", {
+      method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ name }),
+    })),
   };
 }
 
