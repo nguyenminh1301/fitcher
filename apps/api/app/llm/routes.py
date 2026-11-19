@@ -249,14 +249,16 @@ class TierMapping:
 
 
 def fill_defaults(mapping: TierMapping, provider: Provider, installed: list[str] | None = None) -> None:
-    """Map every unmapped chat tier, and an embedding nobody chose, to the provider's proposed models.
+    """Map every unmapped chat tier to the provider's proposed models, and an embedding nobody chose to an Ollama one.
 
     ``installed`` is what an Ollama server listed: its models are proposed only from those, because a model
-    the server does not have fails every question.
+    the server does not have fails every question. A hosted provider's embedding model is never proposed: the
+    local model indexes a pack without a quota, while a free key's limit (Gemini embeds 100 texts a minute) cannot
+    index a pack with thousands of column values; an admin can still choose a provider's model.
     """
     current = mapping.tiers()
     proposed = defaults.chat_models(provider.kind)
-    embedding_model = defaults.embedding_model(provider.kind)
+    embedding_model = defaults.embedding_model(provider.kind) if provider.kind == "ollama" else None
     if provider.kind == "ollama" and installed is not None:
         chat = defaults.installed_chat_model(installed)
         proposed = dict.fromkeys(proposed, chat) if chat else {}

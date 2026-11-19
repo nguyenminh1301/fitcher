@@ -16,6 +16,7 @@
 
 ### Changed
 
+- The local multilingual model is the default embedding: adding OpenAI or Gemini no longer moves the embedding to the provider's model, because a free key's embedding limit cannot index a pack with many values. An Ollama server still proposes its embedding model, and a provider's model can be chosen on the Models page.
 - The owner menu opens as wide as the sidebar it is opened from instead of a fixed 288 pixels that overhung the sidebar.
 
 - Each data source keeps its own pack and each conversation is answered from the pack it was started on: a question names the pack of a new conversation (the pack used last by default), building a pack no longer changes the pack of other conversations, and a conversation started before this change keeps the pack the instance used then. Console endpoints read the pack named by `?pack=` (the pack used last by default), Costs can be limited to one pack, and `GET /api/sources` reports each source's pack as ready with its dataset count, building, failed with its reason, or none. App-state change 0012 records the earlier conversations' pack; ClickHouse change 0009 adds `pack` to `conversations`.

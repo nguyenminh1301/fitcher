@@ -99,9 +99,10 @@ def test_adding_the_first_provider_shows_only_the_key_ending_and_fills_the_tiers
     tiers = client.get("/models/tiers", headers=ADMIN).json()
     fast = tiers["tiers"][0]
     assert (fast["tier"], fast["provider_id"], fast["model"], fast["eval"]["evaluated"]) == ("fast", "openai", "gpt-5.4-mini", False)
-    # The pack was indexed locally, so the provider's embedding model now needs a recompile.
-    assert tiers["embedding"] == {"backend": "provider", "provider_id": "openai", "model": "text-embedding-3-large",
-                                  "dimensions": 1024, "needs_reindex": True}
+    # The embedding stays on the local model the pack was indexed with, so nothing needs a recompile.
+    assert tiers["embedding"] == {"backend": "local", "provider_id": None,
+                                  "model": "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",
+                                  "dimensions": 384, "needs_reindex": False}
     [action] = actions.records
     assert (action.action, action.target) == ("provider_add", "openai")
     assert KEY not in action.new_value and "7777" in action.new_value
@@ -290,16 +291,18 @@ def test_a_key_the_instance_key_cannot_read_asks_for_the_key_again(client, fakes
 
 def test_changing_the_embedding_needs_a_confirmed_reindex(client):
     add_openai(client)
-    change = {"backend": "local", "model": "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"}
+    change = {"backend": "provider", "provider_id": "openai", "model": "text-embedding-3-large", "dimensions": 1024}
 
     refused = client.put("/models/embedding", headers=ADMIN, json=change)
 
     assert refused.status_code == 409 and "full reindex" in refused.json()["detail"]
-    assert client.get("/models/tiers", headers=ADMIN).json()["embedding"]["backend"] == "provider"
+    assert client.get("/models/tiers", headers=ADMIN).json()["embedding"]["backend"] == "local"
 
 
 def test_a_confirmed_embedding_change_marks_the_pack_as_needing_a_recompile(client, actions, fakes):
     add_openai(client)
+    client.put("/models/embedding", headers=ADMIN, json={"backend": "provider", "provider_id": "openai",
+               "model": "text-embedding-3-large", "dimensions": 1024, "confirm_reindex": True})
     fakes.compiled = ("openai/text-embedding-3-large", 1024)
     change = {"backend": "provider", "provider_id": "openai", "model": "text-embedding-3-small", "dimensions": 1536,
               "confirm_reindex": True}
