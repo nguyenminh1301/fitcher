@@ -18,6 +18,12 @@ class RunRow(ContractModel):
     latency_ms: int
     cost_usd: float
     error: str = ""
+    # Tokens sent to and written by every model call of the run, from its ``llm_calls`` rows.
+    input_tokens: int = 0
+    output_tokens: int = 0
+    # The models whose calls answered, in the order they first answered, without the
+    # gateway's SDK prefix; a failed or blocked call is not listed.
+    models: list[str] = []
 
 
 class TraceItem(ContractModel):
@@ -69,6 +75,9 @@ class CostRow(ContractModel):
     provider: str
     calls: int
     cost_usd: float
+    # Tokens sent to (prompt) and written by (completion) the calls, as the provider reported them.
+    input_tokens: int = 0
+    output_tokens: int = 0
 
 
 class AdminConversation(ContractModel):

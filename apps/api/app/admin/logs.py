@@ -3,7 +3,8 @@
 ``AdminLogs`` runs parameterized SELECTs as ``agent_logs_trace_reader``, the
 read-only user whose profile caps execution time and result rows. Runs and
 audit rows are those of the active pack; conversations include the ones their
-owner deleted, which only an admin may read. Costs are LiteLLM's estimates.
+owner deleted, which only an admin may read. Costs are LiteLLM's estimates; token counts
+are what the providers reported.
 """
 
 from collections.abc import Mapping, Sequence
@@ -45,16 +46,31 @@ def _aware(value: datetime) -> datetime:
     return value if value.tzinfo else value.replace(tzinfo=UTC)
 
 
+# The LiteLLM prefixes the gateway puts before a model when it logs a call (``app/llm/providers.py``).
+SDK_PREFIXES = frozenset({"openai", "anthropic", "gemini", "ollama", "ollama_chat"})
+
+
+def model_name(logged: str) -> str:
+    """The provider's own model name of a logged call: ``openai/nvidia/model:free`` becomes ``nvidia/model:free``."""
+    prefix, _, rest = logged.partition("/")
+    return rest if rest and prefix in SDK_PREFIXES else logged
+
+
 def _short(value: object) -> str:
     return " ".join(str(value or "").split())[:TEXT_LIMIT]
 
 
 RUN_SELECT = """
-SELECT r.trace_id, r.ts, r.user_id, a.role, r.question, r.intent, r.status, r.latency_ms, c.cost, r.error
+SELECT r.trace_id, r.ts, r.user_id, a.role, r.question, r.intent, r.status, r.latency_ms, c.cost, r.error,
+    c.input_tokens, c.output_tokens, c.models
 FROM agent_logs.runs AS r FINAL
 LEFT JOIN (SELECT trace_id, any(role) AS role FROM agent_logs.audit GROUP BY trace_id) AS a ON a.trace_id = r.trace_id
-LEFT JOIN (SELECT trace_id, sum(cost_usd) AS cost FROM agent_logs.llm_calls GROUP BY trace_id) AS c
-    ON c.trace_id = r.trace_id
+LEFT JOIN (
+    SELECT trace_id, sum(cost_usd) AS cost, sum(prompt_tokens) AS input_tokens, sum(completion_tokens) AS output_tokens,
+        -- The answering models in the order they first answered.
+        arrayDistinct(arrayMap(call -> call.2, arraySort(groupArrayIf((ts, model), status IN ('success', 'ok'))))) AS models
+    FROM agent_logs.llm_calls GROUP BY trace_id
+) AS c ON c.trace_id = r.trace_id
 WHERE r.pack = {pack:String}"""
 
 
@@ -69,10 +85,12 @@ class AdminLogs:
 
     @staticmethod
     def _run(row: Sequence) -> RunRow:
-        trace_id, ts, user_id, role, question, intent, status, latency_ms, cost, error = row
+        trace_id, ts, user_id, role, question, intent, status, latency_ms, cost, error, input_tokens, output_tokens, models = row
         return RunRow(
             trace_id=trace_id, ts=_aware(ts), user_id=user_id, role=role or "", question=question, intent=intent,
             status=status, latency_ms=int(latency_ms or 0), cost_usd=round(float(cost or 0.0), 6), error=error or "",
+            input_tokens=int(input_tokens or 0), output_tokens=int(output_tokens or 0),
+            models=list(dict.fromkeys(model_name(model) for model in (models or []) if model)),
         )
 
     def runs(
@@ -176,7 +194,8 @@ class AdminLogs:
 
     def costs(self, *, start: date, end: date) -> list[CostRow]:
         rows = self.query(
-            "SELECT toString(toDate(ts)) AS day, alias, provider, model, tier, count() AS calls, sum(cost_usd) AS cost "
+            "SELECT toString(toDate(ts)) AS day, alias, provider, model, tier, count() AS calls, sum(cost_usd) AS cost, "
+            "sum(prompt_tokens) AS input_tokens, sum(completion_tokens) AS output_tokens "
             "FROM agent_logs.llm_calls WHERE ts >= {start:Date} AND ts < {end:Date} "
             "GROUP BY day, alias, provider, model, tier ORDER BY day, alias, provider, model, tier",
             {"start": start, "end": end},
@@ -184,8 +203,9 @@ class AdminLogs:
         return [
             # Rows written through the LiteLLM Proxy have no provider column value; their alias names it.
             CostRow(day=day, alias=alias, model=model, tier=tier, provider=provider or provider_of(alias), calls=int(calls),
-                    cost_usd=round(float(cost or 0.0), 6))
-            for day, alias, provider, model, tier, calls, cost in rows
+                    cost_usd=round(float(cost or 0.0), 6), input_tokens=int(input_tokens or 0),
+                    output_tokens=int(output_tokens or 0))
+            for day, alias, provider, model, tier, calls, cost, input_tokens, output_tokens in rows
         ]
 
     @staticmethod

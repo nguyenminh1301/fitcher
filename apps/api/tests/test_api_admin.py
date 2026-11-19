@@ -16,7 +16,8 @@ from app.main import app
 TS = datetime(2026, 11, 5, 9, 0, tzinfo=UTC)
 ADMIN = SessionHeaders(['admin'])
 REVIEWER = SessionHeaders(['pack_reviewer'])
-RUN = ("t1", TS, "dev.analyst", "reader", "Revenue by widget", "data_query", "succeeded", 1200, 0.0042, "")
+RUN = ("t1", TS, "dev.analyst", "reader", "Revenue by widget", "data_query", "succeeded", 1200, 0.0042, "", 1500, 220,
+       ["openai/nvidia/model:free", "gpt-x", ""])
 
 
 class Script:
@@ -63,9 +64,10 @@ def test_runs_are_filtered_paged_and_scoped_to_the_pack(client):
     assert response.json()[0] == {
         "trace_id": "t1", "ts": "2026-11-05T09:00:00Z", "user_id": "dev.analyst", "role": "reader",
         "question": "Revenue by widget", "intent": "data_query", "status": "succeeded", "latency_ms": 1200,
-        "cost_usd": 0.0042, "error": "",
+        "cost_usd": 0.0042, "error": "", "input_tokens": 1500, "output_tokens": 220, "models": ["nvidia/model:free", "gpt-x"],
     }
     sql, parameters = script.calls[0]
+    assert "sum(prompt_tokens)" in sql and "status IN ('success', 'ok')" in sql
     assert "r.pack = {pack:String}" in sql and "r.user_id = {user:String}" in sql and "r.status = {status:String}" in sql
     assert parameters == {"pack": "minimal", "user": "dev.analyst", "status": "succeeded", "start": date(2026, 11, 1),
                           "end": date(2026, 11, 6), "limit": PAGE_SIZE, "offset": PAGE_SIZE}
@@ -121,8 +123,8 @@ def test_audit_denials_and_screening_verdicts(client):
 
 def test_costs_are_grouped_with_their_provider(client):
     reader, script = logs([(r"FROM agent_logs\.llm_calls", [
-        ("2026-11-05", "openai-small", "", "gpt-x", "fast", 12, 0.0123),
-        ("2026-11-06", "", "lab", "openai/house-model", "sql-gen", 3, None),
+        ("2026-11-05", "openai-small", "", "gpt-x", "fast", 12, 0.0123, 4800, 610),
+        ("2026-11-06", "", "lab", "openai/house-model", "sql-gen", 3, None, None, None),
     ])])
     use(reader)
 
@@ -131,9 +133,9 @@ def test_costs_are_grouped_with_their_provider(client):
     # Rows of the proxy era take their provider from the alias; gateway rows store it.
     assert rows == [
         {"day": "2026-11-05", "alias": "openai-small", "model": "gpt-x", "tier": "fast", "provider": "openai", "calls": 12,
-         "cost_usd": 0.0123},
+         "cost_usd": 0.0123, "input_tokens": 4800, "output_tokens": 610},
         {"day": "2026-11-06", "alias": "", "model": "openai/house-model", "tier": "sql-gen", "provider": "lab", "calls": 3,
-         "cost_usd": 0.0},
+         "cost_usd": 0.0, "input_tokens": 0, "output_tokens": 0},
     ]
     assert script.calls[0][1] == {"start": date(2026, 11, 1), "end": date(2026, 11, 6)}
 
