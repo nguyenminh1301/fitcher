@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Changed
+
+- The Node dependency audit no longer accepts GHSA-fc5q-39xc-vjpf for picomatch: npm stopped reporting it for the locked versions, so the exception list is empty.
+
 ## 0.0.3 - 2026-11-18
 
 ### Changed

@@ -1,8 +1,1 @@
-[
-  {
-    "id": "GHSA-fc5q-39xc-vjpf",
-    "package": "picomatch",
-    "reason": "ReDoS in picomatch <= 4.0.7 with no patched release yet. It is reached only through development tooling (vite, vitest, tinyglobby, fdir, json-schema-to-typescript) that matches the repository's own file patterns, never user input, and it is not in the release image. Remove this exception and update the lock file once a patched picomatch is published.",
-    "expires": "2026-12-31"
-  }
-]
+[]
