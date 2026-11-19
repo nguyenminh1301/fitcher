@@ -214,7 +214,8 @@ class Drafter:
             if current is not None and current.get("status") == "approved":
                 continue
             item = model.model_dump(exclude_none=True)
-            evidence = [e for e in item.pop("evidence") if (e["kind"], e["ref"]) in refs] or [fallback]
+            evidence = [e for e in item.pop("evidence") if (e["kind"], e["ref"]) in refs] or self._own_evidence(
+                file, item, current, profile) or [fallback]
             item["confidence"] = round(min(max(float(item["confidence"]), 0.0), 1.0), 3)
             if current is not None:
                 item = self._fill(file, _plain(current), item)
@@ -227,6 +228,18 @@ class Drafter:
         return drafted
 
     @staticmethod
+    def _own_evidence(file: str, item: dict, current: dict | None, profile: dict | None) -> list[dict]:
+        """Evidence for an item whose reply cited nothing known: what the item already cites, else its own table."""
+        if current is not None:
+            kept = [e for e in _plain(current).get("evidence") or [] if e.get("kind") in ("profile", "doc")]
+            if kept:
+                return kept
+        table = item.get("id") if file == "datasets.yaml" else item.get("dataset")
+        if profile and table in profile["tables"]:
+            return [{"kind": "profile", "ref": table}]
+        return []
+
+    @staticmethod
     def _fill(file: str, current: dict, drafted: dict) -> dict:
         filled = {key: value for key, value in current.items() if key not in ("status", "evidence")}
         for key in FILL_FIELDS[file]:
@@ -234,6 +247,11 @@ class Drafter:
                 filled[key] = drafted[key]
         filled["confidence"] = drafted["confidence"]
         if file == "datasets.yaml":
+            # The profile picks the first date column; the model may name a better one among the time columns
+            # (a hire date rather than a birth date), and anything else keeps the profile's choice.
+            times = [column["name"] for column in current.get("columns") or [] if column.get("role") == "time"]
+            if drafted.get("time_column") in times:
+                filled["time_column"] = drafted["time_column"]
             descriptions = {column["name"]: column["description"] for column in drafted.get("columns", [])}
             filled["columns"] = [
                 {**column, "description": descriptions.get(column["name"], column["description"])}
