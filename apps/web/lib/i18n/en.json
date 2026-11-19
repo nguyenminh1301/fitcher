@@ -422,7 +422,12 @@
     "documentsOffText": "{n} documents stay stored but are no longer searched.",
     "documentsOffButton": "Turn documents off",
     "nav_overview": "Overview",
-    "loadFailedText": "Try again later."
+    "loadFailedText": "Try again later.",
+    "stepsCount_one": "{n} step",
+    "rowsN_one": "{n} row",
+    "testOk_one": "Test run returned {n} row",
+    "files_one": "{n} file",
+    "documentsOffText_one": "{n} document stays stored but is no longer searched."
   },
   "setup": {
     "failed": "The setup could not be saved. Try again.",
@@ -625,7 +630,9 @@
     "savedAndPreparing": "Selection saved. Preparing the tables…",
     "build": "Build the pack",
     "buildOf": "Build the pack of {name}",
-    "savedAndPrepared": "Selection saved. The chosen tables are being prepared."
+    "savedAndPrepared": "Selection saved. The chosen tables are being prepared.",
+    "tested_one": "Connected. {count} table found.",
+    "tablesOf_one": "{selected} of {count} table"
   },
   "owner": {
     "signInTitle": "Open fitcher",
@@ -874,7 +881,12 @@
     "back": "Back",
     "keepPassword": "Leave empty to keep the stored password.",
     "keepCa": "Leave empty to keep the stored certificate.",
-    "nameFixed": "A source name cannot change once saved."
+    "nameFixed": "A source name cannot change once saved.",
+    "dbFound_one": "Connected. {count} table found.",
+    "useTables_one": "Use {count} table",
+    "startTitle_one": "Build the pack from {count} table",
+    "leftTitle_one": "{n} thing left before you can ask",
+    "startText_one": "{count} table becomes an analysis table. fitcher sends the table structure, 3 sample rows and the most common values of each column to the model, which writes descriptions, metrics and example questions. This is one call of about {tokens} tokens. The provider bills it unless the model is free or runs on this computer."
   },
   "instant": {
     "title": "Build the pack",
@@ -944,7 +956,10 @@
     "nothing": "Nothing needs a look.",
     "manage": "Manage",
     "tables": "{n} tables",
-    "noSources": "No source yet."
+    "noSources": "No source yet.",
+    "sourceCount_one": "{n} source",
+    "drafts_one": "{n} item to review",
+    "tables_one": "{n} table"
   },
   "console": {
     "waiting": "new",
@@ -1082,7 +1097,8 @@
     "byDayLabel": "Estimated cost by day, {n} days",
     "byTask": "By task",
     "byModel": "By model",
-    "calls": "Calls"
+    "calls": "Calls",
+    "byDayLabel_one": "Estimated cost by day, {n} day"
   },
   "auditPage": {
     "dataset": "Dataset",

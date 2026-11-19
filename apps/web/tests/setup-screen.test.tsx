@@ -343,7 +343,7 @@ describe("setup data and start steps", () => {
     wrap(<SetupScreen sources={sources} models={fakeModels()} setup={fakeSetup(DATA_PENDING)} {...exits()} />);
 
     await connectDatabase();
-    expect(await screen.findByText("Connected. 1 tables found.")).toBeTruthy();
+    expect(await screen.findByText("Connected. 1 table found.")).toBeTruthy();
     expect(sources.create).not.toHaveBeenCalled();
     await userEvent.click(screen.getByRole("button", { name: "Choose tables" }));
     expect(sources.create).toHaveBeenCalledWith(expect.objectContaining({ name: "erp", host: "db", database: "erp", user: "reader" }));
@@ -376,7 +376,7 @@ describe("setup data and start steps", () => {
       tables: [{ name: "orders", selected: true, mode: "copy", interval_seconds: 86_400, cursor_column: null }],
     });
     expect(sources.sync).toHaveBeenCalledWith("erp");
-    expect(await screen.findByRole("heading", { name: "Build the pack from 1 tables" })).toBeTruthy();
+    expect(await screen.findByRole("heading", { name: "Build the pack from 1 table" })).toBeTruthy();
     expect(await screen.findByText(/one call of about 12,000 tokens/)).toBeTruthy();
     expect(screen.getByText("Copied · 1,200 rows")).toBeTruthy();
     await userEvent.click(screen.getByRole("button", { name: "Build the pack" }));

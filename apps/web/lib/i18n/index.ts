@@ -29,14 +29,21 @@ function lookup(dictionary: Dictionary, key: string): string | undefined {
   return typeof node === "string" ? node : undefined;
 }
 
-/** The ``key`` in ``primary``, else in ``fallback``, else the key itself; ``{name}`` slots are filled from ``vars``. */
+/**
+ * The ``key`` in ``primary``, else in ``fallback``, else the key itself; ``{name}`` slots are filled from ``vars``.
+ * When ``vars.count`` (or ``vars.n``) is 1, a dictionary's ``<key>_one`` text is used if it has one, for languages
+ * whose nouns change in the singular.
+ */
 export function translate(
   fallback: Dictionary,
   primary: Dictionary,
   key: string,
   vars: Record<string, string | number> = {},
 ): string {
-  const text = lookup(primary, key) ?? lookup(fallback, key) ?? key;
+  // A count may arrive already formatted ("1", "1,000"), so only the plain one counts as singular.
+  const single = String(vars.count ?? vars.n) === "1";
+  const pick = (dictionary: Dictionary) => (single ? lookup(dictionary, `${key}_one`) : undefined) ?? lookup(dictionary, key);
+  const text = pick(primary) ?? pick(fallback) ?? key;
   return text.replace(/\{(\w+)\}/g, (slot, name: string) => (name in vars ? String(vars[name]) : slot));
 }
 
