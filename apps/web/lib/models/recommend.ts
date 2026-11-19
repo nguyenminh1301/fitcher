@@ -1,13 +1,12 @@
 // Which models suit each chat task, from the providers' catalogs (DECISIONS §2). The ranking mirrors the api's
-// automatic choice (app/llm/auto.py): the quick tasks (`fast`, `sql-small`) want small, fast models that answer in
-// seconds and leave out models that reason, see or write code first; the SQL tasks want the best benchmark. The
+// automatic choice (app/llm/auto.py): free models first, then the best benchmark, then the measured speed. The
+// quick tasks (`fast`, `sql-small`) run on every question, so models that reason, see or write code before answering
+// go last there; the smallest models stay behind more capable ones because they miss what a question says. The
 // Models page uses it to mark recommended models and to sort the picker; it never limits the choice.
 
 import type { CatalogEntry } from "@/lib/contracts";
 
 export const QUICK_TIERS = new Set(["fast", "sql-small"]);
-/** Size words of small, fast chat models, smallest first (the api's `defaults.SMALL_WORDS`). */
-export const SMALL_WORDS = ["flash-lite", "lite", "nano", "mini", "instant", "flash", "small", "air", "haiku", "turbo", "20b", "8b", "7b"];
 const SLOW = /reason|thinking|omni|(^|[-/])vl($|[-:])|code/;
 
 export type ModelFilter = {
@@ -19,17 +18,6 @@ export type ModelFilter = {
 };
 
 export const NO_FILTER: ModelFilter = { search: "", providerId: "", freeOnly: false, structuredOnly: false };
-
-function escape(word: string): string {
-  return word.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
-
-/** The place of the model's size word among SMALL_WORDS, or null without one. */
-export function smallRank(name: string): number | null {
-  const lowered = name.toLowerCase();
-  const index = SMALL_WORDS.findIndex((word) => new RegExp(`(^|[-/_.:])${escape(word)}($|[-:_.])`).test(lowered));
-  return index === -1 ? null : index;
-}
 
 export function slowModel(name: string): boolean {
   return SLOW.test(name.toLowerCase());
@@ -61,11 +49,8 @@ function compare(a: (number | boolean)[], b: (number | boolean)[]): number {
 /** The sort key of a model for the task: lower comes first. */
 function rankKey(tier: string, model: CatalogEntry): (number | boolean)[] {
   const paid = model.free === "none";
-  if (QUICK_TIERS.has(tier)) {
-    const size = smallRank(model.id);
-    return [slowModel(model.id), paid, size ?? SMALL_WORDS.length, latencyKey(model), benchmarkKey(model)];
-  }
-  return [paid, benchmarkKey(model), latencyKey(model)];
+  const slow = QUICK_TIERS.has(tier) && slowModel(model.id);
+  return [slow, paid, benchmarkKey(model), latencyKey(model)];
 }
 
 /** The task's usable models, best first. */

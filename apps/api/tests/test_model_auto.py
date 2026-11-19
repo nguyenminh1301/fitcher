@@ -51,7 +51,7 @@ def test_auto_best_takes_any_chat_model_and_the_cheaper_one_on_a_tie():
     assert chain(chosen["sql-gen"])[:2] == [("router", "router-cheap"), ("groq", "groq-a")]
 
 
-def test_the_quick_tiers_put_small_fast_models_first_and_leave_out_reasoning_models():
+def test_the_quick_tiers_leave_out_reasoning_models_and_keep_capable_ones_first():
     catalog = [
         model("gemini", "gemini-3.8-flash", free="free_tier", benchmark=60, latency=9000),
         model("gemini", "gemini-flash-lite-latest", free="free_tier", benchmark=40, latency=800),
@@ -62,9 +62,10 @@ def test_the_quick_tiers_put_small_fast_models_first_and_leave_out_reasoning_mod
 
     chosen = auto.choose(catalog, "auto_free")
 
-    assert chain(chosen["fast"]) == [("gemini", "gemini-flash-lite-latest"), ("zai", "glm-4.5-flash"),
-                                     ("groq", "openai/gpt-oss-20b"), ("gemini", "gemini-3.8-flash")]
-    assert chain(chosen["sql-gen"])[0] == ("gemini", "gemini-3.8-flash")
+    # The smallest models miss what a question says, such as its period, so they come after more capable ones.
+    assert chain(chosen["fast"]) == [("gemini", "gemini-3.8-flash"), ("groq", "openai/gpt-oss-20b"), ("zai", "glm-4.5-flash"),
+                                     ("gemini", "gemini-flash-lite-latest")]
+    assert ("router", "nemotron-nano-reasoning:free") in chain(chosen["sql-gen"])
 
 
 def test_a_model_known_not_to_follow_a_schema_serves_no_tier():

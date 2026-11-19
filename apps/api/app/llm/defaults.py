@@ -102,17 +102,12 @@ _NOT_CHAT = re.compile(
 _SLOW = re.compile(r"reason|thinking|omni|(^|[-/])vl($|[-:])|code")
 # Size words of small, fast chat models, smallest first; a check sends one request to the first match, so a
 # check neither spends a large model's quota nor waits for it.
-SMALL_WORDS = _SMALL = ("flash-lite", "lite", "nano", "mini", "instant", "flash", "small", "air", "haiku", "turbo", "20b", "8b", "7b")
+_SMALL = ("flash-lite", "lite", "nano", "mini", "instant", "flash", "small", "air", "haiku", "turbo", "20b", "8b", "7b")
 
 
 def slow_model(name: str) -> bool:
     """Whether the model reasons, sees or writes code before it answers, which makes a quick reply slow."""
     return bool(_SLOW.search(name.lower()))
-
-
-def small_rank(name: str) -> int | None:
-    """The place of the model's size word among ``SMALL_WORDS`` (smallest first), or None without one."""
-    return _small_rank(name)
 
 
 def _small_rank(name: str) -> int | None:

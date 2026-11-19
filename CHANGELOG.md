@@ -22,6 +22,7 @@
 
 ### Fixed
 
+- The quick tasks no longer put the smallest models first: a lite model on the question-reading task missed the period a question named, so "How many orders in 2025?" and the choice of a period both came back as the same "Which period should I use?" question. The quick tasks keep the most capable models that answer without reasoning first.
 - An automatic chain tries six models instead of four, so a task still has models of the same provider (such as another Gemini model with its own quota, or Groq's larger model) after the best one of each provider failed; building a pack used to fail once four models had used their quota or returned JSON that did not match.
 - A request one model rejects (HTTP 400 or 422, such as Groq's "Failed to generate JSON") is asked of the chain's next model instead of stopping the whole chain; building a pack used to fail on the first model that could not write the draft's JSON.
 - A run's page and the runs list read a running run again every two seconds and count its duration up, so a run that finished or failed shows its outcome without reloading; it used to stay "Running" with a duration of 0 ms after its model had already failed.

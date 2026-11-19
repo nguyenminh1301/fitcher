@@ -4,10 +4,11 @@
 benchmark first and then the fastest measured latency. ``auto_best`` uses any
 chat model, best benchmark first and the cheaper one on a tie. A model without
 a benchmark comes after every model with one. The quick tiers (``fast`` and
-``sql-small``) put small, fast models first instead (flash-lite, mini, nano,
-flash, a 20B model…; ``defaults.probe_model``'s size words) and leave out
-models that reason, see or write code before answering: they route a question
-or write simple SQL and must answer in seconds.
+``sql-small``) leave out models that reason, see or write code before
+answering, because they run on every question and must answer in seconds; they
+keep the benchmark order, because the smallest models (lite, nano, 7B) miss
+what the question says, such as its period, and send the user back a
+clarification instead of an answer.
 
 Every chain starts with the best model and then takes the best model of each
 other provider, so one provider's outage or daily limit leaves an answer; it
@@ -39,14 +40,6 @@ AUTO_MODES = frozenset({"auto_free", "auto_best"})
 _log = logging.getLogger(__name__)
 
 
-def _quick_rank(mode: str):
-    def key(model: CatalogModel):
-        size = defaults.small_rank(model.id)
-        latency = model.median_latency_ms if model.median_latency_ms is not None else float("inf")
-        return (size if size is not None else len(defaults.SMALL_WORDS), latency, _rank(mode)(model))
-    return key
-
-
 def _rank(mode: str):
     def key(model: CatalogModel):
         benchmark = -(model.benchmark if model.benchmark is not None else -1.0)
@@ -66,7 +59,7 @@ def eligible(models: Iterable[CatalogModel], mode: str, tier: str) -> list[Catal
         and (model.structured_output is True if tier in STRUCTURED_TIERS else model.structured_output is not False)
         and not (tier in QUICK_TIERS and defaults.slow_model(model.id))
     ]
-    return sorted(chosen, key=_quick_rank(mode) if tier in QUICK_TIERS else _rank(mode))
+    return sorted(chosen, key=_rank(mode))
 
 
 def chain_of(ranked: list[CatalogModel]) -> list[TierModel]:
