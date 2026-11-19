@@ -364,6 +364,28 @@ def test_a_successful_call_writes_its_row_with_the_run_tier_provider_tokens_and_
     assert row.latency_ms >= 0 and row.ts.tzinfo is not None
 
 
+@pytest.mark.parametrize("route", [
+    Route(provider="gemini", model="gemini/gemini-3.1-flash-lite-preview", api_key="test-key"),
+    Route(provider="groq", model="openai/openai/gpt-oss-120b", api_key="gsk-test", api_base="https://api.groq.com/openai/v1"),
+    Route(provider="router", model="openai/meta/llama-4:free", api_key="sk-or-test", api_base="https://openrouter.ai/api/v1"),
+])
+def test_a_call_on_a_free_model_or_tier_costs_nothing_whatever_the_list_price(screened, route):
+    rows = Rows()
+
+    Gateway(Routes({"fast": route}), completion=FakeSdk(chat_reply("ok", 1000, 500)), call_log=rows).text("fast", PROMPT)
+
+    assert rows.records[0].cost_usd == 0.0
+
+
+def test_a_paid_gemini_model_keeps_its_list_price(screened):
+    rows = Rows()
+    route = Route(provider="gemini", model="gemini/gemini-2.5-pro", api_key="test-key")
+
+    Gateway(Routes({"fast": route}), completion=FakeSdk(chat_reply("ok", 1000, 500)), call_log=rows).text("fast", PROMPT)
+
+    assert rows.records[0].cost_usd > 0
+
+
 def test_a_model_without_a_known_price_logs_a_null_cost(screened):
     rows = Rows()
     routes = Routes({"fast": Route(provider="lab", model="openai/house-model-without-price", api_base="http://lab:8000/v1")})

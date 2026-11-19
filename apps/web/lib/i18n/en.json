@@ -225,7 +225,7 @@
     "role": "Role",
     "tables": "Tables",
     "blockedTables": "Blocked tables",
-    "costsNote": "Estimated from token counts and list prices. The provider's invoice is the exact amount.",
+    "costsNote": "Estimated from token counts and list prices. Calls to free models and to a provider's free tier (such as Gemini's Flash models or Groq) count as $0, which is what a key without billing pays. The provider's invoice is the exact amount.",
     "costByDay": "Estimated cost by day",
     "costByAlias": "Estimated cost by model alias",
     "costByModel": "Estimated cost by model",

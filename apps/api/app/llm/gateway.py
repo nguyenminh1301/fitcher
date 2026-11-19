@@ -293,7 +293,7 @@ class _Sender:
             kind = error_type(error)
             call_id = log("failure", kind)
             raise _ProviderFailure(kind, _retry_after(error), call_id) from None
-        call_id = log("success", response=response, cost=calls.estimate_cost(response, route.model, self.call_type))
+        call_id = log("success", response=response, cost=calls.estimate_cost(response, route.model, self.call_type, route.api_base))
         return response, call_id
 
 
@@ -331,7 +331,7 @@ def classifier_reply(route: Route, text: str, *, call_log: CallLog | None = None
         kind = error_type(error)
         log("failure", kind)
         raise LLMError(f"classifier model {route.model} failed: {failure_text(kind)}") from None
-    log("success", response=response, cost=calls.estimate_cost(response, route.model, "completion"))
+    log("success", response=response, cost=calls.estimate_cost(response, route.model, "completion", route.api_base))
     choices = calls.field(response, "choices")
     message = calls.field(choices[0], "message") if isinstance(choices, list) and choices else None
     content = calls.field(message, "content")

@@ -156,6 +156,20 @@ def _free_tier(service: str, model: str, kind: Kind) -> bool:
     return False
 
 
+def free_call(model: str, api_base: str | None, call_type: str) -> bool:
+    """Whether a call to the route's ``model`` (LiteLLM's ``prefix/name``) at ``api_base`` is on a free model or tier.
+
+    A free tier (Gemini's flash and Gemma models, Groq) charges nothing on an account without billing, which is
+    how a free key is used; with billing on, the provider's invoice is the exact amount.
+    """
+    host = urlsplit(api_base or "").hostname or ""
+    service = next((name for suffix, name in SERVICES.items() if host == suffix or host.endswith("." + suffix)), None)
+    prefix, _, name = model.partition("/")
+    if service is None:
+        service = "ollama" if prefix in ("ollama", "ollama_chat") else "custom" if api_base else prefix
+    return _free(service, name or model, "embedding" if call_type == "embedding" else "chat", None, None) != "none"
+
+
 def _free(service: str, model: str, kind: Kind, input_price: float | None, output_price: float | None) -> Free:
     if service == "ollama" or (service == "openrouter" and model.endswith(":free")):
         return "free"

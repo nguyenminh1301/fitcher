@@ -225,7 +225,7 @@
     "role": "Vai trò",
     "tables": "Bảng",
     "blockedTables": "Bảng bị chặn",
-    "costsNote": "Ước tính từ số token và giá niêm yết. Hoá đơn của nhà cung cấp mới là số chính xác.",
+    "costsNote": "Ước tính từ số token và giá niêm yết. Lần gọi model miễn phí hoặc gói miễn phí của provider (như các model Flash của Gemini hay Groq) được tính $0, đúng với key chưa bật thanh toán. Hoá đơn của nhà cung cấp mới là số chính xác.",
     "costByDay": "Chi phí ước tính theo ngày",
     "costByAlias": "Chi phí ước tính theo bí danh mô hình",
     "costByModel": "Chi phí ước tính theo mô hình",
