@@ -837,7 +837,7 @@
     "useTables": "Dùng {count} bảng",
     "useTable": "Dùng 1 bảng",
     "startTitle": "Dựng gói từ {count} bảng",
-    "startText": "{count} bảng thành bảng phân tích. fitcher gửi cấu trúc bảng, 3 dòng mẫu và các giá trị hay gặp của mỗi cột tới model để viết mô tả, chỉ số và câu hỏi mẫu. Đây là một lần gọi khoảng {tokens} token. Nhà cung cấp tính phí lần gọi này, trừ khi model miễn phí hoặc chạy trên máy này.",
+    "startText": "Gói có {count} bảng phân tích: mỗi bảng một, cộng thêm vài bảng nối các bảng liên quan. fitcher gửi cấu trúc bảng, 3 dòng mẫu và các giá trị hay gặp của mỗi cột tới model để viết mô tả, chỉ số và câu hỏi mẫu. Đây là một lần gọi khoảng {tokens} token. Nhà cung cấp tính phí lần gọi này, trừ khi model miễn phí hoặc chạy trên máy này.",
     "chosenTables": "Bảng đã chọn",
     "copied": "Đã chép · {rows} dòng",
     "copying": "Đang chép",
@@ -889,7 +889,7 @@
     "useTables_one": "Dùng {count} bảng",
     "startTitle_one": "Dựng gói từ {count} bảng",
     "leftTitle_one": "Còn {n} việc trước khi hỏi được",
-    "startText_one": "{count} bảng thành bảng phân tích. fitcher gửi cấu trúc bảng, 3 dòng mẫu và các giá trị hay gặp của mỗi cột tới model để viết mô tả, chỉ số và câu hỏi mẫu. Đây là một lần gọi khoảng {tokens} token. Nhà cung cấp tính phí lần gọi này, trừ khi model miễn phí hoặc chạy trên máy này."
+    "startText_one": "Gói có 1 bảng phân tích. fitcher gửi cấu trúc bảng, 3 dòng mẫu và các giá trị hay gặp của mỗi cột tới model để viết mô tả, chỉ số và câu hỏi mẫu. Đây là một lần gọi khoảng {tokens} token. Nhà cung cấp tính phí lần gọi này, trừ khi model miễn phí hoặc chạy trên máy này."
   },
   "instant": {
     "title": "Dựng gói dữ liệu",

@@ -837,7 +837,7 @@
     "useTables": "Use {count} tables",
     "useTable": "Use 1 table",
     "startTitle": "Build the pack from {count} tables",
-    "startText": "{count} tables become analysis tables. fitcher sends the table structure, 3 sample rows and the most common values of each column to the model, which writes descriptions, metrics and example questions. This is one call of about {tokens} tokens. The provider bills it unless the model is free or runs on this computer.",
+    "startText": "The pack gets {count} analysis tables: one per table, plus some that join related tables. fitcher sends the table structure, 3 sample rows and the most common values of each column to the model, which writes descriptions, metrics and example questions. This is one call of about {tokens} tokens. The provider bills it unless the model is free or runs on this computer.",
     "chosenTables": "Chosen tables",
     "copied": "Copied · {rows} rows",
     "copying": "Copying",
@@ -889,7 +889,7 @@
     "useTables_one": "Use {count} table",
     "startTitle_one": "Build the pack from {count} table",
     "leftTitle_one": "{n} thing left before you can ask",
-    "startText_one": "{count} table becomes an analysis table. fitcher sends the table structure, 3 sample rows and the most common values of each column to the model, which writes descriptions, metrics and example questions. This is one call of about {tokens} tokens. The provider bills it unless the model is free or runs on this computer."
+    "startText_one": "The pack gets 1 analysis table. fitcher sends the table structure, 3 sample rows and the most common values of each column to the model, which writes descriptions, metrics and example questions. This is one call of about {tokens} tokens. The provider bills it unless the model is free or runs on this computer."
   },
   "instant": {
     "title": "Build the pack",
