@@ -10,6 +10,9 @@ export type Status = string;
 export type LatencyMs = number;
 export type CostUsd = number;
 export type Error = string;
+export type InputTokens = number;
+export type OutputTokens = number;
+export type Models = string[];
 
 export interface RunRow {
   trace_id: TraceId;
@@ -22,4 +25,7 @@ export interface RunRow {
   latency_ms: LatencyMs;
   cost_usd: CostUsd;
   error?: Error;
+  input_tokens?: InputTokens;
+  output_tokens?: OutputTokens;
+  models?: Models;
 }

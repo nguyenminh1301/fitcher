@@ -7,6 +7,8 @@ export type Tier = string;
 export type Provider = string;
 export type Calls = number;
 export type CostUsd = number;
+export type InputTokens = number;
+export type OutputTokens = number;
 
 /**
  * Estimated LLM cost of one day, provider, model and tier, from the LiteLLM SDK's price table.
@@ -19,4 +21,6 @@ export interface CostRow {
   provider: Provider;
   calls: Calls;
   cost_usd: CostUsd;
+  input_tokens?: InputTokens;
+  output_tokens?: OutputTokens;
 }

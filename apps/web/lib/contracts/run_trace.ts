@@ -10,6 +10,9 @@ export type Status = string;
 export type LatencyMs = number;
 export type CostUsd = number;
 export type Error = string;
+export type InputTokens = number;
+export type OutputTokens = number;
+export type Models = string[];
 export type Name = string;
 export type Kind = "node" | "llm" | "sql" | "access";
 export type Status1 = "ok" | "err" | "deny";
@@ -34,6 +37,9 @@ export interface RunRow {
   latency_ms: LatencyMs;
   cost_usd: CostUsd;
   error?: Error;
+  input_tokens?: InputTokens;
+  output_tokens?: OutputTokens;
+  models?: Models;
 }
 /**
  * One step of a run, in time order: a graph node, an LLM call, a SQL attempt or an access decision.

@@ -29,6 +29,16 @@
     "cost_usd": {
       "title": "Cost Usd",
       "type": "number"
+    },
+    "input_tokens": {
+      "default": 0,
+      "title": "Input Tokens",
+      "type": "integer"
+    },
+    "output_tokens": {
+      "default": 0,
+      "title": "Output Tokens",
+      "type": "integer"
     }
   },
   "required": [

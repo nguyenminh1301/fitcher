@@ -4,6 +4,7 @@
 
 ### Added
 
+- The admin Costs rows report the input and output tokens of their calls, and each run reports its input and output tokens and the models that answered it, summed from the logged model calls.
 - Z.ai is offered among the model services when adding a provider, with its OpenAI-compatible endpoint and a link to its key page.
 
 ### Changed
