@@ -22,6 +22,7 @@
 
 ### Fixed
 
+- A request one model rejects (HTTP 400 or 422, such as Groq's "Failed to generate JSON") is asked of the chain's next model instead of stopping the whole chain; building a pack used to fail on the first model that could not write the draft's JSON.
 - A run's page and the runs list read a running run again every two seconds and count its duration up, so a run that finished or failed shows its outcome without reloading; it used to stay "Running" with a duration of 0 ms after its model had already failed.
 - The prompt-injection filter can be turned on from the Models page: it finds the providers that list a Prompt Guard model (Groq does, free) and turns on with one click, or downloads the model for this computer with its progress. The switch used to stay disabled behind a command-line instruction, and the page now says that the English and Vietnamese rules check every question even while the filter is off.
 - A question no longer waits minutes on one slow model: each task waits at most 30 to 120 seconds for a model, a timeout is never retried on the same model, and the next model of the task's chain answers instead. A model that timed out, was unavailable or is billed on an account without credit is skipped for a while by the following questions. A run used to wait 360 seconds on one model before failing.

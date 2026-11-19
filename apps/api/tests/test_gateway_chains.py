@@ -167,14 +167,23 @@ def test_an_empty_reply_moves_to_the_next_model_after_one_more_try():
     assert len(sdk.calls) == 3
 
 
-def test_an_invalid_request_stops_the_chain():
+def test_a_request_one_model_rejects_is_asked_of_the_next_model_without_resting_anything():
+    # Groq answers a model that could not write the asked JSON with HTTP 400 "Failed to generate JSON".
+    rejected = litellm.BadRequestError("Failed to generate JSON. Please adjust your prompt.", "qwen3.8-27b", "groq")
+    pool = KeyPool(Clock())
+    sdk = Sdk(lambda call: rejected if call["model"] == GROQ_A.model else reply("fallback"))
+
+    assert gateway([[GROQ_A], [LOCAL]], sdk, pool).text("fast", PROMPT) == "fallback"
+    assert pool.order([GROQ_A]) == [GROQ_A]
+
+
+def test_a_request_every_model_rejects_lists_each_attempt():
     sdk = Sdk(lambda call: litellm.BadRequestError("bad schema", "gpt-oss-120b", "groq"))
 
     with pytest.raises(LLMError, match="BadRequestError") as raised:
         gateway([[GROQ_A], [LOCAL]], sdk).text("fast", PROMPT)
 
-    assert len(sdk.calls) == 1
-    assert raised.value.attempts == (("openai/gpt-oss-120b", "BadRequestError"),)
+    assert [attempt[1] for attempt in raised.value.attempts] == ["BadRequestError", "BadRequestError"]
 
 
 def test_an_exhausted_chain_lists_every_attempt_without_the_providers_messages():
