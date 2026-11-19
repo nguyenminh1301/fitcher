@@ -313,12 +313,14 @@ class FileService:
                 kept.append(row)
                 if len(kept) >= INFERENCE_ROWS:
                     break
-            sample_text, delimiter = _csv_text(header, kept), ","
+            sample_text = _csv_text(header, kept)
         else:
-            delimiter, sample_text = _read_csv_head(path)
+            _, sample_text = _read_csv_head(path)
+        # The sample is rewritten with commas whatever the file's delimiter, so it is described as comma separated;
+        # the load reads the file itself with its own delimiter.
         result = self._client.query(
             "DESCRIBE TABLE format(CSVWithNames, {sample:String})", parameters={"sample": sample_text},
-            settings={"format_csv_delimiter": delimiter if kind == "csv" else ",", "schema_inference_make_columns_nullable": 1,
+            settings={"format_csv_delimiter": ",", "schema_inference_make_columns_nullable": 1,
                       "input_format_csv_use_best_effort_in_schema_inference": 1})
         columns = [FileColumn(row[0], row[1]) for row in result.result_rows]
         parsed = list(csv.reader(StringIO(sample_text)))[1:][:SAMPLE_ROWS]

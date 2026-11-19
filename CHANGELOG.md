@@ -9,6 +9,7 @@
 
 ### Fixed
 
+- A CSV file separated by semicolons or tabs is read column by column; before, its columns were proposed as one text column.
 - English counts of one read in the singular ("1 table", "1 source", "Build the pack from 1 table") instead of "1 tables".
 - After a failed pack build the Sources page says no pack is turned on and offers "Build the pack", instead of showing only a succeeded sync while the other pages ask to connect data that is already connected; those pages now say the pack is missing and that it is built from the Sources page.
 - Loading icons turn again, including the one above "Building the pack" and the circle of the step that is running; they stood still before.

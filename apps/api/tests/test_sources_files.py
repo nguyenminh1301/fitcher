@@ -153,12 +153,15 @@ def test_an_upload_keeps_the_original_and_proposes_the_inferred_types(parts, tmp
     assert clickhouse.parameters["sample"].startswith("Mã đơn,Số tiền,Ngày\nA1,")
 
 
-def test_a_semicolon_file_is_read_with_that_delimiter(parts):
+@pytest.mark.parametrize("body", [b"a;b\n1;2\n", b"a\tb\n1\t2\n"], ids=["semicolon", "tab"])
+def test_a_semicolon_or_tab_file_is_described_column_by_column(parts, body):
     _, clickhouse, service = parts
 
-    service.upload("a.csv", BytesIO(b"a;b\n1;2\n"), uploaded_by=None)
+    service.upload("a.csv", BytesIO(body), uploaded_by=None)
 
-    assert clickhouse.query_settings["format_csv_delimiter"] == ";"
+    # The sample is rewritten with commas, so it is described with commas, not the file's own delimiter.
+    assert clickhouse.parameters["sample"] == "a,b\n1,2\n"
+    assert clickhouse.query_settings["format_csv_delimiter"] == ","
 
 
 def test_an_upload_above_the_size_cap_is_refused_and_leaves_no_file(parts, tmp_path):
