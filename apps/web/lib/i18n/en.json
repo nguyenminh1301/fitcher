@@ -497,8 +497,6 @@
     "embeddingSaved": "The embedding model was changed. Recompile the pack.",
     "classifier": "Prompt-injection filter",
     "classifierOn": "On: every question is also scored by the classifier, and a question stops when the classifier cannot run.",
-    "classifierOff": "Off: the English and Vietnamese rules check every question.",
-    "classifierMissing": "The classifier model is not downloaded yet. Run {command}, then turn it on.",
     "turnOn": "Turn on",
     "turnOff": "Turn off",
     "cancel": "Cancel",
@@ -1179,5 +1177,25 @@
     "jsonHelp": "Known to answer in a JSON schema",
     "benchmark": "Score {score}",
     "benchmarkHelp": "Artificial Analysis intelligence index: higher is better"
+  },
+  "classifier": {
+    "rulesAlways": "The English and Vietnamese rules check every question, even when the filter is off: a question that tries to change fitcher's instructions is stopped by them.",
+    "whereLabel": "Where the classifier runs",
+    "engine_provider": "Through a provider",
+    "engine_local": "On this computer",
+    "looking": "Looking for a provider with a Prompt Guard model…",
+    "provider": "Provider of the classifier",
+    "model": "Classifier model",
+    "use": "Use this",
+    "noHost": "None of your providers lists a Prompt Guard model. Add Groq (free) on this page to run Llama Prompt Guard there, or run the classifier on this computer.",
+    "runsOn": "On: every question is also scored by {model} on {provider}.",
+    "runsHere": "On: every question is also scored on this computer.",
+    "download": "Download the model {size}",
+    "downloaded": "The classifier's model was downloaded",
+    "downloadedNote": "The model is on this computer (version {version}).",
+    "downloadFailed": "The download failed.",
+    "progress": "Download progress",
+    "checking": "Checking the downloaded model…",
+    "license": "Model from {source}, licence {license}."
   }
 }
