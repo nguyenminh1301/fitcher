@@ -675,7 +675,7 @@
     "name": "Owner",
     "signedIn": "Signed in",
     "thisComputer": "This computer",
-    "securityItem": "Security and owner password",
+    "securityItem": "Security",
     "menu": "Owner menu",
     "removeExposed": "It cannot be removed while fitcher is open to other machines.",
     "forgottenConsole": "If you forget the owner password you cannot open fitcher: the app has no way to recover it."

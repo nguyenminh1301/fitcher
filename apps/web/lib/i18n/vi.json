@@ -675,7 +675,7 @@
     "name": "Chủ máy",
     "signedIn": "Đã đăng nhập",
     "thisComputer": "Máy này",
-    "securityItem": "Bảo mật và mật khẩu chủ",
+    "securityItem": "Bảo mật",
     "menu": "Menu của chủ máy",
     "removeExposed": "Không gỡ được khi fitcher đang mở cho máy khác.",
     "forgottenConsole": "Quên mật khẩu chủ thì không mở được fitcher: app không có cách lấy lại."
@@ -807,7 +807,7 @@
     "sqlserverCopy": "Bảng SQL Server được sao chép, không đọc trực tiếp.",
     "host": "Máy chủ",
     "port": "Cổng",
-    "database": "Database",
+    "database": "Cơ sở dữ liệu",
     "user": "Người dùng",
     "password": "Mật khẩu",
     "dockerHint": "Database chạy trên máy này thì dùng host.docker.internal.",
