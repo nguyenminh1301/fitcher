@@ -50,6 +50,7 @@ from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 import json
 import os
+import re
 import time
 from typing import Any, Protocol, TypeVar
 import uuid
@@ -72,9 +73,14 @@ TIER_TIMEOUTS = {"fast": 30.0, "sql-small": 45.0, "sql-gen": 90.0, "sql-gen-hard
 # key or model is the retry; a single model is tried once more only after a transient failure that is not a timeout.
 RETRIES = 0
 EMBEDDING_RETRIES = 2
+# A per-minute limit of an embedding provider is waited out when it asks for at most this many seconds, this many
+# times per batch: Gemini's free tier embeds 100 texts a minute and answers HTTP 429 with a retryDelay under a minute.
+EMBEDDING_WAIT_LIMIT = 65.0
+EMBEDDING_WAITS = 3
 # Calls made when a model's reply has no content, before the call fails.
 EMPTY_REPLY_ATTEMPTS = 2
-BATCH_SIZE = 256
+# Gemini refuses more than 100 texts in one embedding request ("at most 100 requests can be in one batch").
+BATCH_SIZE = 100
 
 ModelT = TypeVar("ModelT", bound=BaseModel)
 SCREENED = frozenset({"allow", "flag", TRUSTED_PACK})
@@ -180,15 +186,21 @@ def error_type(error: Exception) -> str:
     return kind
 
 
+_RETRY_DELAY = re.compile(r'"retryDelay":\s*"(\d+(?:\.\d+)?)s"')
+
+
 def _retry_after(error: Exception) -> float | None:
-    """The seconds a rate-limited provider asked to wait, from its Retry-After header."""
+    """The seconds a rate-limited provider asked to wait: its Retry-After header, or Gemini's ``retryDelay``."""
     response = getattr(error, "response", None)
     headers = getattr(response, "headers", None) or getattr(error, "litellm_response_headers", None) or {}
     try:
         value = headers.get("retry-after") or headers.get("Retry-After")
-        return float(value) if value is not None else None
+        if value is not None:
+            return float(value)
     except (AttributeError, TypeError, ValueError):
-        return None
+        pass
+    found = _RETRY_DELAY.search(str(error))
+    return float(found.group(1)) if found else None
 
 
 # What the chain does after a failure, by the SDK's error type: try the provider's next key and rest or
@@ -479,6 +491,13 @@ class Gateway:
         return None, call_id
 
 
+# The failures of an embedding provider's request limit, and what to do when waiting did not help: a free key's
+# limit (Gemini: 100 texts a minute, 1,000 a day) cannot index a pack with many column values.
+EMBEDDING_LIMITS = frozenset({"RateLimitError", QUOTA_EXCEEDED})
+EMBEDDING_LIMIT_HINT = ("the provider's embedding limit is used up, which a free key reaches on a pack with many "
+                        "values; choose the local embedding model on the Models page, or use a paid key")
+
+
 class GatewayEmbeddings:
     """Embeddings of the ``embed`` tier's model, ``dimensions`` floats per text."""
 
@@ -492,11 +511,13 @@ class GatewayEmbeddings:
         batch_size: int = BATCH_SIZE,
         timeout: float = TIMEOUT_SECONDS,
         retries: int = EMBEDDING_RETRIES,
+        sleep: Callable[[float], None] = time.sleep,
     ):
         self.dimensions = dimensions
         self._resolver = resolver
         self._sender = _Sender(embedding or _sdk_embedding, "embedding", call_log, timeout, retries)
         self._batch_size = batch_size
+        self._sleep = sleep
 
     def embed(self, texts: Sequence[str]) -> list[list[float]]:
         vectors: list[list[float]] = []
@@ -509,10 +530,20 @@ class GatewayEmbeddings:
             route = self._resolver.route(EMBED_TIER)
         except LookupError as error:  # no embedding model set, or its provider is gone
             raise EmbeddingError(str(error)) from None
-        try:
-            response, _ = self._sender.send(EMBED_TIER, route, texts, {"input": texts, "dimensions": self.dimensions})
-        except _ProviderFailure as failure:
-            raise EmbeddingError(f"embedding request to model {route.model} failed: {failure}") from None
+        waits = 0
+        while True:
+            try:
+                response, _ = self._sender.send(EMBED_TIER, route, texts, {"input": texts, "dimensions": self.dimensions})
+                break
+            except _ProviderFailure as failure:
+                limited = failure.error_type in EMBEDDING_LIMITS
+                if limited and failure.retry_after is not None and failure.retry_after <= EMBEDDING_WAIT_LIMIT \
+                        and waits < EMBEDDING_WAITS:
+                    waits += 1
+                    self._sleep(failure.retry_after + 1)
+                    continue
+                hint = f"{failure.error_type} ({EMBEDDING_LIMIT_HINT})" if limited else failure_text(failure.error_type)
+                raise EmbeddingError(f"embedding request to model {route.model} failed: {hint}") from None
         data = sorted(calls.field(response, "data") or [], key=lambda item: calls.field(item, "index"))
         vectors = [list(calls.field(item, "embedding")) for item in data]
         if len(vectors) != len(texts):
