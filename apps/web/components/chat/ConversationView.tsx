@@ -77,7 +77,7 @@ export function ConversationView({ id }: { id: string }) {
         )}
       </div>
       <div className="fc-dock">
-        <Composer running={running} onStop={stop} onSend={(text) => void ask(text, { conversationId: id })} meta={pack ? <PackChip name={pack.name} /> : null} />
+        <Composer running={running} onStop={stop} onSend={(text) => void ask(text, { conversationId: id })} meta={thread?.conversation.pack || pack ? <PackChip name={thread?.conversation.pack || pack?.name || ""} /> : null} />
       </div>
     </>
   );

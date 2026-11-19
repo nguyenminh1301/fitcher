@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 
 import { Icon } from "@/components/brand/Icon";
+import { useChat } from "@/lib/chat/ChatContext";
 import { cx } from "@/lib/cx";
 import { useI18n } from "@/lib/i18n/react";
 
@@ -64,4 +65,34 @@ export function Composer({ onSend, onStop, running, large, meta, id = "fc-compos
 export function PackChip({ name }: { name: string }) {
   const { t } = useI18n();
   return <span className="fc-composer-pack" title={t("ui.activePack")}><Icon name="database" />{name}</span>;
+}
+
+/**
+ * The data source a new conversation is answered from: every source whose pack is ready. A conversation keeps the
+ * source it started with, so this is offered only before the first question. Without the sources (a reader's
+ * session or the demo) it is the plain chip of the pack used last.
+ */
+export function PackPicker({ fallback }: { fallback: string }) {
+  const { t } = useI18n();
+  const { api, chosenPack, choosePack } = useChat();
+  const [ready, setReady] = useState<string[] | null>(null);
+  useEffect(() => {
+    let live = true;
+    Promise.resolve().then(() => api.sources.list())
+      .then((list) => { if (live) setReady(list.filter((source) => source.pack?.status === "ready").map((source) => source.pack?.name ?? source.id)); })
+      .catch(() => { if (live) setReady(null); });
+    return () => { live = false; };
+  }, [api]);
+  const current = chosenPack ?? fallback;
+  if (!ready || ready.length < 2) return <PackChip name={current} />;
+  const names = ready.includes(current) ? ready : [current, ...ready];
+  return (
+    <label className="fc-composer-pack fc-composer-pick" title={t("ui.chooseSource")}>
+      <Icon name="database" />
+      <select aria-label={t("ui.chooseSource")} value={current} onChange={(event) => choosePack(event.target.value === fallback ? null : event.target.value)}>
+        {names.map((name) => <option key={name} value={name}>{name}</option>)}
+      </select>
+      <Icon name="chevronDown" />
+    </label>
+  );
 }

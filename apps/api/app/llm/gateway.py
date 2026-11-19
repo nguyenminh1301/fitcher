@@ -14,9 +14,9 @@ chain: each link is one model with one route per API key of its provider. The
 gateway tries the keys of a link in the ``KeyPool``'s round-robin order; a
 rate-limited key rests and a refused key is dropped, and the next key is
 tried. A rate limit with no key left, a timeout, a connection error, a 5xx, a
-missing model or an empty reply moves to the next model. A request the model
-rejected as invalid (400, 422, a context too long) stops the chain, because
-the next model would get the same request. A model that timed out, was
+missing model or an empty reply moves to the next model. So does a request
+one model rejected (400, 422, a context too long, Groq's "Failed to generate
+JSON"): another model may take it, and nothing rests. A model that timed out, was
 unavailable, is missing or needs credit the account lacks rests with that key
 (``KeyPool.rest_model``), so the next calls skip it. When every model failed,
 the ``LLMError`` lists each attempt. The SDK's own retries are off and each
@@ -203,7 +203,9 @@ REST_MODEL = {
 }
 # Failures worth one more call to the same model when it is the only one: brief outages, never a timeout.
 RETRY_SAME = frozenset({"ServiceUnavailableError", "APIConnectionError", "InternalServerError", "APIError"})
-STOP_CHAIN = frozenset({
+# A request one model rejected (400, 422, a context too long, a parameter it does not take, or Groq's "Failed to
+# generate JSON") says nothing about the key or the next model: the next model is asked and nothing rests.
+REQUEST_REJECTED = frozenset({
     "BadRequestError", "UnprocessableEntityError", "ContextWindowExceededError", "ContentPolicyViolationError",
     "UnsupportedParamsError",
 })
@@ -422,7 +424,7 @@ class Gateway:
                             continue
                         attempts.append((route.model, kind))
                         self._after_failure(route, failure)
-                        if single or kind in STOP_CHAIN:
+                        if single:
                             raise LLMError(f"request to model {route.model} failed: {failure_text(kind)}",
                                            tuple(attempts)) from None
                         content = _NEXT_KEY if kind in REST_KEY or kind in DROP_KEY else _NEXT_MODEL
@@ -448,7 +450,9 @@ class Gateway:
         raise LLMError(_attempts_text(tier, attempts), tuple(attempts))
 
     def _after_failure(self, route: Route, failure: "_ProviderFailure") -> None:
-        """Rest or drop the key, or rest the model, by what failed."""
+        """Rest or drop the key, or rest the model, by what failed; a rejected request rests nothing."""
+        if failure.error_type in REQUEST_REJECTED:
+            return
         if failure.error_type in REST_KEY:
             self._keys.rest(route, failure.retry_after)
         elif failure.error_type in DROP_KEY:

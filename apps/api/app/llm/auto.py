@@ -4,10 +4,11 @@
 benchmark first and then the fastest measured latency. ``auto_best`` uses any
 chat model, best benchmark first and the cheaper one on a tie. A model without
 a benchmark comes after every model with one. The quick tiers (``fast`` and
-``sql-small``) put small, fast models first instead (flash-lite, mini, nano,
-flash, a 20B model…; ``defaults.probe_model``'s size words) and leave out
-models that reason, see or write code before answering: they route a question
-or write simple SQL and must answer in seconds.
+``sql-small``) leave out models that reason, see or write code before
+answering, because they run on every question and must answer in seconds; they
+keep the benchmark order, because the smallest models (lite, nano, 7B) miss
+what the question says, such as its period, and send the user back a
+clarification instead of an answer.
 
 Every chain starts with the best model and then takes the best model of each
 other provider, so one provider's outage or daily limit leaves an answer; it
@@ -30,24 +31,27 @@ from app.llm.providers import Provider
 from app.llm.routes import TierMapping, TierModel
 from app.llm.tiers import CHAT_TIERS
 
-CHAIN_LENGTH = 4
+CHAIN_LENGTH = 6
 REFRESH_AFTER = timedelta(days=1)
 STRUCTURED_TIERS = frozenset({"fast"})
 QUICK_TIERS = frozenset({"fast", "sql-small"})
+# Models measured on this application to misread questions, whatever their published benchmark says: they go after
+# every other model of an automatic chain and stay selectable by hand. Measured 2026-11-19 with a free Groq key:
+# qwen/qwen3.8-27b asked "Which measure?" and "Which period?" for "How many orders in 2025?", which
+# openai/gpt-oss-120b answered, and replied with JSON that did not match a pack draft's schema.
+MISREADS = frozenset({"qwen/qwen3.8-27b"})
 AUTO_MODES = frozenset({"auto_free", "auto_best"})
 
 _log = logging.getLogger(__name__)
 
 
-def _quick_rank(mode: str):
+def _rank(mode: str):
     def key(model: CatalogModel):
-        size = defaults.small_rank(model.id)
-        latency = model.median_latency_ms if model.median_latency_ms is not None else float("inf")
-        return (size if size is not None else len(defaults.SMALL_WORDS), latency, _rank(mode)(model))
+        return (model.id in MISREADS, *_published(mode)(model))
     return key
 
 
-def _rank(mode: str):
+def _published(mode: str):
     def key(model: CatalogModel):
         benchmark = -(model.benchmark if model.benchmark is not None else -1.0)
         if mode == "auto_free":
@@ -66,7 +70,7 @@ def eligible(models: Iterable[CatalogModel], mode: str, tier: str) -> list[Catal
         and (model.structured_output is True if tier in STRUCTURED_TIERS else model.structured_output is not False)
         and not (tier in QUICK_TIERS and defaults.slow_model(model.id))
     ]
-    return sorted(chosen, key=_quick_rank(mode) if tier in QUICK_TIERS else _rank(mode))
+    return sorted(chosen, key=_rank(mode))
 
 
 def chain_of(ranked: list[CatalogModel]) -> list[TierModel]:

@@ -120,6 +120,26 @@ describe("Sources page", () => {
     expect(within(shop).getByText("Succeeded")).toBeTruthy();
   });
 
+  it("says whether each source can answer questions, builds the ones that cannot and asks the ready ones", async () => {
+    const ready = { ...SHOP, id: "ready_shop", pack: { name: "ready_shop", status: "ready" as const, datasets: 3, error: null } };
+    const missing = { ...SHOP, id: "new_shop", pack: { name: "new_shop", status: "none" as const, datasets: 0, error: null } };
+    const unsynced = { ...SHOP, id: "empty_shop", last_sync: null, pack: null };
+    const assign = vi.fn();
+    vi.stubGlobal("location", { ...window.location, assign });
+    show(fakeSources([ready, missing, unsynced]));
+
+    expect(within(await row("ready_shop")).getByText("Ready")).toBeTruthy();
+    expect(within(await row("new_shop")).getByText("Not ready for questions")).toBeTruthy();
+    expect((within(await row("empty_shop")).getByRole("button", { name: "Get empty_shop ready for questions" }) as HTMLButtonElement).disabled).toBe(true);
+
+    fireEvent.click(within(await row("new_shop")).getByRole("button", { name: "Get new_shop ready for questions" }));
+    expect(navigate).toHaveBeenCalledWith("/console/sources/new_shop/pack");
+
+    fireEvent.click(within(await row("ready_shop")).getByRole("button", { name: "Ask about ready_shop" }));
+    expect(window.sessionStorage.getItem("fitcher.chosenPack")).toBe("ready_shop");
+    expect(assign).toHaveBeenCalledWith("/");
+  });
+
   it("shows an empty state with a way to add a source", async () => {
     show(fakeSources([]));
     expect(await screen.findByText("No source yet.")).toBeTruthy();

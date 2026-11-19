@@ -119,9 +119,9 @@ describe("models", () => {
     fireEvent.click(change);
     const dialog = await screen.findByRole("dialog", { name: "Models for Quick" });
     const list = within(dialog).getByRole("list", { name: "Models of your providers" });
-    // Only chat models are listed, the small free one first and recommended.
+    // Only chat models are listed, the best free one first and recommended.
     expect(within(list).queryByText("text-embedding-3-large")).toBeNull();
-    expect(within(list).getAllByRole("listitem")[0].textContent).toContain("gemini-flash-lite-latest");
+    expect(within(list).getAllByRole("listitem")[0].textContent).toContain("gemini-3.8-flash");
     expect(within(within(list).getAllByRole("listitem")[0]).getByText("Recommended")).toBeTruthy();
 
     fireEvent.click(within(dialog).getByRole("button", { name: "Free" }));
