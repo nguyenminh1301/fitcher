@@ -138,12 +138,13 @@ function Answers({ source, onBuild, onAsk }: { source: SourceView; onBuild: () =
   const ready = source.last_sync?.status === "succeeded" && source.selected_count > 0;
   return (
     <span className="src-answers">
-      {state === "failed" ? <span className="fc-label fc-label-danger">{t("sourcesPage.answer_failed")}</span>
+      {state === "failed" ? <span className="fc-label fc-label-danger" title={source.pack?.error ?? undefined}>{t("sourcesPage.answer_failed")}</span>
         : <span className="fc-label fc-label-attention">{t("sourcesPage.answer_none")}</span>}
       <button type="button" className="fc-btn fc-btn-primary fc-btn-sm" disabled={!ready} title={ready ? undefined : t("sourcesPage.syncFirst")}
         aria-label={t("sourcesPage.buildOf", { name: source.id })} onClick={onBuild}>
         <Icon name="sparkles" />{state === "failed" ? t("sourcesPage.buildAgain") : t("sourcesPage.buildToAsk")}
       </button>
+      {state === "failed" && source.pack?.error ? <span className="fc-field-error src-answers-error">{source.pack.error}</span> : null}
     </span>
   );
 }
@@ -172,7 +173,8 @@ export function SourcesSection() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sources, syncIds]);
 
-  const running = (data ?? []).some((source) => source.last_sync?.status === "running");
+  // A running sync or pack build is read again until it ends, so its outcome shows without reloading the page.
+  const running = (data ?? []).some((source) => source.last_sync?.status === "running" || source.pack?.status === "building");
   useEffect(() => {
     if (!running) return;
     const timer = setInterval(() => void reload(), POLL_MS);
