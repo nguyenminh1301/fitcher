@@ -4,6 +4,7 @@
 
 ### Added
 
+- `GET /api/models/catalog?provider=` describes each model of a provider: chat, embedding or other (speech, images, classifiers), whether it is free or has a free tier, its price per million tokens, context length, structured output, Artificial Analysis' intelligence index from OpenRouter's public list, and the median latency of this instance's own calls over the last 7 days. The catalog is kept six hours per provider and key.
 - The admin Costs rows report the input and output tokens of their calls, and each run reports its input and output tokens and the models that answered it, summed from the logged model calls.
 - Z.ai is offered among the model services when adding a provider, with its OpenAI-compatible endpoint and a link to its key page.
 
