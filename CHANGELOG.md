@@ -31,6 +31,7 @@
 
 ### Fixed
 
+- The web server no longer reads an unbounded request body into memory before the api checks the request: JSON routes refuse bodies over 1 MiB, and uploads are streamed to the api and refused with 413 once they pass the api's own file limit (`SOURCE_FILE_MAX_BYTES` or `DOCUMENT_MAX_BYTES`) plus 1 MiB of multipart framing, so a 1.5 GB body can no longer exhaust the container's memory.
 - Wrong owner passwords sent through the published port or a reverse proxy no longer lock out the owner at this computer, whose sign-in attempts are counted apart; other clients are counted by their own address (from `X-Forwarded-For` when the proxy is listed in the new `FITCHER_TRUSTED_PROXIES`) and together share a limit of 100 failures in 15 minutes.
 - A reverse proxy or tunnel on the same computer no longer makes its visitors the owner: the web server records the signs that a proxy relayed a request (forwarding headers, `Connection: close`, HTTP/1.0), and the api refuses such a request when it names a loopback host, so a stock nginx `proxy_pass` to the published port can neither read the instance nor set the first owner password; a proxy must send the public name, list it in `FITCHER_ALLOWED_HOSTS` and use the owner password.
 - Leaving a conversation while it is answering, for the console or by closing the page, no longer stops the question: the api answers it and stores the answer, and the conversation shows that it is still answering and then the answer when it is opened again. Only the Stop button stops a question.

@@ -2,15 +2,17 @@
 // server-sent events come back unchanged, with the api's X-Conversation-Id. When the browser stops reading
 // (Stop, or the page closes), the request to the api is aborted too, so the api stops the run.
 
-import { callApi, jsonError } from "@/lib/server/api";
+import { callApi, jsonError, readJsonBody } from "@/lib/server/api";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function POST(request: Request): Promise<Response> {
+  const text = await readJsonBody(request);
+  if (text instanceof Response) return text;
   let body: string;
   try {
-    body = JSON.stringify(await request.json());
+    body = JSON.stringify(JSON.parse(text));
   } catch {
     return jsonError("invalid_request", 400);
   }

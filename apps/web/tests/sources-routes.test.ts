@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const forwardJson = vi.fn(async (_request: Request, path: string) => Response.json({ path }));
 const forwardBody = vi.fn(async (_request: Request, path: string) => Response.json({ path }));
-vi.mock("@/lib/server/api", () => ({ forwardJson, forwardBody }));
+vi.mock("@/lib/server/api", () => ({ forwardJson, forwardBody, uploadLimit: () => 1024 }));
 
 beforeEach(() => {
   forwardJson.mockClear();
