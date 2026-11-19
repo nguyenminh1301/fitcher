@@ -443,7 +443,8 @@ def test_the_catalog_describes_each_model_with_its_measured_latency(client):
 
     body = client.get("/models/catalog", headers=ADMIN, params={"provider": "openai"}).json()
 
-    assert catalog.asked == [("openai", KEY)]
+    # Read once more by the automatic choice of the chains when the provider was added.
+    assert catalog.asked[-1] == ("openai", KEY)
     assert body["provider_id"] == "openai"
     assert body["models"][0] == {
         "id": "gpt-5.4", "provider_id": "openai", "kind": "chat", "free": "none", "input_price": 1.25, "output_price": 10.0,
@@ -588,3 +589,12 @@ def test_auto_best_puts_the_best_benchmark_first(client):
     fast = next(tier for tier in body["tiers"] if tier["tier"] == "fast")
     assert [link["model"] for link in fast["chain"]] == ["gpt-paid", "lab-free", "gpt-free"]
     assert client.put("/models/mode", headers=ADMIN, json={"mode": "fastest"}).status_code == 422
+
+
+def test_a_new_instance_chooses_free_chains_by_itself_until_a_task_is_set_by_hand(client):
+    assert client.get("/models/tiers", headers=ADMIN).json()["mode"] == "auto_free"
+    add_openai(client)
+
+    client.put("/models/tiers/fast", headers=ADMIN, json={"provider_id": "openai", "model": "gpt-5.4"})
+
+    assert client.get("/models/tiers", headers=ADMIN).json()["mode"] == "manual"

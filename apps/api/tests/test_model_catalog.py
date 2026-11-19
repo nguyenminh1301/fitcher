@@ -77,10 +77,10 @@ def test_groq_lists_prices_and_context_and_its_classifier_and_speech_models_are_
     assert models["allam-2-7b"].kind == "chat"
 
 
-def test_zai_flash_models_are_free_unless_the_price_table_bills_them():
+def test_only_the_known_free_zai_models_are_free_and_the_unlisted_one_is_added():
     models = by_id(build(ZAI, listing("zai"), price_table=PRICES, benchmarks=BENCHMARKS))
 
-    assert models["glm-4.5-flash"].free == "free"
+    assert models["glm-4.5-flash"].free == "free" and models["glm-4.5-flash"].structured_output is True
     assert models["glm-5.3-flash"].free == "none" and models["glm-5.3-flash"].input_price == 0.15
     assert models["glm-5.3-flashx"].free == "none" and models["glm-5.3-flashx"].input_price is None
     assert (models["glm-4.6"].input_price, models["glm-4.6"].context) == (0.6, 200000)
@@ -165,3 +165,12 @@ def test_an_unknown_listing_shape_is_refused(body):
 
     with pytest.raises(ModelListError):
         build(GEMINI if "models" in body else GROQ, body, price_table={}, benchmarks={})
+
+
+def test_zai_s_free_model_is_in_its_catalog_although_zai_does_not_list_it():
+    body = {"data": [{"id": "glm-5.3-flash"}, {"id": "glm-4.6"}]}
+
+    models = by_id(build(ZAI, body, price_table={}, benchmarks={}))
+
+    assert models["glm-4.5-flash"].free == "free" and models["glm-4.5-flash"].kind == "chat"
+    assert models["glm-5.3-flash"].free == "none"

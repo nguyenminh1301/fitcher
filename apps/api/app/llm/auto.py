@@ -3,7 +3,11 @@
 ``auto_free`` uses only models that cost nothing or have a free tier, best
 benchmark first and then the fastest measured latency. ``auto_best`` uses any
 chat model, best benchmark first and the cheaper one on a tie. A model without
-a benchmark comes after every model with one.
+a benchmark comes after every model with one. The quick tiers (``fast`` and
+``sql-small``) put small, fast models first instead (flash-lite, mini, nano,
+flash, a 20B model…; ``defaults.probe_model``'s size words) and leave out
+models that reason, see or write code before answering: they route a question
+or write simple SQL and must answer in seconds.
 
 Every chain starts with the best model and then takes the best model of each
 other provider, so one provider's outage or daily limit leaves an answer; it
@@ -20,6 +24,7 @@ from collections.abc import Callable, Iterable, Mapping
 from datetime import datetime, timedelta, UTC
 import logging
 
+from app.llm import defaults
 from app.llm.catalog import CatalogModel, ModelListError, with_latency
 from app.llm.providers import Provider
 from app.llm.routes import TierMapping, TierModel
@@ -28,9 +33,18 @@ from app.llm.tiers import CHAT_TIERS
 CHAIN_LENGTH = 4
 REFRESH_AFTER = timedelta(days=1)
 STRUCTURED_TIERS = frozenset({"fast"})
+QUICK_TIERS = frozenset({"fast", "sql-small"})
 AUTO_MODES = frozenset({"auto_free", "auto_best"})
 
 _log = logging.getLogger(__name__)
+
+
+def _quick_rank(mode: str):
+    def key(model: CatalogModel):
+        size = defaults.small_rank(model.id)
+        latency = model.median_latency_ms if model.median_latency_ms is not None else float("inf")
+        return (size if size is not None else len(defaults.SMALL_WORDS), latency, _rank(mode)(model))
+    return key
 
 
 def _rank(mode: str):
@@ -50,8 +64,9 @@ def eligible(models: Iterable[CatalogModel], mode: str, tier: str) -> list[Catal
         if model.kind == "chat"
         and (mode != "auto_free" or model.free != "none")
         and (model.structured_output is True if tier in STRUCTURED_TIERS else model.structured_output is not False)
+        and not (tier in QUICK_TIERS and defaults.slow_model(model.id))
     ]
-    return sorted(chosen, key=_rank(mode))
+    return sorted(chosen, key=_quick_rank(mode) if tier in QUICK_TIERS else _rank(mode))
 
 
 def chain_of(ranked: list[CatalogModel]) -> list[TierModel]:
