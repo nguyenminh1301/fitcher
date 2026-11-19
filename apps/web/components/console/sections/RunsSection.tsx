@@ -14,6 +14,7 @@ import { StatusLabel } from "@/components/console/kit";
 import { ListPage, RecordTable } from "@/components/console/ListPage";
 import { TraceTimeline, useDuration } from "@/components/console/TraceTimeline";
 import { useChat } from "@/lib/chat/ChatContext";
+import type { RunRow } from "@/lib/contracts";
 import { useLoad } from "@/lib/console/useLoad";
 import { useI18n } from "@/lib/i18n/react";
 import { langOf } from "@/lib/text";
@@ -53,19 +54,35 @@ export function RunsSection() {
   const { navigate } = useConsole();
   const duration = useDuration();
   const usd = useUsd();
-  const { data, failed, reload } = useLoad(useCallback(() => api.runs.list(), [api]));
+  // Every source's runs, so a conversation on one source and one on another show in one list.
+  const { data, failed, reload } = useLoad(useCallback(() => api.runs.list({ all: true }), [api]));
+  const [source, setSource] = useState("");
+  const sources = [...new Set((data ?? []).map((run) => run.pack).filter(Boolean))].sort();
   const now = useWhileRunning(!!data?.some((run) => run.status === "running"), reload);
   const [status, setStatus] = useState("all");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const rows = (data ?? []).filter((run) =>
-    (status === "all" || run.status === status)
+    (!source || run.pack === source)
+    && (status === "all" || run.status === status)
     && (!from || run.ts.slice(0, 10) >= from)
     && (!to || run.ts.slice(0, 10) <= to));
 
   return (
     <ListPage section="runs" loading={!data} failed={failed} skeleton="table">
       <div className="toolbar filters" role="group" aria-label={t("runsPage.filters")}>
+        {sources.length > 1 ? (
+          <div className="fc-field">
+            <label className="fc-field-label" htmlFor="runs-source">{t("runsPage.source")}</label>
+            <div className="sel">
+              <select id="runs-source" className="fc-input fc-input-sm" value={source} onChange={(event) => setSource(event.target.value)}>
+                <option value="">{t("runsPage.allSources")}</option>
+                {sources.map((name) => <option key={name} value={name}>{name}</option>)}
+              </select>
+              <Icon name="chevronDown" />
+            </div>
+          </div>
+        ) : null}
         <div className="fc-field">
           <label className="fc-field-label" htmlFor="runs-from">{t("ui.from")}</label>
           <input id="runs-from" className="fc-input fc-input-sm" type="date" value={from} onChange={(event) => setFrom(event.target.value)} />
@@ -85,7 +102,7 @@ export function RunsSection() {
         </div>
       </div>
       <RecordTable
-        key={`${status}|${from}|${to}`}
+        key={`${source}|${status}|${from}|${to}`}
         label={t("ui.nav_runs")}
         empty={t("runsPage.empty")}
         rows={rows}
@@ -95,6 +112,7 @@ export function RunsSection() {
           { key: "question", label: t("ui.question"), render: (run) => (
             <button type="button" className="row-title link-button" lang={langOf(run.question)} onClick={() => navigate(`/console/runs/${encodeURIComponent(run.trace_id)}`)}>{run.question}</button>
           ) },
+          ...(sources.length > 1 ? [{ key: "pack", label: t("runsPage.source"), nowrap: true, render: (run: RunRow) => <span className="fc-mono">{run.pack}</span> }] : []),
           { key: "status", label: t("ui.status"), render: (run) => <StatusLabel status={run.status}>{t(`ui.${run.status}`)}</StatusLabel> },
           { key: "latency_ms", label: t("ui.duration"), numeric: true, nowrap: true, render: (run) => duration(runDuration(run, now)) },
           { key: "cost_usd", label: t("ui.cost"), numeric: true, render: (run) => usd(run.cost_usd) },

@@ -115,6 +115,8 @@ export type MenuItem = {
   shortcut?: string;
   danger?: boolean;
   checked?: boolean;
+  /** A short muted note after the label, such as a count. */
+  hint?: string;
   disabled?: boolean;
   sub?: MenuItem[];
   separator?: boolean;
@@ -289,6 +291,7 @@ export function Menu({ anchor, items, onClose, align, width, header, label }: Me
       >
         {item.icon ? <Icon name={item.icon} /> : null}
         <span className="fc-navitem-text">{item.label}</span>
+        {item.hint ? <span className="fc-menu-hint">{item.hint}</span> : null}
         {item.checked ? <Icon name="check" /> : null}
         {item.shortcut ? <kbd className="fc-kbd">{item.shortcut}</kbd> : null}
         {!inSub && item.sub ? <Icon name="chevronRight" /> : null}

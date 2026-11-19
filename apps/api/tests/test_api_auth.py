@@ -113,3 +113,29 @@ def test_a_request_names_the_pack_it_reads_and_others_keep_the_pack_used_last(cl
     assert named.status_code == 200 and named.json()["name"] == "minimal"
     assert default.status_code == 503 and "elsewhere" in default.json()["detail"]
     runtime.reload_pack()
+
+
+def test_choosing_a_compiled_pack_makes_it_the_current_one(client, monkeypatch):
+    chosen = []
+    served = []
+    monkeypatch.setattr(runtime, "get_compiled", lambda: served.append(runtime.current_pack()) or compiled_fixture())
+    monkeypatch.setattr(runtime, "set_active_pack", lambda db, name: chosen.append(name))
+
+    response = client.put("/pack", json={"name": "minimal"})
+
+    assert response.status_code == 200 and response.json()["name"] == compiled_fixture().pack.name
+    assert served == ["minimal"] and chosen == ["minimal"]
+
+
+def test_a_pack_that_was_never_compiled_cannot_be_chosen(client, monkeypatch):
+    chosen = []
+
+    def missing():
+        raise runtime.unavailable("compile the pack first")
+
+    monkeypatch.setattr(runtime, "get_compiled", missing)
+    monkeypatch.setattr(runtime, "set_active_pack", lambda db, name: chosen.append(name))
+
+    assert client.put("/pack", json={"name": "nothing_here"}).status_code == 503
+    assert client.put("/pack", json={"name": "../etc"}).status_code == 422
+    assert chosen == []

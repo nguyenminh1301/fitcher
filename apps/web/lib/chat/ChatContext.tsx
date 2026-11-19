@@ -5,7 +5,6 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
-import { keepChosenPack, readChosenPack } from "@/lib/chat/chosenPack";
 import { AskRefused } from "@/lib/api/http/chat";
 import type { FitcherApi } from "@/lib/api/client";
 import type { Conversation, ConversationGroup, ConversationThread, Turn } from "@/lib/api/conversations";
@@ -43,9 +42,10 @@ export type ChatState = {
   ask: (question: string, options?: AskOptions) => Promise<string>;
   /** Stop the answer of a conversation, the one streaming here by default. */
   stop: (conversationId?: string) => void;
-  /** The pack (one per data source) a new conversation is answered from; null for the one used last. */
+  /** The pack (one per data source) a new conversation is answered from: the api's current pack. */
   chosenPack: string | null;
-  choosePack: (name: string | null) => void;
+  /** Make a source's pack the current one on the api, for the console and a new conversation alike. */
+  choosePack: (name: string) => Promise<void>;
 };
 
 const ChatContext = createContext<ChatState | null>(null);
@@ -65,13 +65,11 @@ export function ChatProvider({ api, navigate, activeId, sources = currentSources
   const [identity, setIdentity] = useState<Identity | null>(null);
   const [identities, setIdentities] = useState<Identity[]>([]);
   const [pack, setPack] = useState<ChatState["pack"]>(null);
-  const [chosenPack, setChosenPack] = useState<string | null>(null);
-  // Read after the first render: the server has no browser storage.
-  useEffect(() => setChosenPack(readChosenPack()), []);
-  const choosePack = useCallback((name: string | null) => {
-    keepChosenPack(name);
-    setChosenPack(name);
-  }, []);
+  // The api keeps the current pack, so the chat, the console and other tabs agree on the source.
+  const chosenPack = pack?.name ?? null;
+  const choosePack = useCallback(async (name: string) => {
+    await api.auth.choosePack(name).then(setPack).catch(() => undefined);
+  }, [api]);
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [groups, setGroups] = useState<ConversationGroup[]>([]);
   const [loaded, setLoaded] = useState(false);
@@ -156,7 +154,7 @@ export function ChatProvider({ api, navigate, activeId, sources = currentSources
       const stamp = now().toISOString();
       const conversation: Conversation = existing
         ? { ...existing.conversation, updated_at: stamp }
-        : { id, title: question.slice(0, TITLE_LENGTH), pinned: false, group_id: null, updated_at: stamp, pack: chosenPack ?? pack?.name ?? null };
+        : { id, title: question.slice(0, TITLE_LENGTH), pinned: false, group_id: null, updated_at: stamp, pack: chosenPack };
       let turns = existing?.turns ?? [];
       const replaced = options.editOf ?? options.retryOf;
       let turn: Turn;

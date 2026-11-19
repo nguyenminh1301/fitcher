@@ -40,7 +40,7 @@ type Data = {
 export async function allRuns(api: FitcherApi, from: string): Promise<RunRow[]> {
   const rows: RunRow[] = [];
   for (let page = 1; page <= RUN_PAGES; page += 1) {
-    const batch = await api.runs.list({ from, page });
+    const batch = await api.runs.list({ from, page, all: true });
     rows.push(...batch);
     if (batch.length < 50) break;
   }

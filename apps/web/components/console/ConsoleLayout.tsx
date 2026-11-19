@@ -10,6 +10,7 @@ import { createContext, Fragment, useCallback, useContext, useEffect, useState, 
 import { Icon } from "@/components/brand/Icon";
 import { Logo } from "@/components/brand/Logo";
 import { AccountMenu } from "@/components/chat/AccountMenu";
+import { SourceSwitcher } from "@/components/chat/SourceSwitcher";
 import { Toast } from "@/components/ui/feedback";
 import { useChat } from "@/lib/chat/ChatContext";
 import { GROUPS, SECTIONS } from "@/lib/console/sections";
@@ -35,7 +36,9 @@ type Props = {
 
 export function ConsoleLayout({ section, navigate, onChat, children }: Props) {
   const { t } = useI18n();
-  const { api, pack } = useChat();
+  const { api, pack, choosePack } = useChat();
+  // Choosing another source reads every page again, now from that source's pack.
+  const [generation, setGeneration] = useState(0);
   const [drawer, setDrawer] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   // How many items wait in Review (drafts) and Feedback (dislikes); a count of 0 shows no badge.
@@ -47,7 +50,7 @@ export function ConsoleLayout({ section, navigate, onChat, children }: Props) {
       api.feedbackReview.list().then((rows) => rows.filter((row) => row.rating === "dislike" && !row.proposal).length).catch(() => 0),
     ]).then(([review, feedback]) => { if (live) setWaiting({ review, feedback }); });
     return () => { live = false; };
-  }, [api, section]);
+  }, [api, section, generation]);
 
   useEffect(() => {
     if (!message) return;
@@ -88,11 +91,9 @@ export function ConsoleLayout({ section, navigate, onChat, children }: Props) {
         </header>
         <nav className="cs-nav" aria-label={t("ui.consoleLabel")}>
           <div className="cs-navtop">
-            <a className="cs-switch" href="/console/datasets" title={t("console.activePack")}
-              onClick={(event) => follow(event, () => navigate("/console/datasets"))}>
-              <Logo variant="symbol" height={20} />
-              <span className="cs-pack">{pack?.display_name || pack?.name || t("console.noPack")}</span>
-            </a>
+            <SourceSwitcher variant="sidebar" current={pack?.name ?? ""} empty={t("console.noPack")}
+              onChoose={(name) => void choosePack(name).then(() => setGeneration((value) => value + 1))}
+              onManage={() => navigate("/console/sources")} />
             <span className="cs-navclose">
               <button type="button" className="fc-btn fc-btn-ghost fc-btn-icon fc-btn-sm" aria-label={t("console.closeMenu")} onClick={() => setDrawer(false)}>
                 <Icon name="x" />
@@ -114,7 +115,7 @@ export function ConsoleLayout({ section, navigate, onChat, children }: Props) {
           <AccountMenu onChat={onChat} onConsole={() => navigate("/console")} onSecurity={() => navigate("/console/security")} />
         </nav>
         <div className="cs-scrim" aria-hidden="true" onClick={() => setDrawer(false)} />
-        <main className="cs-main">{children}</main>
+        <main className="cs-main" key={generation}>{children}</main>
         {message ? (
           <div className="fc-toast-wrap">
             <Toast icon="check" onClose={() => setMessage(null)}>{message}</Toast>

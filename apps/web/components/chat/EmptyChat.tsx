@@ -29,9 +29,11 @@ export function EmptyChat() {
   const { api, identity, pack, ask, busy, loaded } = useChat();
   const [suggestions, setSuggestions] = useState<{ text: string; lang: string }[]>([]);
 
+  // The current source's questions, read again when another source is chosen.
+  const packName = pack?.name;
   useEffect(() => {
     void api.chat.suggestions().then(setSuggestions);
-  }, [api]);
+  }, [api, packName]);
 
   // A question picked in the setup is asked as soon as the pack is known.
   useEffect(() => {

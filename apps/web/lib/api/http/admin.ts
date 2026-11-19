@@ -24,6 +24,7 @@ export function createHttpRuns(fetcher: Fetcher = (...args) => fetch(...args)): 
       if (query.from) params.set("from", query.from);
       if (query.to) params.set("to", query.to);
       if (query.page && query.page > 1) params.set("page", String(query.page));
+      if (query.all) params.set("all", "true");
       const search = params.toString();
       return (await call(fetcher, `/api/admin/runs${search ? `?${search}` : ""}`)).json();
     },

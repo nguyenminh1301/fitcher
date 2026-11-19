@@ -1,4 +1,4 @@
-import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { EmptyChat } from "@/components/chat/EmptyChat";
@@ -21,20 +21,22 @@ function source(id: string, status: "ready" | "none"): SourceView {
            pack: { name: id, status, datasets: 1, error: null } };
 }
 
-function show() {
+function show(current = "shop") {
   const api = createMockApi();
+  Object.assign(api.auth, { pack: vi.fn(async () => ({ name: current, display_name: current, roles: ["analyst"] })) });
   const asked: AskRequest[] = [];
   Object.assign(api.sources, { list: vi.fn(async () => [source("shop", "ready"), source("crm", "ready"), source("raw", "none")]) });
   Object.assign(api.chat, {
     ask: vi.fn(async function* (request: AskRequest) { asked.push(request); }),
     suggestions: vi.fn(async () => []),
   });
+  Object.assign(api.auth, { choosePack: vi.fn(async (name: string) => ({ name, display_name: name, roles: ["analyst"] })) });
   render(
     <I18nProvider initial="en">
       <ChatProvider api={api} navigate={vi.fn()} activeId={null} sources={{}}><EmptyChat /></ChatProvider>
     </I18nProvider>,
   );
-  return asked;
+  return { asked, api };
 }
 
 beforeEach(() => {
@@ -49,12 +51,16 @@ afterEach(() => {
 });
 
 describe("the data source of a new conversation", () => {
-  it("offers the sources that can answer and sends the chosen one with the first question", async () => {
-    const asked = show();
-    const picker = await screen.findByRole("combobox", { name: "Data source of a new conversation" }) as HTMLSelectElement;
+  it("offers the sources that can answer in a menu, makes the chosen one current and sends it with the first question", async () => {
+    const { asked, api } = show();
+    fireEvent.click(await screen.findByRole("button", { name: "Source: shop. Choose another" }));
+    const menu = await screen.findByRole("menu");
 
-    expect([...picker.options].map((option) => option.value)).toEqual(["shop", "crm"]);
-    fireEvent.change(picker, { target: { value: "crm" } });
+    const items = within(menu).getAllByRole("menuitem").map((item) => item.textContent);
+    expect(items).toEqual(["shop1 dataset", "crm1 dataset", "Manage sources"]);
+    await act(async () => fireEvent.click(within(menu).getByRole("menuitem", { name: /crm/ })));
+    expect(api.auth.choosePack).toHaveBeenCalledWith("crm");
+    expect(await screen.findByRole("button", { name: "Source: crm. Choose another" })).toBeTruthy();
     fireEvent.change(screen.getByRole("textbox"), { target: { value: "How many leads?" } });
     await act(async () => fireEvent.keyDown(screen.getByRole("textbox"), { key: "Enter" }));
 
@@ -62,11 +68,9 @@ describe("the data source of a new conversation", () => {
     expect(asked[0].pack).toBe("crm");
   });
 
-  it("starts from the source chosen on the Sources page", async () => {
-    window.sessionStorage.setItem("fitcher.chosenPack", "crm");
-    show();
+  it("starts from the api's current source, as chosen in the console or on the Sources page", async () => {
+    show("crm");
 
-    const picker = await screen.findByRole("combobox", { name: "Data source of a new conversation" }) as HTMLSelectElement;
-    await waitFor(() => expect(picker.value).toBe("crm"));
+    expect(await screen.findByRole("button", { name: "Source: crm. Choose another" })).toBeTruthy();
   });
 });

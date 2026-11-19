@@ -10,6 +10,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Header, HTTPException, status
 from pydantic import BaseModel
 
+from app.api import runtime
 from app.api.runtime import (
     PackIdentity, get_compiled, get_compiled_or_none, get_pack_identity, get_pack_identity_or_none,
     pack_identity,
@@ -92,6 +93,21 @@ def pack(identity: Annotated[PackIdentity, Depends(get_pack_identity)]) -> PackI
 
 
 SUGGESTIONS = 3
+
+
+class PackChoice(BaseModel):
+    name: str
+
+
+@router.put("/pack")
+def choose_pack(choice: PackChoice, _: Annotated[Principal, Depends(current_principal)]) -> PackInfo:
+    """Make a compiled pack the current one: the console reads it and a new conversation starts on it."""
+    if not runtime.PACK_NAME.fullmatch(choice.name):
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, detail="name must be a pack name")
+    with runtime.serving(choice.name):
+        identity = pack_identity(runtime.get_compiled())
+    runtime.set_active_pack(runtime.get_state_db(), choice.name)
+    return PackInfo(name=identity.name, display_name=identity.display_name, roles=identity.roles)
 
 
 @router.get("/pack/suggestions")

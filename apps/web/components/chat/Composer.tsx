@@ -7,6 +7,8 @@ import { useChat } from "@/lib/chat/ChatContext";
 import { cx } from "@/lib/cx";
 import { useI18n } from "@/lib/i18n/react";
 
+import { SourceSwitcher } from "./SourceSwitcher";
+
 export type ComposerProps = { onSend: (text: string) => void; onStop?: () => void; running?: boolean; large?: boolean; meta?: ReactNode; id?: string };
 
 /** The question box: Enter sends, Shift+Enter adds a line; while an answer streams the button stops it. */
@@ -73,26 +75,9 @@ export function PackChip({ name }: { name: string }) {
  * session or the demo) it is the plain chip of the pack used last.
  */
 export function PackPicker({ fallback }: { fallback: string }) {
-  const { t } = useI18n();
-  const { api, chosenPack, choosePack } = useChat();
-  const [ready, setReady] = useState<string[] | null>(null);
-  useEffect(() => {
-    let live = true;
-    Promise.resolve().then(() => api.sources.list())
-      .then((list) => { if (live) setReady(list.filter((source) => source.pack?.status === "ready").map((source) => source.pack?.name ?? source.id)); })
-      .catch(() => { if (live) setReady(null); });
-    return () => { live = false; };
-  }, [api]);
-  const current = chosenPack ?? fallback;
-  if (!ready || ready.length < 2) return <PackChip name={current} />;
-  const names = ready.includes(current) ? ready : [current, ...ready];
+  const { chosenPack, choosePack } = useChat();
   return (
-    <label className="fc-composer-pack fc-composer-pick" title={t("ui.chooseSource")}>
-      <Icon name="database" />
-      <select aria-label={t("ui.chooseSource")} value={current} onChange={(event) => choosePack(event.target.value === fallback ? null : event.target.value)}>
-        {names.map((name) => <option key={name} value={name}>{name}</option>)}
-      </select>
-      <Icon name="chevronDown" />
-    </label>
+    <SourceSwitcher variant="composer" current={chosenPack ?? fallback} onChoose={(name) => void choosePack(name)}
+      onManage={() => window.location.assign("/console/sources")} />
   );
 }
