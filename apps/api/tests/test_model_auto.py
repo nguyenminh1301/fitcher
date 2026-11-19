@@ -38,8 +38,11 @@ def chain(tier_models):
 def test_auto_free_ranks_free_models_by_benchmark_then_latency_and_spreads_providers():
     chosen = auto.choose(CATALOG, "auto_free")
 
-    assert chain(chosen["fast"]) == [("groq", "groq-b"), ("gemini", "gemini-a"), ("router", "router-free"), ("groq", "groq-a")]
-    assert chain(chosen["sql-gen"]) == [("groq", "groq-b"), ("zai", "zai-a"), ("gemini", "gemini-a"), ("router", "router-free")]
+    assert chain(chosen["fast"]) == [("groq", "groq-b"), ("gemini", "gemini-a"), ("router", "router-free"), ("groq", "groq-a"),
+                                     ("groq", "groq-c")]
+    # The best model of each provider first, then the next best models, six in all.
+    assert chain(chosen["sql-gen"]) == [("groq", "groq-b"), ("zai", "zai-a"), ("gemini", "gemini-a"), ("router", "router-free"),
+                                        ("groq", "groq-a"), ("groq", "groq-c")]
 
 
 def test_auto_best_takes_any_chat_model_and_the_cheaper_one_on_a_tie():

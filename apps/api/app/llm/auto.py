@@ -30,7 +30,7 @@ from app.llm.providers import Provider
 from app.llm.routes import TierMapping, TierModel
 from app.llm.tiers import CHAT_TIERS
 
-CHAIN_LENGTH = 4
+CHAIN_LENGTH = 6
 REFRESH_AFTER = timedelta(days=1)
 STRUCTURED_TIERS = frozenset({"fast"})
 QUICK_TIERS = frozenset({"fast", "sql-small"})
