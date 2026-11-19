@@ -28,7 +28,9 @@ class InstantEstimate(ContractModel):
 class InstantStep(ContractModel):
     id: Literal["marts", "profile", "files", "draft", "approve", "compile", "activate"]
     state: Literal["pending", "running", "done", "failed"]
-    # Of a long step (the compile's embeddings): how many items are done out of how many, while it runs.
+    # Of a long step, while it runs: the compile's phase (screening column values, then indexing them) and how many
+    # items of that phase are done out of how many.
+    phase: Literal["screen", "index"] | None = None
     done: int | None = None
     total: int | None = None
 

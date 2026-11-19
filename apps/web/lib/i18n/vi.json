@@ -884,7 +884,8 @@
     "providerNamePlaceholder": "Ví dụ: Máy chủ công ty",
     "providerNameHelp": "Hiện trong danh sách provider và khi chọn model; có thể đổi sau.",
     "indexed": "Đã index {done}/{total} mục",
-    "elapsed": "Đã chạy {time}. Bảng lớn có thể mất vài phút; bạn có thể rời trang này."
+    "elapsed": "Đã chạy {time}. Bảng lớn có thể mất vài phút; bạn có thể rời trang này.",
+    "screened": "Đã kiểm tra prompt injection {done}/{total} giá trị"
   },
   "instant": {
     "title": "Dựng gói dữ liệu",

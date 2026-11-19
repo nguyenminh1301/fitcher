@@ -512,7 +512,7 @@ def _model_missing() -> str | None:
     return None
 
 
-def _compile_instant(pack_dir: Path, progress: Callable[[int, int], None] | None = None) -> object:
+def _compile_instant(pack_dir: Path, progress: Callable[[str, int, int], None] | None = None) -> object:
     """Compile an instant pack as ``pack_admin``, as ``jobs.compile_pack`` does as the admin user."""
     settings = load_settings()
     compiled_dir = Path(settings.compiled_pack_dir)
@@ -521,7 +521,7 @@ def _compile_instant(pack_dir: Path, progress: Callable[[int, int], None] | None
 
 
 def _compile_instant_now(pack_dir: Path, settings, compiled_dir: Path,
-                         progress: Callable[[int, int], None] | None = None) -> object:
+                         progress: Callable[[str, int, int], None] | None = None) -> object:
     lock = compile_lock_path(compiled_dir, pack_dir.name)
     lock.parent.mkdir(parents=True, exist_ok=True)
     lock.write_text(datetime.now(UTC).isoformat(), encoding="utf-8")
