@@ -12,7 +12,8 @@ indexed with another model and must be recompiled.
 A key is checked with the provider before it is stored (``GET /models``, or
 OpenRouter's key endpoint), so a key the provider refuses is never kept.
 ``POST /providers/{id}/test`` checks the key,
-then asks one model for a small structured reply through the gateway. For a hosted provider that
+then asks the smallest chat model the provider lists for a small structured
+reply through the gateway. For a hosted provider that
 call is billed, which the response states. A model that fails structured
 output is reported and stays selectable. A provider may hold several keys
 (``POST``/``DELETE /providers/{id}/keys``), which the gateway rotates.
@@ -393,13 +394,6 @@ def model_catalog(
     ])
 
 
-def _test_model(provider: Provider, mapping: TierMapping, listed: list[str]) -> str | None:
-    fast = mapping.tier("fast")
-    if fast is not None and fast.provider_id == provider.id:
-        return fast.model
-    return defaults.chat_models(provider.kind).get("fast") or (listed[0] if listed else None)
-
-
 @router.post("/providers/{provider_id}/test")
 def test_provider(
     provider_id: str, body: ProviderTestRequest, _: Admin, store: Store, mapping: Mapping,
@@ -413,7 +407,8 @@ def test_provider(
         result["models"] = checker(provider, _key(vault, provider))
     except ModelListError as error:
         return ProviderTestResult(**result | {"error": str(error)})
-    model = body.model or _test_model(provider, mapping, result["models"])
+    # The smallest chat model it lists answers the check: a large model spends its quota and may take minutes.
+    model = body.model or defaults.probe_model(provider.kind, result["models"], provider.base_url)
     if model is None:
         return ProviderTestResult(**result | {"error": f"{provider.name} lists no model to test"})
     try:

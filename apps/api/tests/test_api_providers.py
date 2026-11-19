@@ -175,6 +175,17 @@ def test_a_refused_key_neither_replaces_the_stored_key_nor_joins_the_rotation(cl
     assert [key["last4"] for key in client.get("/providers", headers=ADMIN).json()[0]["keys"]] == ["7777"]
 
 
+def test_the_check_asks_the_smallest_chat_model_the_provider_lists(client, fakes):
+    add_openai(client)
+    fakes.models = ["gpt-5.5", "gpt-5.4", "gpt-5.4-mini", "gpt-5.4-nano", "gpt-5.4-nano-tts", "text-embedding-3-large"]
+
+    result = client.post("/providers/openai/test", headers=ADMIN, json={}).json()
+
+    assert result["model"] == "gpt-5.4-nano" and result["structured_output"] is True
+    assert fakes.probed[0].model == "openai/gpt-5.4-nano"
+    assert client.delete("/providers/nope", headers=ADMIN).status_code == 404
+
+
 def test_models_are_listed_with_the_decrypted_key(client, fakes):
     add_openai(client)
 
