@@ -107,6 +107,18 @@ class SyncView(ContractModel):
     error: FailureReason | None
 
 
+class SourcePack(ContractModel):
+    """The pack built from a source, which its conversations are answered from."""
+
+    name: str
+    # ready: compiled and answering; building: a build is running; failed: the build failed and no pack answers;
+    # none: never built.
+    status: Literal["ready", "building", "failed", "none"]
+    datasets: int
+    # Why the latest build failed; also set on a ready pack when a rebuild failed and the previous pack still answers.
+    error: str | None = None
+
+
 class SourceView(ContractModel):
     id: str
     kind: SourceKind
@@ -121,6 +133,7 @@ class SourceView(ContractModel):
     table_count: int
     selected_count: int
     last_sync: SyncView | None
+    pack: SourcePack | None = None
 
 
 class SourceDetail(SourceView):

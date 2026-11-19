@@ -192,13 +192,19 @@ class AdminLogs:
             for ts, trace_id, user_id, src, result, mode, score, hits in self.query(sql, parameters)
         ]
 
-    def costs(self, *, start: date, end: date) -> list[CostRow]:
+    def costs(self, *, start: date, end: date, pack: str | None = None) -> list[CostRow]:
+        """Model call costs by day; with ``pack``, only the calls of runs that pack answered."""
+        parameters: dict = {"start": start, "end": end}
+        scope = ""
+        if pack:
+            scope = "AND trace_id IN (SELECT trace_id FROM agent_logs.runs WHERE pack = {pack:String}) "
+            parameters["pack"] = pack
         rows = self.query(
             "SELECT toString(toDate(ts)) AS day, alias, provider, model, tier, count() AS calls, sum(cost_usd) AS cost, "
             "sum(prompt_tokens) AS input_tokens, sum(completion_tokens) AS output_tokens "
-            "FROM agent_logs.llm_calls WHERE ts >= {start:Date} AND ts < {end:Date} "
+            "FROM agent_logs.llm_calls WHERE ts >= {start:Date} AND ts < {end:Date} " + scope +
             "GROUP BY day, alias, provider, model, tier ORDER BY day, alias, provider, model, tier",
-            {"start": start, "end": end},
+            parameters,
         )
         return [
             # Rows written through the LiteLLM Proxy have no provider column value; their alias names it.

@@ -321,6 +321,18 @@
           "format": "date-time",
           "title": "Updated At",
           "type": "string"
+        },
+        "pack": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Pack"
         }
       },
       "required": [

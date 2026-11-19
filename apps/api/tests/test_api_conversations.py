@@ -52,7 +52,7 @@ def test_list_search_and_read_a_thread(client, store):
     thread = client.get(f"/conversations/{mine}", headers=headers()).json()
 
     assert [item["title"] for item in listed] == ["Top widgets", "Doanh thu quý 1"]
-    assert set(listed[0]) == {"id", "title", "pinned", "group_id", "updated_at"}
+    assert set(listed[0]) == {"id", "title", "pinned", "group_id", "updated_at", "pack"}
     assert [item["id"] for item in found] == [mine]
     assert thread["conversation"]["id"] == mine
     assert [(turn["turn"], turn["question"], [event["event"] for event in turn["events"]]) for turn in thread["turns"]] == [

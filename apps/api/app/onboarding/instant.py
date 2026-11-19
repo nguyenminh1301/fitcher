@@ -216,6 +216,11 @@ class InstantPipeline:
     def job(self, job_id: str) -> InstantJob | None:
         return self._jobs.get(job_id)
 
+    def latest_job(self, source_id: str) -> InstantJob | None:
+        """The source's most recent pack build of this process, running or finished."""
+        jobs = [job for job in self._jobs.values() if job.source_id == source_id]
+        return max(jobs, key=lambda job: job.started_at) if jobs else None
+
     # the job
 
     def run(self, job: InstantJob) -> InstantJob:

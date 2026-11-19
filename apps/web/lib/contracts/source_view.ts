@@ -32,6 +32,10 @@ export type Error =
       | "interrupted"
     )
   | null;
+export type Name = string;
+export type Status1 = "ready" | "building" | "failed" | "none";
+export type Datasets = number;
+export type Error1 = string | null;
 
 export interface SourceView {
   id: Id;
@@ -47,6 +51,7 @@ export interface SourceView {
   table_count: TableCount;
   selected_count: SelectedCount;
   last_sync: SyncView | null;
+  pack?: SourcePack | null;
 }
 export interface SyncView {
   id: Id1;
@@ -56,4 +61,13 @@ export interface SyncView {
   finished_at: FinishedAt;
   results: Results;
   error: Error;
+}
+/**
+ * The pack built from a source, which its conversations are answered from.
+ */
+export interface SourcePack {
+  name: Name;
+  status: Status1;
+  datasets: Datasets;
+  error?: Error1;
 }

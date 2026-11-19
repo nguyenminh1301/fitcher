@@ -5,6 +5,7 @@ export type Title = string;
 export type Pinned = boolean;
 export type GroupId = string | null;
 export type UpdatedAt = string;
+export type Pack = string | null;
 export type Turn = number;
 export type Revision = number;
 export type Question = string;
@@ -104,6 +105,7 @@ export interface Conversation {
   pinned: Pinned;
   group_id: GroupId;
   updated_at: UpdatedAt;
+  pack?: Pack;
 }
 export interface ConversationTurn {
   turn: Turn;

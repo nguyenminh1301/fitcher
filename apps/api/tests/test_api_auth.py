@@ -51,7 +51,7 @@ def test_a_pack_under_onboarding_is_named_from_its_pack_files(client, monkeypatc
     from conftest import FIXTURE_PACK
 
     del app.dependency_overrides[runtime.get_compiled_or_none]
-    runtime.get_compiled.cache_clear()
+    runtime.reload_pack()
     monkeypatch.setenv("ACTIVE_PACK", "minimal")
     monkeypatch.setenv("COMPILED_PACK_DIR", str(tmp_path / "build"))
     monkeypatch.setenv("PACKS_DIR", str(FIXTURE_PACK.parent))
@@ -64,7 +64,7 @@ def test_a_pack_under_onboarding_is_named_from_its_pack_files(client, monkeypatc
 def test_an_uncompiled_pack_makes_the_endpoints_unavailable(client, monkeypatch, tmp_path):
     del app.dependency_overrides[runtime.get_compiled]
     del app.dependency_overrides[runtime.get_compiled_or_none]
-    runtime.get_compiled.cache_clear()
+    runtime.reload_pack()
     monkeypatch.setenv("ACTIVE_PACK", "demo")
     monkeypatch.setenv("COMPILED_PACK_DIR", str(tmp_path))
     monkeypatch.setenv("PACKS_DIR", str(tmp_path / "packs"))
@@ -74,7 +74,7 @@ def test_an_uncompiled_pack_makes_the_endpoints_unavailable(client, monkeypatch,
     assert response.status_code == 503
     assert "compile the pack first" in response.json()["detail"]
     assert client.get("/me", headers=SessionHeaders()).status_code == 503
-    runtime.get_compiled.cache_clear()
+    runtime.reload_pack()
 
 
 def test_suggestions_are_the_first_approved_example_questions_of_the_active_pack(client):
@@ -88,11 +88,28 @@ def test_suggestions_are_the_first_approved_example_questions_of_the_active_pack
 def test_a_new_instance_without_any_pack_still_knows_the_owner(client, monkeypatch):
     del app.dependency_overrides[runtime.get_compiled]
     del app.dependency_overrides[runtime.get_compiled_or_none]
-    runtime.get_compiled.cache_clear()
+    runtime.reload_pack()
     monkeypatch.setattr(runtime, "current_pack", lambda: "")
 
     response = client.get("/me")
 
     assert response.status_code == 200
     assert response.json()["active_role"] is None and response.json()["roles"] == ["pack_reviewer", "admin"]
-    runtime.get_compiled.cache_clear()
+    runtime.reload_pack()
+
+
+def test_a_request_names_the_pack_it_reads_and_others_keep_the_pack_used_last(client, monkeypatch, tmp_path):
+    from conftest import FIXTURE_PACK
+
+    del app.dependency_overrides[runtime.get_compiled_or_none]
+    runtime.reload_pack()
+    monkeypatch.setenv("ACTIVE_PACK", "elsewhere")
+    monkeypatch.setenv("COMPILED_PACK_DIR", str(tmp_path / "build"))
+    monkeypatch.setenv("PACKS_DIR", str(FIXTURE_PACK.parent))
+
+    named = client.get("/pack", params={"pack": "minimal"})
+    default = client.get("/pack")
+
+    assert named.status_code == 200 and named.json()["name"] == "minimal"
+    assert default.status_code == 503 and "elsewhere" in default.json()["detail"]
+    runtime.reload_pack()

@@ -32,6 +32,9 @@ class AskRequest(ContractModel):
     question: str = Field(min_length=1, max_length=4000)
     # A conversation of the asking user to continue; null starts one. The response names it in X-Conversation-Id.
     conversation_id: str | None = None
+    # The pack (one per data source) a new conversation is answered from; the pack used last when null. A
+    # conversation that continues keeps its own pack.
+    pack: str | None = Field(default=None, pattern=r"^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$")
     # The browser's IANA time zone; UTC when null (DECISIONS §6 step 5).
     timezone: str | None = None
     # Ask this question in place of that turn of the conversation, under a new revision; later turns leave the thread.

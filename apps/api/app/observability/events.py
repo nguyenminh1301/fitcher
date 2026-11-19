@@ -204,6 +204,9 @@ class ConversationRecord(LogRecord):
     title: str
     pinned: bool
     group_id: str
+    # The pack of the source the conversation was started on; empty for a conversation stored before packs per
+    # conversation, which keeps the pack the instance used then.
+    pack: str = ""
     deleted: bool
     created_at: datetime
     updated_at: datetime

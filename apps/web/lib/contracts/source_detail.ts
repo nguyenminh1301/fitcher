@@ -33,10 +33,14 @@ export type Error =
     )
   | null;
 export type Name = string;
+export type Status1 = "ready" | "building" | "failed" | "none";
+export type Datasets = number;
+export type Error1 = string | null;
+export type Name1 = string;
 export type Kind1 = "table" | "view";
 export type Rows = number | null;
 export type SizeBytes = number | null;
-export type Name1 = string;
+export type Name2 = string;
 export type Type = string;
 export type Nullable = boolean;
 export type Columns = ColumnView[];
@@ -73,6 +77,7 @@ export interface SourceDetail {
   table_count: TableCount;
   selected_count: SelectedCount;
   last_sync: SyncView | null;
+  pack?: SourcePack | null;
   tables: Tables;
 }
 export interface SyncView {
@@ -84,8 +89,17 @@ export interface SyncView {
   results: Results;
   error: Error;
 }
-export interface TableView {
+/**
+ * The pack built from a source, which its conversations are answered from.
+ */
+export interface SourcePack {
   name: Name;
+  status: Status1;
+  datasets: Datasets;
+  error?: Error1;
+}
+export interface TableView {
+  name: Name1;
   kind: Kind1;
   rows: Rows;
   size_bytes: SizeBytes;
@@ -106,7 +120,7 @@ export interface TableView {
   next_run_at: NextRunAt;
 }
 export interface ColumnView {
-  name: Name1;
+  name: Name2;
   type: Type;
   nullable: Nullable;
 }

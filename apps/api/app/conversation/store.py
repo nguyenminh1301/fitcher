@@ -65,7 +65,7 @@ ERASE_MESSAGES_SQL = (
 ERASE_CONVERSATION_SQL = (
     "DELETE FROM agent_logs.conversations WHERE user_id = {user_id:String} AND conversation_id = {conversation_id:String}"
 )
-CONVERSATION_COLUMNS = ("conversation_id", "title", "pinned", "group_id", "deleted", "created_at", "updated_at")
+CONVERSATION_COLUMNS = ("conversation_id", "title", "pinned", "group_id", "deleted", "created_at", "updated_at", "pack")
 GROUP_COLUMNS = ("group_id", "name", "deleted", "updated_at")
 MESSAGE_COLUMNS = ("turn", "revision", "role", "content", "query_spec", "result", "trace_id", "ts", "events")
 
@@ -138,6 +138,8 @@ class OpenTurn:
     revision: int
     history: list[Turn]
     question: str = ""
+    # The pack the conversation's questions are answered from.
+    pack: str = ""
 
 
 def current_thread(rows: list[ChatMessageRecord]) -> list[Turn]:
@@ -186,20 +188,27 @@ def shown_events(turn: Turn) -> list[EventModel]:
 class ConversationStore:
     def __init__(
         self, client, clock: Callable[[], datetime] = utc_now, new_id: Callable[[], str] = lambda: str(uuid4()),
+        earlier_pack: Callable[[], str] = lambda: "",
     ):
+        """``earlier_pack`` names the pack of a conversation stored before each conversation kept its pack."""
         self._client = client
         self._clock = clock
         self._new_id = new_id
+        self._earlier_pack = earlier_pack
+
+    def pack_of(self, user_id: str, conversation_id: str) -> str:
+        """The pack the conversation is answered from; raises ``ConversationNotFound``."""
+        return self._owned(user_id, conversation_id).pack or self._earlier_pack()
 
     # turns
 
     def open_turn(
         self, user_id: str, conversation_id: str | None, question: str, *,
-        edit_of_turn: int | None = None, retry_of_turn: int | None = None,
+        edit_of_turn: int | None = None, retry_of_turn: int | None = None, pack: str = "",
     ) -> OpenTurn:
         """Open the next turn, or a new revision of an earlier one; ``question`` writes the question later.
 
-        ``conversation_id`` None starts a conversation. Raises ``ConversationNotFound`` when ``user_id``
+        ``conversation_id`` None starts a conversation on ``pack``. Raises ``ConversationNotFound`` when ``user_id``
         has no such conversation and ``TurnNotFound`` when the edited or retried turn is not in its thread.
         """
         if conversation_id is None:
@@ -207,10 +216,10 @@ class ConversationStore:
             now = self._clock()
             self._insert(ConversationRecord(
                 user_id=user_id, conversation_id=conversation_id, title=question[:TITLE_LENGTH], pinned=False,
-                group_id="", deleted=False, created_at=now, updated_at=now,
+                group_id="", deleted=False, created_at=now, updated_at=now, pack=pack,
             ))
         else:
-            self._owned(user_id, conversation_id)
+            pack = self._owned(user_id, conversation_id).pack or self._earlier_pack()
             rows = self._messages(user_id, conversation_id)
             thread = current_thread(rows)
             replaced = edit_of_turn or retry_of_turn
@@ -225,7 +234,7 @@ class ConversationStore:
                 revision = max(row.revision for row in rows) + 1
                 if retry_of_turn is not None:
                     question = target.question
-        return OpenTurn(user_id, conversation_id, number, revision, history, question)
+        return OpenTurn(user_id, conversation_id, number, revision, history, question, pack)
 
     def question(self, turn: OpenTurn) -> None:
         """Write the question of ``turn``, once screening has let it through."""
@@ -379,11 +388,11 @@ class ConversationStore:
         shown = [self._view(row, activity.get(row.conversation_id)) for row in self._rows(user_id) if not row.deleted]
         return sorted(shown, key=lambda item: item.updated_at, reverse=True)
 
-    @staticmethod
-    def _view(row: ConversationRecord, last_message: datetime | None) -> Conversation:
+    def _view(self, row: ConversationRecord, last_message: datetime | None) -> Conversation:
         updated = max(row.updated_at, last_message) if last_message else row.updated_at
         return Conversation(
             id=row.conversation_id, title=row.title, pinned=row.pinned, group_id=row.group_id or None, updated_at=updated,
+            pack=row.pack or self._earlier_pack() or None,
         )
 
     # writes

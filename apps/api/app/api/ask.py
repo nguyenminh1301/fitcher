@@ -1,8 +1,11 @@
 """``POST /ask``: answer one question as a stream of server-sent events (DECISIONS §6).
 
-The request is authenticated, mapped to its pack role and rate limited before
-the graph starts. The question then opens a turn of its conversation: a new
-one when the request names none, otherwise one the user owns, or 404; an edit
+The request is authenticated and rate limited, then served from its pack: the
+pack of the conversation it continues, else the ``pack`` it names (one pack
+per data source), else the pack used last; it is mapped to its role in that
+pack before the graph starts. The question then opens a turn of its
+conversation: a new one, on that pack, when the request names none, otherwise
+one the user owns, or 404; an edit
 or retry opens a new revision of a turn in its thread, or 404. The
 conversation id is returned in the ``X-Conversation-Id`` header. The graph
 runs in a worker thread over the conversation's thread so far;
@@ -26,18 +29,24 @@ import threading
 from typing import Annotated, Literal, Protocol
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from collections.abc import Callable
+
+from fastapi import APIRouter, Depends, Header, HTTPException, status
 from fastapi.responses import StreamingResponse
 
 from app.agent.nodes.resolve_time import TimeResolutionError, reference_date
 from app.agent.nodes.screen import blocked_message
 from app.agent.state import AgentState, RunCancelled
 from app.api.agent import Agent, AgentRun
-from app.api.auth import current_principal, current_role
+from app.api.auth import current_principal, pack_roles
 from app.api.limits import QuestionGate
 from app.api.rate_limit import RateLimiter
-from app.api.runtime import get_agent, get_conversation_store, get_question_gate, get_rate_limiter, unavailable
+from app.api import runtime
+from app.api.runtime import get_conversation_store, get_question_gate, get_rate_limiter, unavailable
 from app.auth.principal import Principal
+from app.auth.roles import active_role, RoleError
+from app.packs.active import set_active_pack
+from app.packs.compiler import CompiledPack
 from app.contracts.events import (
     AskRequest, BlockedEvent, ChartSpecEvent, ClarifyEvent, DenyEvent, DoneEvent, ErrorEvent, EventModel, ResultEvent,
     SqlEvent, StatusEvent, SummaryEvent,
@@ -285,24 +294,82 @@ def rate_limited(
         )
 
 
+def _served(pack: str, build: Callable[[], object]):
+    with runtime.serving(pack):
+        return build()
+
+
+def get_compiled_for() -> Callable[[str], CompiledPack]:
+    """The compiled pack of a name; 503 when it was never compiled."""
+    return lambda pack: _served(pack, runtime.get_compiled)
+
+
+def get_agent_for() -> Callable[[str], Agent]:
+    """The agent of a pack, kept per pack."""
+    return lambda pack: _served(pack, runtime.get_agent)
+
+
+def _remember(pack: str) -> None:
+    """The pack asked last is where a new chat starts; failing to record it never fails the question."""
+    try:
+        if runtime.last_used_pack() != pack:
+            set_active_pack(runtime.get_state_db(), pack)
+    except Exception:  # noqa: BLE001 - the app state is busy or unwritable
+        logger.warning("the last used pack was not recorded")
+
+
+def get_remember_pack() -> Callable[[str], None]:
+    return _remember
+
+
+def get_last_used_pack() -> str:
+    return runtime.last_used_pack()
+
+
+def _pack_of(request: AskRequest, user_id: str, store: ConversationStore, last_used: str) -> str:
+    """The conversation's pack, else the pack the request names, else the pack used last."""
+    if request.conversation_id is None:
+        pack = request.pack or last_used
+    else:
+        try:
+            pack = store.pack_of(user_id, request.conversation_id) or last_used
+        except ConversationNotFound:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, detail="conversation not found") from None
+        except Exception:  # noqa: BLE001 - ClickHouse is unreachable or refused the conversation tables
+            logger.exception("cannot read the conversation's pack")
+            raise unavailable("the conversation store is unavailable") from None
+    if not pack:
+        raise unavailable("no pack is active: connect a source and build its pack, or set ACTIVE_PACK")
+    return pack
+
+
 @router.post("/ask", response_class=StreamingResponse)
 def ask(
     request: AskRequest,
     principal: Annotated[Principal, Depends(current_principal)],
-    role: Annotated[str, Depends(current_role)],
     _: Annotated[None, Depends(rate_limited)],
-    agent: Annotated[Agent, Depends(get_agent)],
+    compiled_for: Annotated[Callable[[str], CompiledPack], Depends(get_compiled_for)],
+    agent_for: Annotated[Callable[[str], Agent], Depends(get_agent_for)],
+    remember: Annotated[Callable[[str], None], Depends(get_remember_pack)],
+    last_used: Annotated[str, Depends(get_last_used_pack)],
     store: Annotated[ConversationStore, Depends(get_conversation_store)],
     gate: Annotated[QuestionGate, Depends(get_question_gate)],
+    x_active_role: Annotated[str | None, Header()] = None,
 ) -> StreamingResponse:
     try:
         today = reference_date(request.timezone)
     except TimeResolutionError as error:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(error)) from None
+    pack = _pack_of(request, principal.user_id, store, last_used)
+    try:
+        role = active_role(principal.roles, pack_roles(compiled_for(pack)), x_active_role)
+    except RoleError as error:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, detail=str(error)) from None
+    agent = agent_for(pack)
     try:
         turn = store.open_turn(
             principal.user_id, request.conversation_id, request.question,
-            edit_of_turn=request.edit_of_turn, retry_of_turn=request.retry_of_turn,
+            edit_of_turn=request.edit_of_turn, retry_of_turn=request.retry_of_turn, pack=pack,
         )
     except ConversationNotFound:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="conversation not found") from None
@@ -316,6 +383,7 @@ def ask(
     except Exception:  # noqa: BLE001 - the role's ClickHouse client could not be created
         logger.exception("cannot prepare a run as role %s", role)
         raise unavailable("the agent cannot reach its data store") from None
+    remember(pack)
     return StreamingResponse(
         event_stream(run, turn.question, AnswerEvents(role, unreviewed_metrics(run.deps.compiled)), record=StoredTurn(store, turn),
                      gate=gate),

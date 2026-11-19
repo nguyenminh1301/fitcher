@@ -69,11 +69,12 @@ def list_screening(
 @router.get("/costs")
 def list_costs(
     _: Admin, logs: Logs, start: Annotated[date | None, Query(alias="from")] = None,
-    end: Annotated[date | None, Query(alias="to")] = None,
+    end: Annotated[date | None, Query(alias="to")] = None, pack: str | None = None,
 ) -> list[CostRow]:
+    """Every model call's cost, or with ``pack`` only the calls of that pack's questions."""
     end = end or date.today() + timedelta(days=1)
     start = start or end - timedelta(days=COST_DAYS)
-    return _read(lambda: logs.costs(start=start, end=end))
+    return _read(lambda: logs.costs(start=start, end=end, pack=pack))
 
 
 @router.get("/conversations")

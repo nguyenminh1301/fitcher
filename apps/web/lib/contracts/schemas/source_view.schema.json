@@ -1,5 +1,48 @@
 {
   "$defs": {
+    "SourcePack": {
+      "additionalProperties": false,
+      "description": "The pack built from a source, which its conversations are answered from.",
+      "properties": {
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "ready",
+            "building",
+            "failed",
+            "none"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "datasets": {
+          "title": "Datasets",
+          "type": "integer"
+        },
+        "error": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Error"
+        }
+      },
+      "required": [
+        "name",
+        "status",
+        "datasets"
+      ],
+      "title": "SourcePack",
+      "type": "object"
+    },
     "SyncView": {
       "additionalProperties": false,
       "properties": {
@@ -192,6 +235,17 @@
           "type": "null"
         }
       ]
+    },
+    "pack": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/SourcePack"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
     }
   },
   "required": [
