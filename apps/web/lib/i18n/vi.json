@@ -1129,6 +1129,7 @@
     "none": "Chưa có báo cáo nào",
     "noneText": "Chạy đánh giá để chấm gói trên bộ câu hỏi của nó.",
     "confirmTitle": "Chạy đánh giá?",
-    "confirmText": "Mỗi ca được hỏi qua model và nhà cung cấp tính phí từng lần gọi. Các ca chạy lần lượt nên có thể mất vài phút."
+    "confirmText": "Mỗi ca được hỏi qua model và nhà cung cấp tính phí từng lần gọi. Các ca chạy lần lượt nên có thể mất vài phút.",
+    "noEvalSet": "Gói này chưa có bộ câu hỏi đánh giá. Gói dựng từ nguồn dữ liệu bắt đầu mà chưa có bộ này; câu hỏi được thêm vào eval.yaml của gói cùng một ngày tham chiếu."
   }
 }

@@ -67,6 +67,21 @@ def test_a_second_eval_run_waits_for_the_first(client):
     assert client.post("/admin/eval-runs", headers=ADMIN).status_code == 409
 
 
+def test_a_pack_without_an_eval_set_is_refused_before_the_run_starts(client):
+    # A pack built from a source has no eval.yaml, so it has no reference date or cases to run.
+    compiled = compiled_fixture()
+    pack = compiled.pack.model_copy(update={"eval": compiled.pack.eval.model_copy(update={"reference_date": None})})
+    app.dependency_overrides[runtime.get_compiled_or_none] = lambda: compiled.model_copy(update={"pack": pack})
+    started = []
+    app.dependency_overrides[runtime.get_eval_runs] = lambda: EvalRuns(lambda name: started.append(name) or 0,
+                                                                        start_thread=lambda target: target())
+
+    response = client.post("/admin/eval-runs", headers=ADMIN)
+
+    assert response.status_code == 409 and response.json()["detail"].startswith("no_eval_set:")
+    assert started == []
+
+
 def test_a_finished_run_frees_the_pack():
     executed = []
     runs = EvalRuns(lambda pack: executed.append(pack) or 0, start_thread=lambda target: target())

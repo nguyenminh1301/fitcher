@@ -2,7 +2,8 @@
 
 Reports are read by a ``pack_reviewer`` or an ``admin``; only an ``admin``
 starts a run, which is billable, runs in the background inside the api and
-answers 409 while another run of the pack has not finished.
+answers 409 while another run of the pack has not finished, or when the pack has
+no evaluation set to run (a pack built from a source starts without one).
 """
 
 import logging
@@ -12,10 +13,12 @@ from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.api.auth import current_principal
 from app.api.console import ADMIN, PACK_REVIEWER, require_admin
-from app.api.runtime import get_eval_reports, get_eval_runs, unavailable
+from app.api.runtime import get_compiled_or_none, get_eval_reports, get_eval_runs, unavailable
 from app.auth.principal import Principal
 from app.contracts.evaluation import EvalReportView, EvalRunStarted
+from app.eval.cases import EvalSetError, load_eval_set
 from app.eval.console import EvalReports, EvalRuns, RunInProgress
+from app.packs.compiler import CompiledPack
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/admin")
@@ -55,8 +58,14 @@ def read_report(report_id: str, _: Reader, reports: Reports) -> EvalReportView:
 @router.post("/eval-runs", status_code=status.HTTP_202_ACCEPTED)
 def start_run(
     _: Annotated[Principal, Depends(require_admin)], reports: Reports,
-    runs: Annotated[EvalRuns, Depends(get_eval_runs)],
+    runs: Annotated[EvalRuns, Depends(get_eval_runs)], compiled: Annotated[CompiledPack | None, Depends(get_compiled_or_none)],
 ) -> EvalRunStarted:
+    # The run itself goes to the background, so a pack it cannot run is refused here rather than failing unseen.
+    if compiled is not None:
+        try:
+            load_eval_set(compiled.pack)
+        except EvalSetError as error:
+            raise HTTPException(status.HTTP_409_CONFLICT, detail=f"no_eval_set: {error}") from None
     try:
         runs.start(reports.pack)
     except RunInProgress as error:

@@ -1129,6 +1129,7 @@
     "none": "No reports yet",
     "noneText": "Run the evaluation to score the pack on its question set.",
     "confirmTitle": "Run the evaluation?",
-    "confirmText": "Every case is asked through the model, and the provider bills each call. Cases run one at a time, so this can take a few minutes."
+    "confirmText": "Every case is asked through the model, and the provider bills each call. Cases run one at a time, so this can take a few minutes.",
+    "noEvalSet": "This pack has no evaluation questions yet. A pack built from a source starts without them; they are added to the pack's eval.yaml with a reference date."
   }
 }

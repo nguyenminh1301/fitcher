@@ -9,6 +9,7 @@
 
 ### Fixed
 
+- Run evaluation on a pack without evaluation questions, such as one built from a source, says so on the page; before, the run was accepted and failed in the background with only a log line.
 - When the pack is built, a dataset keeps the evidence it already cites when the model cites nothing known, instead of every dataset citing the first table, and the model may pick a better time column among the table's dates.
 - A PostgreSQL table that was never analysed shows an unknown size when choosing tables, instead of 0 B.
 - A question for "all time" is answered over every date the data has instead of failing with an internal error.
