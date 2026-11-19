@@ -13,6 +13,7 @@ from typing import Annotated, TypeVar
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 
 from app.api.auth import current_principal
+from app.api.live_runs import LIVE_RUNS
 from app.api.runtime import get_conversation_store, unavailable
 from app.auth.principal import Principal
 from app.contracts.conversations import Conversation, ConversationGroup, ConversationPatch, ConversationThread, GroupInput
@@ -57,7 +58,8 @@ def search_conversations(
 
 @router.get("/conversations/{conversation_id}")
 def read_conversation(conversation_id: str, user: User, store: Store) -> ConversationThread:
-    return _call(lambda: store.thread(user.user_id, conversation_id))
+    thread = _call(lambda: store.thread(user.user_id, conversation_id))
+    return thread.model_copy(update={"running": LIVE_RUNS.running(user.user_id, conversation_id)})
 
 
 @router.patch("/conversations/{conversation_id}")

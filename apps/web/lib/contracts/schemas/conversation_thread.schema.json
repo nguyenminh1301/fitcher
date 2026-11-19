@@ -774,6 +774,11 @@
       },
       "title": "Turns",
       "type": "array"
+    },
+    "running": {
+      "default": false,
+      "title": "Running",
+      "type": "boolean"
     }
   },
   "required": [

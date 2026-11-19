@@ -102,6 +102,33 @@ describe("asking a question", () => {
     expect(state.busy).toBeNull();
   });
 
+  it("follows a question the api is still answering after the page was left, until its answer is stored", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const answering = { conversation: { id: "c1", title: "top", pinned: false, group_id: null, updated_at: "2026-11-20T08:00:00Z", pack: "shop" },
+      turns: [{ turn: 1, revision: 1, question: "top", question_lang: "en", events: [] }], running: true };
+    const answered = { ...answering, running: false, turns: [{ ...answering.turns[0], events: [{ event: "done" as const, trace_id: "t" }] }] };
+    const get = vi.fn().mockResolvedValueOnce(answering).mockResolvedValueOnce(answering).mockResolvedValue(answered);
+    const stop = vi.fn(async () => undefined);
+    const base = api();
+    const chat = { ...base.chat, stop };
+    render(
+      <ChatProvider api={{ ...base, chat, conversations: { ...base.conversations, get } } as FitcherApi} navigate={vi.fn()} activeId={null}>
+        <Probe />
+      </ChatProvider>,
+    );
+    await waitFor(() => expect(state.loaded).toBe(true));
+
+    await act(async () => { await state.loadThread("c1"); });
+    expect(state.threads.c1.running).toBe(true);
+    act(() => state.stop("c1"));
+    expect(stop).toHaveBeenCalledWith("c1");
+
+    await act(async () => { await vi.advanceTimersByTimeAsync(4500); });
+    await waitFor(() => expect(state.threads.c1.running).toBe(false));
+    expect(state.threads.c1.turns[0].events).toEqual([{ event: "done", trace_id: "t" }]);
+    vi.useRealTimers();
+  });
+
   it("ignores a second question while one is running", async () => {
     setup(40);
     await waitFor(() => expect(state.loaded).toBe(true));
@@ -148,6 +175,7 @@ describe("asking through the api", () => {
     const base = api();
     const chat: FitcherApi["chat"] = {
       suggestions: async () => [],
+      stop: async () => undefined,
       async *ask(request, _signal, onConversation) {
         requests.push(request);
         onConversation?.(conversationId);

@@ -75,6 +75,8 @@ export interface FitcherApi {
     /** Stream an answer; ``onConversation`` learns the id the api gave a conversation the request started. */
     ask(request: AskRequest, signal: AbortSignal, onConversation?: (conversationId: string) => void): AsyncIterable<AskEvent>;
     suggestions(): Promise<{ text: string; lang: string }[]>;
+    /** Stop the question a conversation is answering; leaving the page does not stop it. */
+    stop(conversationId: string): Promise<void>;
   };
   conversations: {
     list(): Promise<Conversation[]>;

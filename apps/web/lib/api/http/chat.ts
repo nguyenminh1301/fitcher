@@ -63,6 +63,10 @@ export function createHttpChat(fetcher: typeof fetch = (...args) => fetch(...arg
       }
       throw new Error("The answer stream ended before the answer was complete.");
     },
+    // A run outlives its stream, so the Stop button asks the api to stop it; 404 means it already ended.
+    stop: async (conversationId) => {
+      await fetcher(`/api/conversations/${encodeURIComponent(conversationId)}/stop`, { method: "POST" });
+    },
     // A hand-written pack keeps its suggested questions with its sample data; a pack built from a source has none,
     // so the api offers its first example questions (DECISIONS §11 step 0). The answers always come from the api.
     suggestions: async () => {

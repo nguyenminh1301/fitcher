@@ -36,7 +36,7 @@ describe("http conversations", () => {
     const thread = await conversations.get("c 1");
 
     expect(call(fetcher).url).toBe("/api/conversations/c%201");
-    expect(thread).toEqual({ conversation: CONVERSATION, turns: [{ ...turn, question_lang: "vi" }] });
+    expect(thread).toEqual({ conversation: CONVERSATION, turns: [{ ...turn, question_lang: "vi" }], running: false });
   });
 
   it("returns no thread for a conversation the api does not know", async () => {
