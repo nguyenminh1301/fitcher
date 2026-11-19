@@ -16,8 +16,9 @@ import { useConsole } from "@/components/console/ConsoleLayout";
 import { ListPage } from "@/components/console/ListPage";
 import { billing, PRESETS, presetById, presetIncomplete, providerCreate, type ProviderPreset } from "@/components/models/presets";
 import { presetName, ProviderPicker } from "@/components/models/ProviderPicker";
+import { ClassifierBox } from "@/components/models/ClassifierBox";
 import { TierChainDialog, TierChainRow, useCatalogs } from "@/components/models/TierChainPicker";
-import { Segmented, Switch } from "@/components/ui/controls";
+import { Segmented } from "@/components/ui/controls";
 import { Dialog } from "@/components/ui/overlay";
 import type { FitcherApi } from "@/lib/api/client";
 import { errorText } from "@/lib/api/errorText";
@@ -30,7 +31,6 @@ const LOCAL_MODELS = [
   "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",
   "sentence-transformers/paraphrase-multilingual-mpnet-base-v2",
 ];
-const FETCH_COMMAND = "docker compose run --rm guard-model";
 
 type Page = { providers: ProviderView[]; tiers: ModelTiersView; classifier: ClassifierStatus };
 type Models = FitcherApi["models"];
@@ -291,15 +291,6 @@ export function ModelsSection() {
     }
   }
 
-  async function toggleClassifier(status: ClassifierStatus) {
-    try {
-      await models.setClassifier(!status.enabled);
-      await changed(status.enabled ? t("modelsPage.classifierOff") : t("modelsPage.classifierOn"));
-    } catch (cause) {
-      setError(t("models.failed", { reason: errorText(cause) }));
-    }
-  }
-
   const add = <button type="button" className="fc-btn fc-btn-primary" onClick={() => setAdding(true)}><Icon name="plus" />{t("modelsPage.addProvider")}</button>;
   const view = data?.tiers.embedding;
   return (
@@ -361,22 +352,7 @@ export function ModelsSection() {
           </div>
         </section>
       ) : null}
-      {data ? (
-        <section className="box" aria-labelledby="classifier-title">
-          <div className="box-head"><h2 id="classifier-title" className="box-title">{t("models.classifier")}</h2></div>
-          <div className="box-body">
-            <div>
-              <Switch label={t("models.classifier")} checked={data.classifier.enabled} disabled={!data.classifier.enabled && !data.classifier.model_present}
-                onChange={() => void toggleClassifier(data.classifier)} />
-            </div>
-            <p className="fc-muted" style={{ margin: 0 }}>{t("models.classifierOff")}</p>
-            <p className="fc-muted" style={{ margin: 0 }}>{t("models.classifierOn")}</p>
-            {!data.classifier.model_present ? (
-              <div className="fc-banner fc-banner-info" role="status"><Icon name="info" /><div>{t("models.classifierMissing", { command: FETCH_COMMAND })}</div></div>
-            ) : null}
-          </div>
-        </section>
-      ) : null}
+      {data ? <ClassifierBox models={models} status={data.classifier} providers={data.providers} onChanged={changed} /> : null}
       {adding ? <AddDialog models={models} onClose={() => setAdding(false)} onAdded={(provider) => { setAdding(false); void changed(t("models.added", { name: provider.name })); }} /> : null}
       {picking && data && catalogs.entries ? (
         <TierChainDialog models={models} tier={picking} providers={data.providers} entries={catalogs.entries}

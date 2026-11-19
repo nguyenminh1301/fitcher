@@ -22,6 +22,7 @@
 ### Fixed
 
 - A run's page and the runs list read a running run again every two seconds and count its duration up, so a run that finished or failed shows its outcome without reloading; it used to stay "Running" with a duration of 0 ms after its model had already failed.
+- The prompt-injection filter can be turned on from the Models page: it finds the providers that list a Prompt Guard model (Groq does, free) and turns on with one click, or downloads the model for this computer with its progress. The switch used to stay disabled behind a command-line instruction, and the page now says that the English and Vietnamese rules check every question even while the filter is off.
 - A question no longer waits minutes on one slow model: each task waits at most 30 to 120 seconds for a model, a timeout is never retried on the same model, and the next model of the task's chain answers instead. A model that timed out, was unavailable or is billed on an account without credit is skipped for a while by the following questions. A run used to wait 360 seconds on one model before failing.
 - A model reply that does not match the expected answer format, including JSON with a number too long to read, is answered by the chain's next model instead of failing the whole run with an internal error.
 - Z.ai's "insufficient balance" reply to a billed model is reported as a model that needs credit instead of a rate limit, Gemini's "exceeded your current quota" rests only that model while the key keeps serving the others.

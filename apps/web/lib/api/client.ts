@@ -25,6 +25,8 @@ import type {
   RunRow,
   TraceItem,
   FeedbackInput,
+  ClassifierChange,
+  ClassifierDownload,
   ClassifierStatus,
   EmbeddingChange,
   EmbeddingView,
@@ -146,6 +148,12 @@ export interface FitcherApi {
     setEmbedding(change: EmbeddingChange): Promise<EmbeddingView>;
     classifier(): Promise<ClassifierStatus>;
     setClassifier(enabled: boolean): Promise<ClassifierStatus>;
+    /** Turn the classifier on or off and choose where it runs: a provider's Prompt Guard model or this computer. */
+    changeClassifier(change: ClassifierChange): Promise<ClassifierStatus>;
+    /** Download the classifier's model for this computer in the background, follow it, or cancel it. */
+    startClassifierDownload(): Promise<ClassifierDownload>;
+    classifierDownload(): Promise<ClassifierDownload>;
+    cancelClassifierDownload(): Promise<ClassifierDownload>;
   };
   /** Data sources (DECISIONS §4, §15): an admin connects, tests, edits, deletes and syncs them. No call returns a password. */
   sources: {

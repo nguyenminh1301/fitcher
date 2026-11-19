@@ -39,6 +39,10 @@ export function createHttpModels(fetcher: Fetcher = (...args) => fetch(...args))
     setEmbedding: (change) => json(fetcher, "/api/models/embedding", send("PUT", change)),
     classifier: () => json(fetcher, "/api/screening/classifier"),
     setClassifier: (enabled) => json(fetcher, "/api/screening/classifier", send(enabled ? "POST" : "DELETE")),
+    changeClassifier: (change) => json(fetcher, "/api/screening/classifier", send("PUT", change)),
+    startClassifierDownload: () => json(fetcher, "/api/screening/classifier/download", send("POST")),
+    classifierDownload: () => json(fetcher, "/api/screening/classifier/download"),
+    cancelClassifierDownload: () => json(fetcher, "/api/screening/classifier/download", send("DELETE")),
   };
 }
 

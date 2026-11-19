@@ -161,12 +161,42 @@ describe("models", () => {
     }));
   });
 
-  it("says how to fetch the classifier before it can be turned on", async () => {
+  it("turns the classifier on through a provider that lists a Prompt Guard model in one click", async () => {
+    Object.assign(api.models, {
+      providerModels: vi.fn(async (id: string) => ({ provider_id: id, models: id === "gemini"
+        ? ["gemini-2.5-flash"] : ["gpt-5.4", "meta-llama/llama-prompt-guard-2-22m", "meta-llama/llama-prompt-guard-2-86m"] })),
+      changeClassifier: vi.fn(async () => ({ ...CLASSIFIER, enabled: true, provider_id: "openai", model: "meta-llama/llama-prompt-guard-2-86m" })),
+    });
+    show();
+    const classifier = await screen.findByRole("region", { name: "Prompt-injection filter" });
+    const toggle = within(classifier).getByRole("switch", { name: "Prompt-injection filter" }) as HTMLButtonElement;
+    await waitFor(() => expect(toggle.disabled).toBe(false));
+
+    await act(async () => fireEvent.click(toggle));
+
+    expect(api.models.changeClassifier).toHaveBeenCalledWith({
+      enabled: true, engine: "provider", provider_id: "openai", model: "meta-llama/llama-prompt-guard-2-86m",
+    });
+  });
+
+  it("offers Groq or the download when no provider hosts the classifier, and downloads with progress", async () => {
+    Object.assign(api.models, {
+      startClassifierDownload: vi.fn(async () => ({ state: "downloading", bytes_done: 10_000_000, bytes_total: 300_000_000 })),
+      classifierDownload: vi.fn(async () => ({ state: "downloading", bytes_done: 20_000_000, bytes_total: 300_000_000 })),
+    });
     show();
     const classifier = await screen.findByRole("region", { name: "Prompt-injection filter" });
 
-    expect(within(classifier).getByText(/docker compose run --rm guard-model/)).toBeTruthy();
+    expect(await within(classifier).findByText(/Add Groq \(free\)/)).toBeTruthy();
     expect((within(classifier).getByRole("switch", { name: "Prompt-injection filter" }) as HTMLButtonElement).disabled).toBe(true);
+    expect(within(classifier).getByText(/rules check every question, even when the filter is off/)).toBeTruthy();
+
+    fireEvent.click(within(classifier).getByRole("radio", { name: "On this computer" }));
+    await act(async () => fireEvent.click(within(classifier).getByRole("button", { name: /Download the model/ })));
+
+    expect(api.models.startClassifierDownload).toHaveBeenCalled();
+    expect(within(classifier).getByRole("progressbar", { name: "Download progress" })).toBeTruthy();
+    expect(within(classifier).getByText("10 MB / 300 MB")).toBeTruthy();
   });
 
   it("adds a provider from the cards, checks it, and removes it again when the check fails", async () => {

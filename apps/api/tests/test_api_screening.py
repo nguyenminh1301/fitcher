@@ -73,7 +73,7 @@ def test_turning_it_on_without_a_provider_or_a_model_is_refused(client):
                          json={"enabled": True, "engine": "provider", "provider_id": "nope"})
 
     assert refused.status_code == 422 and "provider" in refused.json()["detail"]
-    assert local.status_code == 409 and "Security page" in local.json()["detail"]
+    assert local.status_code == 409 and "Models page" in local.json()["detail"]
     assert unknown.status_code == 422
     assert client.get("/screening/classifier", headers=ADMIN).json()["enabled"] is False
 

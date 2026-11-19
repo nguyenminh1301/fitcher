@@ -497,8 +497,6 @@
     "embeddingSaved": "Đã đổi model embedding. Hãy compile lại pack.",
     "classifier": "Bộ lọc prompt injection",
     "classifierOn": "Bật: mọi câu hỏi được chấm thêm bằng bộ phân loại; câu hỏi dừng lại khi bộ phân loại không chạy được.",
-    "classifierOff": "Tắt: bộ quy tắc tiếng Anh và tiếng Việt kiểm tra mọi câu hỏi.",
-    "classifierMissing": "Model của bộ phân loại chưa được tải. Chạy {command} rồi bật.",
     "turnOn": "Bật",
     "turnOff": "Tắt",
     "cancel": "Huỷ",
@@ -1179,5 +1177,25 @@
     "jsonHelp": "Đã biết trả lời được theo JSON schema",
     "benchmark": "Điểm {score}",
     "benchmarkHelp": "Chỉ số trí tuệ của Artificial Analysis: càng cao càng tốt"
+  },
+  "classifier": {
+    "rulesAlways": "Bộ luật tiếng Anh và tiếng Việt luôn kiểm tra mọi câu hỏi, kể cả khi bộ lọc tắt: câu hỏi tìm cách đổi chỉ dẫn của fitcher sẽ bị chặn.",
+    "whereLabel": "Nơi chạy bộ phân loại",
+    "engine_provider": "Qua nhà cung cấp",
+    "engine_local": "Trên máy này",
+    "looking": "Đang tìm nhà cung cấp có model Prompt Guard…",
+    "provider": "Nhà cung cấp chạy bộ phân loại",
+    "model": "Model phân loại",
+    "use": "Dùng lựa chọn này",
+    "noHost": "Chưa nhà cung cấp nào của bạn có model Prompt Guard. Thêm Groq (miễn phí) ở trang này để chạy Llama Prompt Guard, hoặc chạy bộ phân loại trên máy này.",
+    "runsOn": "Đang bật: mọi câu hỏi được {model} trên {provider} chấm điểm thêm.",
+    "runsHere": "Đang bật: mọi câu hỏi được chấm điểm thêm ngay trên máy này.",
+    "download": "Tải model {size}",
+    "downloaded": "Đã tải xong model của bộ phân loại",
+    "downloadedNote": "Model đã có trên máy này (phiên bản {version}).",
+    "downloadFailed": "Tải model thất bại.",
+    "progress": "Tiến độ tải",
+    "checking": "Đang kiểm tra model vừa tải…",
+    "license": "Model từ {source}, giấy phép {license}."
   }
 }

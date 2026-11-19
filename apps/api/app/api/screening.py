@@ -3,7 +3,7 @@
 The EN/VI rules always screen; the classifier is turned on and off here and is
 off on a new instance. It runs through a provider that hosts Llama Prompt
 Guard (the default engine) or on this computer from an ONNX model
-(``local_onnx``). That model is downloaded from the Security page
+(``local_onnx``). That model is downloaded from the Models page
 (``POST /screening/classifier/download``) or, in the Compose stack, exported
 by the ``guard-model`` job. Once the classifier is on, screening fails closed
 whenever it cannot score. Each change is written to
@@ -40,7 +40,7 @@ from app.state.settings import Settings
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/screening")
 Admin = Annotated[Principal, Depends(require_admin)]
-FETCH_HINT = "download it on the Security page"
+FETCH_HINT = "download it on the Models page"
 
 
 def get_model_dir() -> Path:
