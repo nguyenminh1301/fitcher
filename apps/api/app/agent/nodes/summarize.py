@@ -6,6 +6,7 @@ every figure it may quote is already a column computed in SQL.
 
 import json
 
+from app.agent.nodes.screen import question_language
 from app.agent.prompts import render
 from app.agent.state import AgentDeps, AgentState
 from app.llm.client import LLMError
@@ -20,7 +21,7 @@ def summarize(state: AgentState, deps: AgentDeps) -> dict:
     rows = result.rows[:ROWS_IN_PROMPT]
     prompt = render(
         PROMPT,
-        language=state["extraction"].language,
+        language=question_language(state),
         question=json.dumps(state["question"], ensure_ascii=False),
         spec=json.dumps(state["spec"].model_dump(mode="json", exclude={"warnings"}), ensure_ascii=False),
         warnings="\n".join(f"- {warning}" for warning in state.get("warnings", [])) or "none",

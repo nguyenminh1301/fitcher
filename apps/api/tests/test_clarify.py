@@ -164,6 +164,14 @@ def test_the_gate_turns_a_need_into_a_clarification_in_the_question_language():
     assert update["clarification"].question == "Bạn muốn xem khoảng thời gian nào?"
 
 
+def test_a_vietnamese_question_gets_a_vietnamese_clarification_when_the_model_says_english():
+    parsed = Extraction.model_validate(extraction_reply(language="en"))
+
+    update = gate({"question": "Có bao nhiêu đơn hàng?", "need": Need(kind="period"), "extraction": parsed}, deps([]))
+
+    assert update["clarification"].question == "Bạn muốn xem khoảng thời gian nào?"
+
+
 def test_clarify_ends_the_run_before_sql():
     agent = deps([routing_reply(), extraction_reply(rank_term="best")])
 
