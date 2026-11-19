@@ -82,7 +82,7 @@ class DraftedColumn(_Reply):
 class DraftedDataset(_Drafted):
     description: str
     grain: str
-    time_column: str
+    time_column: str | None = None
     columns: list[DraftedColumn]
 
 
@@ -214,7 +214,8 @@ class Drafter:
             if current is not None and current.get("status") == "approved":
                 continue
             item = model.model_dump(exclude_none=True)
-            evidence = [e for e in item.pop("evidence") if (e["kind"], e["ref"]) in refs] or [fallback]
+            evidence = [e for e in item.pop("evidence") if (e["kind"], e["ref"]) in refs] or self._own_evidence(
+                file, item, current, profile) or [fallback]
             item["confidence"] = round(min(max(float(item["confidence"]), 0.0), 1.0), 3)
             if current is not None:
                 item = self._fill(file, _plain(current), item)
@@ -227,6 +228,18 @@ class Drafter:
         return drafted
 
     @staticmethod
+    def _own_evidence(file: str, item: dict, current: dict | None, profile: dict | None) -> list[dict]:
+        """Evidence for an item whose reply cited nothing known: what the item already cites, else its own table."""
+        if current is not None:
+            kept = [e for e in _plain(current).get("evidence") or [] if e.get("kind") in ("profile", "doc")]
+            if kept:
+                return kept
+        table = item.get("id") if file == "datasets.yaml" else item.get("dataset")
+        if profile and table in profile["tables"]:
+            return [{"kind": "profile", "ref": table}]
+        return []
+
+    @staticmethod
     def _fill(file: str, current: dict, drafted: dict) -> dict:
         filled = {key: value for key, value in current.items() if key not in ("status", "evidence")}
         for key in FILL_FIELDS[file]:
@@ -234,6 +247,11 @@ class Drafter:
                 filled[key] = drafted[key]
         filled["confidence"] = drafted["confidence"]
         if file == "datasets.yaml":
+            # The profile picks the first date column; the model may name a better one among the time columns
+            # (a hire date rather than a birth date), and anything else keeps the profile's choice.
+            times = [column["name"] for column in current.get("columns") or [] if column.get("role") == "time"]
+            if drafted.get("time_column") in times:
+                filled["time_column"] = drafted["time_column"]
             descriptions = {column["name"]: column["description"] for column in drafted.get("columns", [])}
             filled["columns"] = [
                 {**column, "description": descriptions.get(column["name"], column["description"])}
@@ -243,9 +261,18 @@ class Drafter:
 
     @staticmethod
     def _new_dataset(item: dict) -> dict:
+        # The model's reply is held to the loader's rules: only string columns are indexable, and the time
+        # column must be a column whose role is time, or there is none.
         item["columns"] = [
-            {key: value for key, value in column.items() if key != "indexable" or value} for column in item["columns"]
+            {key: value for key, value in column.items()
+             if key != "indexable" or (value and column["type"] == "string")}
+            for column in item["columns"]
         ]
+        times = [column["name"] for column in item["columns"] if column["role"] == "time"]
+        if item.get("time_column") not in times:
+            item.pop("time_column", None)
+            if times:
+                item["time_column"] = times[0]
         return item
 
     def _test_run(self, file: str, item: dict) -> None:

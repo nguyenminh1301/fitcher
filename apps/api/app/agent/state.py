@@ -137,6 +137,8 @@ class AgentState(TypedDict, total=False):
     summary: str | None
     # Why the CLI entry point refused the question before any SQL was generated.
     rejection: str | None
+    # The model call that reads the question failed (rate limit, outage); the run stops as a failure, not a refusal.
+    model_error: str | None
     # The gate's denial: what the asking role may not read, and the message for the user.
     denial: BaseModel | None
     # What build_spec could not settle, and the gate's clarifying question about it.

@@ -242,14 +242,14 @@ describe("Source flows", () => {
     fireEvent.click(await screen.findByRole("button", { name: /Use 2 tables/ }));
 
     // The saved choice comes back from the api; here it keeps one chosen table.
-    expect(await screen.findByRole("heading", { name: "Build the pack from 1 tables" })).toBeTruthy();
+    expect(await screen.findByRole("heading", { name: "Build the pack from 1 table" })).toBeTruthy();
   });
 
   it("rebuilds a source's pack from the tables in use", async () => {
     const sources = fakeSources();
     show(sources, <BuildPackPage id="shop" />);
 
-    expect(await screen.findByRole("heading", { name: "Build the pack from 1 tables" })).toBeTruthy();
+    expect(await screen.findByRole("heading", { name: "Build the pack from 1 table" })).toBeTruthy();
     await waitFor(() => expect(sources.instantEstimate).toHaveBeenCalledWith({ source_id: "shop", tables: ["items"] }));
   });
 });

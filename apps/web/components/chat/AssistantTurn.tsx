@@ -82,7 +82,7 @@ export function AssistantTurn({ turn, streaming, onStop, onRetry, onFollowUp, on
       {clarify ? <ClarifyOptions question={clarify.question} options={clarify.options} lang={clarify.lang} onPick={onFollowUp} /> : null}
       {error ? (
         <NoticeCard
-          kind={error.kind === "failed" ? "failed" : error.kind === "stopped" ? "stopped" : error.kind === "refused" ? "refused" : "network"}
+          kind={error.kind === "failed" ? "failed" : error.kind === "stopped" ? "stopped" : error.kind === "refused" ? "refused" : error.kind === "model" ? "model" : "network"}
           lang={lang}
           text={error.kind === "refused" && error.message ? error.message : undefined}
           sql={error.sql ?? undefined}

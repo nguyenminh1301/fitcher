@@ -4,8 +4,11 @@ import { ICONS } from "./geometry";
 
 export type IconProps = { name: string; size?: "lg" | "xl"; spin?: boolean; label?: string; className?: string };
 
-/** A Lucide line icon from the design system; decorative unless it has a label. */
-export function Icon({ name, size, spin, label, className }: IconProps) {
+/**
+ * A Lucide line icon from the design system; decorative unless it has a label. ``loader`` only ever marks
+ * work in progress, so it turns unless ``spin`` is false.
+ */
+export function Icon({ name, size, spin = name === "loader", label, className }: IconProps) {
   const parts = ICONS[name] ?? ICONS.circle;
   return (
     <svg

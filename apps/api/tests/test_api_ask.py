@@ -20,7 +20,7 @@ from app.api.ask import AnswerEvents, event_stream
 from app.api.rate_limit import RateLimiter
 from app.contracts.events import AskEvent
 from app.conversation.store import ConversationStore
-from app.llm.client import GatewayBlocked
+from app.llm.client import GatewayBlocked, LLMError
 from app.screening.screen import Screener
 from app.data.clickhouse import QueryError, QueryStopper
 from app.main import app
@@ -207,6 +207,13 @@ def test_a_question_the_flow_cannot_read_is_refused_without_options():
 
     assert kinds(events) == ["clarify", "done"]
     assert (events[-2]["question"], events[-2]["options"]) == ("no value of widget_sales matches \'Mars\'", [])
+
+
+def test_a_model_that_does_not_answer_ends_with_a_model_error_instead_of_asking_back():
+    events = collect(FakeAgent([routing_reply(), LLMError("RateLimitError (the provider is limiting requests)")]))
+
+    assert kinds(events)[-1] == "error"
+    assert (events[-1]["kind"], events[-1]["error"]) == ("model", "RateLimitError (the provider is limiting requests)")
 
 
 class ScriptedRun:

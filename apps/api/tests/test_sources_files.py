@@ -153,12 +153,15 @@ def test_an_upload_keeps_the_original_and_proposes_the_inferred_types(parts, tmp
     assert clickhouse.parameters["sample"].startswith("Mã đơn,Số tiền,Ngày\nA1,")
 
 
-def test_a_semicolon_file_is_read_with_that_delimiter(parts):
+@pytest.mark.parametrize("body", [b"a;b\n1;2\n", b"a\tb\n1\t2\n"], ids=["semicolon", "tab"])
+def test_a_semicolon_or_tab_file_is_described_column_by_column(parts, body):
     _, clickhouse, service = parts
 
-    service.upload("a.csv", BytesIO(b"a;b\n1;2\n"), uploaded_by=None)
+    service.upload("a.csv", BytesIO(body), uploaded_by=None)
 
-    assert clickhouse.query_settings["format_csv_delimiter"] == ";"
+    # The sample is rewritten with commas, so it is described with commas, not the file's own delimiter.
+    assert clickhouse.parameters["sample"] == "a,b\n1,2\n"
+    assert clickhouse.query_settings["format_csv_delimiter"] == ","
 
 
 def test_an_upload_above_the_size_cap_is_refused_and_leaves_no_file(parts, tmp_path):
@@ -222,6 +225,18 @@ def test_a_confirmed_load_stages_streams_publishes_and_registers_the_source(part
     assert (table_row.name, table_row.selected, table_row.mode, table_row.last_rows) == ("orders", True, "copy", 2)
     assert store.syncs("orders")[0].status == "succeeded"
     assert store.get_file(upload.id).source_id == "orders"
+
+
+def test_a_tab_separated_file_is_loaded_with_its_rows_rewritten_with_commas(parts):
+    # ClickHouse refuses a tab as the CSV delimiter, so the load must not hand it the file as it is.
+    _, clickhouse, service = parts
+    upload = service.upload("tips.csv", BytesIO(b"bill\tnote\n16.99\t\"a, b\"\n"), uploaded_by=None)
+
+    service.load(upload.id, None, confirmed(upload))
+
+    _, fmt, settings, data = clickhouse.inserted[0]
+    assert fmt == "CSV" and "format_csv_delimiter" not in settings
+    assert data.decode().splitlines() == ["bill,note", '16.99,"a, b"']
 
 
 def test_the_source_can_be_named_and_a_taken_name_is_a_conflict(parts):

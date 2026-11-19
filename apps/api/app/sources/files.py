@@ -313,12 +313,14 @@ class FileService:
                 kept.append(row)
                 if len(kept) >= INFERENCE_ROWS:
                     break
-            sample_text, delimiter = _csv_text(header, kept), ","
+            sample_text = _csv_text(header, kept)
         else:
-            delimiter, sample_text = _read_csv_head(path)
+            _, sample_text = _read_csv_head(path)
+        # The sample is rewritten with commas whatever the file's delimiter, so it is described as comma separated;
+        # the load reads the file itself with its own delimiter.
         result = self._client.query(
             "DESCRIBE TABLE format(CSVWithNames, {sample:String})", parameters={"sample": sample_text},
-            settings={"format_csv_delimiter": delimiter if kind == "csv" else ",", "schema_inference_make_columns_nullable": 1,
+            settings={"format_csv_delimiter": ",", "schema_inference_make_columns_nullable": 1,
                       "input_format_csv_use_best_effort_in_schema_inference": 1})
         columns = [FileColumn(row[0], row[1]) for row in result.result_rows]
         parsed = list(csv.reader(StringIO(sample_text)))[1:][:SAMPLE_ROWS]
@@ -397,6 +399,14 @@ class FileService:
             self._client.raw_insert(loading, insert_block=block, fmt="CSV", settings=settings)
             return
         delimiter, _ = _read_csv_head(path)
+        if delimiter == "\t":
+            # ClickHouse refuses a tab as the CSV delimiter, so the rows are rewritten with commas as they stream.
+            with path.open(encoding="utf-8-sig", newline="") as text:
+                reader = csv.reader(text, delimiter="\t")
+                header = next(reader, [])
+                self._client.raw_insert(loading, insert_block=_csv_chunks(header, reader), fmt="CSV",
+                                        settings={"input_format_csv_skip_first_lines": 1})
+            return
         settings = {"input_format_csv_skip_first_lines": 1, "format_csv_delimiter": delimiter,
                     "input_format_csv_use_best_effort_in_schema_inference": 1}
         with path.open("rb") as handle:

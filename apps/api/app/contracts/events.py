@@ -119,10 +119,11 @@ class DoneEvent(EventModel):
 
 
 class ErrorEvent(EventModel):
-    """``failed``: no SQL attempt produced a result; ``internal``: the run broke, with no detail for the client."""
+    """``failed``: no SQL attempt produced a result; ``internal``: the run broke, with no detail for the client;
+    ``model``: the model call that reads the question failed, with the provider's reason in ``error``."""
 
     event: Literal["error"] = "error"
-    kind: Literal["failed", "internal"]
+    kind: Literal["failed", "internal", "model"]
     message: str
     # The last SQL attempt and its error, for a failed run.
     sql: str | None = None

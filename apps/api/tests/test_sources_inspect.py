@@ -46,6 +46,7 @@ def test_a_postgres_table_list_carries_estimates_sizes_keys_and_flags():
     orders, items, view = tables["orders"], tables["order_items"], tables["v_open"]
     assert (orders.kind, orders.rows, orders.size_bytes) == ("table", 1200, 50 * 8192)
     assert items.rows == 40000, "a table never analysed reports -1, so the live-tuple statistic is used"
+    assert items.size_bytes is None, "a table never analysed reports no pages, so its size is unknown rather than 0 B"
     assert view.kind == "view" and view.rows is None and view.size_bytes is None
     assert orders.primary_key == ("id",) and items.primary_key == ()
     assert [(fk.columns, fk.ref_table, fk.ref_columns) for fk in items.foreign_keys] == [(("line_ref",), "orders", ("id",))]

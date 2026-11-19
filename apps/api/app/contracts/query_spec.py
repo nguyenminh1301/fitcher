@@ -54,7 +54,8 @@ class QuerySpec(ContractModel):
     intent: Literal["data_query"] = "data_query"
     metric_ids: list[str] = Field(min_length=1)
     dimensions: list[str] = []
-    periods: list[Period] = Field(min_length=1)
+    # Empty only for a dataset without a time column, which is read whole.
+    periods: list[Period] = []
     filters: list[Filter] = []
     top_n: int | None = Field(default=None, ge=1, le=MAX_TOP_N)
     rank_by: str | None = None

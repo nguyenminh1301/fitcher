@@ -20,14 +20,14 @@ const CONSOLE: Partial<ConsoleFile> = {
   conversations: [],
 };
 
-function renderConsole(user: string, section: string) {
+function renderConsole(user: string, section: string, api = createMockApi()) {
   window.localStorage.setItem("fitcher.demo.identity", user);
   const navigate = vi.fn();
   const onChat = vi.fn();
   render(
     <ThemeProvider>
       <I18nProvider initial="en">
-        <ChatProvider api={createMockApi()} navigate={vi.fn()} activeId={null} sources={{}}>
+        <ChatProvider api={api} navigate={vi.fn()} activeId={null} sources={{}}>
           <ConsoleLayout section={section} navigate={navigate} onChat={onChat}>
             <p>section page</p>
           </ConsoleLayout>
@@ -92,6 +92,18 @@ describe("console layout", () => {
 
     expect(navigate).toHaveBeenCalledWith("/console/datasets");
     expect(app?.getAttribute("data-drawer")).toBe("closed");
+  });
+
+  it("offers sign-out once a password is set on this page, without reloading", async () => {
+    const api = createMockApi();
+    const status = vi.spyOn(api.owner, "status").mockResolvedValue({ password_set: false, signed_in: false, exposed: false } as never);
+    renderConsole("rev", "review", api);
+    await waitFor(() => expect(links()).toContain("Review"));
+    status.mockResolvedValue({ password_set: true, signed_in: true, exposed: false } as never);
+
+    fireEvent.click(await within(nav()).findByRole("button", { name: "Owner menu" }));
+
+    expect(await screen.findByRole("menuitem", { name: "Sign out" })).toBeTruthy();
   });
 
   it("offers the chat and the Security page from the owner menu, and no sign-out without a password", async () => {

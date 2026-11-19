@@ -35,7 +35,7 @@ export function DatasetsSection() {
                   <td><button type="button" className="src-link" onClick={() => setOpen(item.id)}>{item.id}</button></td>
                   <td data-label={t("ui.description")} lang={langOf(item.description)}>{item.description}</td>
                   <td data-label={t("ui.grain")}>{item.grain}</td>
-                  <td data-label={t("ui.timeColumn")}><span className="fc-mono">{item.time_column}</span></td>
+                  <td data-label={t("ui.timeColumn")}>{item.time_column ? <span className="fc-mono">{item.time_column}</span> : <span className="fc-muted">{t("datasetsPage.noTime")}</span>}</td>
                 </tr>
               ))}
             </tbody>
@@ -50,7 +50,9 @@ function DatasetDetail({ dataset, onBack }: { dataset?: DatasetView; onBack: () 
   const { t } = useI18n();
   return (
     <DetailPage feature="datasets" title={dataset?.id} mono backLabel={t("ui.nav_datasets")} onBack={onBack} loading={false} missing={!dataset}
-      description={dataset ? t("datasetsPage.summary", { description: dataset.description, grain: dataset.grain, time: dataset.time_column }) : null}>
+      description={dataset ? (dataset.time_column
+        ? t("datasetsPage.summary", { description: dataset.description, grain: dataset.grain, time: dataset.time_column })
+        : t("datasetsPage.summaryNoTime", { description: dataset.description, grain: dataset.grain })) : null}>
       {dataset ? (
         <section className="box" aria-labelledby="columns-title">
           <div className="box-head"><h2 id="columns-title" className="box-title">{t("ui.columns")}</h2></div>

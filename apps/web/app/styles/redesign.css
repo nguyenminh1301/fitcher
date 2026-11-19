@@ -62,7 +62,7 @@
 .prog li:last-child { border-bottom: 0; }
 .prog-dot { width: 24px; height: 24px; border-radius: 9999px; display: flex; align-items: center; justify-content: center; flex: none; border: 1.5px solid var(--borderColor-default); color: var(--fgColor-muted); }
 .prog-dot[data-state="done"] { background: var(--fgColor-success); border-color: var(--fgColor-success); color: #fff; }
-.prog-dot[data-state="running"] { border-color: var(--fgColor-default); border-right-color: transparent; }
+.prog-dot[data-state="running"] { border-color: var(--fgColor-default); border-right-color: transparent; animation: fc-spin 1s linear infinite; }
 .prog-dot .fc-icon { width: 14px; height: 14px; stroke-width: 3; }
 .chip { display: inline-flex; align-items: center; gap: 8px; min-height: 36px; padding: 8px 14px; border: 1px solid var(--borderColor-default); border-radius: 9999px; background: var(--bgColor-default); font: 400 14px/20px var(--font-sans); color: var(--fgColor-default); cursor: pointer; text-align: left; }
 .chip:hover { background: var(--bgColor-muted); }
@@ -208,6 +208,10 @@
 .toast .fc-icon { color: inherit; }
 .toast .fc-btn { color: inherit; }
 .menu-sub { position: absolute; left: calc(100% + 4px); top: 0; width: 180px; }
+/* A menu item's own panel, opened beside the menu */
+.fc-submenu { width: 220px; z-index: 46; }
+.fc-menu-heading { padding: 6px 8px 4px; font-size: 12px; font-weight: 600; color: var(--fgColor-muted); }
+.fc-menu-open { background: var(--control-transparent-bgColor-hover); }
 
 /* Skeleton, empty */
 .sk { background: var(--bgColor-neutral-muted); border-radius: 6px; display: block; }

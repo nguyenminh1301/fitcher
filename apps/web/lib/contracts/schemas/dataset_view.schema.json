@@ -45,8 +45,16 @@
       "type": "string"
     },
     "time_column": {
-      "title": "Time Column",
-      "type": "string"
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Time Column"
     },
     "readable_roles": {
       "items": {
@@ -67,7 +75,6 @@
     "id",
     "description",
     "grain",
-    "time_column",
     "readable_roles",
     "columns"
   ],

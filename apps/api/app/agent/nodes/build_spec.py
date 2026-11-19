@@ -258,9 +258,17 @@ def _value_term_filters(terms: list[GlossaryTerm], dataset: Dataset, filtered: s
     ]
 
 
+def _require_period(state: AgentState, dataset: Dataset) -> None:
+    """A dataset with a time column needs a period; one without dates is answered over all its rows."""
+    if not state["periods"] and dataset.time_column is not None:
+        raise NeedsChoice(Need(kind="period"))
+
+
 def coverage_warnings(periods: list[Period], dataset: str, coverage: DateCoverage | None) -> list[str]:
-    if coverage is None or coverage.rows == 0 or coverage.min_date is None or coverage.max_date is None:
+    if coverage is None or coverage.rows == 0:
         return [f"{dataset} has no data"]
+    if coverage.min_date is None or coverage.max_date is None:
+        return []
     low, high = date.fromisoformat(coverage.min_date), date.fromisoformat(coverage.max_date)
     warnings = []
     for period in periods:
@@ -290,11 +298,9 @@ def _reviewed_spec(state: AgentState, compiled: CompiledPack, example: Hit) -> Q
     payload = example.source["payload"]
     reviewed = payload["spec"]
     dataset = {item.id: item for item in compiled.pack.datasets.datasets}[payload["datasets"][0]]
-    periods = state["periods"]
-    if not periods:
-        raise NeedsChoice(Need(kind="period"))
+    _require_period(state, dataset)
     dimensions = list(reviewed.get("dimensions", []))
-    if state.get("time_grain") and dataset.time_column not in dimensions:
+    if state.get("time_grain") and dataset.time_column is not None and dataset.time_column not in dimensions:
         dimensions.append(dataset.time_column)
     filters = [
         Filter(column=item["column"], op=item["op"], value=item["values"] if item["op"] in ("in", "not in") else item["values"][0])
@@ -310,6 +316,11 @@ def _finish(state: AgentState, compiled: CompiledPack, metric_ids: list[str], da
             filters: list[Filter], top_n: int | None, rank_by: str | None) -> QuerySpec:
     extraction, periods = state["extraction"], state["periods"]
     warnings = []
+    if dataset.time_column is None:
+        # A table without dates is read whole: a named period or time grain cannot narrow it.
+        if periods or state.get("time_grain"):
+            warnings.append(f"{dataset.id} has no date column, so the question was answered over all its rows")
+        periods = []
     compare = extraction.compare and len(periods) > 1
     if extraction.compare and not compare:
         warnings.append("only one period was named, so nothing is compared")
@@ -358,11 +369,10 @@ def make_spec(state: AgentState, compiled: CompiledPack, example: Hit | None = N
     if len(datasets) != 1:
         raise SpecRejected(f"the metrics {', '.join(metric_ids)} come from different datasets")
     dataset = catalog.datasets[datasets.pop()]
-    if not periods:
-        raise NeedsChoice(Need(kind="period"))
+    _require_period(state, dataset)
 
     dimensions = [_resolve_column(term, dataset, catalog, retrieval) for term in extraction.dimension_terms]
-    if state.get("time_grain") and dataset.time_column not in dimensions:
+    if state.get("time_grain") and dataset.time_column is not None and dataset.time_column not in dimensions:
         dimensions.append(dataset.time_column)
     filters = []
     for extracted in extraction.filters:

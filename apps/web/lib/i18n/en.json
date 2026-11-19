@@ -413,8 +413,8 @@
     "noPackAction": "Open Sources",
     "refusedTitle": "The answer could not start",
     "refusedText": "fitcher refused this question before running it. Nothing from this run was saved.",
-    "noPackSection": "No pack yet.",
-    "noPackSectionText": "Connect your data and build the pack first.",
+    "noPackSection": "No pack is turned on",
+    "noPackSectionText": "This page reads from the pack. Add data and build the pack, or build it again if the last build failed; both are on the Sources page.",
     "nav_security": "Security",
     "documentsAbout": "Policies, handbooks and glossaries help fitcher understand what a word means. Numbers always come from your data, never from documents.",
     "documentsUse": "Use company documents",
@@ -422,7 +422,18 @@
     "documentsOffText": "{n} documents stay stored but are no longer searched.",
     "documentsOffButton": "Turn documents off",
     "nav_overview": "Overview",
-    "loadFailedText": "Try again later."
+    "loadFailedText": "Try again later.",
+    "stepsCount_one": "{n} step",
+    "rowsN_one": "{n} row",
+    "testOk_one": "Test run returned {n} row",
+    "files_one": "{n} file",
+    "documentsOffText_one": "{n} document stays stored but is no longer searched.",
+    "clarified": "Asked back",
+    "blocked": "Blocked",
+    "cancelled": "Stopped",
+    "modelTitle": "The model did not answer",
+    "modelText": "The model provider did not answer this time. It may be limiting requests, which free models do, or be out of reach. Try again in a moment, or choose another model on the Models page.",
+    "providerMessage": "Provider message"
   },
   "setup": {
     "failed": "The setup could not be saved. Try again.",
@@ -625,7 +636,9 @@
     "savedAndPreparing": "Selection saved. Preparing the tables…",
     "build": "Build the pack",
     "buildOf": "Build the pack of {name}",
-    "savedAndPrepared": "Selection saved. The chosen tables are being prepared."
+    "savedAndPrepared": "Selection saved. The chosen tables are being prepared.",
+    "tested_one": "Connected. {count} table found.",
+    "tablesOf_one": "{selected} of {count} table"
   },
   "owner": {
     "signInTitle": "Open fitcher",
@@ -827,7 +840,7 @@
     "useTables": "Use {count} tables",
     "useTable": "Use 1 table",
     "startTitle": "Build the pack from {count} tables",
-    "startText": "{count} tables become analysis tables. fitcher sends the table structure, 3 sample rows and the most common values of each column to the model, which writes descriptions, metrics and example questions. This is one call of about {tokens} tokens. The provider bills it unless the model is free or runs on this computer.",
+    "startText": "The pack gets {count} analysis tables: one per table, plus some that join related tables. fitcher sends the table structure, 3 sample rows and the most common values of each column to the model, which writes descriptions, metrics and example questions. This is one call of about {tokens} tokens. The provider bills it unless the model is free or runs on this computer.",
     "chosenTables": "Chosen tables",
     "copied": "Copied · {rows} rows",
     "copying": "Copying",
@@ -874,7 +887,12 @@
     "back": "Back",
     "keepPassword": "Leave empty to keep the stored password.",
     "keepCa": "Leave empty to keep the stored certificate.",
-    "nameFixed": "A source name cannot change once saved."
+    "nameFixed": "A source name cannot change once saved.",
+    "dbFound_one": "Connected. {count} table found.",
+    "useTables_one": "Use {count} table",
+    "startTitle_one": "Build the pack from {count} table",
+    "leftTitle_one": "{n} thing left before you can ask",
+    "startText_one": "The pack gets 1 analysis table. fitcher sends the table structure, 3 sample rows and the most common values of each column to the model, which writes descriptions, metrics and example questions. This is one call of about {tokens} tokens. The provider bills it unless the model is free or runs on this computer."
   },
   "instant": {
     "title": "Build the pack",
@@ -944,7 +962,10 @@
     "nothing": "Nothing needs a look.",
     "manage": "Manage",
     "tables": "{n} tables",
-    "noSources": "No source yet."
+    "noSources": "No source yet.",
+    "sourceCount_one": "{n} source",
+    "drafts_one": "{n} item to review",
+    "tables_one": "{n} table"
   },
   "console": {
     "waiting": "new",
@@ -998,7 +1019,9 @@
     "addTitle": "Add a data source",
     "readOnly": "fitcher only reads your data and never writes to it.",
     "backToSources": "Sources",
-    "listTitle": "All sources"
+    "listTitle": "All sources",
+    "noPackTitle": "No pack is turned on",
+    "noPackText": "The data is synced but the pack hasn't been built, or the last build failed. The other pages need a pack to read the data."
   },
   "modelsPage": {
     "addTitle": "Add a provider",
@@ -1033,7 +1056,9 @@
     "type_number": "Number",
     "type_date": "Date",
     "type_datetime": "Date and time",
-    "type_boolean": "True or false"
+    "type_boolean": "True or false",
+    "noTime": "None",
+    "summaryNoTime": "{description} Grain: {grain}. The table has no date column, so questions are answered over all its rows."
   },
   "documentsPage": {
     "size": "Size",
@@ -1078,7 +1103,8 @@
     "byDayLabel": "Estimated cost by day, {n} days",
     "byTask": "By task",
     "byModel": "By model",
-    "calls": "Calls"
+    "calls": "Calls",
+    "byDayLabel_one": "Estimated cost by day, {n} day"
   },
   "auditPage": {
     "dataset": "Dataset",
@@ -1109,6 +1135,7 @@
     "none": "No reports yet",
     "noneText": "Run the evaluation to score the pack on its question set.",
     "confirmTitle": "Run the evaluation?",
-    "confirmText": "Every case is asked through the model, and the provider bills each call. Cases run one at a time, so this can take a few minutes."
+    "confirmText": "Every case is asked through the model, and the provider bills each call. Cases run one at a time, so this can take a few minutes.",
+    "noEvalSet": "This pack has no evaluation questions yet. A pack built from a source starts without them; they are added to the pack's eval.yaml with a reference date."
   }
 }

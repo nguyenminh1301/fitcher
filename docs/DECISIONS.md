@@ -133,7 +133,7 @@ Path: `<packs dir>/<company>/`, in the data volume of a running instance. Packs 
 | File | Contents |
 |---|---|
 | `business_profile.yaml` | industry, currency, fiscal year start month, default conventions (e.g. "best-selling" = by revenue); never the user's time zone or answer language (§6) |
-| `datasets.yaml` | marts: table/column descriptions, types, roles (dimension/measure/time), grain, primary time column |
+| `datasets.yaml` | marts: table/column descriptions, types, roles (dimension/measure/time), grain, primary time column (none for a table without dates) |
 | `glossary.yaml` | terms with **Vietnamese + English** aliases, pointing to metrics/columns/values |
 | `metrics.yaml` | id, sql_expr, dataset, grain, unit, owner |
 | `relationships.yaml` | allowed join paths (if any); the LLM may not invent joins |
@@ -191,6 +191,7 @@ Nodes in order:
    The browser sends its IANA time zone with every request; clients without one (CLI, eval) pass it explicitly, otherwise UTC is used.
 6. **retrieve**: hybrid search over the search collections (§5). Candidates for the question's own terms (metrics, dimensions, filter values) are searched across all of the pack's roles, so a term resolves to what it means and the gate can deny it rather than replace it with the nearest item the role may read; the context given to SQL generation (examples, dataset hits) is filtered by the asking role.
 7. **build_spec** -> `QuerySpec`, with a coverage check (dataset min/max dates versus the requested periods).
+   A dataset may have no time column (a product catalog or a contact list has no dates). Its QuerySpec has no periods: the question is answered over all rows without asking for a period, and a period or time grain the question names is dropped with a warning.
    When an approved example readable by the asking role asks the same question (compared case-, diacritic- and punctuation-insensitively) and carries a reviewed spec, that spec's metrics, dataset, dimensions, filters, top N and ranking replace the term resolution; periods and time grain still come from the question, and the gate checks the result as usual. A reviewed spec names only pack items and pack values, never a value taken from a user's run.
 8. **gate**:
    - ambiguous -> **clarify** (ask the user with options, or apply the pack's default convention if one exists)

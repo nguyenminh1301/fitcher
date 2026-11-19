@@ -27,6 +27,11 @@ if TYPE_CHECKING:
 Unit = Literal["day", "week", "month", "quarter", "year"]
 
 
+# The first and last days a period may span, the years the extraction accepts.
+EARLIEST = date(1900, 1, 1)
+LATEST = date(2200, 12, 31)
+
+
 class TimeResolutionError(ValueError):
     """The descriptors cannot be turned into valid periods."""
 
@@ -168,7 +173,11 @@ def resolve_period(descriptor: PeriodDescriptor, today: date, fiscal_start_month
         start = date(d.year, d.month, 1)
         return Period(label=start.strftime("%Y-%m"), start=start, end=_add_months(start, 1))
     if d.kind == "range":
-        return Period(label=f"{d.start.isoformat()} to {d.end.isoformat()}", start=d.start, end=d.end + timedelta(days=1))
+        # "All time" can come back as a range to 9999-12-31; the range is held to the dates a period may span.
+        start, last = max(d.start, EARLIEST), min(d.end, LATEST)
+        if last < start:
+            raise TimeResolutionError(f"the range {d.start} to {d.end} is outside the dates a period may span")
+        return Period(label=f"{start.isoformat()} to {last.isoformat()}", start=start, end=last + timedelta(days=1))
     if d.kind == "relative":
         start = _shift(d.unit, _unit_start(d.unit, today, cal), d.offset)
         return Period(label=_unit_label(d.unit, start, cal), start=start, end=_shift(d.unit, start, 1))

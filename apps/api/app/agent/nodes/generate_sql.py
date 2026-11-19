@@ -68,7 +68,7 @@ def _schema(pack: Pack, datasets: list[str], grants: dict[str, DatasetGrant], ro
                 for metric_id in grant.aggregate_only.metrics
             ]
             lines.append(f"  - {ROW_COUNT_COLUMN} (number, measure): rows of {dataset.id} in the group")
-        header = f"marts.{table}: {dataset.description} Grain: {grain}. Time column: {dataset.time_column}."
+        header = f"marts.{table}: {dataset.description} Grain: {grain}. Time column: {dataset.time_column or 'none'}."
         blocks.append("\n".join([header, *lines]))
     return "\n".join(blocks)
 

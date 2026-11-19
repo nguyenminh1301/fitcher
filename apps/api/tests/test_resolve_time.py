@@ -81,6 +81,18 @@ def test_explicit_range_end_is_inclusive_in_the_question():
     )
 
 
+def test_an_all_time_range_to_the_last_possible_date_is_held_to_the_supported_dates():
+    # "All time" came back from the model as 0001-01-01 to 9999-12-31, and adding the day after overflowed.
+    assert resolve(kind="range", start=date(1, 1, 1), end=date(9999, 12, 31)) == (
+        "1900-01-01 to 2200-12-31", "1900-01-01", "2201-01-01",
+    )
+
+
+def test_a_range_wholly_outside_the_supported_dates_is_refused():
+    with pytest.raises(TimeResolutionError):
+        resolve(kind="range", start=date(9000, 1, 1), end=date(9999, 12, 31))
+
+
 def test_year_to_date_includes_the_reference_day():
     assert resolve(kind="to_date", unit="year") == ("2026 to 2026-01-15", "2026-01-01", "2026-01-16")
     assert resolve(4, kind="to_date", unit="year") == ("FY2026 to 2026-01-15", "2025-04-01", "2026-01-16")

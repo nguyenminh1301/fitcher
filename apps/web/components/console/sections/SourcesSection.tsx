@@ -120,7 +120,7 @@ function LastSync({ source }: { source: SourceView }) {
 
 export function SourcesSection() {
   const { t } = useI18n();
-  const { api } = useChat();
+  const { api, pack, loaded } = useChat();
   const { navigate } = useConsole();
   const sources = api.sources;
   const failure = useFailure();
@@ -171,8 +171,18 @@ export function SourcesSection() {
   const drifted = (data ?? []).filter((source) => drifts[source.id]?.pack && drifts[source.id].changes.length);
   const add = <button type="button" className="fc-btn fc-btn-primary" onClick={() => setAdding(true)}><Icon name="plus" />{t("sources.add")}</button>;
 
+  // Without an active pack the other pages have nothing to read: say so here, where the pack is built.
+  const buildable = loaded && !pack ? (data ?? []).find((source) => source.last_sync?.status === "succeeded" && source.selected_count > 0) : undefined;
+
   return (
     <ListPage section="sources" loading={!data} failed={failed} actions={data?.length ? add : undefined}>
+      {buildable ? (
+        <div className="fc-banner fc-banner-attention" role="status">
+          <Icon name="alert" />
+          <div style={{ flex: 1 }}><b>{t("sourcesPage.noPackTitle")}</b><div>{t("sourcesPage.noPackText")}</div></div>
+          <button type="button" className="fc-btn fc-btn-sm fc-btn-primary" onClick={() => build(buildable)}>{t("sources.build")}</button>
+        </div>
+      ) : null}
       {drifted.map((source) => (
         <div key={source.id} className="fc-banner fc-banner-attention" role="status">
           <Icon name="alert" />

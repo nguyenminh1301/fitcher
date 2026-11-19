@@ -77,7 +77,9 @@ function Spark({ values, color }: { values: number[]; color: string }) {
   );
 }
 
-const RUN_TONE: Record<string, string> = { succeeded: "success", failed: "danger", denied: "attention", rejected: "attention" };
+const RUN_TONE: Record<string, string> = {
+  succeeded: "success", failed: "danger", error: "danger", denied: "attention", rejected: "attention", blocked: "attention", clarified: "done",
+};
 
 export function OverviewSection() {
   const { t, formatNumber, formatDate } = useI18n();

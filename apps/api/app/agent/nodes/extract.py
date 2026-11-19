@@ -65,5 +65,6 @@ def extract(state: AgentState, deps: AgentDeps) -> dict:
         prompt = render(PROMPT, question=json.dumps(state["question"], ensure_ascii=False), conversation=conversation)
         extraction = deps.llm.structured(TIER, prompt, Extraction)
     except LLMError as error:
-        return {"rejection": f"the question could not be read: {error}"}
+        # The run ends here like a refusal, but the answer reports the model failure rather than asking back.
+        return {"rejection": f"the question could not be read: {error}", "model_error": str(error)}
     return {"extraction": extraction, "time_grain": extraction.time_grain}

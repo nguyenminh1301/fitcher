@@ -56,7 +56,7 @@ def authorize(spec: QuerySpec, pack: Pack, role: str, language: str) -> Denial |
         return Denial(dataset=spec.dataset, blocked=blocked, message=_message(role, blocked, language, None))
     dataset = next(item for item in pack.datasets.datasets if item.id == spec.dataset)
     needed = [*spec.dimensions, *(item.column for item in spec.filters)]
-    if spec.periods:
+    if spec.periods and dataset.time_column is not None:
         needed.append(dataset.time_column)
     metrics = {metric.id: metric for metric in pack.metrics.metrics}
     aggregate = None

@@ -413,8 +413,8 @@
     "noPackAction": "Mở Nguồn dữ liệu",
     "refusedTitle": "Không thể bắt đầu trả lời",
     "refusedText": "fitcher đã từ chối câu hỏi này trước khi chạy. Lượt chạy này chưa được lưu.",
-    "noPackSection": "Chưa có gói.",
-    "noPackSectionText": "Kết nối dữ liệu và dựng gói trước.",
+    "noPackSection": "Chưa có gói đang bật",
+    "noPackSectionText": "Trang này đọc từ gói. Thêm dữ liệu rồi dựng gói, hoặc dựng lại nếu lần trước bị lỗi; cả hai đều ở trang Nguồn dữ liệu.",
     "nav_security": "Bảo mật",
     "documentsAbout": "Tài liệu như quy định, sổ tay, bảng thuật ngữ giúp fitcher hiểu nghĩa của một từ. Số liệu luôn lấy từ dữ liệu, không lấy từ tài liệu.",
     "documentsUse": "Dùng tài liệu công ty",
@@ -422,7 +422,18 @@
     "documentsOffText": "{n} tài liệu vẫn được lưu nhưng không còn được tìm.",
     "documentsOffButton": "Tắt tài liệu",
     "nav_overview": "Tổng quan",
-    "loadFailedText": "Thử lại sau."
+    "loadFailedText": "Thử lại sau.",
+    "stepsCount_one": "{n} bước",
+    "rowsN_one": "{n} dòng",
+    "testOk_one": "Chạy thử trả về {n} dòng",
+    "files_one": "{n} tệp",
+    "documentsOffText_one": "{n} tài liệu vẫn được lưu nhưng không còn được tìm.",
+    "clarified": "Đã hỏi lại",
+    "blocked": "Đã chặn",
+    "cancelled": "Đã dừng",
+    "modelTitle": "Model không phản hồi",
+    "modelText": "Nhà cung cấp model không trả lời lần này. Có thể họ đang giới hạn số yêu cầu (model miễn phí hay bị vậy) hoặc không kết nối được. Thử lại sau ít phút, hoặc chọn model khác ở trang Model.",
+    "providerMessage": "Thông báo của nhà cung cấp"
   },
   "setup": {
     "failed": "Không lưu được thiết lập. Hãy thử lại.",
@@ -625,7 +636,9 @@
     "savedAndPreparing": "Đã lưu lựa chọn. Đang chuẩn bị bảng…",
     "build": "Tạo gói",
     "buildOf": "Tạo gói của {name}",
-    "savedAndPrepared": "Đã lưu lựa chọn. Các bảng đã chọn đang được chuẩn bị."
+    "savedAndPrepared": "Đã lưu lựa chọn. Các bảng đã chọn đang được chuẩn bị.",
+    "tested_one": "Đã kết nối. Tìm thấy {count} bảng.",
+    "tablesOf_one": "{selected} trên {count} bảng"
   },
   "owner": {
     "signInTitle": "Mở fitcher",
@@ -827,7 +840,7 @@
     "useTables": "Dùng {count} bảng",
     "useTable": "Dùng 1 bảng",
     "startTitle": "Dựng gói từ {count} bảng",
-    "startText": "{count} bảng thành bảng phân tích. fitcher gửi cấu trúc bảng, 3 dòng mẫu và các giá trị hay gặp của mỗi cột tới model để viết mô tả, chỉ số và câu hỏi mẫu. Đây là một lần gọi khoảng {tokens} token. Nhà cung cấp tính phí lần gọi này, trừ khi model miễn phí hoặc chạy trên máy này.",
+    "startText": "Gói có {count} bảng phân tích: mỗi bảng một, cộng thêm vài bảng nối các bảng liên quan. fitcher gửi cấu trúc bảng, 3 dòng mẫu và các giá trị hay gặp của mỗi cột tới model để viết mô tả, chỉ số và câu hỏi mẫu. Đây là một lần gọi khoảng {tokens} token. Nhà cung cấp tính phí lần gọi này, trừ khi model miễn phí hoặc chạy trên máy này.",
     "chosenTables": "Bảng đã chọn",
     "copied": "Đã chép · {rows} dòng",
     "copying": "Đang chép",
@@ -874,7 +887,12 @@
     "back": "Quay lại",
     "keepPassword": "Để trống để giữ mật khẩu đã lưu.",
     "keepCa": "Để trống để giữ chứng chỉ đã lưu.",
-    "nameFixed": "Tên nguồn không đổi được sau khi lưu."
+    "nameFixed": "Tên nguồn không đổi được sau khi lưu.",
+    "dbFound_one": "Đã kết nối. Tìm thấy {count} bảng.",
+    "useTables_one": "Dùng {count} bảng",
+    "startTitle_one": "Dựng gói từ {count} bảng",
+    "leftTitle_one": "Còn {n} việc trước khi hỏi được",
+    "startText_one": "Gói có 1 bảng phân tích. fitcher gửi cấu trúc bảng, 3 dòng mẫu và các giá trị hay gặp của mỗi cột tới model để viết mô tả, chỉ số và câu hỏi mẫu. Đây là một lần gọi khoảng {tokens} token. Nhà cung cấp tính phí lần gọi này, trừ khi model miễn phí hoặc chạy trên máy này."
   },
   "instant": {
     "title": "Dựng gói dữ liệu",
@@ -944,7 +962,10 @@
     "nothing": "Không có gì cần xem.",
     "manage": "Quản lý",
     "tables": "{n} bảng",
-    "noSources": "Chưa có nguồn."
+    "noSources": "Chưa có nguồn.",
+    "sourceCount_one": "{n} nguồn",
+    "drafts_one": "{n} mục chờ duyệt",
+    "tables_one": "{n} bảng"
   },
   "console": {
     "waiting": "mục mới",
@@ -998,7 +1019,9 @@
     "addTitle": "Thêm nguồn dữ liệu",
     "readOnly": "fitcher chỉ đọc dữ liệu, không ghi.",
     "backToSources": "Nguồn dữ liệu",
-    "listTitle": "Danh sách nguồn"
+    "listTitle": "Danh sách nguồn",
+    "noPackTitle": "Chưa có gói nào đang bật",
+    "noPackText": "Dữ liệu đã đồng bộ nhưng gói chưa được dựng, hoặc lần dựng trước bị lỗi. Các trang khác cần gói để đọc dữ liệu."
   },
   "modelsPage": {
     "addTitle": "Thêm nhà cung cấp",
@@ -1033,7 +1056,9 @@
     "type_number": "Số",
     "type_date": "Ngày",
     "type_datetime": "Ngày giờ",
-    "type_boolean": "Đúng/sai"
+    "type_boolean": "Đúng/sai",
+    "noTime": "Không có",
+    "summaryNoTime": "{description} Độ chi tiết: {grain}. Bảng không có cột ngày nên câu hỏi được trả lời trên toàn bộ dòng."
   },
   "documentsPage": {
     "size": "Kích thước",
@@ -1078,7 +1103,8 @@
     "byDayLabel": "Chi phí ước tính theo ngày, {n} ngày",
     "byTask": "Theo tác vụ",
     "byModel": "Theo model",
-    "calls": "Lượt gọi"
+    "calls": "Lượt gọi",
+    "byDayLabel_one": "Chi phí ước tính theo ngày, {n} ngày"
   },
   "auditPage": {
     "dataset": "Bộ dữ liệu",
@@ -1109,6 +1135,7 @@
     "none": "Chưa có báo cáo nào",
     "noneText": "Chạy đánh giá để chấm gói trên bộ câu hỏi của nó.",
     "confirmTitle": "Chạy đánh giá?",
-    "confirmText": "Mỗi ca được hỏi qua model và nhà cung cấp tính phí từng lần gọi. Các ca chạy lần lượt nên có thể mất vài phút."
+    "confirmText": "Mỗi ca được hỏi qua model và nhà cung cấp tính phí từng lần gọi. Các ca chạy lần lượt nên có thể mất vài phút.",
+    "noEvalSet": "Gói này chưa có bộ câu hỏi đánh giá. Gói dựng từ nguồn dữ liệu bắt đầu mà chưa có bộ này; câu hỏi được thêm vào eval.yaml của gói cùng một ngày tham chiếu."
   }
 }

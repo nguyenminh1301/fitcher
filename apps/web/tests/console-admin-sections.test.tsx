@@ -136,6 +136,18 @@ describe("evaluation", () => {
   });
 });
 
+describe("evaluation without an eval set", () => {
+  it("says the pack has no evaluation questions instead of failing silently", async () => {
+    vi.spyOn(api.evaluation, "start").mockRejectedValue(new Error("no_eval_set: eval.yaml of pack shop must set reference_date"));
+    show("evaluation", <EvaluationSection />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Run evaluation" }));
+    await act(async () => fireEvent.click(within(screen.getByRole("dialog", { name: "Run the evaluation?" })).getByRole("button", { name: "Run evaluation" })));
+
+    expect((await screen.findByRole("alert")).textContent).toContain("This pack has no evaluation questions yet");
+  });
+});
+
 describe("runs and trace", () => {
   it("filters runs by status and opens a run's trace", async () => {
     show("runs", <RunsSection />);

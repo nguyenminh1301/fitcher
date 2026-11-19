@@ -12,6 +12,7 @@ import { DetailPage } from "@/components/console/DetailPage";
 import { StatusLabel } from "@/components/console/kit";
 import { ListPage, RecordTable } from "@/components/console/ListPage";
 import { Dialog } from "@/components/ui/overlay";
+import { errorText } from "@/lib/api/errorText";
 import type { EvalReport } from "@/lib/contracts";
 import { useChat } from "@/lib/chat/ChatContext";
 import { useLoad } from "@/lib/console/useLoad";
@@ -163,15 +164,20 @@ export function EvaluationSection() {
   const { data, failed, reload } = useReports();
   const [confirming, setConfirming] = useState(false);
   const [running, setRunning] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const latest = data?.[0];
 
   async function start() {
     setConfirming(false);
     setRunning(true);
+    setError(null);
     try {
       await api.evaluation.start();
       toast(t("ui.evalDone"));
       await reload();
+    } catch (cause) {
+      const text = errorText(cause);
+      setError(text.includes("no_eval_set") ? t("evaluationPage.noEvalSet") : text);
     } finally {
       setRunning(false);
     }
@@ -190,6 +196,7 @@ export function EvaluationSection() {
           </button>
         </div>
       }>
+      {error ? <div className="fc-banner fc-banner-danger" role="alert"><Icon name="alert" /><div>{error}</div></div> : null}
       {running ? (
         <>
           <section className="box box-pad ev-running" role="status">

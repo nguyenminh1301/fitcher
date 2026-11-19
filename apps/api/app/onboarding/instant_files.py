@@ -2,7 +2,7 @@
 
 From the mart views and their profile:
 
-- ``datasets.yaml``: one dataset per view with a time column, wide views first because they hold the joined
+- ``datasets.yaml``: one dataset per view, wide views first because they hold the joined
   columns the agent needs. A number is a measure, a date or a date and time is time, and text, booleans and key
   columns are dimensions; a string column with at most ``INDEXED_VALUES`` values, other than a key, is indexable so
   its values can be matched in filters. Descriptions are left for the drafter (``status: draft``).
@@ -10,7 +10,7 @@ From the mart views and their profile:
   join-key candidates (drafts).
 - empty glossary, metrics and examples for the drafter, and no ``eval.yaml``.
 
-A view without a time column gets no dataset, because every dataset needs one; the summary lists it.
+A view without a date column still gets a dataset, without a time column; its questions are answered without a period.
 """
 
 from collections.abc import Sequence
@@ -44,7 +44,7 @@ def _columns(view: MartView, facts: dict) -> list[dict]:
 
 
 def dataset_items(views: Sequence[MartView], profile: dict) -> list[dict]:
-    """A draft dataset for each profiled view that has a time column, the wide views first."""
+    """A draft dataset for each profiled view, the wide views first; its first date column is its time column."""
     items = []
     for view in sorted(views, key=lambda view: not view.wide):
         facts = profile["tables"].get(view.name)
@@ -52,13 +52,13 @@ def dataset_items(views: Sequence[MartView], profile: dict) -> list[dict]:
             continue
         columns = _columns(view, facts)
         times = [column["name"] for column in columns if column["role"] == "time"]
-        if not times:
-            continue
         grain = (f"One row of {view.table}, with the columns of the tables it references" if view.wide
                  else f"One row of {view.table}")
+        item = {"id": view.name, "description": TO_DRAFT, "grain": grain}
+        if times:
+            item["time_column"] = times[0]
         items.append({
-            "id": view.name, "description": TO_DRAFT, "grain": grain, "time_column": times[0],
-            "columns": columns, "status": "draft",
+            **item, "columns": columns, "status": "draft",
             "evidence": [{"kind": "profile", "ref": view.name}], "confidence": 0.5,
         })
     return items

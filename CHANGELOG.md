@@ -4,7 +4,26 @@
 
 ### Changed
 
+- A menu item with choices, such as Language in the owner menu or "Move to group" on a conversation, opens them in a panel beside the menu on hover or click, with the item's name as its heading and a check mark on the current choice; the arrow keys open and close it. The menu used to be replaced by the choices.
+- A table without a date column, such as a product catalog or a contact list, becomes a dataset of the pack instead of being left out. Its questions are answered over all its rows without asking for a period; a period the question names is dropped with a warning, the Datasets page shows no time column for it, and the pack build no longer fails when the model's draft gives such a table a time column or marks a number column as searchable.
 - The Node dependency audit no longer accepts GHSA-fc5q-39xc-vjpf for picomatch: npm stopped reporting it for the locked versions, so the exception list is empty.
+
+### Fixed
+
+- After an owner password is set on the Security page, the owner menu offers Sign out and says the browser is signed in without reloading the page; it read the password state only once.
+- When the model does not answer the question (a free model's rate limit, an outage), the chat says so in the question's language with the provider's message and a Try again button; it used to show the raw error in English as if fitcher were asking back, and the run is now recorded as failed.
+- A tab separated CSV file loads; ClickHouse refused it before, so the load failed after the columns were confirmed.
+- Before building a pack, the setup says how many analysis tables the pack gets and that some join related tables, instead of a count that did not match the tables chosen.
+- Runs where fitcher asked a question back, or that were blocked or stopped, show "Asked back", "Blocked" or "Stopped" on the Runs and Overview pages instead of an untranslated key, and the Runs filter offers them.
+- Run evaluation on a pack without evaluation questions, such as one built from a source, says so on the page; before, the run was accepted and failed in the background with only a log line.
+- When the pack is built, a dataset keeps the evidence it already cites when the model cites nothing known, instead of every dataset citing the first table, and the model may pick a better time column among the table's dates.
+- A PostgreSQL table that was never analysed shows an unknown size when choosing tables, instead of 0 B.
+- A question for "all time" is answered over every date the data has instead of failing with an internal error.
+- A CSV file separated by semicolons or tabs is read column by column; before, its columns were proposed as one text column.
+- English counts of one read in the singular ("1 table", "1 source", "Build the pack from 1 table") instead of "1 tables".
+- After a failed pack build the Sources page says no pack is turned on and offers "Build the pack", instead of showing only a succeeded sync while the other pages ask to connect data that is already connected; those pages now say the pack is missing and that it is built from the Sources page.
+- Loading icons turn again, including the one above "Building the pack" and the circle of the step that is running; they stood still before.
+- The Feedback page without an active pack no longer logs a feedback store failure with a traceback; the api answers that no pack is active.
 
 ## 0.0.3 - 2026-11-18
 

@@ -17,7 +17,7 @@ import { useLoad } from "@/lib/console/useLoad";
 import { useI18n } from "@/lib/i18n/react";
 import { langOf } from "@/lib/text";
 
-const STATUSES = ["all", "succeeded", "failed", "denied", "rejected"];
+const STATUSES = ["all", "succeeded", "clarified", "failed", "error", "denied", "rejected", "blocked"];
 
 /** An estimated cost in US dollars, to four decimals as model calls cost fractions of a cent. */
 export function useUsd(): (value: number, decimals?: number) => string {
