@@ -25,8 +25,10 @@ table, not a guess, and are the published terms on 2026-11-19:
 - Gemini (Google AI Studio): Flash and Flash-Lite models, Gemma models and the
   embedding models have a daily free allowance; Pro models are billed.
 - Groq: every model is usable on the free plan within its rate limits.
-- Z.ai: the GLM ``-flash`` models are free of charge (``-flashx`` is billed),
-  unless LiteLLM's price table gives the model a price.
+- Z.ai: ``glm-4.5-flash``, ``glm-4.7-flash`` and ``glm-4.6v-flash`` are free of
+  charge; newer ``-flash`` models such as ``glm-5.3-flash`` are billed and refuse
+  an account without credit. Z.ai lists only its billed models, so its free
+  ``glm-4.5-flash`` is added to its catalog.
 
 ``median_latency_ms`` is measured: the median latency of this instance's own
 successful calls to the model over the last 7 days, from ``llm_calls``.
@@ -88,6 +90,11 @@ class CatalogModel:
     # Artificial Analysis' intelligence index, from OpenRouter's list.
     benchmark: float | None = None
     median_latency_ms: int | None = None
+
+
+# Z.ai's free models (measured 2026-11-19 with a free account); Z.ai does not list the first one.
+ZAI_FREE = frozenset({"glm-4.5-flash", "glm-4.7-flash", "glm-4.6v-flash"})
+ZAI_UNLISTED = ("glm-4.5-flash",)
 
 
 def service_of(provider: Provider) -> str:
@@ -152,7 +159,7 @@ def _free_tier(service: str, model: str, kind: Kind) -> bool:
 def _free(service: str, model: str, kind: Kind, input_price: float | None, output_price: float | None) -> Free:
     if service == "ollama" or (service == "openrouter" and model.endswith(":free")):
         return "free"
-    if service == "zai" and re.search(r"-flash$", model) and not (input_price or output_price):
+    if service == "zai" and model in ZAI_FREE:
         return "free"
     if _free_tier(service, model, kind):
         return "free_tier"
@@ -172,6 +179,8 @@ def _structured(service: str, model: str, item: dict, entry: dict, kind: Kind) -
     if service == "gemini":
         # Gemini models take a response schema; Gemma models on the same API do not.
         return model.startswith("gemini-")
+    if service == "zai" and model in ZAI_UNLISTED:
+        return True  # answered the provider check's JSON schema on 2026-11-19
     return None
 
 
@@ -222,7 +231,11 @@ def build(provider: Provider, body: dict, *, price_table: Mapping[str, dict],
     """The catalog of the provider from its listing, sorted by kind then name; measured latency is added later."""
     service = service_of(provider)
     models = []
-    for model, item in listing_items(provider, body):
+    listed = listing_items(provider, body)
+    if service == "zai":
+        known = {name for name, _ in listed}
+        listed = [*listed, *((name, {}) for name in ZAI_UNLISTED if name not in known)]
+    for model, item in listed:
         item = item if isinstance(item, dict) else {}
         entry = _price_entry(service, model, price_table)
         kind = _kind(service, model, item, entry)

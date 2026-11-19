@@ -153,7 +153,7 @@ def test_a_provider_error_raises_llm_error_without_the_providers_message(screene
 
 
 def test_a_rate_limited_call_says_what_the_user_can_do(screened):
-    sdk = FakeSdk(litellm.RateLimitError("Rate limit exceeded: free-models-per-day. sk-or-v1-abcd", "openrouter", "x:free"))
+    sdk = FakeSdk(litellm.RateLimitError("Rate limit reached for requests. sk-or-v1-abcd", "openrouter", "x:free"))
 
     with pytest.raises(LLMError) as raised:
         gateway(sdk).text("fast", PROMPT)
@@ -344,7 +344,7 @@ def test_a_model_without_a_known_price_logs_a_null_cost(screened):
 
 def test_a_failed_call_writes_its_row_with_the_error_type(screened):
     rows = Rows()
-    sdk = FakeSdk(litellm.RateLimitError("quota exceeded for key sk-test-****1234", "openai", "gpt-4.1-mini"))
+    sdk = FakeSdk(litellm.RateLimitError("rate limit reached for key sk-test-****1234", "openai", "gpt-4.1-mini"))
 
     with pytest.raises(LLMError):
         gateway(sdk, call_log=rows).text("fast", PROMPT)

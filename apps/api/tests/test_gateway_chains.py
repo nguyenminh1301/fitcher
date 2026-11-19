@@ -4,6 +4,7 @@ from collections.abc import Iterator
 
 import litellm
 import pytest
+from pydantic import BaseModel
 
 from app.llm.client import LLMError, Prompt
 from app.llm.gateway import Gateway, Route
@@ -201,13 +202,95 @@ def test_a_model_whose_keys_all_rest_is_skipped_without_a_call():
     assert [call["model"] for call in sdk.calls] == ["openai/local-model"]
 
 
-def test_a_single_route_keeps_the_sdk_retries_and_the_one_model_message():
+def test_a_single_route_is_not_retried_by_the_sdk_and_keeps_the_one_model_message():
     sdk = Sdk(lambda call: rate_limited())
 
     with pytest.raises(LLMError, match=r"^request to model openai/gpt-oss-120b failed: RateLimitError"):
         gateway([[GROQ_A]], sdk).text("fast", PROMPT)
 
-    assert sdk.calls[0]["num_retries"] == 2
+    assert [call["num_retries"] for call in sdk.calls] == [0]
+
+
+def test_each_tier_waits_its_own_time_for_a_model():
+    sdk = Sdk(lambda call: reply())
+    chat = gateway([[GEMINI]], sdk)
+
+    chat.text("fast", PROMPT)
+    chat.text("sql-gen-hard", PROMPT)
+
+    assert [call["timeout"] for call in sdk.calls] == [30.0, 120.0]
+
+
+def timed_out() -> litellm.Timeout:
+    return litellm.Timeout("took too long", "gemini-2.5-flash", "gemini")
+
+
+def test_a_model_that_timed_out_is_not_asked_again_and_rests_for_the_next_calls():
+    clock = Clock()
+    pool = KeyPool(clock)
+    sdk = Sdk(lambda call: timed_out() if call["model"] == GEMINI.model else reply("fallback"))
+    chat = gateway([[GEMINI], [GROQ_A]], sdk, pool)
+
+    assert chat.text("fast", PROMPT) == "fallback"
+    assert chat.text("fast", PROMPT) == "fallback"
+
+    # The timeout was not retried, and the second call went straight to the next model.
+    assert [call["model"] for call in sdk.calls] == [GEMINI.model, GROQ_A.model, GROQ_A.model]
+    clock.now += 61
+    chat.text("fast", PROMPT)
+    assert sdk.calls[-2]["model"] == GEMINI.model
+
+
+def test_a_paid_model_without_credit_moves_on_and_rests_only_that_model():
+    # Z.ai answers a paid model on an account without credit with HTTP 429 and "Insufficient balance".
+    broke = litellm.RateLimitError("Insufficient balance or no resource package. Please recharge.", "zai", "glm-5.3")
+    paid, free = route("zai", "glm-5.3-flash", "z"), route("zai", "glm-4.5-flash", "z")
+    logs: list = []
+    pool = KeyPool(Clock())
+    sdk = Sdk(lambda call: broke if call["model"] == paid.model else reply("free"))
+    chat = gateway([[paid], [free]], sdk, pool, logs)
+
+    assert chat.text("fast", PROMPT) == "free"
+    assert chat.text("fast", PROMPT) == "free"
+
+    assert [row.error for row in logs] == ["PaymentRequiredError", "", ""]
+    # The key itself was not rested: its free model kept answering.
+    assert [call["model"] for call in sdk.calls] == [paid.model, free.model, free.model]
+
+
+def test_a_single_model_gets_one_more_call_after_a_brief_outage_but_not_after_a_timeout():
+    outage = iter([litellm.ServiceUnavailableError("busy", "gemini-2.5-flash", "gemini"), reply("back")])
+    sdk = Sdk(lambda call: next(outage))
+    assert gateway([[GEMINI]], sdk).text("fast", PROMPT) == "back"
+
+    slow = Sdk(lambda call: timed_out())
+    with pytest.raises(LLMError, match="Timeout"):
+        gateway([[GEMINI]], slow).text("fast", PROMPT)
+    assert len(slow.calls) == 1
+
+
+def test_models_that_all_rest_are_still_asked_rather_than_failing_unasked():
+    pool = KeyPool(Clock())
+    pool.rest_model(GEMINI, 60)
+    sdk = Sdk(lambda call: reply("asked"))
+
+    assert gateway([[GEMINI]], sdk, pool).text("fast", PROMPT) == "asked"
+
+
+@pytest.mark.parametrize(("message", "status", "kind"), [
+    ("Insufficient balance or no resource package. Please recharge.", 429, "PaymentRequiredError"),
+    ("The service may be temporarily overloaded, please try again later", 429, "ServiceUnavailableError"),
+    ("Rate limit exceeded: free-models-per-day", 429, "QuotaExceededError"),
+    ("You exceeded your current quota, please check your plan and billing details.", 429, "QuotaExceededError"),
+    ("You exceeded your current quota ... insufficient_quota", 429, "PaymentRequiredError"),
+    ("Rate limit reached for requests", 429, "RateLimitError"),
+    ("Invalid API Key; insufficient balance", 401, "AuthenticationError"),
+])
+def test_the_error_type_follows_the_message_when_the_status_means_something_else(message, status, kind):
+    from app.llm.gateway import error_type
+
+    error = litellm.APIError(status, message, "zai", "glm")
+    assert error_type(error) == kind
 
 
 def test_a_refused_key_reported_as_a_bad_request_is_still_a_refused_key():
@@ -219,3 +302,22 @@ def test_a_refused_key_reported_as_a_bad_request_is_still_a_refused_key():
 
     assert gateway([[GROQ_A, GROQ_B]], sdk, logs=logs).text("fast", PROMPT) == "ready"
     assert [row.error for row in logs] == ["AuthenticationError", ""]
+
+
+class Answer(BaseModel):
+    count: int
+
+
+def test_a_reply_that_does_not_match_the_schema_is_answered_by_the_next_model():
+    # A model that repeats digits writes a number too long for Python to read: a ValueError, not a JSON error.
+    runaway = '{"count": ' + "9" * 5000 + "}"
+    sdk = Sdk(lambda call: reply(runaway) if call["model"] == GEMINI.model else reply('{"count": 5}'))
+
+    assert gateway([[GEMINI], [GROQ_A]], sdk).structured("fast", PROMPT, Answer) == Answer(count=5)
+
+
+def test_a_single_model_with_a_reply_that_cannot_be_read_fails_with_a_model_error():
+    sdk = Sdk(lambda call: reply('{"count": ' + "9" * 5000 + "}"))
+
+    with pytest.raises(LLMError, match="does not match Answer"):
+        gateway([[GEMINI]], sdk).structured("fast", PROMPT, Answer)

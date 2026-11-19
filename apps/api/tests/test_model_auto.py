@@ -45,7 +45,23 @@ def test_auto_free_ranks_free_models_by_benchmark_then_latency_and_spreads_provi
 def test_auto_best_takes_any_chat_model_and_the_cheaper_one_on_a_tie():
     chosen = auto.choose(CATALOG, "auto_best")
 
-    assert chain(chosen["fast"])[:2] == [("router", "router-cheap"), ("groq", "groq-a")]
+    assert chain(chosen["sql-gen"])[:2] == [("router", "router-cheap"), ("groq", "groq-a")]
+
+
+def test_the_quick_tiers_put_small_fast_models_first_and_leave_out_reasoning_models():
+    catalog = [
+        model("gemini", "gemini-3.8-flash", free="free_tier", benchmark=60, latency=9000),
+        model("gemini", "gemini-flash-lite-latest", free="free_tier", benchmark=40, latency=800),
+        model("groq", "openai/gpt-oss-20b", free="free_tier", benchmark=35, latency=400),
+        model("router", "nemotron-nano-reasoning:free", benchmark=50),
+        model("zai", "glm-4.5-flash", benchmark=30),
+    ]
+
+    chosen = auto.choose(catalog, "auto_free")
+
+    assert chain(chosen["fast"]) == [("gemini", "gemini-flash-lite-latest"), ("zai", "glm-4.5-flash"),
+                                     ("groq", "openai/gpt-oss-20b"), ("gemini", "gemini-3.8-flash")]
+    assert chain(chosen["sql-gen"])[0] == ("gemini", "gemini-3.8-flash")
 
 
 def test_a_model_known_not_to_follow_a_schema_serves_no_tier():
@@ -65,6 +81,7 @@ def mapping(tmp_path):
 
 def test_refresh_applies_the_choice_once_a_day_and_never_in_manual_mode(mapping):
     tiers, store = mapping
+    tiers.set_mode("manual")
     tiers.set_tier("fast", "openai", "kept")
     catalog = {"openai": [model("openai", "gpt-free", benchmark=50)],
                "openai-compatible": [model("openai-compatible", "lab", benchmark=10)]}
