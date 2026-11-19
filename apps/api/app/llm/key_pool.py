@@ -5,7 +5,10 @@ further than the last, so a provider's free allowances are used evenly. A key
 the provider rate-limited rests for its ``Retry-After`` time, or
 ``COOLDOWN_SECONDS`` when the provider gave none. A key the provider refused
 (401 or 403) is not tried again by this process; a replaced key is a new key
-with a new id, so it is tried. The state is per process and is lost on restart,
+with a new id, so it is tried. A model that timed out, was unavailable, is
+missing or needs credit the account lacks rests on its own (``rest_model``)
+with that key, while the key keeps serving the provider's other models. The
+state is per process and is lost on restart,
 which costs at most one more refused call per key.
 """
 
@@ -30,8 +33,11 @@ class KeyPool:
         self._next: dict[str, int] = {}
         self._resting: dict[tuple[str, str], float] = {}
         self._refused: set[tuple[str, str]] = set()
+        self._models_resting: dict[tuple[str, str, str], float] = {}
 
     def _usable(self, route: "Route", now: float) -> bool:
+        if self._models_resting.get((route.provider, route.key_id or "", route.model), 0.0) > now:
+            return False
         if route.key_id is None:
             return True
         key = (route.provider, route.key_id)
@@ -57,6 +63,11 @@ class KeyPool:
         wait = min(max(seconds if seconds is not None else COOLDOWN_SECONDS, 1.0), MAX_COOLDOWN_SECONDS)
         with self._lock:
             self._resting[(route.provider, route.key_id)] = self._clock() + wait
+
+    def rest_model(self, route: "Route", seconds: float) -> None:
+        """This model failed with this key: skip it for ``seconds``."""
+        with self._lock:
+            self._models_resting[(route.provider, route.key_id or "", route.model)] = self._clock() + seconds
 
     def refuse(self, route: "Route") -> None:
         """The provider refused this key: do not use it again."""

@@ -16,9 +16,14 @@ rate-limited key rests and a refused key is dropped, and the next key is
 tried. A rate limit with no key left, a timeout, a connection error, a 5xx, a
 missing model or an empty reply moves to the next model. A request the model
 rejected as invalid (400, 422, a context too long) stops the chain, because
-the next model would get the same request. When every model failed, the
-``LLMError`` lists each attempt. With a chain the SDK's own retries are off:
-the next key or model is the retry.
+the next model would get the same request. A model that timed out, was
+unavailable, is missing or needs credit the account lacks rests with that key
+(``KeyPool.rest_model``), so the next calls skip it. When every model failed,
+the ``LLMError`` lists each attempt. The SDK's own retries are off and each
+tier has its own timeout (``TIER_TIMEOUTS``): the next key or model is the
+retry, and a single model gets one more call only after a brief outage, never
+after a timeout. The error type comes from the HTTP status, then from words of
+the provider's message (``MESSAGE_TYPES``), which is never shown.
 
 Before any provider call the gateway checks screening (DECISIONS §9, Layer
 0): the call must carry the ``screening`` metadata of ``llm_metadata`` (the
@@ -32,8 +37,7 @@ authentication boundary. The ``template_tag`` rule is skipped: the api's own
 prompts put untrusted content between such tags.
 
 Every call, answered, failed or refused, writes one ``llm_calls`` row through
-``call_log`` (``app/llm/call_log.py``). Every call sets a timeout and bounded
-retries and drops a parameter the model does not accept (such as a fixed
+``call_log`` (``app/llm/call_log.py``). Every call sets a timeout and drops a parameter the model does not accept (such as a fixed
 temperature) instead of failing.
 
 LiteLLM is imported on the first call, not with this module: the import is
@@ -62,7 +66,12 @@ from app.observability.tracing import llm_metadata, TRUSTED_PACK
 from app.screening import rules
 
 TIMEOUT_SECONDS = 120
-RETRIES = 2
+# How long one call to a chat tier's model may take before the chain moves on: a quick task gives up sooner.
+TIER_TIMEOUTS = {"fast": 30.0, "sql-small": 45.0, "sql-gen": 90.0, "sql-gen-hard": 120.0}
+# Chat calls are not retried by the SDK: a timeout retried on the same model only multiplies the wait. The next
+# key or model is the retry; a single model is tried once more only after a transient failure that is not a timeout.
+RETRIES = 0
+EMBEDDING_RETRIES = 2
 # Calls made when a model's reply has no content, before the call fails.
 EMPTY_REPLY_ATTEMPTS = 2
 BATCH_SIZE = 256
@@ -134,13 +143,41 @@ class _ProviderFailure(Exception):
 
 # Some OpenAI-compatible providers answer a refused key or a rate limit in a shape the SDK reports as another
 # error type; the HTTP status is what the chain acts on.
-STATUS_TYPES = {401: "AuthenticationError", 403: "PermissionDeniedError", 429: "RateLimitError"}
+STATUS_TYPES = {401: "AuthenticationError", 402: "PaymentRequiredError", 403: "PermissionDeniedError",
+                429: "RateLimitError"}
+PAYMENT_REQUIRED = "PaymentRequiredError"
+QUOTA_EXCEEDED = "QuotaExceededError"
+# Words of a provider's error message that tell what really happened when its status says something else; the
+# first match wins. Z.ai answers a paid model on an account without credit with HTTP 429 "insufficient balance"
+# (OpenAI with ``insufficient_quota``); Gemini answers a model whose free quota is used up with HTTP 429 "You
+# exceeded your current quota", which holds for that model only; OpenRouter's daily allowance of free requests
+# reads "free-models-per-day"; a provider's "overloaded" 429 is an outage of the model, not a limit of the key.
+# The message is read here only to classify the error and is never shown or logged.
+MESSAGE_TYPES = (
+    (("insufficient balance", "insufficient_quota", "insufficient credit", "credit balance", "recharge",
+      "no resource package", "payment required", "requires more credits"), PAYMENT_REQUIRED),
+    (("exceeded your current quota", "quota exceeded", "resource_exhausted", "per-day", "per day"), QUOTA_EXCEEDED),
+    (("overloaded", "over capacity", "temporarily unavailable", "high demand"), "ServiceUnavailableError"),
+    (("rate limit", "too many requests"), "RateLimitError"),
+)
+# Types whose message is not read: a refused key stays a refused key whatever its message says.
+_KEY_TYPES = frozenset({"AuthenticationError", "PermissionDeniedError"})
 
 
 def error_type(error: Exception) -> str:
-    """The SDK error's type name, or the type its HTTP status means when the SDK named another."""
+    """The SDK error's type name, or the type its HTTP status or message means when the SDK named another."""
     status = getattr(error, "status_code", None)
-    return STATUS_TYPES.get(status, type(error).__name__) if isinstance(status, int) else type(error).__name__
+    kind = STATUS_TYPES.get(status, type(error).__name__) if isinstance(status, int) else type(error).__name__
+    if kind in _KEY_TYPES:
+        return kind
+    try:
+        message = str(error).lower()
+    except Exception:  # noqa: BLE001 - an error that cannot be printed keeps its type
+        return kind
+    for words, meaning in MESSAGE_TYPES:
+        if any(word in message for word in words):
+            return meaning
+    return kind
 
 
 def _retry_after(error: Exception) -> float | None:
@@ -158,11 +195,22 @@ def _retry_after(error: Exception) -> float | None:
 # drop this one, stop because every model would get the same invalid request, or else move to the next model.
 REST_KEY = frozenset({"RateLimitError"})
 DROP_KEY = frozenset({"AuthenticationError", "PermissionDeniedError"})
+# Failures of one model, not of the key: the model rests for this long (seconds), so the next calls of this run
+# and of later runs go straight to the next model instead of waiting on it again.
+REST_MODEL = {
+    "Timeout": 60.0, "ServiceUnavailableError": 30.0, "APIConnectionError": 30.0, "InternalServerError": 30.0,
+    "APIError": 30.0, PAYMENT_REQUIRED: 1800.0, QUOTA_EXCEEDED: 900.0, "NotFoundError": 1800.0, "EmptyReply": 60.0,
+}
+# Failures worth one more call to the same model when it is the only one: brief outages, never a timeout.
+RETRY_SAME = frozenset({"ServiceUnavailableError", "APIConnectionError", "InternalServerError", "APIError"})
 STOP_CHAIN = frozenset({
     "BadRequestError", "UnprocessableEntityError", "ContextWindowExceededError", "ContentPolicyViolationError",
     "UnsupportedParamsError",
 })
 EMPTY_REPLY = "EmptyReply"
+INVALID_REPLY = "InvalidReply"
+# What the chain does next after a failure it recovered from.
+_NEXT_KEY, _NEXT_MODEL = object(), object()
 
 
 # What a person can do about a provider failure, by the SDK's error type. The provider's own message is never
@@ -176,7 +224,12 @@ FAILURE_HINTS = {
     "Timeout": "the model took too long to answer; try again or choose a faster model on the Models page",
     "APIConnectionError": "the provider could not be reached; check its address and the network",
     "ServiceUnavailableError": "the provider is unavailable for now; try again later",
+    QUOTA_EXCEEDED: "the account's quota for this model is used up for now; the task's next model answers until it "
+                    "resets, or add another provider or key on the Models page",
+    INVALID_REPLY: "the model's reply did not match the answer format; another model may follow it better",
     "ContextWindowExceededError": "the request is longer than this model accepts; choose a model with a larger context",
+    PAYMENT_REQUIRED: "the model is billed and the account has no credit for it; add credit or choose a free model "
+                      "on the Models page",
 }
 
 
@@ -197,7 +250,7 @@ class _Sender:
     retries: int
 
     def send(self, tier: str, route: Route, texts: Sequence[str], request: dict, *,
-             retries: int | None = None, fallback_of: str = "") -> tuple[Any, str]:
+             retries: int | None = None, fallback_of: str = "", timeout: float | None = None) -> tuple[Any, str]:
         """The SDK's reply and the call id logged for it."""
         metadata = llm_metadata()
         started_at, started = calls.now(), time.monotonic()
@@ -218,7 +271,8 @@ class _Sender:
             raise GatewayBlocked(reason)
         try:
             response = self.sdk(
-                model=route.model, api_key=route.api_key, api_base=route.api_base, timeout=self.timeout,
+                model=route.model, api_key=route.api_key, api_base=route.api_base,
+                timeout=self.timeout if timeout is None else timeout,
                 num_retries=self.retries if retries is None else retries, drop_params=True, **request,
             )
         except Exception as error:  # noqa: BLE001 - every SDK and provider failure is reported by type only
@@ -282,12 +336,15 @@ class Gateway:
         completion: Callable[..., Any] | None = None,
         call_log: CallLog | None = None,
         temperature: float | None = None,
-        timeout: float = TIMEOUT_SECONDS,
+        timeout: float | None = None,
         retries: int = RETRIES,
         keys: KeyPool | None = None,
     ):
+        """``timeout`` applies to every tier; without it each tier has its own (``TIER_TIMEOUTS``)."""
         self._resolver = resolver
-        self._sender = _Sender(completion or _sdk_completion, "completion", call_log, timeout, retries)
+        self._timeout = timeout
+        self._sender = _Sender(completion or _sdk_completion, "completion", call_log,
+                               timeout if timeout is not None else TIMEOUT_SECONDS, retries)
         self._temperature = temperature
         self._keys = keys or SHARED_KEYS
 
@@ -296,14 +353,18 @@ class Gateway:
             "type": "json_schema",
             "json_schema": {"name": schema.__name__, "schema": schema.model_json_schema()},
         }
-        model, content = self._complete(tier, prompt, response_format)
-        try:
-            return schema.model_validate(json.loads(content))
-        except (json.JSONDecodeError, ValidationError):
-            pass
-        # Raised outside the handler: the validation details echo reply content, so the error keeps
-        # neither them in its message nor the caught exception as its cause or context.
-        raise LLMError(f"model {model} replied with JSON that does not match {schema.__name__}")
+        parsed: list[ModelT] = []
+
+        def accept(content: str) -> bool:
+            # ValueError also covers a reply whose number is too long to read (a model repeating digits).
+            try:
+                parsed.append(schema.model_validate(json.loads(content)))
+                return True
+            except (ValueError, ValidationError, RecursionError):
+                return False
+
+        self._complete(tier, prompt, response_format, accept, schema.__name__)
+        return parsed[-1]
 
     def text(self, tier: str, prompt: Prompt) -> str:
         return self._complete(tier, prompt, None)[1]
@@ -320,8 +381,13 @@ class Gateway:
             raise LLMError(f"no model is mapped to the {tier} tier; add a provider on the Models page")
         return links
 
-    def _complete(self, tier: str, prompt: Prompt, response_format: dict | None) -> tuple[str, str]:
-        """The model that answered ``tier``, and its reply text."""
+    def _complete(self, tier: str, prompt: Prompt, response_format: dict | None,
+                  accept: Callable[[str], bool] | None = None, schema_name: str = "") -> tuple[str, str]:
+        """The model that answered ``tier``, and its reply text.
+
+        A reply ``accept`` refuses (JSON that does not match the schema) fails that model like an error, and the
+        chain's next model is asked.
+        """
         check_chat_tier(tier)
         links = self._links(tier)
         request: dict = {
@@ -332,38 +398,65 @@ class Gateway:
         if self._temperature is not None:
             request["temperature"] = self._temperature
         single = len(links) == 1 and len(links[0]) == 1
+        timeout = self._timeout if self._timeout is not None else TIER_TIMEOUTS.get(tier, TIMEOUT_SECONDS)
+        orders = [self._keys.order(routes) for routes in links]
+        if not any(orders):
+            # Every model rests after recent failures: try them again rather than fail without asking anyone.
+            orders = links
         attempts: list[tuple[str, str]] = []
         previous = ""
-        for routes in links:
-            usable = self._keys.order(routes)
+        for routes, usable in zip(links, orders):
             if not usable:
-                attempts.append((routes[0].model, "RateLimitError"))
+                attempts.append((routes[0].model, "Resting"))
                 continue
             for route in usable:
-                try:
-                    content, previous = self._ask(tier, route, prompt, request, None if single else 0, previous)
-                except _ProviderFailure as failure:
-                    previous = failure.call_id
-                    attempts.append((route.model, failure.error_type))
-                    if single or failure.error_type in STOP_CHAIN:
-                        raise LLMError(f"request to model {route.model} failed: {failure_text(failure.error_type)}",
-                                       tuple(attempts)) from None
-                    if failure.error_type in REST_KEY:
-                        self._keys.rest(route, failure.retry_after)
-                        continue
-                    if failure.error_type in DROP_KEY:
-                        self._keys.refuse(route)
-                        continue
+                tries = 2 if single else 1
+                while tries:
+                    tries -= 1
+                    try:
+                        content, previous = self._ask(tier, route, prompt, request, timeout, previous)
+                    except _ProviderFailure as failure:
+                        previous = failure.call_id
+                        kind = failure.error_type
+                        if tries and kind in RETRY_SAME:
+                            continue
+                        attempts.append((route.model, kind))
+                        self._after_failure(route, failure)
+                        if single or kind in STOP_CHAIN:
+                            raise LLMError(f"request to model {route.model} failed: {failure_text(kind)}",
+                                           tuple(attempts)) from None
+                        content = _NEXT_KEY if kind in REST_KEY or kind in DROP_KEY else _NEXT_MODEL
+                    break
+                if content is _NEXT_KEY:
+                    continue
+                if content is _NEXT_MODEL:
                     break
                 if content is None:
                     attempts.append((route.model, EMPTY_REPLY))
+                    self._keys.rest_model(route, REST_MODEL[EMPTY_REPLY])
                     if single:
                         raise LLMError(f"model {route.model} returned an empty reply", tuple(attempts))
+                    break
+                if accept is not None and not accept(content):
+                    attempts.append((route.model, INVALID_REPLY))
+                    if single:
+                        # The reply is not quoted: it may echo the request.
+                        raise LLMError(f"model {route.model} replied with JSON that does not match {schema_name}",
+                                       tuple(attempts))
                     break
                 return route.model, content
         raise LLMError(_attempts_text(tier, attempts), tuple(attempts))
 
-    def _ask(self, tier: str, route: Route, prompt: Prompt, request: dict, retries: int | None,
+    def _after_failure(self, route: Route, failure: "_ProviderFailure") -> None:
+        """Rest or drop the key, or rest the model, by what failed."""
+        if failure.error_type in REST_KEY:
+            self._keys.rest(route, failure.retry_after)
+        elif failure.error_type in DROP_KEY:
+            self._keys.refuse(route)
+        elif failure.error_type in REST_MODEL:
+            self._keys.rest_model(route, REST_MODEL[failure.error_type])
+
+    def _ask(self, tier: str, route: Route, prompt: Prompt, request: dict, timeout: float,
              fallback_of: str) -> tuple[str | None, str]:
         """The route's reply text, or None when it stayed empty, and the last call id logged."""
         # A reasoning model sometimes spends its whole reply on reasoning and returns no content; it is asked
@@ -371,7 +464,7 @@ class Gateway:
         call_id = fallback_of
         for _ in range(EMPTY_REPLY_ATTEMPTS):
             response, call_id = self._sender.send(tier, route, (prompt.system, prompt.user), request,
-                                                  retries=retries, fallback_of=fallback_of)
+                                                  fallback_of=fallback_of, timeout=timeout)
             choices = calls.field(response, "choices")
             message = calls.field(choices[0], "message") if isinstance(choices, list) and choices else None
             content = calls.field(message, "content")
@@ -394,7 +487,7 @@ class GatewayEmbeddings:
         call_log: CallLog | None = None,
         batch_size: int = BATCH_SIZE,
         timeout: float = TIMEOUT_SECONDS,
-        retries: int = RETRIES,
+        retries: int = EMBEDDING_RETRIES,
     ):
         self.dimensions = dimensions
         self._resolver = resolver
