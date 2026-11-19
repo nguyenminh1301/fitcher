@@ -8,6 +8,8 @@ from app.contracts.query_spec import ContractModel
 
 class RunRow(ContractModel):
     trace_id: str
+    # The pack (one per data source) that answered the run.
+    pack: str = ""
     ts: datetime
     user_id: str
     # The pack role the run used, from its access decision; empty when it stopped before one.

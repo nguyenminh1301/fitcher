@@ -38,9 +38,10 @@ def _read(call):
 def list_runs(
     _: Admin, logs: Logs, user: str | None = None, status_filter: Annotated[str | None, Query(alias="status")] = None,
     start: Annotated[date | None, Query(alias="from")] = None, end: Annotated[date | None, Query(alias="to")] = None,
-    page: Annotated[int, Query(ge=1)] = 1,
+    page: Annotated[int, Query(ge=1)] = 1, every_pack: Annotated[bool, Query(alias="all")] = False,
 ) -> list[RunRow]:
-    return _read(lambda: logs.runs(user=user, start=start, end=end, status=status_filter, page=page))
+    """The current pack's runs, or with ``all`` every pack's, each naming its pack."""
+    return _read(lambda: logs.runs(user=user, start=start, end=end, status=status_filter, page=page, every_pack=every_pack))
 
 
 @router.get("/runs/{trace_id}")

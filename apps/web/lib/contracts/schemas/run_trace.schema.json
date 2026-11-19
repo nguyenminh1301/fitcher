@@ -7,6 +7,11 @@
           "title": "Trace Id",
           "type": "string"
         },
+        "pack": {
+          "default": "",
+          "title": "Pack",
+          "type": "string"
+        },
         "ts": {
           "format": "date-time",
           "title": "Ts",

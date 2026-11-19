@@ -62,7 +62,7 @@ def _short(value: object) -> str:
 
 RUN_SELECT = """
 SELECT r.trace_id, r.ts, r.user_id, a.role, r.question, r.intent, r.status, r.latency_ms, c.cost, r.error,
-    c.input_tokens, c.output_tokens, c.models
+    c.input_tokens, c.output_tokens, c.models, r.pack
 FROM agent_logs.runs AS r FINAL
 LEFT JOIN (SELECT trace_id, any(role) AS role FROM agent_logs.audit GROUP BY trace_id) AS a ON a.trace_id = r.trace_id
 LEFT JOIN (
@@ -71,7 +71,7 @@ LEFT JOIN (
         arrayDistinct(arrayMap(call -> call.2, arraySort(groupArrayIf((ts, model), status IN ('success', 'ok'))))) AS models
     FROM agent_logs.llm_calls GROUP BY trace_id
 ) AS c ON c.trace_id = r.trace_id
-WHERE r.pack = {pack:String}"""
+WHERE (r.pack = {pack:String} OR {every_pack:Bool})"""
 
 
 class AdminLogs:
@@ -85,8 +85,10 @@ class AdminLogs:
 
     @staticmethod
     def _run(row: Sequence) -> RunRow:
-        trace_id, ts, user_id, role, question, intent, status, latency_ms, cost, error, input_tokens, output_tokens, models = row
+        (trace_id, ts, user_id, role, question, intent, status, latency_ms, cost, error, input_tokens, output_tokens, models,
+         pack) = row
         return RunRow(
+            pack=pack or "",
             trace_id=trace_id, ts=_aware(ts), user_id=user_id, role=role or "", question=question, intent=intent,
             status=status, latency_ms=int(latency_ms or 0), cost_usd=round(float(cost or 0.0), 6), error=error or "",
             input_tokens=int(input_tokens or 0), output_tokens=int(output_tokens or 0),
@@ -95,10 +97,11 @@ class AdminLogs:
 
     def runs(
         self, *, user: str | None = None, start: date | None = None, end: date | None = None,
-        status: str | None = None, page: int = 1,
+        status: str | None = None, page: int = 1, every_pack: bool = False,
     ) -> list[RunRow]:
-        """Runs newest first, ``PAGE_SIZE`` per page; ``end`` is exclusive."""
-        where, parameters = [], {"pack": self.pack, "limit": PAGE_SIZE, "offset": (max(page, 1) - 1) * PAGE_SIZE}
+        """Runs newest first, ``PAGE_SIZE`` per page; ``end`` is exclusive; ``every_pack`` reads every pack's runs."""
+        where, parameters = [], {"pack": self.pack, "every_pack": every_pack, "limit": PAGE_SIZE,
+                                 "offset": (max(page, 1) - 1) * PAGE_SIZE}
         if user:
             where.append("r.user_id = {user:String}")
             parameters["user"] = user
@@ -116,7 +119,9 @@ class AdminLogs:
         return [self._run(row) for row in self.query(sql, parameters)]
 
     def trace(self, trace_id: str) -> RunTrace | None:
-        rows = self.query(RUN_SELECT + "\n  AND r.trace_id = {trace_id:String}", {"pack": self.pack, "trace_id": trace_id})
+        # A trace id names one run, whichever pack answered it, so a run listed among every pack's runs opens.
+        rows = self.query(RUN_SELECT + "\n  AND r.trace_id = {trace_id:String}",
+                          {"pack": self.pack, "every_pack": True, "trace_id": trace_id})
         if not rows:
             return None
         parameters = {"trace_id": trace_id}

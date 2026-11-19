@@ -17,7 +17,7 @@ TS = datetime(2026, 11, 5, 9, 0, tzinfo=UTC)
 ADMIN = SessionHeaders(['admin'])
 REVIEWER = SessionHeaders(['pack_reviewer'])
 RUN = ("t1", TS, "dev.analyst", "reader", "Revenue by widget", "data_query", "succeeded", 1200, 0.0042, "", 1500, 220,
-       ["openai/nvidia/model:free", "gpt-x", ""])
+       ["openai/nvidia/model:free", "gpt-x", ""], "minimal")
 
 
 class Script:
@@ -62,15 +62,25 @@ def test_runs_are_filtered_paged_and_scoped_to_the_pack(client):
 
     assert response.status_code == 200
     assert response.json()[0] == {
-        "trace_id": "t1", "ts": "2026-11-05T09:00:00Z", "user_id": "dev.analyst", "role": "reader",
+        "trace_id": "t1", "pack": "minimal", "ts": "2026-11-05T09:00:00Z", "user_id": "dev.analyst", "role": "reader",
         "question": "Revenue by widget", "intent": "data_query", "status": "succeeded", "latency_ms": 1200,
         "cost_usd": 0.0042, "error": "", "input_tokens": 1500, "output_tokens": 220, "models": ["nvidia/model:free", "gpt-x"],
     }
     sql, parameters = script.calls[0]
     assert "sum(prompt_tokens)" in sql and "status IN ('success', 'ok')" in sql
     assert "r.pack = {pack:String}" in sql and "r.user_id = {user:String}" in sql and "r.status = {status:String}" in sql
-    assert parameters == {"pack": "minimal", "user": "dev.analyst", "status": "succeeded", "start": date(2026, 11, 1),
-                          "end": date(2026, 11, 6), "limit": PAGE_SIZE, "offset": PAGE_SIZE}
+    assert parameters == {"pack": "minimal", "every_pack": False, "user": "dev.analyst", "status": "succeeded",
+                          "start": date(2026, 11, 1), "end": date(2026, 11, 6), "limit": PAGE_SIZE, "offset": PAGE_SIZE}
+
+
+def test_every_packs_runs_are_listed_on_request_each_with_its_pack(client):
+    reader, script = logs([(r"FROM agent_logs\.runs", [RUN, (*RUN[:-1], "other_source")])])
+    use(reader)
+
+    rows = client.get("/admin/runs", headers=ADMIN, params={"all": "true"}).json()
+
+    assert [row["pack"] for row in rows] == ["minimal", "other_source"]
+    assert script.calls[0][1]["every_pack"] is True
 
 
 def test_a_trace_merges_nodes_llm_calls_sql_and_access_in_time_order(client):
