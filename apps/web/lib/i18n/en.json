@@ -882,7 +882,9 @@
     "providerName": "Name",
     "providerNameOptional": "Name (optional)",
     "providerNamePlaceholder": "For example: Company server",
-    "providerNameHelp": "Shown in the provider list and the model picker; you can change it later."
+    "providerNameHelp": "Shown in the provider list and the model picker; you can change it later.",
+    "indexed": "{done} of {total} items indexed",
+    "elapsed": "Running for {time}. Building a large table can take several minutes; you can leave this page."
   },
   "instant": {
     "title": "Build the pack",

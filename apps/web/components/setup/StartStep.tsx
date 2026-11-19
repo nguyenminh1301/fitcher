@@ -38,6 +38,22 @@ function Dot({ state }: { state: DotState }) {
   );
 }
 
+/** The seconds since ``since``, read again every second while ``live``. */
+function useElapsed(since: string | undefined, live: boolean): number {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (!live) return undefined;
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, [live]);
+  return since ? Math.max(0, Math.floor((now - Date.parse(since)) / 1000)) : 0;
+}
+
+function clock(seconds: number): string {
+  const minutes = Math.floor(seconds / 60);
+  return `${minutes}:${String(seconds % 60).padStart(2, "0")}`;
+}
+
 function Spinner() {
   return <span className="fc-spin fc-spinning" aria-hidden="true" />;
 }
@@ -90,6 +106,7 @@ export function StartStep({ sources, chosen, meta, onAsk, onConsole, onModel, po
 
   const jobId = job?.id;
   const running = job?.status === "running";
+  const elapsed = useElapsed(job?.started_at, running);
   useEffect(() => {
     if (!jobId || !running) return;
     const timer = setInterval(() => {
@@ -144,10 +161,21 @@ export function StartStep({ sources, chosen, meta, onAsk, onConsole, onModel, po
 
   if (job) {
     const failed = job.status === "failed";
+    // A step that counts its items (the compile's embeddings) shows how many are done and a bar.
+    const counted = (group: string) => {
+      const step = job.steps.find((item) => GROUPS.find(([name]) => name === group)?.[1].includes(item.id) && typeof item.total === "number" && item.total > 0);
+      return step ? { done: step.done ?? 0, total: step.total ?? 0 } : null;
+    };
+    const measured = (group: string) => {
+      const count = counted(group);
+      return count ? t("onboarding.indexed", { done: formatNumber(count.done), total: formatNumber(count.total) }) : null;
+    };
     const failedGroup = GROUPS.find(([, ids]) => groupState(job, ids) === "failed")?.[0] ?? "marts";
     return (
       <>
-        <StepHead icon={<Icon name={failed ? "alert" : "loader"} size="xl" />} title={failed ? t("onboarding.buildFailed") : t("onboarding.building")} />
+        <StepHead icon={<Icon name={failed ? "alert" : "loader"} size="xl" />} title={failed ? t("onboarding.buildFailed") : t("onboarding.building")}>
+          {failed ? null : t("onboarding.elapsed", { time: clock(elapsed) })}
+        </StepHead>
         <ol className="prog" aria-label={t("onboarding.buildProgress")} aria-live="polite">
           {GROUPS.map(([group, ids]) => {
             const state = groupState(job, ids);
@@ -155,8 +183,12 @@ export function StartStep({ sources, chosen, meta, onAsk, onConsole, onModel, po
               <li key={group} aria-current={state === "running" ? "step" : undefined}>
                 <Dot state={state} />
                 <span className={state === "pending" ? "fc-muted" : undefined} style={{ flex: 1 }}>{t(`onboarding.group_${group}`)}</span>
-                {state === "running" ? <span className="fc-muted">{t("onboarding.running")}</span> : null}
+                {state === "running" ? <span className="fc-muted">{measured(group) ?? t("onboarding.running")}</span> : null}
                 {state === "failed" ? <span className="prog-failed">{t("onboarding.failedLabel")}</span> : null}
+                {state === "running" && counted(group) ? (
+                  <progress className="prog-bar" max={counted(group)!.total} value={counted(group)!.done}
+                    aria-label={t(`onboarding.group_${group}`)} />
+                ) : null}
               </li>
             );
           })}

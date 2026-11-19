@@ -431,6 +431,25 @@ describe("setup data and start steps", () => {
     expect(sources.instantStart).toHaveBeenCalledTimes(2);
   });
 
+  it("counts the items the compile has indexed with a bar and the time the build has run", async () => {
+    const running = JOB("running", { marts: "done", profile: "done", files: "done", draft: "done", approve: "done", compile: "running" });
+    running.steps = running.steps.map((step) => (step.id === "compile" ? { ...step, done: 1500, total: 6000 } : step));
+    const sources = fakeSources({ instantStart: vi.fn(async () => ({ job: running })), instantJob: vi.fn(async () => ({ job: running })) });
+    wrap(<SetupScreen sources={sources} models={fakeModels()} setup={fakeSetup(DATA_PENDING)} {...exits()} />);
+
+    await connectDatabase();
+    await userEvent.click(await screen.findByRole("button", { name: "Choose tables" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Use 1 table" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Build the pack" }));
+
+    const progress = await screen.findByRole("list", { name: "Pack build progress" });
+    expect(within(progress).getByText("1,500 of 6,000 items indexed")).toBeTruthy();
+    const bar = within(progress).getByRole("progressbar") as HTMLProgressElement;
+    expect(bar.max).toBe(6000);
+    expect(bar.value).toBe(1500);
+    expect(screen.getByText(/^Running for \d+:\d\d\./)).toBeTruthy();
+  });
+
   it("says a model is needed instead of offering the paid call", async () => {
     const sources = fakeSources({ instantEstimate: vi.fn(async () => ({ prompt_tokens: 0, datasets: 1, model_missing: "no provider yet" })) });
     wrap(<SetupScreen sources={sources} models={fakeModels()} setup={fakeSetup(DATA_PENDING)} {...exits()} />);

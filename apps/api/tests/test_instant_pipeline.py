@@ -116,8 +116,11 @@ def packs_dir(tmp_path: Path) -> Path:
 def _pipeline(packs_dir, drafter=None, compile_fails=False, model_missing=None, client=None):
     compiled, activated = [], []
 
-    def compile_pack(pack_dir: Path):
+    def compile_pack(pack_dir: Path, progress=None):
         compiled.append(pack_dir.name)
+        if progress is not None:
+            progress(0, 1200)
+            progress(500, 1200)
         if compile_fails:
             raise RuntimeError("index generation failed")
         return {"generation": 2}
@@ -155,6 +158,8 @@ def test_a_job_runs_every_step_and_activates_the_compiled_pack(packs_dir):
     assert job.status == "succeeded"
     assert [step["id"] for step in job.steps] == list(STEPS) and {step["state"] for step in job.steps} == {"done"}
     assert compiled == ["shop"] and activated == ["shop"]
+    compile_step = next(step for step in job.steps if step["id"] == "compile")
+    assert (compile_step["done"], compile_step["total"]) == (500, 1200)
     assert job.result["pack"] == "shop"
     assert job.result["suggested_questions"] == ["Question 1?", "Question 2?", "Question 3?"]
     assert client.views == {"shop__widgets", "shop__sales", "shop__sales__wide"}

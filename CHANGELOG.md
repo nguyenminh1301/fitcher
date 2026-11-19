@@ -4,6 +4,7 @@
 
 ### Added
 
+- A pack build shows how long it has run and, while it indexes, how many items are indexed out of all of them with a progress bar, so a long build of a large table visibly moves.
 - Model providers show their logos on the provider cards, the provider list and the model picker, and an OpenAI-compatible endpoint or a server on this computer takes a name of its own when it is added; any provider can be renamed on the Models page.
 
 - The Sources page says for each source whether it can answer questions, with a button that gets a source ready (builds its pack) and an Ask button for a ready source, and a new conversation lets you choose which ready source it is answered from. Sources added after the setup used to have no pack and no visible way to build one, so questions about them could not be asked.
