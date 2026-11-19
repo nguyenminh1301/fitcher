@@ -16,8 +16,9 @@ so a question screening stops is never stored as a turn (DECISIONS §9); the
 answer is stored before its last event is sent, so a follow-up can read it
 at once.
 A comment frame keeps the connection open every 15 seconds. When the client
-disconnects, the run stops at its next node and the ClickHouse query it may
-be running is killed.
+disconnects, the run goes on and stores its answer (``app.api.live_runs``): leaving
+the page never loses an answer. ``POST /conversations/{id}/stop`` stops it at its
+next node and kills the ClickHouse query it may be running.
 """
 
 import asyncio
@@ -40,6 +41,7 @@ from app.agent.state import AgentState, RunCancelled
 from app.api.agent import Agent, AgentRun
 from app.api.auth import current_principal, pack_roles
 from app.api.limits import QuestionGate
+from app.api.live_runs import LIVE_RUNS, LiveRun, LiveRuns
 from app.api.rate_limit import RateLimiter
 from app.api import runtime
 from app.api.runtime import get_conversation_store, get_question_gate, get_rate_limiter, unavailable
@@ -206,10 +208,15 @@ QUESTION_THREADS = ThreadPoolExecutor(max_workers=128, thread_name_prefix="quest
 async def event_stream(
     run: AgentRun, question: str, events: AnswerEvents, heartbeat_seconds: float = HEARTBEAT_SECONDS,
     record: Record | None = None, gate: QuestionGate | None = None,
+    live: tuple[LiveRuns, str, str] | None = None,
 ) -> AsyncIterator[str]:
+    """The run's events; ``live`` is the registry, user and conversation that let the run be stopped by request."""
     loop = asyncio.get_running_loop()
     queue: asyncio.Queue[EventModel | None] = asyncio.Queue()
     stopped = threading.Event()
+    entry = LiveRun(user_id=live[1], stopped=stopped, cancel=run.cancel) if live is not None else None
+    if live is not None and entry is not None:
+        live[0].add(live[2], entry)
 
     def put(item: EventModel | None) -> None:
         try:
@@ -258,6 +265,8 @@ async def event_stream(
         finally:
             if gate is not None and admitted is not None:
                 gate.leave()
+            if live is not None and entry is not None:
+                live[0].finish(live[2], entry)
             put(None)
 
     loop.run_in_executor(QUESTION_THREADS, work)
@@ -277,7 +286,8 @@ async def event_stream(
                 finished = True
                 return
     finally:
-        if not finished:
+        # A stream closed before the end stops a run that nobody can find again; a run of a conversation goes on.
+        if not finished and live is None:
             stopped.set()
             loop.run_in_executor(None, run.cancel)
 
@@ -386,7 +396,14 @@ def ask(
     remember(pack)
     return StreamingResponse(
         event_stream(run, turn.question, AnswerEvents(role, unreviewed_metrics(run.deps.compiled)), record=StoredTurn(store, turn),
-                     gate=gate),
+                     gate=gate, live=(LIVE_RUNS, principal.user_id, turn.conversation_id)),
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no", "X-Conversation-Id": turn.conversation_id},
     )
+
+
+@router.post("/conversations/{conversation_id}/stop", status_code=status.HTTP_204_NO_CONTENT)
+def stop_answer(conversation_id: str, principal: Annotated[Principal, Depends(current_principal)]) -> None:
+    """Stop the question the conversation is answering; 404 when none of the user's is running."""
+    if not LIVE_RUNS.stop(principal.user_id, conversation_id):
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="no question of this conversation is running")

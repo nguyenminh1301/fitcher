@@ -25,7 +25,8 @@ export function ConversationView({ id }: { id: string }) {
     void loadThread(id).then((found) => setMissing(found === null));
   }, [id, loadThread]);
 
-  const running = busy === id;
+  // Streaming here, or answered by the api after this page was left and opened again.
+  const running = busy === id || !!thread?.running;
   const turns = thread?.turns.length ?? 0;
   const lastEvents = thread?.turns.at(-1)?.events.length ?? 0;
   // Follow the newest answer while it streams and when it finishes, unless the reader scrolled up to read
@@ -64,7 +65,7 @@ export function ConversationView({ id }: { id: string }) {
                     <AssistantTurn
                       turn={turn}
                       streaming={streaming}
-                      onStop={stop}
+                      onStop={() => stop(id)}
                       onRetry={running ? undefined : () => void ask(turn.question, { conversationId: id, retryOf: turn.turn })}
                       onFollowUp={(text) => void ask(text, { conversationId: id })}
                       onFeedback={(input) => api.feedback.send(input).catch((error: unknown) => console.error("feedback was not saved", error))}
@@ -77,7 +78,7 @@ export function ConversationView({ id }: { id: string }) {
         )}
       </div>
       <div className="fc-dock">
-        <Composer running={running} onStop={stop} onSend={(text) => void ask(text, { conversationId: id })} meta={thread?.conversation.pack || pack ? <PackChip name={thread?.conversation.pack || pack?.name || ""} /> : null} />
+        <Composer running={running} onStop={() => stop(id)} onSend={(text) => void ask(text, { conversationId: id })} meta={thread?.conversation.pack || pack ? <PackChip name={thread?.conversation.pack || pack?.name || ""} /> : null} />
       </div>
     </>
   );

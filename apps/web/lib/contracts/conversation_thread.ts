@@ -94,10 +94,12 @@ export type Events = (
   | ErrorEvent
 )[];
 export type Turns = ConversationTurn[];
+export type Running = boolean;
 
 export interface ConversationThread {
   conversation: Conversation;
   turns: Turns;
+  running?: Running;
 }
 export interface Conversation {
   id: Id;

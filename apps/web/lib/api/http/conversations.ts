@@ -45,6 +45,7 @@ export function createHttpConversations(fetcher: typeof fetch = (...args) => fet
       return {
         conversation: thread.conversation,
         turns: thread.turns.map((turn) => ({ ...turn, question_lang: langOf(turn.question), events: turn.events as AskEvent[] })),
+        running: thread.running ?? false,
       };
     },
     save: async () => {},
