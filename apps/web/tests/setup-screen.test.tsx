@@ -173,7 +173,6 @@ describe("setup models step", () => {
 
     expect(screen.queryByLabelText("Address")).toBeNull();
     expect(screen.getByRole("link", { name: /Get a key from Groq/ }).getAttribute("href")).toBe("https://console.groq.com/keys");
-    expect(screen.queryByRole("region", { name: "How to get an OpenRouter key" })).toBeNull();
     await userEvent.type(screen.getByLabelText("API key"), "gsk-test-1234");
     await userEvent.click(screen.getByRole("button", { name: "Check the key" }));
     expect(models.addProvider).toHaveBeenCalledWith({
@@ -181,7 +180,7 @@ describe("setup models step", () => {
     });
   });
 
-  it("walks through creating an OpenRouter key, then maps every tier to the chosen free model and checks it", async () => {
+  it("shows OpenRouter's free-model note, then maps every tier to the chosen free model and checks it", async () => {
     const OPENROUTER: ProviderView = {
       id: "openai-compatible", name: "OpenRouter", kind: "openai_compatible", base_url: "https://openrouter.ai/api/v1",
       key_set: true, key_last4: "abcd", hosted: false, in_use: false,
@@ -203,12 +202,7 @@ describe("setup models step", () => {
 
     await userEvent.click(await screen.findByRole("radio", { name: /OpenRouter/ }));
     expect(screen.queryByText(/bills it/)).toBeNull();
-    const guide = screen.getByRole("region", { name: "How to get an OpenRouter key" });
-    await userEvent.click(within(guide).getByRole("button", { name: /Copy the key/ }));
-    expect(within(guide).getByRole("button", { name: /Copy the key/ }).getAttribute("aria-current")).toBe("step");
-    expect(guide.textContent).toContain("Step 4 of 4");
-    expect(within(guide).getByRole("button", { name: "Play the guide" })).toBeTruthy();
-
+    expect(screen.getByText(/ends in :free cost nothing/)).toBeTruthy();
     await userEvent.type(screen.getByLabelText("API key"), "sk-or-v1-test");
     await userEvent.click(screen.getByRole("button", { name: "Check the key" }));
     expect(models.addProvider).toHaveBeenCalledWith({

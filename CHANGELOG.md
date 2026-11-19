@@ -28,6 +28,10 @@
 - Loading icons turn again, including the one above "Building the pack" and the circle of the step that is running; they stood still before.
 - The Feedback page without an active pack no longer logs a feedback store failure with a traceback; the api answers that no pack is active.
 
+### Removed
+
+- The animated walkthrough for creating an OpenRouter key is gone from the setup's provider card; the "Get a key" link and the note on OpenRouter's free models stay.
+
 ## 0.0.3 - 2026-11-18
 
 ### Changed

@@ -242,19 +242,6 @@
 .bars-x { grid-column: 2; display: flex; gap: 6px; font-size: 11px; color: var(--fgColor-muted); }
 .bars-x > span { flex: 1; text-align: center; }
 
-/* OpenRouter key guide (generic drawing, not the real site) */
-.guide { border: 1px solid var(--borderColor-default); border-radius: 10px; overflow: hidden; background: var(--bgColor-default); }
-.guide-bar { display: flex; align-items: center; gap: 8px; padding: 6px 10px; background: var(--bgColor-muted); border-bottom: 1px solid var(--borderColor-default); }
-.guide-url { flex: 1; height: 22px; border-radius: 9999px; background: var(--bgColor-default); border: 1px solid var(--borderColor-muted); font: 400 11px/20px var(--font-mono); padding: 0 10px; color: var(--fgColor-muted); }
-.guide-view { height: 168px; display: flex; font-size: 12px; }
-.guide-side { width: 108px; border-right: 1px solid var(--borderColor-muted); padding: 10px 8px; display: flex; flex-direction: column; gap: 6px; }
-.guide-side > span { height: 18px; border-radius: 4px; padding: 0 6px; line-height: 18px; color: var(--fgColor-muted); }
-.guide-main { flex: 1; padding: 12px; display: flex; flex-direction: column; gap: 8px; }
-.guide-ring { outline: 2px solid var(--fgColor-accent); outline-offset: 2px; border-radius: 6px; }
-.guide-foot { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-top: 1px solid var(--borderColor-muted); }
-.guide-dots { display: flex; gap: 6px; flex: 1; }
-.guide-dot { width: 24px; height: 24px; border-radius: 9999px; border: 1px solid var(--borderColor-default); background: var(--bgColor-default); font-size: 11px; font-weight: 600; color: var(--fgColor-muted); cursor: pointer; padding: 0; }
-.guide-dot[aria-current="step"] { background: var(--fgColor-default); color: var(--bgColor-default); border-color: var(--fgColor-default); }
 
 /* Console: mobile header, drawer, card tables, detail split */
 .cs-mhead { display: none; }
@@ -308,9 +295,6 @@
 /* A spinning ring for busy buttons and loading lines (components.css .fc-spin gives the rotation). */
 .fc-spinning { width: 16px; height: 16px; border-radius: 9999px; border: 2px solid currentColor; border-right-color: transparent; display: inline-block; flex: none; }
 
-/* OpenRouter key guide: caption and the copied key row. */
-.guide-caption { margin: 0; padding: 8px 10px 0; font-size: 13px; line-height: 18px; }
-.guide-key { display: flex; gap: 6px; align-items: center; }
 
 /* Model chooser: at most eight rows, then the list scrolls. */
 .chooser-list { max-height: 352px; overflow: auto; }
@@ -324,8 +308,6 @@
 .fc-app.ob { height: auto; overflow: visible; flex-direction: column; }
 .ob-top .fc-logo { justify-self: start; }
 .ob-top-end { display: flex; justify-content: flex-end; }
-.guide-main > .sk { height: 10px; width: 75%; }
-.guide-main > .sk:nth-of-type(odd) { width: 60%; }
 .row-link > .sk { height: 12px; flex: 1; }
 .row-link > input[type="radio"], .row-link > input[type="checkbox"], .tbl input[type="checkbox"] { width: 16px; height: 16px; margin: 0; flex: none; accent-color: var(--fgColor-default); }
 

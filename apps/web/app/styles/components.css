@@ -441,5 +441,4 @@ textarea.fc-input { height: auto; min-height: 80px; padding: var(--base-size-8) 
 .fc-enter { animation: fc-enter 200ms ease-out both; }
 
 /* The OpenRouter key walkthrough: a small drawing of the page with the element to click marked. */
-@keyframes fc-guide-pulse { 0%, 100% { box-shadow: 0 0 0 0 var(--focus-outlineColor); } 50% { box-shadow: 0 0 0 4px var(--bgColor-accent-muted); } }
 

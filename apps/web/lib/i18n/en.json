@@ -511,7 +511,8 @@
     "about_service": "One key gives access to many models, often with free or low-cost ones.",
     "about_local": "A model server running on this computer. Nothing leaves the computer and nothing is billed.",
     "about_other": "Any service or server that speaks the OpenAI API, at the address it gives you.",
-    "getKey": "Get a key from {name}"
+    "getKey": "Get a key from {name}",
+    "openRouterFreeNote": "Models whose name ends in :free cost nothing: up to 50 requests a day, or 1,000 a day once the account has bought 10 credits."
   },
   "sources": {
     "manyTables": "This source has {count} tables. Choose the ones the questions need: every table becomes a mart and makes the pack's draft longer.",
@@ -679,20 +680,6 @@
     "menu": "Owner menu",
     "removeExposed": "It cannot be removed while fitcher is open to other machines.",
     "forgottenConsole": "If you forget the owner password you cannot open fitcher: the app has no way to recover it."
-  },
-  "guide": {
-    "title": "How to get an OpenRouter key",
-    "play": "Play the guide",
-    "pause": "Pause the guide",
-    "step_signIn": "Sign in at openrouter.ai",
-    "step_keys": "Open Settings, then Keys",
-    "step_create": "Create a key named \"fitcher\" and leave the credit limit empty",
-    "step_paste": "Copy the key, shown only once, and paste it in the field above",
-    "freeNote": "Models whose name ends in :free cost nothing: up to 50 requests a day, or 1,000 a day once the account has bought 10 credits.",
-    "browser": "Illustrated browser",
-    "pick": "Choose a step",
-    "stepN": "Step {n}",
-    "caption": "Step {n} of 4: {text}"
   },
   "onboarding": {
     "step_models": "Model",
