@@ -32,7 +32,7 @@ from app.contracts.providers import (  # noqa: E402
 from app.contracts.query_spec import QuerySpec  # noqa: E402
 from app.contracts.result import Result  # noqa: E402
 from app.contracts.review import DatasetView, ReviewItem, ReviewItemPatch  # noqa: E402
-from app.contracts.screening import ClassifierStatus  # noqa: E402
+from app.contracts.screening import ClassifierChange, ClassifierDownload, ClassifierStatus  # noqa: E402
 from app.contracts.owner import OwnerPasswordChange, OwnerPasswordRemoval, OwnerSignIn, OwnerStatus  # noqa: E402
 from app.contracts.setup import SetupStatus  # noqa: E402
 from app.contracts.instant import InstantEstimate, InstantEstimateRequest, InstantJobReply, InstantRequest  # noqa: E402
@@ -71,6 +71,8 @@ CONTRACTS = {
     "embedding_view": (EmbeddingView, "serialization"),
     "embedding_change": (EmbeddingChange, "validation"),
     "classifier_status": (ClassifierStatus, "serialization"),
+    "classifier_change": (ClassifierChange, "validation"),
+    "classifier_download": (ClassifierDownload, "serialization"),
     "dataset_view": (DatasetView, "serialization"),
     "review_item": (ReviewItem, "serialization"),
     "review_item_patch": (ReviewItemPatch, "validation"),
