@@ -11,7 +11,8 @@ indexed with another model and must be recompiled.
 
 A key is checked with the provider before it is stored (``GET /models``, or
 OpenRouter's key endpoint), so a key the provider refuses is never kept.
-``POST /providers/{id}/test`` checks the key,
+Removing a provider takes it out of every chain; a tier it alone served is
+mapped to a remaining provider. ``POST /providers/{id}/test`` checks the key,
 then asks the smallest chat model the provider lists for a small structured
 reply through the gateway. For a hosted provider that
 call is billed, which the response states. A model that fails structured
@@ -305,16 +306,34 @@ def change_provider(provider_id: str, body: ProviderUpdate, admin: Admin, store:
     return _view(provider, mapping.providers_in_use())
 
 
+def _refill(mapping: TierMapping, store: ProviderStore, vault: SecretVault, checker: Callable,
+            tiers: list[str]) -> None:
+    """Map each of ``tiers`` to a remaining provider: its proposed model, or the smallest chat model it lists.
+
+    A provider that cannot be listed is skipped; a tier no remaining provider can serve stays unmapped.
+    """
+    for tier in tiers:
+        for provider in store.list():
+            proposed = defaults.chat_models(provider.kind).get(tier)
+            if proposed is None:
+                try:
+                    proposed = defaults.probe_model(provider.kind, checker(provider, _key(vault, provider)), provider.base_url)
+                except (ModelListError, HTTPException):
+                    continue
+            if proposed:
+                mapping.set_tier(tier, provider.id, proposed)
+                break
+
+
 @router.delete("/providers/{provider_id}", status_code=status.HTTP_204_NO_CONTENT)
 def remove_provider(provider_id: str, admin: Admin, store: Store, mapping: Mapping, log: Log, vault: Vault,
-                    catalog: CatalogDep, latency: Latency) -> Response:
+                    catalog: CatalogDep, latency: Latency, checker: KeyChecker) -> Response:
     before = _found(store, provider_id)
-    # A chain keeps its other models when one provider goes; a tier the provider alone serves, or the
-    # embedding, must be mapped elsewhere first.
-    if provider_id in mapping.providers_needed():
-        raise HTTPException(status.HTTP_409_CONFLICT,
-                            detail=f"{before.name} is in use by a model tier or the embedding; map them elsewhere first")
+    # The provider leaves every chain; a tier it alone served takes the proposed models of a provider that
+    # remains, and an embedding it served goes back to the local model.
+    emptied = mapping.drop_provider(provider_id)
     store.delete(provider_id)
+    _refill(mapping, store, vault, checker, emptied)
     _refresh_auto(mapping, store, vault, catalog, latency, force=True)
     _record(log, admin, "provider_remove", provider_id, _described(before), "")
     return Response(status_code=status.HTTP_204_NO_CONTENT)

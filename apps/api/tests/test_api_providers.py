@@ -143,13 +143,29 @@ def test_moving_a_keyed_provider_to_a_new_address_without_its_key_is_refused(cli
     assert client.get("/providers", headers=ADMIN).json()[0]["base_url"] == "https://models.example/v1"
 
 
-def test_a_provider_in_use_cannot_be_removed(client):
+def test_a_provider_in_use_is_removed_and_its_tiers_move_to_a_remaining_provider(client, fakes):
     add_openai(client)
+    fakes.models = ["gemini-2.5-flash", "gemini-2.5-pro"]
     assert client.post("/providers", headers=ADMIN, json={"kind": "gemini", "api_key": KEY}).json()["in_use"] is False
 
-    assert client.delete("/providers/gemini", headers=ADMIN).status_code == 204
-    refused = client.delete("/providers/openai", headers=ADMIN)
-    assert refused.status_code == 409 and "in use" in refused.json()["detail"]
+    assert client.delete("/providers/openai", headers=ADMIN).status_code == 204
+
+    body = client.get("/models/tiers", headers=ADMIN).json()
+    assert {(tier["tier"], tier["provider_id"], tier["model"]) for tier in body["tiers"]} == {
+        ("fast", "gemini", "gemini-2.5-flash"), ("sql-small", "gemini", "gemini-2.5-flash"),
+        ("sql-gen", "gemini", "gemini-2.5-pro"), ("sql-gen-hard", "gemini", "gemini-2.5-pro"),
+    }
+    assert body["embedding"]["backend"] == "local"
+    assert [provider["id"] for provider in client.get("/providers", headers=ADMIN).json()] == ["gemini"]
+
+
+def test_the_last_provider_can_be_removed_and_leaves_its_tiers_unmapped(client):
+    add_openai(client)
+
+    assert client.delete("/providers/openai", headers=ADMIN).status_code == 204
+
+    assert all(
+        tier["provider_id"] is None and tier["chain"] == [] for tier in client.get("/models/tiers", headers=ADMIN).json()["tiers"])
 
 
 def test_a_key_the_provider_refuses_is_not_stored(client, fakes, actions):
@@ -538,8 +554,7 @@ def test_a_provider_that_shares_every_tier_with_another_can_be_removed(client):
     assert client.delete("/providers/openai-compatible", headers=ADMIN).status_code == 204
     tiers = client.get("/models/tiers", headers=ADMIN).json()["tiers"]
     assert {len(tier["chain"]) for tier in tiers} == {1}
-    # The embedding and the tiers it alone serves keep the last provider.
-    assert client.delete("/providers/openai", headers=ADMIN).status_code == 409
+    assert {tier["provider_id"] for tier in tiers} == {"openai"}
 
 
 def test_auto_free_chooses_free_models_across_providers_and_a_manual_tier_ends_it(client):

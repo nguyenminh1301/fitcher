@@ -203,6 +203,31 @@ class TierMapping:
         self._settings.set(EMBEDDING_GROUP, "backend", "local")
         return self.embedding()
 
+    def drop_provider(self, provider_id: str) -> list[str]:
+        """Take the provider out of every chain; returns the chat tiers left with no model.
+
+        An embedding the provider served goes back to the local default model, so questions keep their search.
+        """
+        emptied = []
+        with self._db.write() as conn:
+            for tier in CHAT_TIERS:
+                rows = conn.execute(
+                    "SELECT provider_id, model FROM tier_chain WHERE tier = ? ORDER BY position", (tier,),
+                ).fetchall()
+                kept = [row for row in rows if row[0] != provider_id]
+                if len(kept) == len(rows):
+                    continue
+                conn.execute("DELETE FROM tier_chain WHERE tier = ?", (tier,))
+                conn.executemany(
+                    "INSERT INTO tier_chain (tier, position, provider_id, model) VALUES (?, ?, ?, ?)",
+                    [(tier, position, kept_provider, model) for position, (kept_provider, model) in enumerate(kept)],
+                )
+                if not kept:
+                    emptied.append(tier)
+        if self.embedding().provider_id == provider_id:
+            self.set_local_embedding(LOCAL_DEFAULT.model)
+        return emptied
+
     def providers_needed(self) -> set[str]:
         """The providers that alone serve a chat tier, or serve the embedding: removing one would leave it unserved."""
         needed = set()

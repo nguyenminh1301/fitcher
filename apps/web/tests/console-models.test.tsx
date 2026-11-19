@@ -79,16 +79,17 @@ describe("models", () => {
     expect(screen.queryByText("Sample data")).toBeNull();
   });
 
-  it("does not offer to remove a provider in use and asks before removing another", async () => {
+  it("removes a provider in use after asking, saying where its tasks go", async () => {
     show();
     const openai = await screen.findByRole("group", { name: "OpenAI" });
-    expect((within(openai).getByRole("button", { name: "Remove OpenAI" }) as HTMLButtonElement).disabled).toBe(true);
 
-    fireEvent.click(within(screen.getByRole("group", { name: "Gemini" })).getByRole("button", { name: "Remove Gemini" }));
+    fireEvent.click(within(openai).getByRole("button", { name: "Remove OpenAI" }));
     expect(api.models.removeProvider).not.toHaveBeenCalled();
-    await act(async () => fireEvent.click(within(screen.getByRole("alertdialog")).getByRole("button", { name: "Remove" })));
+    const dialog = screen.getByRole("alertdialog");
+    expect(within(dialog).getByText(/tasks it serves move to another provider/)).toBeTruthy();
+    await act(async () => fireEvent.click(within(dialog).getByRole("button", { name: "Remove" })));
 
-    await waitFor(() => expect(api.models.removeProvider).toHaveBeenCalledWith("gemini"));
+    await waitFor(() => expect(api.models.removeProvider).toHaveBeenCalledWith("openai"));
   });
 
   it("shows each task's model with its evaluation, and saves a new model as soon as it is picked", async () => {
