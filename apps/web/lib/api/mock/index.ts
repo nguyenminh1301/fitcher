@@ -143,7 +143,7 @@ export function createMockApi(options: { latencyMs?: number; identity?: () => Pr
     // The Models page has no sample data: providers, keys and tiers live in the instance's app state.
     models: Object.fromEntries([
       "providers", "addProvider", "changeProvider", "removeProvider", "providerModels", "testProvider", "tiers", "setTier",
-      "setEmbedding", "classifier", "setClassifier",
+      "catalog", "setMode", "setEmbedding", "classifier", "setClassifier",
     ].map((name) => [name, () => Promise.reject(new Error("The Models page needs the api; it has no sample data."))])) as unknown as FitcherApi["models"],
     sources: Object.fromEntries([
       "list", "test", "create", "update", "remove", "tables", "changeTables", "sync", "cancel", "syncs", "upload", "loadFile",

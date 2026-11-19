@@ -458,3 +458,23 @@ a.stat:hover { background: var(--bgColor-muted); }
   .ev-layer > .ev-layer-bar { grid-column: 1 / -1; grid-row: 2; }
 }
 .split-side .tbl th, .split-side .tbl td { padding-left: 12px; padding-right: 12px; }
+
+/* Model chains of the Models page: one row per task, the ordered chain, and the picker's searchable list. */
+.mp-tiers { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
+.mp-tier { border: 1px solid var(--borderColor-muted); border-radius: 8px; padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+.mp-tier-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.mp-tier-name { font-weight: 600; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.mp-tier-help { font-size: 13px; line-height: 18px; }
+.mp-heading { margin: 0 0 8px; font-size: 14px; font-weight: 600; }
+.mp-chain { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.mp-link, .mp-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; padding: 6px 8px; border-radius: 6px; background: var(--bgColor-muted); }
+.mp-chain-compact .mp-link { background: transparent; padding: 2px 0; }
+.mp-order { flex: none; width: 20px; height: 20px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 600; background: var(--bgColor-neutral-muted); }
+.mp-name { flex: 1 1 220px; min-width: 0; overflow-wrap: anywhere; }
+.mp-facts { display: inline-flex; flex-wrap: wrap; gap: 4px; }
+.mp-facts .fc-label { display: inline-flex; align-items: center; gap: 4px; }
+.mp-actions { display: inline-flex; gap: 2px; margin-left: auto; }
+.mp-filters { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.mp-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; max-height: 360px; overflow: auto; }
+.mp-row { background: transparent; border-bottom: 1px solid var(--borderColor-muted); border-radius: 0; }
+.mp-row > .fc-btn { margin-left: auto; }

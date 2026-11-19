@@ -28,7 +28,9 @@ import type {
   ClassifierStatus,
   EmbeddingChange,
   EmbeddingView,
+  ModelCatalog,
   ModelTiersView,
+  ModeChange,
   ProviderCreate,
   ProviderModels,
   ProviderTestResult,
@@ -136,6 +138,10 @@ export interface FitcherApi {
     tiers(): Promise<ModelTiersView>;
     /** Map a chat tier to any model of a configured provider. */
     setTier(tier: string, change: TierChange): Promise<TierView>;
+    /** What each model of a provider is for, its price, context, structured output, benchmark and measured speed. */
+    catalog(providerId: string): Promise<ModelCatalog>;
+    /** How the chains are chosen: by hand, or automatically from free models or from the best models. */
+    setMode(mode: ModeChange["mode"]): Promise<ModelTiersView>;
     /** Change the embedding model; the api refuses it unless ``confirm_reindex`` is set. */
     setEmbedding(change: EmbeddingChange): Promise<EmbeddingView>;
     classifier(): Promise<ClassifierStatus>;

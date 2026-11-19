@@ -3,8 +3,10 @@
 // Models (DECISIONS §2 Model tiers, §9, §15): the providers, the model each chat task uses with the pack's latest
 // evaluation of it, the embedding model and the optional prompt-injection classifier. A provider is added from
 // the setup's provider cards and checked at once; a failed check removes it again. A provider can be checked,
-// list its models, take a new key, or be removed unless a task or the embedding uses it. Picking a model for a
-// task saves it at once; the evaluation informs the choice and never blocks it. Changing the embedding is
+// list its models, take a new key, or be removed (its tasks move to another provider). Each task tries a chain
+// of models in order; the chains are chosen automatically from free or from the best models, or by hand in a
+// picker that searches and filters every provider's catalog and marks the models that suit the task. The
+// evaluation informs the choice and never blocks it. Changing the embedding is
 // confirmed, because the pack must be compiled again. No key is ever shown.
 
 import { useCallback, useEffect, useState } from "react";
@@ -14,13 +16,14 @@ import { useConsole } from "@/components/console/ConsoleLayout";
 import { ListPage } from "@/components/console/ListPage";
 import { billing, PRESETS, presetById, presetIncomplete, providerCreate, type ProviderPreset } from "@/components/models/presets";
 import { presetName, ProviderPicker } from "@/components/models/ProviderPicker";
+import { TierChainDialog, TierChainRow, useCatalogs } from "@/components/models/TierChainPicker";
 import { Segmented, Switch } from "@/components/ui/controls";
 import { Dialog } from "@/components/ui/overlay";
 import type { FitcherApi } from "@/lib/api/client";
 import { errorText } from "@/lib/api/errorText";
 import { useChat } from "@/lib/chat/ChatContext";
 import { useLoad } from "@/lib/console/useLoad";
-import type { ClassifierStatus, EmbeddingChange, ModelTiersView, ProviderTestResult, ProviderView, TierView } from "@/lib/contracts";
+import type { ClassifierStatus, EmbeddingChange, ModeChange, ModelTiersView, ProviderTestResult, ProviderView, TierView } from "@/lib/contracts";
 import { useI18n } from "@/lib/i18n/react";
 
 const LOCAL_MODELS = [
@@ -31,6 +34,7 @@ const FETCH_COMMAND = "docker compose run --rm guard-model";
 
 type Page = { providers: ProviderView[]; tiers: ModelTiersView; classifier: ClassifierStatus };
 type Models = FitcherApi["models"];
+type Mode = ModeChange["mode"];
 
 /** The preset a stored provider came from: its kind, or the service its address belongs to. */
 function presetOf(provider: ProviderView): ProviderPreset | null {
@@ -169,62 +173,6 @@ function EvalLabel({ tier }: { tier: TierView }) {
     : <span className="fc-label fc-label-attention">{t("models.evalNotPassed", { reason: tier.eval.reason })}</span>;
 }
 
-function TierRow({ models, tier, providers, listOf, onSaved }: {
-  models: Models; tier: TierView; providers: ProviderView[]; listOf: (id: string) => Promise<string[]>; onSaved: (text: string) => Promise<void>;
-}) {
-  const { t } = useI18n();
-  const [providerId, setProviderId] = useState(tier.provider_id ?? "");
-  const [listed, setListed] = useState<string[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!providerId) return;
-    let live = true;
-    listOf(providerId).then((list) => { if (live) setListed(list); }).catch(() => { if (live) setListed([]); });
-    return () => { live = false; };
-  }, [providerId, listOf]);
-
-  async function save(model: string) {
-    setError(null);
-    try {
-      await models.setTier(tier.tier, { provider_id: providerId, model });
-      await onSaved(t("models.tierSaved", { tier: tier.tier, model }));
-    } catch (cause) {
-      setError(t("models.failed", { reason: errorText(cause) }));
-    }
-  }
-
-  const current = providerId === tier.provider_id ? tier.model ?? "" : "";
-  const options = [...new Set([...(current ? [current] : []), ...(listed ?? [])])];
-  return (
-    <tr>
-      <td><span>{t(`onboarding.tier_${tier.tier}`)}</span> <span className="fc-mono fc-muted">{tier.tier}</span></td>
-      <td>
-        <div className="sel">
-          <select className="fc-input fc-input-sm" aria-label={t("modelsPage.providerFor", { tier: tier.tier })} value={providerId}
-            onChange={(event) => setProviderId(event.target.value)}>
-            {tier.provider_id ? null : <option value="">{t("onboarding.noModel")}</option>}
-            {providers.map((provider) => <option key={provider.id} value={provider.id}>{provider.name}</option>)}
-          </select>
-          <Icon name="chevronDown" />
-        </div>
-      </td>
-      <td>
-        <div className="sel">
-          <select className="fc-input fc-input-sm" aria-label={t("modelsPage.modelFor", { tier: tier.tier })} value={current} disabled={!providerId}
-            onChange={(event) => { if (event.target.value) void save(event.target.value); }}>
-            {current ? null : <option value="">{listed === null && providerId ? t("onboarding.loadingModels") : t("onboarding.noModel")}</option>}
-            {options.map((name) => <option key={name} value={name}>{name}</option>)}
-          </select>
-          <Icon name="chevronDown" />
-        </div>
-        {error ? <span className="fc-field-error" role="alert"><Icon name="alert" />{error}</span> : null}
-      </td>
-      <td><EvalLabel tier={tier} /></td>
-    </tr>
-  );
-}
-
 function EmbeddingDialog({ models, view, providers, onClose, onSaved }: {
   models: Models; view: ModelTiersView["embedding"]; providers: ProviderView[]; onClose: () => void; onSaved: (text: string) => Promise<void>;
 }) {
@@ -313,12 +261,8 @@ export function ModelsSection() {
   const [removing, setRemoving] = useState<ProviderView | null>(null);
   const [embedding, setEmbedding] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  // Each provider's model list is read once and shared by the task rows.
-  const [lists] = useState(() => new Map<string, Promise<string[]>>());
-  const listOf = useCallback((id: string) => {
-    if (!lists.has(id)) lists.set(id, models.providerModels(id).then((reply) => [...reply.models].sort()).catch(() => []));
-    return lists.get(id) as Promise<string[]>;
-  }, [lists, models]);
+  const [picking, setPicking] = useState<TierView | null>(null);
+  const catalogs = useCatalogs(models, data?.providers ?? []);
 
   const changed = async (text: string) => {
     toast(text);
@@ -333,6 +277,15 @@ export function ModelsSection() {
       await models.removeProvider(pending.id);
       setError(null);
       await changed(t("models.removed", { name: pending.name }));
+    } catch (cause) {
+      setError(t("models.failed", { reason: errorText(cause) }));
+    }
+  }
+
+  async function changeMode(mode: Mode) {
+    try {
+      await models.setMode(mode);
+      await changed(t("modelPicker.modeSaved", { mode: t(`modelPicker.mode_${mode}`) }));
     } catch (cause) {
       setError(t("models.failed", { reason: errorText(cause) }));
     }
@@ -372,17 +325,25 @@ export function ModelsSection() {
           </section>
           <section className="box" aria-labelledby="tiers-title">
             <div className="box-head"><h2 id="tiers-title" className="box-title">{t("modelsPage.tiersTitle")}</h2></div>
-            <div style={{ overflowX: "auto" }}>
-              <table className="tbl tier-table">
-                <thead><tr><th>{t("modelsPage.task")}</th><th>{t("models.tierProvider")}</th><th>{t("models.tierModel")}</th><th>{t("modelsPage.latestEval")}</th></tr></thead>
-                <tbody>
-                  {data.tiers.tiers.map((tier) => (
-                    <TierRow key={`${tier.tier}-${tier.provider_id}-${tier.model}`} models={models} tier={tier} providers={data.providers} listOf={listOf} onSaved={changed} />
-                  ))}
-                </tbody>
-              </table>
+            <div className="box-body">
+              <div>
+                <Segmented label={t("modelPicker.modeLabel")} value={data.tiers.mode ?? "manual"} onChange={(mode) => void changeMode(mode as Mode)}
+                  options={[["auto_free", t("modelPicker.mode_auto_free")], ["auto_best", t("modelPicker.mode_auto_best")], ["manual", t("modelPicker.mode_manual")]]} />
+              </div>
+              <p className="fc-muted" style={{ margin: 0 }}>{t(`modelPicker.modeHelp_${data.tiers.mode ?? "manual"}`)}</p>
+              {catalogs.failed.length ? (
+                <div className="fc-banner fc-banner-attention" role="status"><Icon name="alert" />
+                  <div>{t("modelPicker.catalogFailed", { names: catalogs.failed.map((id) => data.providers.find((provider) => provider.id === id)?.name ?? id).join(", ") })}</div>
+                </div>
+              ) : null}
+              <ul className="mp-tiers">
+                {data.tiers.tiers.map((tier) => (
+                  <TierChainRow key={tier.tier} tier={tier} providers={data.providers} entries={catalogs.entries}
+                    onChange={() => setPicking(tier)} extra={<EvalLabel tier={tier} />} />
+                ))}
+              </ul>
             </div>
-            <p className="fc-field-help box-note">{t("modelsPage.evalNote")}</p>
+            <p className="fc-field-help box-note">{t("modelPicker.chainNote")} {t("modelsPage.evalNote")}</p>
           </section>
         </>
       ) : null}
@@ -417,6 +378,10 @@ export function ModelsSection() {
         </section>
       ) : null}
       {adding ? <AddDialog models={models} onClose={() => setAdding(false)} onAdded={(provider) => { setAdding(false); void changed(t("models.added", { name: provider.name })); }} /> : null}
+      {picking && data && catalogs.entries ? (
+        <TierChainDialog models={models} tier={picking} providers={data.providers} entries={catalogs.entries}
+          onClose={() => setPicking(null)} onSaved={changed} />
+      ) : null}
       {embedding && view && data ? <EmbeddingDialog models={models} view={view} providers={data.providers} onClose={() => setEmbedding(false)} onSaved={changed} /> : null}
       <Dialog open={!!removing} tone="danger" title={t("models.removeTitle", { name: removing?.name ?? "" })} closeLabel={t("common.close")} onClose={() => setRemoving(null)}
         actions={<>
