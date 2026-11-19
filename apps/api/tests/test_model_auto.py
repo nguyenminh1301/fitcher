@@ -119,3 +119,15 @@ def test_a_provider_that_does_not_list_its_models_is_left_out(mapping):
 
     assert auto.refresh(tiers, store.list(), listing, {}, force=True)
     assert tiers.chain("fast") == [TierModel("openai-compatible", "lab")]
+
+
+def test_a_model_measured_to_misread_questions_goes_after_the_others_whatever_its_benchmark():
+    catalog = [
+        model("groq", "qwen/qwen3.8-27b", free="free_tier", benchmark=20.1),
+        model("groq", "openai/gpt-oss-120b", free="free_tier", benchmark=3.8),
+        model("gemini", "gemini-3.5-flash", free="free_tier", benchmark=15),
+    ]
+
+    chosen = auto.choose(catalog, "auto_free")
+
+    assert chain(chosen["fast"]) == [("gemini", "gemini-3.5-flash"), ("groq", "openai/gpt-oss-120b"), ("groq", "qwen/qwen3.8-27b")]

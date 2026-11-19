@@ -8,6 +8,8 @@ import type { CatalogEntry } from "@/lib/contracts";
 
 export const QUICK_TIERS = new Set(["fast", "sql-small"]);
 const SLOW = /reason|thinking|omni|(^|[-/])vl($|[-:])|code/;
+/** Models measured on this application to misread questions (the api's `auto.MISREADS`); they go last. */
+export const MISREADS = new Set(["qwen/qwen3.8-27b"]);
 
 export type ModelFilter = {
   search: string;
@@ -50,7 +52,7 @@ function compare(a: (number | boolean)[], b: (number | boolean)[]): number {
 function rankKey(tier: string, model: CatalogEntry): (number | boolean)[] {
   const paid = model.free === "none";
   const slow = QUICK_TIERS.has(tier) && slowModel(model.id);
-  return [slow, paid, benchmarkKey(model), latencyKey(model)];
+  return [MISREADS.has(model.id), slow, paid, benchmarkKey(model), latencyKey(model)];
 }
 
 /** The task's usable models, best first. */

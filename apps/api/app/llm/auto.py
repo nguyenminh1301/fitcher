@@ -35,12 +35,23 @@ CHAIN_LENGTH = 6
 REFRESH_AFTER = timedelta(days=1)
 STRUCTURED_TIERS = frozenset({"fast"})
 QUICK_TIERS = frozenset({"fast", "sql-small"})
+# Models measured on this application to misread questions, whatever their published benchmark says: they go after
+# every other model of an automatic chain and stay selectable by hand. Measured 2026-11-19 with a free Groq key:
+# qwen/qwen3.8-27b asked "Which measure?" and "Which period?" for "How many orders in 2025?", which
+# openai/gpt-oss-120b answered, and replied with JSON that did not match a pack draft's schema.
+MISREADS = frozenset({"qwen/qwen3.8-27b"})
 AUTO_MODES = frozenset({"auto_free", "auto_best"})
 
 _log = logging.getLogger(__name__)
 
 
 def _rank(mode: str):
+    def key(model: CatalogModel):
+        return (model.id in MISREADS, *_published(mode)(model))
+    return key
+
+
+def _published(mode: str):
     def key(model: CatalogModel):
         benchmark = -(model.benchmark if model.benchmark is not None else -1.0)
         if mode == "auto_free":
