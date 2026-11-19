@@ -28,7 +28,7 @@ The web app has a chat and a workspace console, in English and Vietnamese, light
 
 ![How the pieces fit together](docs/architecture/system.svg)
 
-The user talks to the web app, which streams answers from the API. fitcher is a personal app: there are no accounts, and the API answers only the machine it runs on unless an owner password is set and the browser signs in with it. The API runs the agent: it looks up the company's terms in the search index, sends language tasks to the AI models connected in the app, and runs SQL in ClickHouse as a read-only role. Models are called by task (fast replies, simple SQL, harder SQL), any task can use any model of a connected provider, and the pack's test results are shown next to each model. Search uses the provider's embedding model, or a local one when the provider has none. All of these services run together in one Docker image on one machine.
+The user talks to the web app, which streams answers from the API. fitcher is a personal app: there are no accounts, and the API answers only the machine it runs on unless an owner password is set and the browser signs in with it. The API runs the agent: it looks up the company's terms in the search index, sends language tasks to the AI models connected in the app, and runs SQL in ClickHouse as a read-only role. Models are called by task (fast replies, simple SQL, harder SQL), any task can use any model of a connected provider, and the pack's test results are shown next to each model. Search uses a local multilingual embedding model by default, or a provider's embedding model when one is chosen. All of these services run together in one Docker image on one machine.
 
 ![How a question is answered](docs/architecture/question-flow.svg)
 
@@ -46,7 +46,7 @@ A pack reads only the datasets you approved. Publishing the pack gives its marts
 | --- | --- |
 | Web app | Next.js, ECharts, TanStack Table |
 | API and agent | FastAPI with streamed responses, LangGraph, sqlglot |
-| AI models | OpenAI, Anthropic, Gemini, a local Ollama model or any OpenAI-compatible endpoint, called in process through the LiteLLM SDK; the provider's embedding model, or a local multilingual one with fastembed |
+| AI models | OpenAI, Anthropic, Gemini, a local Ollama model or any OpenAI-compatible endpoint, called in process through the LiteLLM SDK; a local multilingual embedding model with fastembed by default, or a provider's embedding model |
 | Data and run logs | ClickHouse |
 | Search index | ClickHouse, combining meaning-based and keyword search |
 | Data modelling | dbt |
