@@ -21,8 +21,9 @@ function source(id: string, status: "ready" | "none"): SourceView {
            pack: { name: id, status, datasets: 1, error: null } };
 }
 
-function show() {
+function show(current = "shop") {
   const api = createMockApi();
+  Object.assign(api.auth, { pack: vi.fn(async () => ({ name: current, display_name: current, roles: ["analyst"] })) });
   const asked: AskRequest[] = [];
   Object.assign(api.sources, { list: vi.fn(async () => [source("shop", "ready"), source("crm", "ready"), source("raw", "none")]) });
   Object.assign(api.chat, {
@@ -67,9 +68,8 @@ describe("the data source of a new conversation", () => {
     expect(asked[0].pack).toBe("crm");
   });
 
-  it("starts from the source chosen on the Sources page", async () => {
-    window.sessionStorage.setItem("fitcher.chosenPack", "crm");
-    show();
+  it("starts from the api's current source, as chosen in the console or on the Sources page", async () => {
+    show("crm");
 
     expect(await screen.findByRole("button", { name: "Source: crm. Choose another" })).toBeTruthy();
   });

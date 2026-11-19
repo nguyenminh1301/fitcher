@@ -5,7 +5,6 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
-import { keepChosenPack, readChosenPack } from "@/lib/chat/chosenPack";
 import { AskRefused } from "@/lib/api/http/chat";
 import type { FitcherApi } from "@/lib/api/client";
 import type { Conversation, ConversationGroup, ConversationThread, Turn } from "@/lib/api/conversations";
@@ -41,10 +40,10 @@ export type ChatState = {
   /** Ask in a conversation (a new one without ``conversationId``); edit or retry replace that turn and the ones after it. */
   ask: (question: string, options?: AskOptions) => Promise<string>;
   stop: () => void;
-  /** The pack (one per data source) a new conversation is answered from; null for the one used last. */
+  /** The pack (one per data source) a new conversation is answered from: the api's current pack. */
   chosenPack: string | null;
-  /** Choose the source a new conversation starts on; it resolves once the api made its pack the current one. */
-  choosePack: (name: string | null) => Promise<void>;
+  /** Make a source's pack the current one on the api, for the console and a new conversation alike. */
+  choosePack: (name: string) => Promise<void>;
 };
 
 const ChatContext = createContext<ChatState | null>(null);
@@ -64,14 +63,10 @@ export function ChatProvider({ api, navigate, activeId, sources = currentSources
   const [identity, setIdentity] = useState<Identity | null>(null);
   const [identities, setIdentities] = useState<Identity[]>([]);
   const [pack, setPack] = useState<ChatState["pack"]>(null);
-  const [chosenPack, setChosenPack] = useState<string | null>(null);
-  // Read after the first render: the server has no browser storage.
-  useEffect(() => setChosenPack(readChosenPack()), []);
-  // Choosing a source makes its pack the current one on the api too, so the console and a new chat agree on it.
-  const choosePack = useCallback(async (name: string | null) => {
-    keepChosenPack(name);
-    setChosenPack(name);
-    if (name) await api.auth.choosePack(name).then(setPack).catch(() => undefined);
+  // The api keeps the current pack, so the chat, the console and other tabs agree on the source.
+  const chosenPack = pack?.name ?? null;
+  const choosePack = useCallback(async (name: string) => {
+    await api.auth.choosePack(name).then(setPack).catch(() => undefined);
   }, [api]);
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [groups, setGroups] = useState<ConversationGroup[]>([]);
@@ -132,7 +127,7 @@ export function ChatProvider({ api, navigate, activeId, sources = currentSources
       const stamp = now().toISOString();
       const conversation: Conversation = existing
         ? { ...existing.conversation, updated_at: stamp }
-        : { id, title: question.slice(0, TITLE_LENGTH), pinned: false, group_id: null, updated_at: stamp, pack: chosenPack ?? pack?.name ?? null };
+        : { id, title: question.slice(0, TITLE_LENGTH), pinned: false, group_id: null, updated_at: stamp, pack: chosenPack };
       let turns = existing?.turns ?? [];
       const replaced = options.editOf ?? options.retryOf;
       let turn: Turn;

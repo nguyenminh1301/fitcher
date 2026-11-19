@@ -1,6 +1,6 @@
 import { cleanup, configure, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from "vitest";
 
 import { ConsoleLayout } from "@/components/console/ConsoleLayout";
 import { AddSourcePage, BuildPackPage } from "@/components/console/sections/SourceFlows";
@@ -82,9 +82,13 @@ function fakeSources(initial: SourceView[] = [SHOP]) {
 
 let navigate = vi.fn();
 
+let choose: Mock<FitcherApi["auth"]["choosePack"]>;
+
 function show(sources: FitcherApi["sources"], page: React.ReactNode = <SourcesSection />) {
   window.localStorage.setItem("fitcher.demo.identity", "adm");
-  const api = { ...createMockApi(), sources };
+  const base = createMockApi();
+  choose = vi.fn(async (name: string) => ({ name, display_name: name, roles: ["analyst"] }));
+  const api = { ...base, sources, auth: { ...base.auth, choosePack: choose } };
   render(
     <ThemeProvider>
       <I18nProvider initial="en">
@@ -136,8 +140,8 @@ describe("Sources page", () => {
     expect(navigate).toHaveBeenCalledWith("/console/sources/new_shop/pack");
 
     fireEvent.click(within(await row("ready_shop")).getByRole("button", { name: "Ask about ready_shop" }));
-    expect(window.sessionStorage.getItem("fitcher.chosenPack")).toBe("ready_shop");
     await waitFor(() => expect(assign).toHaveBeenCalledWith("/"));
+    expect(choose).toHaveBeenCalledWith("ready_shop");
   });
 
   it("reads a building pack again until it ends, and shows why it failed", async () => {
