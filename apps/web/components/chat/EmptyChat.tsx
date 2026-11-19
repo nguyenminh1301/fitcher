@@ -7,7 +7,7 @@ import { useChat } from "@/lib/chat/ChatContext";
 import { takeQuestion } from "@/lib/chat/pendingQuestion";
 import { useI18n } from "@/lib/i18n/react";
 
-import { Composer, PackChip } from "./Composer";
+import { Composer, PackPicker } from "./Composer";
 
 /** No pack is active yet, so there is nothing to ask about: point to connecting data and building the pack. */
 function NoPack() {
@@ -47,7 +47,7 @@ export function EmptyChat() {
       <div className="fc-hero">
         <h1>{firstName ? t("ui.heroTitle", { name: firstName }) : t("ui.heroTitleAnonymous")}</h1>
         <p className="fc-hero-sub">{t("ui.heroSub", { pack: pack?.display_name ?? "" })}</p>
-        <Composer large running={!!busy} onSend={(text) => void ask(text)} meta={pack ? <PackChip name={pack.name} /> : null} />
+        <Composer large running={!!busy} onSend={(text) => void ask(text)} meta={pack ? <PackPicker fallback={pack.name} /> : null} />
         {suggestions.length ? (
           <div>
             <h2 className="fc-navgroup" style={{ margin: 0, padding: "0 var(--base-size-12) var(--base-size-4)" }}>{t("ui.suggested")}</h2>

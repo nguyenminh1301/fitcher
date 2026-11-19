@@ -5,6 +5,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
+import { keepChosenPack, readChosenPack } from "@/lib/chat/chosenPack";
 import { AskRefused } from "@/lib/api/http/chat";
 import type { FitcherApi } from "@/lib/api/client";
 import type { Conversation, ConversationGroup, ConversationThread, Turn } from "@/lib/api/conversations";
@@ -40,6 +41,9 @@ export type ChatState = {
   /** Ask in a conversation (a new one without ``conversationId``); edit or retry replace that turn and the ones after it. */
   ask: (question: string, options?: AskOptions) => Promise<string>;
   stop: () => void;
+  /** The pack (one per data source) a new conversation is answered from; null for the one used last. */
+  chosenPack: string | null;
+  choosePack: (name: string | null) => void;
 };
 
 const ChatContext = createContext<ChatState | null>(null);
@@ -59,6 +63,13 @@ export function ChatProvider({ api, navigate, activeId, sources = currentSources
   const [identity, setIdentity] = useState<Identity | null>(null);
   const [identities, setIdentities] = useState<Identity[]>([]);
   const [pack, setPack] = useState<ChatState["pack"]>(null);
+  const [chosenPack, setChosenPack] = useState<string | null>(null);
+  // Read after the first render: the server has no browser storage.
+  useEffect(() => setChosenPack(readChosenPack()), []);
+  const choosePack = useCallback((name: string | null) => {
+    keepChosenPack(name);
+    setChosenPack(name);
+  }, []);
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [groups, setGroups] = useState<ConversationGroup[]>([]);
   const [loaded, setLoaded] = useState(false);
@@ -118,7 +129,7 @@ export function ChatProvider({ api, navigate, activeId, sources = currentSources
       const stamp = now().toISOString();
       const conversation: Conversation = existing
         ? { ...existing.conversation, updated_at: stamp }
-        : { id, title: question.slice(0, TITLE_LENGTH), pinned: false, group_id: null, updated_at: stamp };
+        : { id, title: question.slice(0, TITLE_LENGTH), pinned: false, group_id: null, updated_at: stamp, pack: chosenPack ?? pack?.name ?? null };
       let turns = existing?.turns ?? [];
       const replaced = options.editOf ?? options.retryOf;
       let turn: Turn;
@@ -144,6 +155,8 @@ export function ChatProvider({ api, navigate, activeId, sources = currentSources
       const request: AskRequest = {
         question: turn.question,
         conversation_id: existing ? id : null,
+        // A conversation keeps the pack it started with; a new one starts from the chosen source.
+        pack: existing ? null : chosenPack,
         timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
         edit_of_turn: options.editOf ?? null,
         retry_of_turn: options.retryOf ?? null,
@@ -186,7 +199,7 @@ export function ChatProvider({ api, navigate, activeId, sources = currentSources
       })();
       return id;
     },
-    [api, loadThread, navigate, now, putThread, refresh],
+    [api, loadThread, navigate, now, putThread, refresh, chosenPack, pack],
   );
 
   const stop = useCallback(() => controller.current?.abort(), []);
@@ -205,9 +218,9 @@ export function ChatProvider({ api, navigate, activeId, sources = currentSources
   const value = useMemo<ChatState>(
     () => ({
       api, sources, identity, identities, pack, conversations, groups, loaded, activeId, now, navigate, refresh, switchIdentity,
-      threads, busy, loadThread, ask, stop,
+      threads, busy, loadThread, ask, stop, chosenPack, choosePack,
     }),
-    [api, sources, identity, identities, pack, conversations, groups, loaded, activeId, now, navigate, refresh, switchIdentity, threads, busy, loadThread, ask, stop],
+    [api, sources, identity, identities, pack, conversations, groups, loaded, activeId, now, navigate, refresh, switchIdentity, threads, busy, loadThread, ask, stop, chosenPack, choosePack],
   );
   return <ChatContext.Provider value={value}>{children}</ChatContext.Provider>;
 }

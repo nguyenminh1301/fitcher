@@ -433,7 +433,8 @@
     "cancelled": "Đã dừng",
     "modelTitle": "Model không phản hồi",
     "modelText": "Nhà cung cấp model không trả lời lần này. Có thể họ đang giới hạn số yêu cầu (model miễn phí hay bị vậy) hoặc không kết nối được. Thử lại sau ít phút, hoặc chọn model khác ở trang Model.",
-    "providerMessage": "Thông báo của nhà cung cấp"
+    "providerMessage": "Thông báo của nhà cung cấp",
+    "chooseSource": "Nguồn dữ liệu của hội thoại mới"
   },
   "setup": {
     "failed": "Không lưu được thiết lập. Hãy thử lại.",
@@ -1006,7 +1007,18 @@
     "backToSources": "Nguồn dữ liệu",
     "listTitle": "Danh sách nguồn",
     "noPackTitle": "Chưa có gói nào đang bật",
-    "noPackText": "Dữ liệu đã đồng bộ nhưng gói chưa được dựng, hoặc lần dựng trước bị lỗi. Các trang khác cần gói để đọc dữ liệu."
+    "noPackText": "Dữ liệu đã đồng bộ nhưng gói chưa được dựng, hoặc lần dựng trước bị lỗi. Các trang khác cần gói để đọc dữ liệu.",
+    "answersHead": "Câu hỏi",
+    "answer_ready": "Sẵn sàng",
+    "answer_building": "Đang chuẩn bị…",
+    "answer_failed": "Chưa chuẩn bị được",
+    "answer_none": "Chưa hỏi được",
+    "buildToAsk": "Chuẩn bị để hỏi",
+    "buildAgain": "Thử lại",
+    "buildOf": "Chuẩn bị {name} để hỏi",
+    "ask": "Hỏi",
+    "askOf": "Hỏi về {name}",
+    "syncFirst": "Hãy sao chép dữ liệu trước: đồng bộ rồi chọn bảng."
   },
   "modelsPage": {
     "addTitle": "Thêm nhà cung cấp",

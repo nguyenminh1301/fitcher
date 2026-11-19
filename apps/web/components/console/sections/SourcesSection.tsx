@@ -118,9 +118,39 @@ function LastSync({ source }: { source: SourceView }) {
   );
 }
 
+/** Whether questions can be asked about the source: its pack is ready, being built, failed or not built yet. */
+function Answers({ source, onBuild, onAsk }: { source: SourceView; onBuild: () => void; onAsk: () => void }) {
+  const { t } = useI18n();
+  const state = source.pack?.status ?? "none";
+  if (state === "ready") {
+    return (
+      <span className="src-answers">
+        <span className="fc-label fc-label-success">{t("sourcesPage.answer_ready")}</span>
+        <button type="button" className="fc-btn fc-btn-sm" aria-label={t("sourcesPage.askOf", { name: source.id })} onClick={onAsk}>
+          <Icon name="message" />{t("sourcesPage.ask")}
+        </button>
+      </span>
+    );
+  }
+  if (state === "building") {
+    return <span className="fc-label"><span className="fc-spin fc-spinning" aria-hidden="true" />{t("sourcesPage.answer_building")}</span>;
+  }
+  const ready = source.last_sync?.status === "succeeded" && source.selected_count > 0;
+  return (
+    <span className="src-answers">
+      {state === "failed" ? <span className="fc-label fc-label-danger">{t("sourcesPage.answer_failed")}</span>
+        : <span className="fc-label fc-label-attention">{t("sourcesPage.answer_none")}</span>}
+      <button type="button" className="fc-btn fc-btn-primary fc-btn-sm" disabled={!ready} title={ready ? undefined : t("sourcesPage.syncFirst")}
+        aria-label={t("sourcesPage.buildOf", { name: source.id })} onClick={onBuild}>
+        <Icon name="sparkles" />{state === "failed" ? t("sourcesPage.buildAgain") : t("sourcesPage.buildToAsk")}
+      </button>
+    </span>
+  );
+}
+
 export function SourcesSection() {
   const { t } = useI18n();
-  const { api, pack, loaded } = useChat();
+  const { api, pack, loaded, choosePack } = useChat();
   const { navigate } = useConsole();
   const sources = api.sources;
   const failure = useFailure();
@@ -168,6 +198,11 @@ export function SourcesSection() {
     ].filter(Boolean).join(", ");
   };
   const build = (source: SourceView) => navigate(`/console/sources/${encodeURIComponent(source.id)}/pack`);
+  // A new conversation answered from this source's pack.
+  const askFrom = (source: SourceView) => {
+    choosePack(source.pack?.name ?? source.id);
+    window.location.assign("/");
+  };
   const drifted = (data ?? []).filter((source) => drifts[source.id]?.pack && drifts[source.id].changes.length);
   const add = <button type="button" className="fc-btn fc-btn-primary" onClick={() => setAdding(true)}><Icon name="plus" />{t("sources.add")}</button>;
 
@@ -213,7 +248,7 @@ export function SourcesSection() {
               <thead>
                 <tr>
                   <th>{t("sourcesPage.source")}</th><th>{t("sourcesPage.tablesUsedHead")}</th><th>{t("sourcesPage.lastSync")}</th>
-                  <th>{t("ui.status")}</th><th><span className="fc-sr">{t("ui.actions")}</span></th>
+                  <th>{t("ui.status")}</th><th>{t("sourcesPage.answersHead")}</th><th><span className="fc-sr">{t("ui.actions")}</span></th>
                 </tr>
               </thead>
               <tbody>
@@ -250,6 +285,9 @@ export function SourcesSection() {
                             {status === "running" ? <span className="fc-spin fc-spinning" aria-hidden="true" /> : null}{t(`sources.status_${status}`)}
                           </span>
                         ) : <span className="fc-muted">{t("sources.never")}</span>}
+                      </td>
+                      <td data-label={t("sourcesPage.answersHead")}>
+                        <Answers source={source} onBuild={() => build(source)} onAsk={() => askFrom(source)} />
                       </td>
                       <td className="row-actions">
                         {status === "running" ? (

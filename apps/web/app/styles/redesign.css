@@ -478,3 +478,9 @@ a.stat:hover { background: var(--bgColor-muted); }
 .mp-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; max-height: 360px; overflow: auto; }
 .mp-row { background: transparent; border-bottom: 1px solid var(--borderColor-muted); border-radius: 0; }
 .mp-row > .fc-btn { margin-left: auto; }
+
+/* Whether a source can answer questions, and the composer's choice of data source for a new conversation. */
+.src-answers { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.fc-composer-pick { position: relative; cursor: pointer; }
+.fc-composer-pick select { appearance: none; background: transparent; border: 0; color: inherit; font: inherit; padding: 0 2px; cursor: pointer; }
+.fc-composer-pick select:focus-visible { outline: 2px solid var(--focus-outlineColor, currentColor); outline-offset: 2px; }

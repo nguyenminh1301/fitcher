@@ -433,7 +433,8 @@
     "cancelled": "Stopped",
     "modelTitle": "The model did not answer",
     "modelText": "The model provider did not answer this time. It may be limiting requests, which free models do, or be out of reach. Try again in a moment, or choose another model on the Models page.",
-    "providerMessage": "Provider message"
+    "providerMessage": "Provider message",
+    "chooseSource": "Data source of a new conversation"
   },
   "setup": {
     "failed": "The setup could not be saved. Try again.",
@@ -1006,7 +1007,18 @@
     "backToSources": "Sources",
     "listTitle": "All sources",
     "noPackTitle": "No pack is turned on",
-    "noPackText": "The data is synced but the pack hasn't been built, or the last build failed. The other pages need a pack to read the data."
+    "noPackText": "The data is synced but the pack hasn't been built, or the last build failed. The other pages need a pack to read the data.",
+    "answersHead": "Questions",
+    "answer_ready": "Ready",
+    "answer_building": "Getting ready…",
+    "answer_failed": "Could not get ready",
+    "answer_none": "Not ready for questions",
+    "buildToAsk": "Get ready for questions",
+    "buildAgain": "Try again",
+    "buildOf": "Get {name} ready for questions",
+    "ask": "Ask",
+    "askOf": "Ask about {name}",
+    "syncFirst": "Copy its data first: sync it, then choose tables."
   },
   "modelsPage": {
     "addTitle": "Add a provider",
