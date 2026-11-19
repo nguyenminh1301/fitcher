@@ -246,7 +246,15 @@ def _screen_note(verdict) -> str:
     )
 
 
-def screen_documents(documents: dict[str, list[dict]], screener: Screener, summary: CompileSummary) -> None:
+# How far a compile is: the phase ("screen" while the classifier scores column values, "index" while they are
+# embedded), the items done and the phase's total.
+Progress = Callable[[str, int, int], None]
+# Items screened or embedded per call while compiling, so the progress of a pack with thousands of values moves often.
+PROGRESS_CHUNK = 500
+
+
+def screen_documents(documents: dict[str, list[dict]], screener: Screener, summary: CompileSummary,
+                     progress: Progress | None = None) -> None:
     """Drop blocked kb_docs chunks and report flagged column values, recording both in ``summary``."""
     chunks = documents["kb_docs"]
     kept: list[dict] = []
@@ -258,7 +266,12 @@ def screen_documents(documents: dict[str, list[dict]], screener: Screener, summa
     documents["kb_docs"] = kept
     values = documents["column_values"]
     texts = [value["payload"]["value"] for value in values]
-    for value, verdict in zip(values, screener.screen_many(texts, "column_value"), strict=True):
+    verdicts = []
+    for start in range(0, len(texts), PROGRESS_CHUNK):
+        if progress is not None:
+            progress("screen", start, len(texts))
+        verdicts.extend(screener.screen_many(texts[start:start + PROGRESS_CHUNK], "column_value"))
+    for value, verdict in zip(values, verdicts, strict=True):
         if verdict.verdict in ("flag", "block") or verdict.rule_hits:
             shown = value["payload"]["value"][:SHOWN_VALUE]
             summary.flagged_values.append(f"{value['dataset']}.{value['column']}={shown!r} ({_screen_note(verdict)})")
@@ -329,18 +342,14 @@ def registry_chunks(
     return copied, fresh
 
 
-# Texts embedded per call while compiling, so the progress of a pack with thousands of values moves often.
-PROGRESS_CHUNK = 500
-
-
 def build_generation(
     search: SearchEngine, embeddings: EmbeddingClient, pack: str, documents: dict[str, list[dict]],
-    carried: dict[str, list[dict]] | None = None, progress: Callable[[int, int], None] | None = None,
+    carried: dict[str, list[dict]] | None = None, progress: Progress | None = None,
 ) -> tuple[int, dict[str, int]]:
     """Create and fill generation N+1 of every collection; delete it again on any failure.
 
     ``carried`` holds ready points per index, copied with their vectors and not embedded again. ``progress``
-    hears the texts embedded so far and the total, before the first text and after each chunk.
+    hears the texts embedded so far and the total in its "index" phase, before the first text and after each chunk.
     """
     carried = carried or {}
     generation = next_generation(search, pack)
@@ -348,7 +357,7 @@ def build_generation(
     total = sum(len(documents[index]) for index in INDEX_NAMES)
     done = 0
     if progress is not None:
-        progress(done, total)
+        progress("index", done, total)
     try:
         for index in INDEX_NAMES:
             name = alias_name(pack, index)
@@ -359,7 +368,7 @@ def build_generation(
                 vectors.extend(embeddings.embed([document["embedding_text"] for document in docs[start:start + PROGRESS_CHUNK]]))
                 done += len(docs[start:start + PROGRESS_CHUNK])
                 if progress is not None:
-                    progress(done, total)
+                    progress("index", done, total)
             search.write(name, [*points(name, docs, vectors), *carried.get(index, [])], generation)
             counts[index] = search.size(name, generation)
             expected = len(docs) + len(carried.get(index, []))
@@ -414,7 +423,7 @@ def compile_pack(
     registry: DocumentRegistry | None = None,
     documents_dir: Path | None = None,
     embedding_alias: str = "",
-    progress: Callable[[int, int], None] | None = None,
+    progress: Progress | None = None,
 ) -> CompileSummary:
     """Compile ``pack_dir``; with ``skip_index`` stop after the metric test-run and the access policies.
 
@@ -448,7 +457,7 @@ def compile_pack(
             embeddings.dimensions, summary,
         )
         documents[KB_DOCS].extend(fresh)
-    screen_documents(documents, screener or Screener(None), summary)
+    screen_documents(documents, screener or Screener(None), summary, progress)
     generation, counts = build_generation(search, embeddings, pack.name, documents, {KB_DOCS: carried}, progress)
     compiled = CompiledPack(
         pack=pack, generation=generation, embedding_dimensions=embeddings.dimensions,

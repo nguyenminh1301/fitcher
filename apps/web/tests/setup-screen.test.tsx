@@ -433,7 +433,7 @@ describe("setup data and start steps", () => {
 
   it("counts the items the compile has indexed with a bar and the time the build has run", async () => {
     const running = JOB("running", { marts: "done", profile: "done", files: "done", draft: "done", approve: "done", compile: "running" });
-    running.steps = running.steps.map((step) => (step.id === "compile" ? { ...step, done: 1500, total: 6000 } : step));
+    running.steps = running.steps.map((step) => (step.id === "compile" ? { ...step, phase: "index" as const, done: 1500, total: 6000 } : step));
     const sources = fakeSources({ instantStart: vi.fn(async () => ({ job: running })), instantJob: vi.fn(async () => ({ job: running })) });
     wrap(<SetupScreen sources={sources} models={fakeModels()} setup={fakeSetup(DATA_PENDING)} {...exits()} />);
 

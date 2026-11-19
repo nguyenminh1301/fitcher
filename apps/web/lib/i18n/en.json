@@ -884,7 +884,8 @@
     "providerNamePlaceholder": "For example: Company server",
     "providerNameHelp": "Shown in the provider list and the model picker; you can change it later.",
     "indexed": "{done} of {total} items indexed",
-    "elapsed": "Running for {time}. Building a large table can take several minutes; you can leave this page."
+    "elapsed": "Running for {time}. Building a large table can take several minutes; you can leave this page.",
+    "screened": "{done} of {total} values checked for prompt injection"
   },
   "instant": {
     "title": "Build the pack",

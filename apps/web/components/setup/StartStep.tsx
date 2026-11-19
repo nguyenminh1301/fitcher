@@ -164,11 +164,12 @@ export function StartStep({ sources, chosen, meta, onAsk, onConsole, onModel, po
     // A step that counts its items (the compile's embeddings) shows how many are done and a bar.
     const counted = (group: string) => {
       const step = job.steps.find((item) => GROUPS.find(([name]) => name === group)?.[1].includes(item.id) && typeof item.total === "number" && item.total > 0);
-      return step ? { done: step.done ?? 0, total: step.total ?? 0 } : null;
+      return step ? { phase: step.phase ?? "index", done: step.done ?? 0, total: step.total ?? 0 } : null;
     };
     const measured = (group: string) => {
       const count = counted(group);
-      return count ? t("onboarding.indexed", { done: formatNumber(count.done), total: formatNumber(count.total) }) : null;
+      return count ? t(count.phase === "screen" ? "onboarding.screened" : "onboarding.indexed",
+        { done: formatNumber(count.done), total: formatNumber(count.total) }) : null;
     };
     const failedGroup = GROUPS.find(([, ids]) => groupState(job, ids) === "failed")?.[0] ?? "marts";
     return (

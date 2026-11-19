@@ -4,6 +4,7 @@
 
 ### Added
 
+- While a pack compiles, the build page also counts the column values the prompt-injection classifier has checked, the step that comes before indexing and takes longest when the classifier is on.
 - A pack build shows how long it has run and, while it indexes, how many items are indexed out of all of them with a progress bar, so a long build of a large table visibly moves.
 - Model providers show their logos on the provider cards, the provider list and the model picker, and an OpenAI-compatible endpoint or a server on this computer takes a name of its own when it is added; any provider can be renamed on the Models page.
 

@@ -67,9 +67,9 @@ class InstantJob:
     def _set(self, step: str, state: str) -> None:
         next(item for item in self.steps if item["id"] == step)["state"] = state
 
-    def _progress(self, step: str, done: int, total: int) -> None:
-        """How much of a long step is done: the compile reports the texts it has embedded out of all of them."""
-        next(item for item in self.steps if item["id"] == step).update(done=done, total=total)
+    def _progress(self, step: str, phase: str, done: int, total: int) -> None:
+        """How much of a long step is done: the compile reports the values screened, then the texts embedded."""
+        next(item for item in self.steps if item["id"] == step).update(phase=phase, done=done, total=total)
 
 
 class InstantWarehouse:
@@ -303,7 +303,7 @@ class InstantPipeline:
             state["previous"] = previous
         building.rename(target)
         state["swapped"] = True
-        self._compile_pack(target, progress=lambda done, total: job._progress("compile", done, total))
+        self._compile_pack(target, progress=lambda phase, done, total: job._progress("compile", phase, done, total))
 
     def _step_activate(self, job: InstantJob, pack: str, building: Path, state: dict) -> None:
         self._activate_pack(pack)

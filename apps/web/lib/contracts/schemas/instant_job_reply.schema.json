@@ -179,6 +179,22 @@
           "title": "State",
           "type": "string"
         },
+        "phase": {
+          "anyOf": [
+            {
+              "enum": [
+                "screen",
+                "index"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Phase"
+        },
         "done": {
           "anyOf": [
             {
