@@ -413,8 +413,8 @@
     "noPackAction": "Open Sources",
     "refusedTitle": "The answer could not start",
     "refusedText": "fitcher refused this question before running it. Nothing from this run was saved.",
-    "noPackSection": "No pack yet.",
-    "noPackSectionText": "Connect your data and build the pack first.",
+    "noPackSection": "No pack is turned on",
+    "noPackSectionText": "This page reads from the pack. Add data and build the pack, or build it again if the last build failed; both are on the Sources page.",
     "nav_security": "Security",
     "documentsAbout": "Policies, handbooks and glossaries help fitcher understand what a word means. Numbers always come from your data, never from documents.",
     "documentsUse": "Use company documents",
@@ -998,7 +998,9 @@
     "addTitle": "Add a data source",
     "readOnly": "fitcher only reads your data and never writes to it.",
     "backToSources": "Sources",
-    "listTitle": "All sources"
+    "listTitle": "All sources",
+    "noPackTitle": "No pack is turned on",
+    "noPackText": "The data is synced but the pack hasn't been built, or the last build failed. The other pages need a pack to read the data."
   },
   "modelsPage": {
     "addTitle": "Add a provider",

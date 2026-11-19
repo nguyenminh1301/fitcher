@@ -413,8 +413,8 @@
     "noPackAction": "Mở Nguồn dữ liệu",
     "refusedTitle": "Không thể bắt đầu trả lời",
     "refusedText": "fitcher đã từ chối câu hỏi này trước khi chạy. Lượt chạy này chưa được lưu.",
-    "noPackSection": "Chưa có gói.",
-    "noPackSectionText": "Kết nối dữ liệu và dựng gói trước.",
+    "noPackSection": "Chưa có gói đang bật",
+    "noPackSectionText": "Trang này đọc từ gói. Thêm dữ liệu rồi dựng gói, hoặc dựng lại nếu lần trước bị lỗi; cả hai đều ở trang Nguồn dữ liệu.",
     "nav_security": "Bảo mật",
     "documentsAbout": "Tài liệu như quy định, sổ tay, bảng thuật ngữ giúp fitcher hiểu nghĩa của một từ. Số liệu luôn lấy từ dữ liệu, không lấy từ tài liệu.",
     "documentsUse": "Dùng tài liệu công ty",
@@ -998,7 +998,9 @@
     "addTitle": "Thêm nguồn dữ liệu",
     "readOnly": "fitcher chỉ đọc dữ liệu, không ghi.",
     "backToSources": "Nguồn dữ liệu",
-    "listTitle": "Danh sách nguồn"
+    "listTitle": "Danh sách nguồn",
+    "noPackTitle": "Chưa có gói nào đang bật",
+    "noPackText": "Dữ liệu đã đồng bộ nhưng gói chưa được dựng, hoặc lần dựng trước bị lỗi. Các trang khác cần gói để đọc dữ liệu."
   },
   "modelsPage": {
     "addTitle": "Thêm nhà cung cấp",
