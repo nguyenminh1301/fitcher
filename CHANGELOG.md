@@ -29,6 +29,7 @@
 
 ### Fixed
 
+- The count of column values checked for prompt injection moves every 25 values instead of every 500: a classifier on a provider such as Groq scores about 35 values a minute, so the count stayed at 0 for many minutes.
 - Calls to a free model or a provider's free tier (Gemini's Flash and Gemma models, Groq, OpenRouter's `:free` models, Z.ai's free models) are recorded at $0 instead of the paid list price, so the Costs page no longer shows a cost for a key that has no billing. Calls recorded before the change keep their old estimate.
 - The Sources page reads a pack that is being built again every few seconds, so a finished or failed build shows without reloading the page, and a failed build shows its reason. Before, "Getting ready…" kept spinning after the build had failed.
 - Building a pack with a Gemini embedding no longer fails with HTTP 400: embeddings go in batches of at most 100 texts, the most Gemini accepts. A provider's per-minute embedding limit is waited out for the delay it gives, and a limit that does not reset soon fails the build with a message that says to choose the local embedding model.
