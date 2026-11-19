@@ -250,7 +250,10 @@ def _screen_note(verdict) -> str:
 # embedded), the items done and the phase's total.
 Progress = Callable[[str, int, int], None]
 # Items screened or embedded per call while compiling, so the progress of a pack with thousands of values moves often.
+# A classifier on a provider scores one value per request (Groq's Prompt Guard about 35 a minute), so screening
+# reports every 25 values; local embedding and the local classifier batch well, so indexing reports every 500.
 PROGRESS_CHUNK = 500
+SCREEN_CHUNK = 25
 
 
 def screen_documents(documents: dict[str, list[dict]], screener: Screener, summary: CompileSummary,
@@ -267,10 +270,10 @@ def screen_documents(documents: dict[str, list[dict]], screener: Screener, summa
     values = documents["column_values"]
     texts = [value["payload"]["value"] for value in values]
     verdicts = []
-    for start in range(0, len(texts), PROGRESS_CHUNK):
+    for start in range(0, len(texts), SCREEN_CHUNK):
         if progress is not None:
             progress("screen", start, len(texts))
-        verdicts.extend(screener.screen_many(texts[start:start + PROGRESS_CHUNK], "column_value"))
+        verdicts.extend(screener.screen_many(texts[start:start + SCREEN_CHUNK], "column_value"))
     for value, verdict in zip(values, verdicts, strict=True):
         if verdict.verdict in ("flag", "block") or verdict.rule_hits:
             shown = value["payload"]["value"][:SHOWN_VALUE]
