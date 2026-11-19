@@ -427,7 +427,10 @@
     "rowsN_one": "{n} dòng",
     "testOk_one": "Chạy thử trả về {n} dòng",
     "files_one": "{n} tệp",
-    "documentsOffText_one": "{n} tài liệu vẫn được lưu nhưng không còn được tìm."
+    "documentsOffText_one": "{n} tài liệu vẫn được lưu nhưng không còn được tìm.",
+    "clarified": "Đã hỏi lại",
+    "blocked": "Đã chặn",
+    "cancelled": "Đã dừng"
   },
   "setup": {
     "failed": "Không lưu được thiết lập. Hãy thử lại.",

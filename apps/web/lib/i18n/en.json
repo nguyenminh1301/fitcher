@@ -427,7 +427,10 @@
     "rowsN_one": "{n} row",
     "testOk_one": "Test run returned {n} row",
     "files_one": "{n} file",
-    "documentsOffText_one": "{n} document stays stored but is no longer searched."
+    "documentsOffText_one": "{n} document stays stored but is no longer searched.",
+    "clarified": "Asked back",
+    "blocked": "Blocked",
+    "cancelled": "Stopped"
   },
   "setup": {
     "failed": "The setup could not be saved. Try again.",
