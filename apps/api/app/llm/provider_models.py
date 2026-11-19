@@ -6,12 +6,16 @@ or the error type only, never the reply or the address, because either can
 quote the key or the network layout.
 """
 
+from urllib.parse import urlsplit
+
 import httpx
 
 from app.llm.providers import Provider
 
 TIMEOUT_SECONDS = 15
 ANTHROPIC_VERSION = "2023-06-01"
+# The statuses a provider answers a wrong key with; Gemini answers 400 for a key it does not know.
+REFUSED_KEY = frozenset({400, 401, 403})
 
 
 class ModelListError(RuntimeError):
@@ -40,6 +44,9 @@ def fetch_listing(provider: Provider, api_key: str | None, http: httpx.Client | 
         response = http.get(url, headers=headers)
     except httpx.HTTPError as error:
         raise ModelListError(f"{provider.name} did not answer: {type(error).__name__}") from None
+    if response.status_code in REFUSED_KEY:
+        raise ModelListError(f"{provider.name} refused the key (HTTP {response.status_code}); check that the key "
+                             f"was created for {provider.name}")
     if response.status_code != 200:
         raise ModelListError(f"{provider.name} returned HTTP {response.status_code} for its model list")
     try:
@@ -66,3 +73,34 @@ def listing_items(provider: Provider, body: dict) -> list[tuple[str, dict]]:
 def list_models(provider: Provider, api_key: str | None, http: httpx.Client | None = None) -> list[str]:
     """The provider's model names, sorted."""
     return sorted({name for name, _ in listing_items(provider, fetch_listing(provider, api_key, http))})
+
+
+# Services whose model list answers without a key, with the address that answers only to a valid key.
+# OpenRouter lists its models to anyone, so a wrong key would pass a listing; its key endpoint costs no tokens.
+_KEY_ENDPOINTS = {"openrouter.ai": "/key"}
+
+
+def _key_endpoint(provider: Provider) -> str | None:
+    if provider.kind != "openai_compatible" or not provider.base_url:
+        return None
+    host = urlsplit(provider.base_url).hostname or ""
+    path = next((path for domain, path in _KEY_ENDPOINTS.items() if host == domain or host.endswith(f".{domain}")), None)
+    return f"{provider.base_url}{path}" if path else None
+
+
+def checked_models(provider: Provider, api_key: str | None, http: httpx.Client | None = None) -> list[str]:
+    """The provider's model names, read only after the provider accepted ``api_key``; sends no prompt.
+
+    A refused key raises ``ModelListError`` with the HTTP status, so a key is never stored or kept as working
+    when the provider would refuse every question with it.
+    """
+    http = http or httpx.Client(timeout=TIMEOUT_SECONDS)
+    endpoint = _key_endpoint(provider) if api_key else None
+    if endpoint:
+        try:
+            response = http.get(endpoint, headers={"Authorization": f"Bearer {api_key}"})
+        except httpx.HTTPError as error:
+            raise ModelListError(f"{provider.name} did not answer: {type(error).__name__}") from None
+        if response.status_code != 200:
+            raise ModelListError(f"{provider.name} refused the key (HTTP {response.status_code})")
+    return list_models(provider, api_key, http)

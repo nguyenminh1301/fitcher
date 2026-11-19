@@ -20,6 +20,7 @@
 
 ### Fixed
 
+- A provider key is checked with the provider before it is stored, and a key the provider refuses is not kept: a Gemini key entered for OpenAI used to be saved, take over every task and then refuse to be removed. OpenRouter keys are checked on its key endpoint because its model list answers without a key.
 - A dialog's close button is labelled in the interface language when a page gives no label of its own, and the Vietnamese database connection form asks for the "Cơ sở dữ liệu" instead of the English "Database".
 - Notices in the chat (blocked, denied, failed, empty, lost connection, stopped, model errors) give their title and fixed explanation in the interface language; only a message the api wrote for the question keeps the question's language. A Vietnamese question in an English interface used to show a Vietnamese title under English buttons.
 - After an owner password is set on the Security page, the owner menu offers Sign out and says the browser is signed in without reloading the page; it read the password state only once.
