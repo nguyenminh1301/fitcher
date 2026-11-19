@@ -22,6 +22,8 @@
 
 ### Fixed
 
+- A Vietnamese question now gets its clarifying question, summary and refusals in Vietnamese even when the model reports the question as English; Vietnamese letters in the question decide the reply language first.
+
 - Models measured on this application to misread questions (Groq's `qwen/qwen3.8-27b`, which asked again for the measure and the period of a clear question) go after every other model of an automatic chain, whatever their published benchmark says.
 - The quick tasks no longer put the smallest models first: a lite model on the question-reading task missed the period a question named, so "How many orders in 2025?" and the choice of a period both came back as the same "Which period should I use?" question. The quick tasks keep the most capable models that answer without reasoning first.
 - An automatic chain tries six models instead of four, so a task still has models of the same provider (such as another Gemini model with its own quota, or Groq's larger model) after the best one of each provider failed; building a pack used to fail once four models had used their quota or returned JSON that did not match.

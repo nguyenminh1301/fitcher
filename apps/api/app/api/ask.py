@@ -35,7 +35,7 @@ from fastapi import APIRouter, Depends, Header, HTTPException, status
 from fastapi.responses import StreamingResponse
 
 from app.agent.nodes.resolve_time import TimeResolutionError, reference_date
-from app.agent.nodes.screen import blocked_message
+from app.agent.nodes.screen import blocked_message, question_language
 from app.agent.state import AgentState, RunCancelled
 from app.api.agent import Agent, AgentRun
 from app.api.auth import current_principal, pack_roles
@@ -62,7 +62,7 @@ TERMINAL = frozenset({"done", "error"})
 
 
 def _language(state: Mapping) -> str:
-    return getattr(state.get("extraction"), "language", None) or state.get("language") or "en"
+    return question_language(state)
 
 
 def unreviewed_metrics(compiled) -> frozenset[str]:

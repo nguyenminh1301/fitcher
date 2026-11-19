@@ -18,6 +18,7 @@ from pydantic import BaseModel, ConfigDict
 
 from app.agent.audit import audit
 from app.agent.nodes.clarify import clarification
+from app.agent.nodes.screen import question_language
 from app.agent.state import AgentDeps, AgentState
 from app.contracts.query_spec import QuerySpec
 from app.packs.models import Pack
@@ -89,7 +90,7 @@ def may_read_metric(pack: Pack, role: str, metric_id: str) -> bool:
 
 
 def gate(state: AgentState, deps: AgentDeps) -> dict:
-    language = getattr(state.get("extraction"), "language", None) or state.get("language") or "en"
+    language = question_language(state)
     pack = deps.compiled.pack
     if state.get("need") is not None:
         asked = clarification(state["need"], language, pack, lambda metric_id: may_read_metric(pack, deps.role, metric_id))

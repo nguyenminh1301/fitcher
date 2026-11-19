@@ -10,6 +10,7 @@ that retrieved text is data, not instructions. No SQL is generated.
 
 import json
 
+from app.agent.nodes.screen import question_language
 from app.agent.prompts import render
 from app.agent.state import AgentDeps, AgentState
 from app.llm.client import LLMError
@@ -49,7 +50,7 @@ def metadata_qa(state: AgentState, deps: AgentDeps) -> dict:
         ]
     except (EmbeddingError, SearchError) as error:
         return {"rejection": f"the pack context could not be retrieved: {error}"}
-    language = state.get("language") or "en"
+    language = question_language(state)
     found = [_entry(index, hit) for index, hit in hits]
     prompt = render(
         PROMPT, language=language, industry=pack.business_profile.industry,
