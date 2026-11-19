@@ -14,7 +14,7 @@ from fastapi.testclient import TestClient
 import pytest
 
 from app.agent.state import RunCancelled
-from app.api import runtime
+from app.api import ask as ask_api, runtime
 from app.api.agent import GraphRun, QueryIds
 from app.api.ask import AnswerEvents, event_stream
 from app.api.rate_limit import RateLimiter
@@ -72,6 +72,10 @@ def serve(agent: FakeAgent, compiled, per_minute: int = 3, store: ConversationSt
     app.dependency_overrides[runtime.get_compiled] = lambda: compiled
     app.dependency_overrides[runtime.get_compiled_or_none] = lambda: compiled
     app.dependency_overrides[runtime.get_agent] = lambda: agent
+    app.dependency_overrides[ask_api.get_compiled_for] = lambda: lambda pack: compiled
+    app.dependency_overrides[ask_api.get_agent_for] = lambda: lambda pack: agent
+    app.dependency_overrides[ask_api.get_remember_pack] = lambda: lambda pack: None
+    app.dependency_overrides[ask_api.get_last_used_pack] = lambda: compiled.pack.name
     app.dependency_overrides[runtime.get_rate_limiter] = lambda: limiter
 
 
@@ -549,3 +553,62 @@ def test_a_question_beyond_the_limit_streams_a_queue_status_until_it_gets_a_plac
     queue = [(e["node"], e["phase"]) for e in events if e.get("event") == "status" and e["node"] == "queue"]
     assert queue == [("queue", "start"), ("queue", "end")] and events[0]["node"] == "queue"
     assert gate.running == 0
+
+
+def ask_on_packs(store: ConversationStore, *bodies: dict) -> tuple[list, list[str], list[str]]:
+    """Ask with a compiled pack per name; returns the responses, the packs served and the packs remembered."""
+    served, remembered = [], []
+    agent = FakeAgent([reply for _ in bodies for reply in (routing_reply(), extraction_reply(), GOOD_SQL, "Done.")])
+    serve(agent, compiled_fixture(), store=store)
+    app.dependency_overrides[ask_api.get_compiled_for] = lambda: lambda pack: served.append(pack) or compiled_fixture()
+    app.dependency_overrides[ask_api.get_remember_pack] = lambda: remembered.append
+    app.dependency_overrides[ask_api.get_last_used_pack] = lambda: "shop"
+    try:
+        with TestClient(app) as client:
+            responses = []
+            for body in bodies:
+                body = dict(body)
+                if body.get("conversation_id") == "FIRST":
+                    body["conversation_id"] = responses[0].headers["x-conversation-id"]
+                responses.append(post(client, **body))
+            return responses, served, remembered
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_a_new_conversation_is_answered_from_the_pack_it_names_and_keeps_it():
+    client = FakeConversationClient()
+
+    responses, served, remembered = ask_on_packs(
+        ConversationStore(client), {"pack": "music"}, {"conversation_id": "FIRST", "pack": "shop"},
+    )
+
+    assert [response.status_code for response in responses] == [200, 200]
+    assert served == ["music", "music"] and remembered == ["music", "music"]
+    assert {row["pack"] for row in client.tables["conversations"]} == {"music"}
+
+
+def test_a_new_conversation_without_a_pack_starts_on_the_pack_used_last():
+    client = FakeConversationClient()
+
+    [response], served, _ = ask_on_packs(ConversationStore(client), {})
+
+    assert response.status_code == 200 and served == ["shop"]
+    assert client.tables["conversations"][0]["pack"] == "shop"
+
+
+def test_a_conversation_stored_before_packs_per_conversation_keeps_the_earlier_pack():
+    client = FakeConversationClient()
+    store = ConversationStore(client, earlier_pack=lambda: "chinook")
+    opened = store.open_turn("owner", None, "Earlier question", pack="")
+
+    [response], served, _ = ask_on_packs(store, {"conversation_id": opened.conversation_id})
+
+    assert response.status_code == 200 and served == ["chinook"]
+    assert store.conversations("owner", limit=5, offset=0)[0].pack == "chinook"
+
+
+def test_an_invalid_pack_name_is_refused():
+    [response], served, _ = ask_on_packs(ConversationStore(FakeConversationClient()), {"pack": "../music"})
+
+    assert response.status_code == 422 and served == []

@@ -6,6 +6,7 @@ collection: no response, log line or admin action carries it, and a failure is a
 instead of the driver's text. A source is saved only after its connection was tested.
 """
 
+from collections.abc import Callable
 from datetime import datetime
 import json
 import logging
@@ -15,10 +16,12 @@ from typing import Annotated, Protocol
 from fastapi import APIRouter, Depends, File, HTTPException, Response, UploadFile, status
 
 from app.api.console import require_admin
-from app.api.runtime import get_admin_action_log, get_file_service, get_source_service, get_source_store, get_state_db, unavailable
+from app.api.runtime import (
+    get_admin_action_log, get_file_service, get_source_service, get_source_store, get_state_db, pack_status, unavailable,
+)
 from app.auth.principal import Principal
 from app.contracts.sources import (
-    ColumnView, FileColumn, FileLoad, FileUploadView, ForeignKeyView, ProbeResult, SourceConnection, SourceCreate, SourceDetail, SourcePatch, SourceView,
+    ColumnView, FileColumn, FileLoad, FileUploadView, ForeignKeyView, ProbeResult, SourceConnection, SourceCreate, SourceDetail, SourcePack, SourcePatch, SourceView,
     SourceDrift, SyncView, TableChangeInput, TableDrift, TablesChange, TableView,
 )
 from app.config import load_settings
@@ -205,9 +208,20 @@ def load_file(file_id: str, body: FileLoad, admin: Admin, service: Files, store:
     return _detail(source, store)
 
 
+def get_pack_status():
+    """Each source's pack: ready, building, failed or none (``runtime.pack_status``)."""
+    return pack_status
+
+
 @router.get("")
-def list_sources(_: Admin, store: Store) -> list[SourceView]:
-    return [_source_view(source, store) for source in store.list()]
+def list_sources(_: Admin, store: Store, status_of: Annotated[Callable, Depends(get_pack_status)]) -> list[SourceView]:
+    views = []
+    for source in store.list():
+        state, datasets, error = status_of(source.id)
+        views.append(_source_view(source, store).model_copy(update={
+            "pack": SourcePack(name=source.id, status=state, datasets=datasets, error=error),
+        }))
+    return views
 
 
 @router.post("/test")

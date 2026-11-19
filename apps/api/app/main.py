@@ -23,6 +23,7 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
 
 
 app = FastAPI(title="fitcher API", version="0.1.0", lifespan=lifespan)
+app.add_middleware(runtime.PackSelection)
 app.add_middleware(HostOriginGuard)
 app.include_router(auth.router)
 app.include_router(owner.router)

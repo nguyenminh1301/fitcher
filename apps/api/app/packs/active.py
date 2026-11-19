@@ -1,7 +1,8 @@
-"""The pack the instance answers from (DECISIONS §16: one active pack per instance).
+"""The pack used last (DECISIONS §1, §15): where a new chat and the console start.
 
-``ACTIVE_PACK`` wins when it is set, so a development or scripted setup keeps naming its pack; otherwise the app
-state records the pack an instant pack made active.
+Each data source has its own pack and each conversation keeps its pack, so this is a default, not the only pack
+the instance serves. ``ACTIVE_PACK`` wins when it is set, so a development or scripted setup keeps naming its
+pack; otherwise the app state records the pack last built or asked.
 """
 
 from collections.abc import Mapping

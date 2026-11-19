@@ -21,6 +21,8 @@ class Conversation(ContractModel):
     group_id: str | None
     # The latest change of the conversation or its newest message.
     updated_at: datetime
+    # The pack (one per data source) its questions are answered from; null when none is known.
+    pack: str | None = None
 
 
 class ConversationGroup(ContractModel):

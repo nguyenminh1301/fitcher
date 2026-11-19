@@ -169,3 +169,19 @@ def test_median_latency_is_read_per_provider_and_model_without_the_sdk_prefix():
     assert reader.median_latency() == {("groq", "openai/gpt-oss-120b"): 840, ("gemini", "gemini-2.5-flash"): 1200}
     sql, parameters = script.calls[0]
     assert "status IN ('success', 'ok')" in sql and parameters == {"days": 7}
+
+
+def test_costs_can_be_limited_to_one_packs_questions(client):
+    reader, script = logs([(r"FROM agent_logs\.llm_calls", [])])
+    use(reader)
+
+    client.get("/admin/costs", headers=ADMIN, params={"from": "2026-11-01", "to": "2026-11-06", "pack": "music"})
+
+    sql, parameters = script.calls[0]
+    assert "SELECT trace_id FROM agent_logs.runs WHERE pack = {pack:String}" in sql and parameters["pack"] == "music"
+
+
+def test_a_pack_parameter_must_be_a_pack_name(client):
+    use(logs([])[0])
+
+    assert client.get("/admin/runs", headers=ADMIN, params={"pack": "../etc"}).status_code == 422

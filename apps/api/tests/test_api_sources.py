@@ -45,6 +45,7 @@ def parts(tmp_path):
     app.dependency_overrides[sources_api.get_source_store] = lambda: store
     app.dependency_overrides[sources_api.get_source_service] = lambda: service
     app.dependency_overrides[runtime.get_admin_action_log] = lambda: actions
+    app.dependency_overrides[sources_api.get_pack_status] = lambda: lambda name: ("none", 0, None)
     yield TestClient(app), store, clickhouse, actions, vault, sqlserver
     app.dependency_overrides.clear()
 
@@ -423,3 +424,17 @@ def test_an_upload_named_with_a_path_stays_inside_the_upload_directory(client, p
     assert not (tmp_path.parent / "outside.csv").exists() and not (tmp_path / "outside.csv").exists()
     assert all(path.resolve().is_relative_to((tmp_path / "uploads").resolve())
                for path in tmp_path.rglob("*outside*"))
+
+
+def test_each_source_lists_the_status_of_its_own_pack(client):
+    connect(client)
+    connect(client, name="music")
+    statuses = {"shop": ("ready", 3, None), "music": ("failed", 0, "the model did not answer")}
+    app.dependency_overrides[sources_api.get_pack_status] = lambda: statuses.get
+
+    listed = {source["id"]: source["pack"] for source in client.get("/sources", headers=ADMIN).json()}
+
+    assert listed == {
+        "shop": {"name": "shop", "status": "ready", "datasets": 3, "error": None},
+        "music": {"name": "music", "status": "failed", "datasets": 0, "error": "the model did not answer"},
+    }

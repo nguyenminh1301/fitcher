@@ -41,8 +41,10 @@ SPECS: dict[tuple[str, str], SettingSpec] = {
     ("documents", "enabled"): SettingSpec(bool, False),
     # Questions answered at once by the one api process; the rest wait in order (app/api/limits.py).
     ("limits", "concurrent_questions"): SettingSpec(int, 4),
-    # The pack an instant pack made active; ACTIVE_PACK wins when set (app/packs/active.py).
+    # The pack used last, where a new chat starts; ACTIVE_PACK wins when set (app/packs/active.py).
     ("pack", "active"): SettingSpec(str),
+    # The pack conversations started before each conversation kept its own pack were answered from.
+    ("pack", "earlier_conversations"): SettingSpec(str),
 }
 
 

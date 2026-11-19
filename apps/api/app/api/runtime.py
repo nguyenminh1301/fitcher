@@ -3,15 +3,26 @@
 Each is a FastAPI dependency, so tests override it. A missing setting or an
 uncompiled pack makes the endpoints that need it answer 503, while ``/health``
 keeps working; a failure is not cached, so the next request tries again.
+
+Several compiled packs live side by side, one per data source, and a request
+serves one of them (DECISIONS §1): the pack named by ``?pack=`` (set by
+``PackSelection``), the pack of the conversation a question belongs to, or
+else the pack used last. The objects built for a pack (the compiled pack, the
+agent, its documents, eval reports and run logs) are kept per pack name.
 """
 
+from collections.abc import Callable, Iterator
+from contextlib import contextmanager
+from contextvars import ContextVar
 from dataclasses import dataclass
 from functools import cache
 import logging
 from datetime import UTC, datetime
 import os
 from pathlib import Path
+import re
 import threading
+from urllib.parse import parse_qs
 
 import yaml
 
@@ -71,21 +82,100 @@ def get_vault() -> SecretVault:
     return shared_vault()
 
 
-def current_pack() -> str:
-    """The active pack: ``ACTIVE_PACK``, else the pack an instant pack made active (app/packs/active.py)."""
+PACK_NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$")
+_requested_pack: ContextVar[str | None] = ContextVar("requested_pack", default=None)
+
+
+def last_used_pack() -> str:
+    """``ACTIVE_PACK``, else the pack last asked or built (app/packs/active.py); a new chat starts on it."""
     return active_pack(get_state_db())
 
 
-@cache
+def current_pack() -> str:
+    """The pack this request serves: the one it named or its conversation's, else the pack used last."""
+    return _requested_pack.get() or last_used_pack()
+
+
+@contextmanager
+def serving(pack: str) -> Iterator[None]:
+    """Serve ``pack`` for the code run inside, as a ``?pack=`` request does."""
+    token = _requested_pack.set(pack or None)
+    try:
+        yield
+    finally:
+        _requested_pack.reset(token)
+
+
+class PackSelection:
+    """ASGI middleware: a request's ``?pack=`` names the pack the request serves; an invalid name is refused."""
+
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http":
+            return await self.app(scope, receive, send)
+        names = parse_qs(scope.get("query_string", b"").decode("latin-1")).get("pack") or []
+        if not names or not names[-1]:
+            return await self.app(scope, receive, send)
+        if not PACK_NAME.fullmatch(names[-1]):
+            from fastapi.responses import JSONResponse  # noqa: PLC0415 - only built for a refused request
+
+            return await JSONResponse({"detail": "pack must be a pack name"}, status_code=422)(scope, receive, send)
+        token = _requested_pack.set(names[-1])
+        try:
+            return await self.app(scope, receive, send)
+        finally:
+            _requested_pack.reset(token)
+
+
+class PerPack:
+    """One object per pack name, built on first use; a failure is not kept, so the next use tries again."""
+
+    def __init__(self, build: Callable[[str], object], close: Callable[[object], None] | None = None):
+        self._build = build
+        self._close = close
+        self._items: dict[str, object] = {}
+        self._lock = threading.Lock()
+
+    def __call__(self, name: str):
+        with self._lock:
+            if name not in self._items:
+                self._items[name] = self._build(name)
+            return self._items[name]
+
+    def forget(self, name: str | None = None) -> None:
+        """Drop the object of ``name``, or every object, closing each one."""
+        with self._lock:
+            if name is None:
+                dropped = list(self._items.values())
+                self._items.clear()
+            else:
+                dropped = [self._items.pop(name)] if name in self._items else []
+        for item in dropped:
+            if self._close is not None:
+                self._close(item)
+
+    def __len__(self) -> int:
+        return len(self._items)
+
+
+def _load_compiled(name: str) -> CompiledPack:
+    try:
+        return load_compiled(Path(load_settings().compiled_pack_dir), name)
+    except CompileError as error:
+        raise unavailable(str(error)) from None
+
+
+compiled_packs = PerPack(_load_compiled)
+
+
 def get_compiled() -> CompiledPack:
-    settings = load_settings()
+    """The compiled pack this request serves."""
     name = current_pack()
     if not name:
         raise unavailable("no pack is active: connect a source and build its pack, or set ACTIVE_PACK")
-    try:
-        return load_compiled(Path(settings.compiled_pack_dir), name)
-    except CompileError as error:
-        raise unavailable(str(error)) from None
+    return compiled_packs(name)
 
 
 def get_compiled_or_none() -> CompiledPack | None:
@@ -203,27 +293,40 @@ def _call_log():
         return _call_log_writer.enqueue
 
 
-@cache
-def get_agent() -> Agent:
+def _build_agent(name: str) -> Agent:
     try:
-        return Agent(load_settings(), get_compiled(), get_screener(), lambda: documents_enabled(get_state_db()))
+        return Agent(load_settings(), compiled_packs(name), get_screener(), lambda: documents_enabled(get_state_db()))
     except LLMError as error:
         raise unavailable(str(error)) from None
+
+
+agents = PerPack(_build_agent, close=lambda agent: agent.close())
+
+
+def get_agent() -> Agent:
+    """The agent of the pack this request serves."""
+    get_compiled()
+    return agents(current_pack())
 
 
 @cache
 def get_conversation_store() -> ConversationStore:
     try:
-        return ConversationStore(conversations_client())
+        return ConversationStore(conversations_client(),
+                                 earlier_pack=lambda: Settings(get_state_db()).get("pack", "earlier_conversations") or "")
     except RuntimeError as error:
         raise unavailable(str(error)) from None
 
 
-@cache
 def get_document_service() -> DocumentService:
-    """The active pack's documents; chunks are screened and embedded like a compile does."""
+    """The documents of the pack this request serves; chunks are screened and embedded like a compile does."""
+    return document_services(pack_identity(get_compiled_or_none()).name)
+
+
+def _build_document_service(name: str) -> DocumentService:
     settings = load_settings()
-    identity = pack_identity(get_compiled_or_none())
+    with serving(name):
+        identity = pack_identity(get_compiled_or_none())
     try:
         registry = ClickHouseDocumentRegistry(pack_review_client())
         embeddings, _ = index_embeddings(call_log=_call_log())
@@ -237,8 +340,11 @@ def get_document_service() -> DocumentService:
     )
 
 
+document_services = PerPack(_build_document_service)
+
+
 def get_document_service_or_none() -> DocumentService | None:
-    """The active pack's documents, or None without an active pack or document store."""
+    """The documents of the pack this request serves, or None without a pack or document store."""
     try:
         return get_document_service()
     except HTTPException:
@@ -306,14 +412,20 @@ def get_eval_runs() -> EvalRuns:
     return EvalRuns(execute)
 
 
-@cache
-def get_eval_reports() -> EvalReports:
+def _build_eval_reports(name: str) -> EvalReports:
     try:
         client = trace_reader_client()
     except Exception as error:  # noqa: BLE001 - a missing password or ClickHouse unreachable
         raise unavailable(f"the eval reports are unavailable: {error}") from None
-    return EvalReports(lambda sql, parameters: client.query(sql, parameters=parameters).result_rows,
-                       pack_identity(get_compiled_or_none()).name)
+    return EvalReports(lambda sql, parameters: client.query(sql, parameters=parameters).result_rows, name)
+
+
+eval_reports = PerPack(_build_eval_reports)
+
+
+def get_eval_reports() -> EvalReports:
+    """The eval reports of the pack this request serves."""
+    return eval_reports(pack_identity(get_compiled_or_none()).name)
 
 
 def get_admin_action_log() -> ClickHouseModelStore:
@@ -321,13 +433,23 @@ def get_admin_action_log() -> ClickHouseModelStore:
     return get_model_store()
 
 
-@cache
-def get_admin_logs() -> AdminLogs:
-    """The run logs of the active pack, read as ``agent_logs_trace_reader``."""
+def _build_admin_logs(name: str) -> AdminLogs:
     try:
-        return AdminLogs.from_client(trace_reader_client(), pack_identity(get_compiled_or_none()).name)
+        return AdminLogs.from_client(trace_reader_client(), name)
     except Exception as error:  # noqa: BLE001 - a missing password or ClickHouse unreachable
         raise unavailable(f"the run logs are unavailable: {error}") from None
+
+
+admin_logs = PerPack(_build_admin_logs)
+
+
+def get_admin_logs() -> AdminLogs:
+    """The run logs of the pack this request serves, read as ``agent_logs_trace_reader``."""
+    try:
+        name = pack_identity(get_compiled_or_none()).name
+    except HTTPException:
+        name = ""  # without any pack the logs still answer for every pack's model calls
+    return admin_logs(name)
 
 
 @cache
@@ -443,8 +565,7 @@ def _rebuild_missing_indices() -> None:
         except Exception:  # noqa: BLE001 - one pack's failure must not stop the others or the api
             logger.exception("compiling pack %s to rebuild its search index failed", pack)
             continue
-        if pack == current_pack():
-            reload_pack()
+        reload_pack(pack)
 
 
 def rebuild_missing_indices_in_background() -> None:
@@ -453,8 +574,9 @@ def rebuild_missing_indices_in_background() -> None:
 
 
 def _activate_instant(pack: str) -> None:
+    """A built pack serves its source's conversations and is where a new chat starts; other packs are untouched."""
     set_active_pack(get_state_db(), pack)
-    reload_pack()
+    reload_pack(pack)
 
 
 @cache
@@ -469,16 +591,28 @@ def get_instant_pipeline() -> InstantPipeline:
     )
 
 
-# The objects built for the active pack; ``reload_pack`` drops them when another pack becomes active or is compiled.
-PACK_DEPENDENCIES = (get_compiled, get_agent, get_document_service, get_eval_reports)
+def pack_status(name: str) -> tuple[str, int, str | None]:
+    """The status of the pack built from source ``name``, its dataset count and its latest build error."""
+    job = get_instant_pipeline().latest_job(name) if get_instant_pipeline.cache_info().currsize else None
+    if job is not None and job.status == "running":
+        return "building", 0, None
+    error = job.error if job is not None and job.status == "failed" else None
+    if (Path(load_settings().compiled_pack_dir) / name / "compiled.json").is_file():
+        try:
+            return "ready", len(compiled_packs(name).pack.datasets.datasets), error
+        except HTTPException as refused:
+            return "failed", 0, error or str(refused.detail)
+    return ("failed", 0, error) if error else ("none", 0, None)
 
 
-def reload_pack() -> None:
-    """Forget the active pack's objects, closing the agent's log writer, so the next request reads the new pack."""
-    if get_agent.cache_info().currsize:
-        get_agent().close()
+# The objects built per pack; ``reload_pack`` drops them when the pack is compiled again.
+PACK_DEPENDENCIES = (compiled_packs, agents, document_services, eval_reports, admin_logs)
+
+
+def reload_pack(name: str | None = None) -> None:
+    """Forget the objects of pack ``name`` (or of every pack), closing its agent's log writer."""
     for dependency in PACK_DEPENDENCIES:
-        dependency.cache_clear()
+        dependency.forget(name)
 
 
 def close() -> None:
@@ -486,8 +620,7 @@ def close() -> None:
     if _source_scheduler is not None:
         _source_scheduler.stop()
     global _call_log_writer
-    if get_agent.cache_info().currsize:
-        get_agent().close()
+    agents.forget()
     with _call_log_lock:
         if _call_log_writer is not None:
             _call_log_writer.close()
