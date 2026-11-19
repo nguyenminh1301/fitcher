@@ -49,7 +49,7 @@ def test_a_mapping_needs_a_known_provider_a_model_and_a_chat_tier(store, mapping
         mapping.set_tier("embed", "openai", "text-embedding-3-large")
 
 
-def test_the_first_provider_fills_every_unmapped_chat_tier_and_its_embedding_model(store, mapping):
+def test_the_first_provider_fills_every_unmapped_chat_tier_and_leaves_the_embedding_local(store, mapping):
     provider = store.create("openai", api_key=KEY)
     other = store.create("anthropic", api_key=KEY)
     mapping.set_tier("sql-gen-hard", other.id, "claude-opus-5-5")
@@ -60,11 +60,11 @@ def test_the_first_provider_fills_every_unmapped_chat_tier_and_its_embedding_mod
         "fast": TierModel("openai", "gpt-5.4-mini"), "sql-small": TierModel("openai", "gpt-5.4-mini"),
         "sql-gen": TierModel("openai", "gpt-5.4"), "sql-gen-hard": TierModel("anthropic", "claude-opus-5-5"),
     }
-    # The local models lost recall against this one (docs/eval/local-embedding-report.md), so it is the default.
-    assert mapping.embedding() == EmbeddingChoice("provider", "text-embedding-3-large", 1024, provider_id="openai")
+    # A free key's embedding limit cannot index a large pack, so a hosted provider's model is only chosen by hand.
+    assert mapping.embedding() == LOCAL_DEFAULT
 
 
-def test_the_embedding_runs_locally_until_a_provider_offers_one(store, mapping):
+def test_the_embedding_stays_local_when_hosted_providers_are_added(store, mapping):
     assert mapping.embedding() == EmbeddingChoice(
         backend="local", model="sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2", dimensions=384,
     )
@@ -73,7 +73,7 @@ def test_the_embedding_runs_locally_until_a_provider_offers_one(store, mapping):
     assert mapping.embedding() == LOCAL_DEFAULT
     assert mapping.tier("fast") == TierModel("anthropic", "claude-haiku-5-5")
     fill_defaults(mapping, store.create("gemini", api_key=KEY))
-    assert mapping.embedding() == EmbeddingChoice("provider", "gemini-embedding-001", 768, provider_id="gemini")
+    assert mapping.embedding() == LOCAL_DEFAULT
 
 
 def test_a_local_model_chosen_by_the_admin_is_kept_when_a_provider_is_added(store, mapping):
@@ -145,7 +145,8 @@ def test_the_environment_creates_each_provider_once_and_maps_the_first(store, ma
     assert [p.id for p in created] == ["openai", "ollama"]
     assert store.get("ollama").base_url == "http://host.docker.internal:11434"
     assert mapping.tier("sql-gen") == TierModel("openai", "gpt-5.4")
-    assert mapping.embedding() == EmbeddingChoice("provider", "text-embedding-3-large", 1024, provider_id="openai")
+    # The Ollama server is on this computer too, so its embedding model is proposed.
+    assert mapping.embedding() == EmbeddingChoice("provider", "nomic-embed-text", 768, provider_id="ollama")
     assert bootstrap_from_env(store, mapping, {**env, "ANTHROPIC_API_KEY": KEY}) == []
     assert [p.id for p in store.list()] == ["openai", "ollama"]
 
@@ -235,7 +236,8 @@ def test_the_resolver_names_each_tiers_provider_and_model(state, store, mapping)
     labels = SettingsRoutes(mapping, store, state[1].reader(), overrides={"fast": TierModel("openai", "gpt-5.5")}).labels()
 
     assert labels == {"fast": "openai/gpt-5.5", "sql-small": "openai/gpt-5.4-mini", "sql-gen": "openai/gpt-5.4",
-                      "sql-gen-hard": "openai/gpt-5.5", "embed": "openai/text-embedding-3-large"}
+                      "sql-gen-hard": "openai/gpt-5.5",
+                      "embed": "local/sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"}
 
 
 def test_the_aliases_mapped_before_the_app_state_are_copied_once(store, mapping):
@@ -274,10 +276,10 @@ def test_a_pack_compiled_with_a_local_model_keeps_it(store, mapping):
 
 
 @pytest.mark.parametrize("compiled", [None, ("anthropic-embed", 1024)])
-def test_otherwise_the_first_provider_offers_the_embedding(store, mapping, compiled):
+def test_otherwise_the_embedding_stays_local(store, mapping, compiled):
     bootstrap_from_env(store, mapping, {"OPENAI_API_KEY": KEY}, compiled_embedding=lambda: compiled)
 
-    assert mapping.embedding() == EmbeddingChoice("provider", "text-embedding-3-large", 1024, provider_id="openai")
+    assert mapping.embedding() == LOCAL_DEFAULT
 
 
 def test_a_chain_routes_each_model_through_every_key_of_its_provider(state, store, mapping):

@@ -6,6 +6,8 @@ export type Tables = string[];
 export type Status = "running" | "succeeded" | "failed";
 export type Id1 = "marts" | "profile" | "files" | "draft" | "approve" | "compile" | "activate";
 export type State = "pending" | "running" | "done" | "failed";
+export type Done = number | null;
+export type Total = number | null;
 export type Steps = InstantStep[];
 export type FailedStep = string | null;
 export type Error = string | null;
@@ -37,6 +39,8 @@ export interface InstantJobView {
 export interface InstantStep {
   id: Id1;
   state: State;
+  done?: Done;
+  total?: Total;
 }
 export interface InstantResult {
   pack: Pack;

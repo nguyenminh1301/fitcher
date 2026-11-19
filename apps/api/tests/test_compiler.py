@@ -67,6 +67,16 @@ def test_first_compile_publishes_generation_one(pack_dir, tmp_path):
     }
 
 
+def test_the_compile_reports_how_many_texts_it_has_embedded_out_of_all(pack_dir, tmp_path):
+    heard = []
+
+    run(pack_dir, tmp_path, FakeSearch(), progress=lambda done, total: heard.append((done, total)))
+
+    # 17 documents in all (see the first compile above), heard before the first text and after each index's texts.
+    assert heard[0] == (0, 17) and heard[-1] == (17, 17)
+    assert [done for done, _ in heard] == sorted(done for done, _ in heard)
+
+
 def test_every_point_carries_a_dense_and_a_bm25_vector_and_values_also_trigrams(pack_dir, tmp_path):
     search = FakeSearch()
 

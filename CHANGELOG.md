@@ -4,6 +4,7 @@
 
 ### Added
 
+- A pack build shows how long it has run and, while it indexes, how many items are indexed out of all of them with a progress bar, so a long build of a large table visibly moves.
 - Model providers show their logos on the provider cards, the provider list and the model picker, and an OpenAI-compatible endpoint or a server on this computer takes a name of its own when it is added; any provider can be renamed on the Models page.
 
 - The Sources page says for each source whether it can answer questions, with a button that gets a source ready (builds its pack) and an Ask button for a ready source, and a new conversation lets you choose which ready source it is answered from. Sources added after the setup used to have no pack and no visible way to build one, so questions about them could not be asked.
@@ -16,6 +17,7 @@
 
 ### Changed
 
+- The local multilingual model is the default embedding: adding OpenAI or Gemini no longer moves the embedding to the provider's model, because a free key's embedding limit cannot index a pack with many values. An Ollama server still proposes its embedding model, and a provider's model can be chosen on the Models page.
 - The owner menu opens as wide as the sidebar it is opened from instead of a fixed 288 pixels that overhung the sidebar.
 
 - Each data source keeps its own pack and each conversation is answered from the pack it was started on: a question names the pack of a new conversation (the pack used last by default), building a pack no longer changes the pack of other conversations, and a conversation started before this change keeps the pack the instance used then. Console endpoints read the pack named by `?pack=` (the pack used last by default), Costs can be limited to one pack, and `GET /api/sources` reports each source's pack as ready with its dataset count, building, failed with its reason, or none. App-state change 0012 records the earlier conversations' pack; ClickHouse change 0009 adds `pack` to `conversations`.

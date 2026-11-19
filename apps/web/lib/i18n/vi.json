@@ -882,7 +882,9 @@
     "providerName": "Tên",
     "providerNameOptional": "Tên (không bắt buộc)",
     "providerNamePlaceholder": "Ví dụ: Máy chủ công ty",
-    "providerNameHelp": "Hiện trong danh sách provider và khi chọn model; có thể đổi sau."
+    "providerNameHelp": "Hiện trong danh sách provider và khi chọn model; có thể đổi sau.",
+    "indexed": "Đã index {done}/{total} mục",
+    "elapsed": "Đã chạy {time}. Bảng lớn có thể mất vài phút; bạn có thể rời trang này."
   },
   "instant": {
     "title": "Dựng gói dữ liệu",
