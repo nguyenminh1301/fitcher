@@ -11,6 +11,7 @@ import pytest
 from sources_fixtures import UploadClickHouse
 from state_fixtures import new_state
 
+from app.onboarding import docs_parser
 from app.onboarding.docs_parser import DocumentRejected
 from app.sources import files
 from app.sources.files import FileColumn, FileService, FileTooLarge
@@ -75,6 +76,44 @@ def test_content_that_is_not_a_supported_table_is_rejected(data, status):
 def test_a_macro_enabled_workbook_is_rejected_by_the_document_readers_rule():
     with pytest.raises(DocumentRejected, match="macro"):
         files.detect_format(workbook([["a"]], macro=True), "book.xlsx")
+
+
+def _bomb() -> bytes:
+    """A workbook whose sheet inflates from a few kilobytes to 8 MiB of repeated XML."""
+    buffer = BytesIO()
+    with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as archive:
+        archive.writestr("[Content_Types].xml", "<Types/>")
+        archive.writestr("xl/workbook.xml", "<workbook/>")
+        archive.writestr("xl/worksheets/sheet1.xml", b"<row/>" * (8 * 1024 * 1024 // 6))
+    return buffer.getvalue()
+
+
+def test_a_workbook_compressed_past_the_ratio_limit_is_refused_before_parsing():
+    with pytest.raises(DocumentRejected, match="compressed more than") as raised:
+        files.detect_format(_bomb(), "bomb.xlsx")
+    assert raised.value.status == 413
+
+
+def test_a_workbook_declaring_more_than_the_uncompressed_limit_is_refused(monkeypatch):
+    monkeypatch.setattr(docs_parser, "MAX_OFFICE_UNCOMPRESSED_BYTES", 100)
+
+    with pytest.raises(DocumentRejected, match="expands to more than") as raised:
+        files.detect_format(workbook([["a", "b"], [1, 2]]), "book.xlsx")
+    assert raised.value.status == 413
+
+
+def test_the_inference_sample_reads_a_bounded_number_of_rows(monkeypatch):
+    book = Workbook()
+    sheet = book.active
+    sheet.append(["code"])
+    for index in range(50):
+        sheet.append([index])
+    buffer = BytesIO()
+    book.save(buffer)
+
+    header, rows = files.workbook_rows(buffer.getvalue(), max_rows=11)
+
+    assert header == ["code"] and len(list(rows)) == 10
 
 
 # Names
