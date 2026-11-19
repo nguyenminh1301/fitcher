@@ -4,6 +4,7 @@
 
 ### Changed
 
+- A menu item with choices, such as Language in the owner menu or "Move to group" on a conversation, opens them in a panel beside the menu on hover or click, with the item's name as its heading and a check mark on the current choice; the arrow keys open and close it. The menu used to be replaced by the choices.
 - A table without a date column, such as a product catalog or a contact list, becomes a dataset of the pack instead of being left out. Its questions are answered over all its rows without asking for a period; a period the question names is dropped with a warning, the Datasets page shows no time column for it, and the pack build no longer fails when the model's draft gives such a table a time column or marks a number column as searchable.
 
 ### Fixed

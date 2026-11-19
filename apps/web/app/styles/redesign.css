@@ -208,6 +208,10 @@
 .toast .fc-icon { color: inherit; }
 .toast .fc-btn { color: inherit; }
 .menu-sub { position: absolute; left: calc(100% + 4px); top: 0; width: 180px; }
+/* A menu item's own panel, opened beside the menu */
+.fc-submenu { width: 220px; z-index: 46; }
+.fc-menu-heading { padding: 6px 8px 4px; font-size: 12px; font-weight: 600; color: var(--fgColor-muted); }
+.fc-menu-open { background: var(--control-transparent-bgColor-hover); }
 
 /* Skeleton, empty */
 .sk { background: var(--bgColor-neutral-muted); border-radius: 6px; display: block; }

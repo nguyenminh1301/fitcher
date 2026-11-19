@@ -308,7 +308,6 @@ textarea.fc-input { height: auto; min-height: 80px; padding: var(--base-size-8) 
 .fc-menu-item[aria-disabled="true"] { color: var(--fgColor-disabled); cursor: not-allowed; }
 .fc-menu-danger, .fc-menu-danger > .fc-icon { color: var(--fgColor-danger); }
 .fc-menu-checked { font-weight: 600; }
-.fc-menu-back { color: var(--fgColor-muted); font-weight: 600; }
 .fc-kbd { margin-left: auto; font: 500 11px/16px var(--font-mono); color: var(--fgColor-muted); border: 1px solid var(--borderColor-default); border-radius: var(--borderRadius-small); padding: 0 4px; white-space: nowrap; }
 .fc-menu-sep { height: 1px; background: var(--borderColor-muted); margin: var(--base-size-4) calc(var(--base-size-8) * -1); }
 
