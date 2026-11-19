@@ -121,7 +121,7 @@ export type MenuItem = {
   node?: ReactNode;
 };
 
-export type MenuProps = { anchor: HTMLElement | null; items: MenuItem[]; onClose: (selected?: boolean) => void; align?: "start" | "end"; width?: number; header?: ReactNode; label?: string };
+export type MenuProps = { anchor: HTMLElement | null; items: MenuItem[]; onClose: (selected?: boolean) => void; align?: "start" | "end"; /** A width in pixels, or "anchor" to match the button that opens the menu. */ width?: number | "anchor"; header?: ReactNode; label?: string };
 
 /**
  * An anchored action menu, kept inside the app frame; arrow keys move, Escape closes, a shortcut letter picks.
@@ -304,7 +304,7 @@ export function Menu({ anchor, items, onClose, align, width, header, label }: Me
         role="menu"
         aria-label={label}
         onKeyDown={onKey}
-        style={{ left: position?.left ?? 0, top: position?.top ?? 0, visibility: position ? "visible" : "hidden", width }}
+        style={{ left: position?.left ?? 0, top: position?.top ?? 0, visibility: position ? "visible" : "hidden", width: width === "anchor" ? Math.max(anchor.offsetWidth, 200) : width }}
       >
         {header ?? null}
         {items.map((item, index) => row(item, index, false))}

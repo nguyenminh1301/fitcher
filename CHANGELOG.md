@@ -16,6 +16,8 @@
 
 ### Changed
 
+- The owner menu opens as wide as the sidebar it is opened from instead of a fixed 288 pixels that overhung the sidebar.
+
 - Each data source keeps its own pack and each conversation is answered from the pack it was started on: a question names the pack of a new conversation (the pack used last by default), building a pack no longer changes the pack of other conversations, and a conversation started before this change keeps the pack the instance used then. Console endpoints read the pack named by `?pack=` (the pack used last by default), Costs can be limited to one pack, and `GET /api/sources` reports each source's pack as ready with its dataset count, building, failed with its reason, or none. App-state change 0012 records the earlier conversations' pack; ClickHouse change 0009 adds `pack` to `conversations`.
 - The owner menu names the Security page "Security" ("Bảo mật" in Vietnamese) instead of "Security and owner password".
 - A menu item with choices, such as Language in the owner menu or "Move to group" on a conversation, opens them in a panel beside the menu on hover or click, with the item's name as its heading and a check mark on the current choice; the arrow keys open and close it. The menu used to be replaced by the choices.

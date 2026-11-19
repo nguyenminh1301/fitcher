@@ -132,6 +132,17 @@ describe("account menu", () => {
     expect(screen.getByText("Sales today")).toBeTruthy();
   });
 
+  it("opens as wide as the sidebar's account button", async () => {
+    renderShell();
+    await screen.findByText("Sales today");
+    const button = await screen.findByRole("button", { name: "Owner menu" });
+    Object.defineProperty(button, "offsetWidth", { configurable: true, value: 232 });
+
+    const menu = await openAccount();
+
+    expect(menu.style.width).toBe("232px");
+  });
+
   it("hides the identity picker once sign-in is wired", async () => {
     renderShell({ sources: { auth: "http" } });
     await screen.findByText("Sales today");

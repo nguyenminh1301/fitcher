@@ -80,7 +80,7 @@ export function AccountMenu({ onConsole, onChat, onSecurity }: { onConsole?: () 
         <span className="acct-text"><span className="acct-name">{name}</span><span className="acct-sub">{where}</span></span>
         <Icon name="chevronsUpDown" />
       </button>
-      <Menu anchor={anchor} align="start" width={288} label={label} header={header} items={items} onClose={() => setAnchor(null)} />
+      <Menu anchor={anchor} align="start" width="anchor" label={label} header={header} items={items} onClose={() => setAnchor(null)} />
     </>
   );
 }
