@@ -29,6 +29,8 @@ class Fakes:
     def __init__(self):
         self.models = ["gpt-5.4", "gpt-5.4-mini"]
         self.listed_with: list[str | None] = []
+        self.checked_with: list[str | None] = []
+        self.refused_key: str | None = None
         self.list_error: ModelListError | None = None
         self.probed: list = []
         self.probe_error: LLMError | None = None
@@ -36,6 +38,15 @@ class Fakes:
 
     def lister(self, provider, api_key):
         self.listed_with.append(api_key)
+        if self.list_error:
+            raise self.list_error
+        return self.models
+
+    def checker(self, provider, api_key):
+        """Lists the models once the key is accepted, as ``checked_models`` does."""
+        self.checked_with.append(api_key)
+        if api_key is not None and api_key == self.refused_key:
+            raise ModelListError(f"{provider.name} refused the key (HTTP 401)")
         if self.list_error:
             raise self.list_error
         return self.models
@@ -62,6 +73,7 @@ def client(tmp_path, fakes, actions):
     app.dependency_overrides[setup_api.get_state_db] = lambda: db
     app.dependency_overrides[providers_api.get_vault] = lambda: vault
     app.dependency_overrides[providers_api.get_model_lister] = lambda: fakes.lister
+    app.dependency_overrides[providers_api.get_key_checker] = lambda: fakes.checker
     app.dependency_overrides[providers_api.get_probe] = lambda: fakes.probe
     app.dependency_overrides[runtime.get_admin_action_log] = lambda: actions
     app.dependency_overrides[providers_api.get_compiled_embedding] = lambda: fakes.compiled
@@ -131,13 +143,62 @@ def test_moving_a_keyed_provider_to_a_new_address_without_its_key_is_refused(cli
     assert client.get("/providers", headers=ADMIN).json()[0]["base_url"] == "https://models.example/v1"
 
 
-def test_a_provider_in_use_cannot_be_removed(client):
+def test_a_provider_in_use_is_removed_and_its_tiers_move_to_a_remaining_provider(client, fakes):
     add_openai(client)
+    fakes.models = ["gemini-2.5-flash", "gemini-2.5-pro"]
     assert client.post("/providers", headers=ADMIN, json={"kind": "gemini", "api_key": KEY}).json()["in_use"] is False
 
-    assert client.delete("/providers/gemini", headers=ADMIN).status_code == 204
-    refused = client.delete("/providers/openai", headers=ADMIN)
-    assert refused.status_code == 409 and "in use" in refused.json()["detail"]
+    assert client.delete("/providers/openai", headers=ADMIN).status_code == 204
+
+    body = client.get("/models/tiers", headers=ADMIN).json()
+    assert {(tier["tier"], tier["provider_id"], tier["model"]) for tier in body["tiers"]} == {
+        ("fast", "gemini", "gemini-2.5-flash"), ("sql-small", "gemini", "gemini-2.5-flash"),
+        ("sql-gen", "gemini", "gemini-2.5-pro"), ("sql-gen-hard", "gemini", "gemini-2.5-pro"),
+    }
+    assert body["embedding"]["backend"] == "local"
+    assert [provider["id"] for provider in client.get("/providers", headers=ADMIN).json()] == ["gemini"]
+
+
+def test_the_last_provider_can_be_removed_and_leaves_its_tiers_unmapped(client):
+    add_openai(client)
+
+    assert client.delete("/providers/openai", headers=ADMIN).status_code == 204
+
+    assert all(
+        tier["provider_id"] is None and tier["chain"] == [] for tier in client.get("/models/tiers", headers=ADMIN).json()["tiers"])
+
+
+def test_a_key_the_provider_refuses_is_not_stored(client, fakes, actions):
+    fakes.refused_key = KEY
+
+    refused = client.post("/providers", headers=ADMIN, json={"kind": "openai", "api_key": KEY})
+
+    assert refused.status_code == 422 and "refused the key" in refused.json()["detail"]
+    assert client.get("/providers", headers=ADMIN).json() == []
+    assert all(
+        tier["provider_id"] is None and tier["chain"] == [] for tier in client.get("/models/tiers", headers=ADMIN).json()["tiers"])
+    assert actions.records == []
+
+
+def test_a_refused_key_neither_replaces_the_stored_key_nor_joins_the_rotation(client, fakes):
+    add_openai(client)
+    fakes.refused_key = "sk-wrong-key-0000"
+
+    replaced = client.patch("/providers/openai", headers=ADMIN, json={"api_key": "sk-wrong-key-0000"})
+    added = client.post("/providers/openai/keys", headers=ADMIN, json={"api_key": "sk-wrong-key-0000"})
+
+    assert replaced.status_code == added.status_code == 422
+    assert [key["last4"] for key in client.get("/providers", headers=ADMIN).json()[0]["keys"]] == ["7777"]
+
+
+def test_the_check_asks_the_smallest_chat_model_the_provider_lists(client, fakes):
+    add_openai(client)
+    fakes.models = ["gpt-5.5", "gpt-5.4", "gpt-5.4-mini", "gpt-5.4-nano", "gpt-5.4-nano-tts", "text-embedding-3-large"]
+
+    result = client.post("/providers/openai/test", headers=ADMIN, json={}).json()
+
+    assert result["model"] == "gpt-5.4-nano" and result["structured_output"] is True
+    assert fakes.probed[0].model == "openai/gpt-5.4-nano"
     assert client.delete("/providers/nope", headers=ADMIN).status_code == 404
 
 
@@ -224,7 +285,7 @@ def test_a_key_the_instance_key_cannot_read_asks_for_the_key_again(client, fakes
                      client.post("/providers/openai/test", headers=ADMIN, json={})):
         assert response.status_code == 409
         assert "enter it again" in response.json()["detail"]
-    assert fakes.listed_with == [] and fakes.probed == []
+    assert fakes.checked_with == [KEY] and fakes.listed_with == [] and fakes.probed == []
 
 
 def test_changing_the_embedding_needs_a_confirmed_reindex(client):
@@ -493,8 +554,7 @@ def test_a_provider_that_shares_every_tier_with_another_can_be_removed(client):
     assert client.delete("/providers/openai-compatible", headers=ADMIN).status_code == 204
     tiers = client.get("/models/tiers", headers=ADMIN).json()["tiers"]
     assert {len(tier["chain"]) for tier in tiers} == {1}
-    # The embedding and the tiers it alone serves keep the last provider.
-    assert client.delete("/providers/openai", headers=ADMIN).status_code == 409
+    assert {tier["provider_id"] for tier in tiers} == {"openai"}
 
 
 def test_auto_free_chooses_free_models_across_providers_and_a_manual_tier_ends_it(client):

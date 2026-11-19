@@ -131,7 +131,7 @@ function ProviderRow({ models, provider, onChanged, onRemove }: {
         </button>
         {takesKey ? <button type="button" className="fc-btn fc-btn-sm" disabled={busy !== null} onClick={() => setKey(key === null ? "" : null)}>{t("models.replaceKey")}</button> : null}
         <button type="button" className="fc-btn fc-btn-ghost fc-btn-icon fc-btn-sm" aria-label={t("modelsPage.removeOf", { name: provider.name })}
-          disabled={provider.in_use} title={provider.in_use ? t("modelsPage.inUseNote") : undefined} onClick={onRemove}><Icon name="trash" /></button>
+          onClick={onRemove}><Icon name="trash" /></button>
       </div>
       {result || listed || key !== null || (provider.hosted && preset && billing(preset) === "billed") ? (
         <div className="prov-extra">

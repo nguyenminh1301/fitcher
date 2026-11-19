@@ -9,8 +9,12 @@ provider. The embedding runs locally until an admin chooses another model on
 reindex it needs; ``needs_reindex`` then tells that the active pack was
 indexed with another model and must be recompiled.
 
-``POST /providers/{id}/test`` lists the provider's models, then asks one model
-for a small structured reply through the gateway. For a hosted provider that
+A key is checked with the provider before it is stored (``GET /models``, or
+OpenRouter's key endpoint), so a key the provider refuses is never kept.
+Removing a provider takes it out of every chain; a tier it alone served is
+mapped to a remaining provider. ``POST /providers/{id}/test`` checks the key,
+then asks the smallest chat model the provider lists for a small structured
+reply through the gateway. For a hosted provider that
 call is billed, which the response states. A model that fails structured
 output is reported and stays selectable. A provider may hold several keys
 (``POST``/``DELETE /providers/{id}/keys``), which the gateway rotates.
@@ -52,8 +56,8 @@ from app.llm.catalog import Catalog, with_latency
 from app.llm.client import LLMError, Prompt
 from app.llm.eligibility import eligibility, ReportSummary
 from app.llm.gateway import Gateway, Route
-from app.llm.provider_models import list_models, ModelListError
-from app.llm.providers import check_fields, key_name, Provider, ProviderError, ProviderNotFound, ProviderStore
+from app.llm.provider_models import checked_models, list_models, ModelListError
+from app.llm.providers import check_fields, DISPLAY_NAMES, key_name, Provider, ProviderError, ProviderNotFound, ProviderStore
 from app.llm.clients import compiled_embedding
 from app.llm.routes import EmbeddingChoice, fill_defaults, TierMapping, TierModel
 from app.llm.tiers import CHAT_TIERS, EMBED_TIER
@@ -103,6 +107,14 @@ def get_model_lister() -> Callable[[Provider, str | None], list[str]]:
 
 
 @cache
+def get_key_checker() -> Callable[[Provider, str | None], list[str]]:
+    """Lists a provider's models only once the provider accepted the key; raises ``ModelListError`` otherwise."""
+    return checked_models
+
+
+KeyChecker = Annotated[Callable, Depends(get_key_checker)]
+
+
 def get_catalog() -> Catalog:
     """The process's model catalog, kept per provider for six hours."""
     return Catalog()
@@ -207,6 +219,14 @@ def _refused(error: ProviderError) -> HTTPException:
     return HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(error))
 
 
+def _verify(checker: Callable, provider: Provider, api_key: str | None) -> list[str]:
+    """The provider's models, read with ``api_key``; a refused key or an unreachable provider is a 422."""
+    try:
+        return checker(provider, api_key)
+    except ModelListError as error:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(error)) from None
+
+
 @router.get("/providers")
 def list_providers(_: Admin, store: Store, mapping: Mapping) -> list[ProviderView]:
     in_use = mapping.providers_in_use()
@@ -240,10 +260,20 @@ def _ollama_models(body: ProviderCreate, lister: Callable) -> list[str]:
 def add_provider(body: ProviderCreate, admin: Admin, store: Store, mapping: Mapping, log: Log,
                  db: Annotated[StateDb, Depends(get_state_db)],
                  lister: Annotated[Callable, Depends(get_model_lister)], vault: Vault, catalog: CatalogDep,
-                 latency: Latency) -> ProviderView:
+                 latency: Latency, checker: KeyChecker) -> ProviderView:
     # An Ollama server is asked for its models first: the tiers are proposed only from installed models, and a
     # server the container cannot reach is refused with how to reach it, instead of failing every question later.
     installed = _ollama_models(body, lister) if body.kind == "ollama" else None
+    if body.kind != "ollama":
+        # The key is checked before anything is stored: a key the provider refuses is never kept, and the tiers
+        # are never mapped to a provider that cannot answer.
+        try:
+            candidate = Provider(id="new", name=body.name or DISPLAY_NAMES.get(body.kind, body.kind), kind=body.kind,
+                                 base_url=check_fields(body.kind, api_key=body.api_key, base_url=body.base_url),
+                                 key_set=bool(body.api_key), key_last4=None)
+        except ProviderError as error:
+            raise _refused(error) from None
+        _verify(checker, candidate, body.api_key)
     try:
         provider = store.create(body.kind, name=body.name, api_key=body.api_key, base_url=body.base_url)
     except ProviderError as error:
@@ -257,8 +287,15 @@ def add_provider(body: ProviderCreate, admin: Admin, store: Store, mapping: Mapp
 
 @router.patch("/providers/{provider_id}")
 def change_provider(provider_id: str, body: ProviderUpdate, admin: Admin, store: Store, mapping: Mapping,
-                    log: Log, vault: Vault, catalog: CatalogDep, latency: Latency) -> ProviderView:
+                    log: Log, vault: Vault, catalog: CatalogDep, latency: Latency, checker: KeyChecker) -> ProviderView:
     before = _found(store, provider_id)
+    if body.api_key:
+        try:
+            base_url = check_fields(before.kind, api_key=body.api_key,
+                                    base_url=body.base_url if body.base_url is not None else before.base_url)
+        except ProviderError as error:
+            raise _refused(error) from None
+        _verify(checker, Provider(before.id, before.name, before.kind, base_url, True, None), body.api_key)
     try:
         provider = store.update(provider_id, name=body.name, api_key=body.api_key, base_url=body.base_url)
     except ProviderError as error:
@@ -269,16 +306,34 @@ def change_provider(provider_id: str, body: ProviderUpdate, admin: Admin, store:
     return _view(provider, mapping.providers_in_use())
 
 
+def _refill(mapping: TierMapping, store: ProviderStore, vault: SecretVault, checker: Callable,
+            tiers: list[str]) -> None:
+    """Map each of ``tiers`` to a remaining provider: its proposed model, or the smallest chat model it lists.
+
+    A provider that cannot be listed is skipped; a tier no remaining provider can serve stays unmapped.
+    """
+    for tier in tiers:
+        for provider in store.list():
+            proposed = defaults.chat_models(provider.kind).get(tier)
+            if proposed is None:
+                try:
+                    proposed = defaults.probe_model(provider.kind, checker(provider, _key(vault, provider)), provider.base_url)
+                except (ModelListError, HTTPException):
+                    continue
+            if proposed:
+                mapping.set_tier(tier, provider.id, proposed)
+                break
+
+
 @router.delete("/providers/{provider_id}", status_code=status.HTTP_204_NO_CONTENT)
 def remove_provider(provider_id: str, admin: Admin, store: Store, mapping: Mapping, log: Log, vault: Vault,
-                    catalog: CatalogDep, latency: Latency) -> Response:
+                    catalog: CatalogDep, latency: Latency, checker: KeyChecker) -> Response:
     before = _found(store, provider_id)
-    # A chain keeps its other models when one provider goes; a tier the provider alone serves, or the
-    # embedding, must be mapped elsewhere first.
-    if provider_id in mapping.providers_needed():
-        raise HTTPException(status.HTTP_409_CONFLICT,
-                            detail=f"{before.name} is in use by a model tier or the embedding; map them elsewhere first")
+    # The provider leaves every chain; a tier it alone served takes the proposed models of a provider that
+    # remains, and an embedding it served goes back to the local model.
+    emptied = mapping.drop_provider(provider_id)
     store.delete(provider_id)
+    _refill(mapping, store, vault, checker, emptied)
     _refresh_auto(mapping, store, vault, catalog, latency, force=True)
     _record(log, admin, "provider_remove", provider_id, _described(before), "")
     return Response(status_code=status.HTTP_204_NO_CONTENT)
@@ -286,9 +341,11 @@ def remove_provider(provider_id: str, admin: Admin, store: Store, mapping: Mappi
 
 @router.post("/providers/{provider_id}/keys", status_code=status.HTTP_201_CREATED)
 def add_key(provider_id: str, body: ProviderKeyCreate, admin: Admin, store: Store, mapping: Mapping, log: Log,
-            vault: Vault, catalog: CatalogDep, latency: Latency) -> ProviderView:
-    """Add a key the gateway rotates with the provider's other keys."""
-    _found(store, provider_id)
+            vault: Vault, catalog: CatalogDep, latency: Latency, checker: KeyChecker) -> ProviderView:
+    """Add a key the gateway rotates with the provider's other keys, once the provider accepted it."""
+    provider = _found(store, provider_id)
+    if provider.kind != "ollama" and body.api_key and body.api_key.strip():
+        _verify(checker, provider, body.api_key.strip())
     try:
         key = store.add_key(provider_id, body.api_key, body.label)
     except ProviderError as error:
@@ -356,27 +413,21 @@ def model_catalog(
     ])
 
 
-def _test_model(provider: Provider, mapping: TierMapping, listed: list[str]) -> str | None:
-    fast = mapping.tier("fast")
-    if fast is not None and fast.provider_id == provider.id:
-        return fast.model
-    return defaults.chat_models(provider.kind).get("fast") or (listed[0] if listed else None)
-
-
 @router.post("/providers/{provider_id}/test")
 def test_provider(
     provider_id: str, body: ProviderTestRequest, _: Admin, store: Store, mapping: Mapping,
-    vault: Annotated[SecretVault, Depends(get_vault)], lister: Annotated[Callable, Depends(get_model_lister)],
+    vault: Annotated[SecretVault, Depends(get_vault)], checker: KeyChecker,
     probe: Annotated[Callable, Depends(get_probe)],
 ) -> ProviderTestResult:
     provider = _found(store, provider_id)
     result = {"provider_id": provider_id, "models": [], "model": body.model, "structured_output": False,
               "paid": provider.hosted, "error": None}
     try:
-        result["models"] = lister(provider, _key(vault, provider))
+        result["models"] = checker(provider, _key(vault, provider))
     except ModelListError as error:
         return ProviderTestResult(**result | {"error": str(error)})
-    model = body.model or _test_model(provider, mapping, result["models"])
+    # The smallest chat model it lists answers the check: a large model spends its quota and may take minutes.
+    model = body.model or defaults.probe_model(provider.kind, result["models"], provider.base_url)
     if model is None:
         return ProviderTestResult(**result | {"error": f"{provider.name} lists no model to test"})
     try:

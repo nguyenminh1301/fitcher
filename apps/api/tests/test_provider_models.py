@@ -94,3 +94,37 @@ def test_an_unreachable_server_names_the_error_type_only():
     with pytest.raises(ModelListError, match="ConnectError") as raised:
         list_models(lab, None, client(refuse))
     assert "10.0.0.7" not in str(raised.value)
+
+
+def test_a_refused_key_is_reported_as_refused_with_its_status():
+    gemini = provider("gemini")
+
+    with pytest.raises(ModelListError, match=r"refused the key \(HTTP 400\)"):
+        list_models(gemini, KEY, client(lambda request: httpx.Response(400, json={"error": "API key not valid"})))
+
+
+def test_openrouter_checks_the_key_on_its_key_endpoint_because_its_model_list_is_public():
+    from app.llm.provider_models import checked_models
+
+    sent: list[httpx.Request] = []
+    router = provider("openai_compatible", "https://openrouter.ai/api/v1")
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        sent.append(request)
+        if request.url.path.endswith("/key"):
+            return httpx.Response(401, json={"error": "no auth"})
+        return httpx.Response(200, json={"data": [{"id": "any/model"}]})
+
+    with pytest.raises(ModelListError, match="refused the key"):
+        checked_models(router, "sk-or-wrong", client(handler))
+    assert [request.url.path for request in sent] == ["/api/v1/key"]
+
+
+def test_another_service_is_checked_by_its_model_list_alone():
+    from app.llm.provider_models import checked_models
+
+    sent: list[httpx.Request] = []
+    groq = provider("openai_compatible", "https://api.groq.com/openai/v1")
+
+    assert checked_models(groq, KEY, client(recorder({"data": [{"id": "openai/gpt-oss-20b"}]}, sent))) == ["openai/gpt-oss-20b"]
+    assert [request.url.path for request in sent] == ["/openai/v1/models"]

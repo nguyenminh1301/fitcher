@@ -12,6 +12,7 @@ returns 768 floats.
 """
 
 import re
+from urllib.parse import urlsplit
 
 _CHAT = {
     "openai": {"fast": "gpt-5.4-mini", "sql-small": "gpt-5.4-mini", "sql-gen": "gpt-5.4", "sql-gen-hard": "gpt-5.5"},
@@ -89,3 +90,59 @@ def fixed_dimensions(model: str) -> int | None:
 def proposed_dimensions(model: str) -> int | None:
     """The vector size proposed for an embedding model of ``embedding_model``."""
     return _PROPOSED_DIMENSIONS.get(model)
+
+
+# Words in a model name that mark a model which cannot answer a chat request: speech, images, video, music,
+# embeddings, realtime audio, safety classifiers and agent products.
+_NOT_CHAT = re.compile(
+    r"embed|tts|whisper|transcri|audio|speech|orpheus|image|imagen|veo|lyria|banana|vision-only|realtime|live|"
+    r"guard|moderation|robotics|computer-use|deep-research|aqa|search|dall-e|sora|rerank",
+)
+# Words of models that think, see or hear before they answer: slower to reply to a one-line check.
+_SLOW = re.compile(r"reason|thinking|omni|(^|[-/])vl($|[-:])|code")
+# Size words of small, fast chat models, smallest first; a check sends one request to the first match, so a
+# check neither spends a large model's quota nor waits for it.
+_SMALL = ("flash-lite", "lite", "nano", "mini", "instant", "flash", "small", "air", "haiku", "turbo", "20b", "8b", "7b")
+
+
+def _small_rank(name: str) -> int | None:
+    lowered = name.lower()
+    for rank, word in enumerate(_SMALL):
+        if re.search(rf"(^|[-/_.:]){re.escape(word)}($|[-:_.])", lowered):
+            return rank
+    return None
+
+
+# Free chat models a service serves without listing them, by the host of its base URL: Z.ai lists only its paid
+# models and answers them with "insufficient balance" on a free account, while ``glm-4.5-flash`` is free.
+FREE_CHECK_MODELS = {"api.z.ai": "glm-4.5-flash"}
+
+
+def probe_model(kind: str, listed: list[str], base_url: str | None = None) -> str | None:
+    """The model a provider check asks: a known free model of the service, else the smallest chat model it lists.
+
+    A free model (OpenRouter's ``:free``) is preferred, then one that does not reason or code first, then the
+    smallest size word, then a stable name over
+    a preview and the newest-looking name. Ollama's proposed model is the one it has installed. None when the
+    provider lists no chat model.
+    """
+    if kind == "ollama":
+        return installed_chat_model(listed)
+    host = urlsplit(base_url).hostname if base_url else None
+    if host in FREE_CHECK_MODELS:
+        return FREE_CHECK_MODELS[host]
+    chat = [name for name in listed if not _NOT_CHAT.search(name.lower())]
+    if not chat:
+        return None
+    proposed = _CHAT.get(kind, {}).get("fast")
+    ranked = [(rank, name) for name in chat if (rank := _small_rank(name)) is not None]
+    if not ranked:
+        return proposed if proposed in chat else sorted(chat)[0]
+
+    def order(item: tuple[int, str]) -> tuple:
+        rank, name = item
+        return (not name.endswith(":free"), bool(_SLOW.search(name.lower())), rank, "preview" in name or "exp" in name,
+                not name.endswith("latest"),
+                [-ord(char) for char in name])
+
+    return min(ranked, key=order)[1]
