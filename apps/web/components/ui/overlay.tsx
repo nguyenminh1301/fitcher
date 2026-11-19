@@ -7,6 +7,7 @@ import { createPortal } from "react-dom";
 
 import { Icon } from "@/components/brand/Icon";
 import { cx } from "@/lib/cx";
+import { useI18n } from "@/lib/i18n/react";
 
 const FOCUSABLE = "button:not([disabled]), input:not([disabled]), textarea, select, [tabindex='0']";
 
@@ -88,16 +89,17 @@ export function Overlay({ open, onClose, className, role = "dialog", labelledBy,
  * A modal dialog: a title with a close button, the body and a row of actions. ``wide`` fits a table; on a
  * phone every dialog fills the screen.
  */
-export function Dialog({ open, title, tone, actions, onClose, wide, closeLabel = "Close", children }: {
+export function Dialog({ open, title, tone, actions, onClose, wide, closeLabel, children }: {
   open: boolean; title: string; tone?: "danger"; actions?: ReactNode; onClose?: () => void; wide?: boolean; closeLabel?: string; children?: ReactNode;
 }) {
   const titleId = useId();
+  const { t } = useI18n();
   return (
     <Overlay open={open} onClose={onClose} className={cx("dlg", wide && "dlg-wide")} role={tone === "danger" ? "alertdialog" : "dialog"} labelledBy={titleId}>
       <div className="dlg-head">
         <h2 className="dlg-title" id={titleId}>{title}</h2>
         {onClose ? (
-          <button type="button" className="fc-btn fc-btn-ghost fc-btn-icon fc-btn-sm" aria-label={closeLabel} onClick={onClose}><Icon name="x" /></button>
+          <button type="button" className="fc-btn fc-btn-ghost fc-btn-icon fc-btn-sm" aria-label={closeLabel ?? t("common.close")} onClick={onClose}><Icon name="x" /></button>
         ) : null}
       </div>
       {children ? <div className="dlg-body">{children}</div> : null}

@@ -113,7 +113,7 @@ describe("console layout", () => {
     fireEvent.click(await within(nav()).findByRole("button", { name: "Owner menu" }));
     expect(screen.getByRole("radiogroup", { name: "Theme" })).toBeTruthy();
     expect(screen.queryByRole("menuitem", { name: "Sign out" })).toBeNull();
-    fireEvent.click(screen.getByRole("menuitem", { name: "Security and owner password" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Security" }));
     expect(navigate).toHaveBeenCalledWith("/console/security");
 
     fireEvent.click(within(nav()).getByRole("button", { name: "Owner menu" }));

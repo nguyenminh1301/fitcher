@@ -37,6 +37,10 @@ export const PRESETS: ProviderPreset[] = [
     baseUrl: "https://api.groq.com/openai/v1", keyUrl: "https://console.groq.com/keys",
   },
   {
+    id: "zai", kind: "openai_compatible", name: "Z.ai", group: "service", key: "required",
+    baseUrl: "https://api.z.ai/api/paas/v4", keyUrl: "https://z.ai/manage-apikey/apikey-list",
+  },
+  {
     id: "mistral", kind: "openai_compatible", name: "Mistral", group: "service", key: "required",
     baseUrl: "https://api.mistral.ai/v1", keyUrl: "https://console.mistral.ai/api-keys",
   },

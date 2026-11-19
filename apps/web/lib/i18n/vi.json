@@ -511,7 +511,8 @@
     "about_service": "Một khoá dùng được nhiều mô hình, thường có mô hình miễn phí hoặc giá rẻ.",
     "about_local": "Máy chủ mô hình chạy trên máy này. Không gì rời khỏi máy và không bị tính phí.",
     "about_other": "Bất kỳ dịch vụ hay máy chủ nào dùng API của OpenAI, theo địa chỉ mà nó cung cấp.",
-    "getKey": "Lấy khoá từ {name}"
+    "getKey": "Lấy khoá từ {name}",
+    "openRouterFreeNote": "Model có tên kết thúc bằng :free không tốn tiền: tối đa 50 yêu cầu mỗi ngày, hoặc 1.000 yêu cầu mỗi ngày khi tài khoản đã mua 10 credit."
   },
   "sources": {
     "manyTables": "Nguồn này có {count} bảng. Hãy chọn các bảng cần cho câu hỏi: mỗi bảng thành một mart và làm bản nháp của gói dài hơn.",
@@ -675,24 +676,10 @@
     "name": "Chủ máy",
     "signedIn": "Đã đăng nhập",
     "thisComputer": "Máy này",
-    "securityItem": "Bảo mật và mật khẩu chủ",
+    "securityItem": "Bảo mật",
     "menu": "Menu của chủ máy",
     "removeExposed": "Không gỡ được khi fitcher đang mở cho máy khác.",
     "forgottenConsole": "Quên mật khẩu chủ thì không mở được fitcher: app không có cách lấy lại."
-  },
-  "guide": {
-    "title": "Hướng dẫn lấy khoá OpenRouter",
-    "play": "Phát hướng dẫn",
-    "pause": "Tạm dừng hướng dẫn",
-    "step_signIn": "Đăng nhập ở openrouter.ai",
-    "step_keys": "Mở Settings › Keys",
-    "step_create": "Tạo khoá tên \"fitcher\", để trống giới hạn credit",
-    "step_paste": "Sao chép khoá (chỉ hiện một lần) và dán vào ô bên trên",
-    "freeNote": "Model có tên kết thúc bằng :free không tốn tiền: tối đa 50 yêu cầu mỗi ngày, hoặc 1.000 yêu cầu mỗi ngày khi tài khoản đã mua 10 credit.",
-    "browser": "Trình duyệt minh hoạ",
-    "pick": "Chọn bước",
-    "stepN": "Bước {n}",
-    "caption": "Bước {n}/4: {text}"
   },
   "onboarding": {
     "step_models": "Model",
@@ -807,7 +794,7 @@
     "sqlserverCopy": "Bảng SQL Server được sao chép, không đọc trực tiếp.",
     "host": "Máy chủ",
     "port": "Cổng",
-    "database": "Database",
+    "database": "Cơ sở dữ liệu",
     "user": "Người dùng",
     "password": "Mật khẩu",
     "dockerHint": "Database chạy trên máy này thì dùng host.docker.internal.",

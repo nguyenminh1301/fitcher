@@ -3,12 +3,11 @@
 // The provider list of the setup's Models step (DECISIONS §2, §15) as radio cards. The five most used
 // providers show first; the rest open under "More providers", grouped as model services, servers on this
 // computer and any other OpenAI-compatible endpoint. The chosen card opens its fields underneath: a key with
-// a link to the page that creates it, the address of a server, and OpenRouter's key walkthrough.
+// a link to the page that creates it, the address of a server, and OpenRouter's note on free models.
 
 import { useId, useState } from "react";
 
 import { Icon } from "@/components/brand/Icon";
-import { OpenRouterKeyGuide } from "@/components/models/KeyGuide";
 import { asksAddress, PRESETS, presetById, type ProviderPreset } from "@/components/models/presets";
 import { useI18n } from "@/lib/i18n/react";
 
@@ -137,10 +136,7 @@ function Fields({ preset, apiKey, onApiKey, address, onAddress, error, disabled 
         </div>
       )}
       {preset.id === "openrouter" ? (
-        <>
-          <OpenRouterKeyGuide />
-          <p className="fc-field-help" style={{ margin: 0 }}>{t("guide.freeNote")}</p>
-        </>
+        <p className="fc-field-help" style={{ margin: 0 }}>{t("models.openRouterFreeNote")}</p>
       ) : null}
     </>
   );

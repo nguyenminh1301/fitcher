@@ -147,7 +147,7 @@ describe("account menu", () => {
     const menu = await openAccount();
 
     expect(within(menu).getByRole("menuitem", { name: "Console" })).toBeTruthy();
-    expect(within(menu).getByRole("menuitem", { name: "Security and owner password" })).toBeTruthy();
+    expect(within(menu).getByRole("menuitem", { name: "Security" })).toBeTruthy();
     expect(within(menu).getByRole("radiogroup", { name: "Theme" })).toBeTruthy();
   });
 });

@@ -2,14 +2,21 @@
 
 ## Unreleased
 
+### Added
+
+- Z.ai is offered among the model services when adding a provider, with its OpenAI-compatible endpoint and a link to its key page.
+
 ### Changed
 
+- The owner menu names the Security page "Security" ("Bảo mật" in Vietnamese) instead of "Security and owner password".
 - A menu item with choices, such as Language in the owner menu or "Move to group" on a conversation, opens them in a panel beside the menu on hover or click, with the item's name as its heading and a check mark on the current choice; the arrow keys open and close it. The menu used to be replaced by the choices.
 - A table without a date column, such as a product catalog or a contact list, becomes a dataset of the pack instead of being left out. Its questions are answered over all its rows without asking for a period; a period the question names is dropped with a warning, the Datasets page shows no time column for it, and the pack build no longer fails when the model's draft gives such a table a time column or marks a number column as searchable.
 - The Node dependency audit no longer accepts GHSA-fc5q-39xc-vjpf for picomatch: npm stopped reporting it for the locked versions, so the exception list is empty.
 
 ### Fixed
 
+- A dialog's close button is labelled in the interface language when a page gives no label of its own, and the Vietnamese database connection form asks for the "Cơ sở dữ liệu" instead of the English "Database".
+- Notices in the chat (blocked, denied, failed, empty, lost connection, stopped, model errors) give their title and fixed explanation in the interface language; only a message the api wrote for the question keeps the question's language. A Vietnamese question in an English interface used to show a Vietnamese title under English buttons.
 - After an owner password is set on the Security page, the owner menu offers Sign out and says the browser is signed in without reloading the page; it read the password state only once.
 - When the model does not answer the question (a free model's rate limit, an outage), the chat says so in the question's language with the provider's message and a Try again button; it used to show the raw error in English as if fitcher were asking back, and the run is now recorded as failed.
 - A tab separated CSV file loads; ClickHouse refused it before, so the load failed after the columns were confirmed.
@@ -24,6 +31,10 @@
 - After a failed pack build the Sources page says no pack is turned on and offers "Build the pack", instead of showing only a succeeded sync while the other pages ask to connect data that is already connected; those pages now say the pack is missing and that it is built from the Sources page.
 - Loading icons turn again, including the one above "Building the pack" and the circle of the step that is running; they stood still before.
 - The Feedback page without an active pack no longer logs a feedback store failure with a traceback; the api answers that no pack is active.
+
+### Removed
+
+- The animated walkthrough for creating an OpenRouter key is gone from the setup's provider card; the "Get a key" link and the note on OpenRouter's free models stay.
 
 ## 0.0.3 - 2026-11-18
 

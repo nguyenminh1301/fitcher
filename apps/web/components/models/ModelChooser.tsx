@@ -110,7 +110,7 @@ export function ModelChooser({ models, provider, tiers, onChosen, onLater, meta,
         ) : null}
         {listed ? <div className="pager"><span aria-live="polite">{t("onboarding.modelCount", { shown: shown.length, total: listed.length })}</span></div> : null}
       </div>
-      {openRouter && freeOnly && !setup ? <p className="fc-field-help" style={{ margin: 0 }}>{t("guide.freeNote")}</p> : null}
+      {openRouter && freeOnly && !setup ? <p className="fc-field-help" style={{ margin: 0 }}>{t("models.openRouterFreeNote")}</p> : null}
       {error ? <span className="fc-field-error" role="alert"><Icon name="alert" />{error}</span> : null}
       {setup ? (
         <div className="ob-foot">
