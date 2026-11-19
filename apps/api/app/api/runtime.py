@@ -512,15 +512,16 @@ def _model_missing() -> str | None:
     return None
 
 
-def _compile_instant(pack_dir: Path) -> object:
+def _compile_instant(pack_dir: Path, progress: Callable[[int, int], None] | None = None) -> object:
     """Compile an instant pack as ``pack_admin``, as ``jobs.compile_pack`` does as the admin user."""
     settings = load_settings()
     compiled_dir = Path(settings.compiled_pack_dir)
     with one_job():
-        return _compile_instant_now(pack_dir, settings, compiled_dir)
+        return _compile_instant_now(pack_dir, settings, compiled_dir, progress)
 
 
-def _compile_instant_now(pack_dir: Path, settings, compiled_dir: Path) -> object:
+def _compile_instant_now(pack_dir: Path, settings, compiled_dir: Path,
+                         progress: Callable[[int, int], None] | None = None) -> object:
     lock = compile_lock_path(compiled_dir, pack_dir.name)
     lock.parent.mkdir(parents=True, exist_ok=True)
     lock.write_text(datetime.now(UTC).isoformat(), encoding="utf-8")
@@ -534,7 +535,7 @@ def _compile_instant_now(pack_dir: Path, settings, compiled_dir: Path) -> object
             # With company documents off no chunk is indexed; turning them on again indexes them at the next compile.
             registry=ClickHouseDocumentRegistry(pack_review_client()) if documents_enabled(get_state_db()) else None,
             documents_dir=Path(settings.documents_dir),
-            embedding_alias=label,
+            embedding_alias=label, progress=progress,
         )
     finally:
         lock.unlink(missing_ok=True)

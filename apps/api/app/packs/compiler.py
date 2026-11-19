@@ -329,23 +329,37 @@ def registry_chunks(
     return copied, fresh
 
 
+# Texts embedded per call while compiling, so the progress of a pack with thousands of values moves often.
+PROGRESS_CHUNK = 500
+
+
 def build_generation(
     search: SearchEngine, embeddings: EmbeddingClient, pack: str, documents: dict[str, list[dict]],
-    carried: dict[str, list[dict]] | None = None,
+    carried: dict[str, list[dict]] | None = None, progress: Callable[[int, int], None] | None = None,
 ) -> tuple[int, dict[str, int]]:
     """Create and fill generation N+1 of every collection; delete it again on any failure.
 
-    ``carried`` holds ready points per index, copied with their vectors and not embedded again.
+    ``carried`` holds ready points per index, copied with their vectors and not embedded again. ``progress``
+    hears the texts embedded so far and the total, before the first text and after each chunk.
     """
     carried = carried or {}
     generation = next_generation(search, pack)
     counts: dict[str, int] = {}
+    total = sum(len(documents[index]) for index in INDEX_NAMES)
+    done = 0
+    if progress is not None:
+        progress(done, total)
     try:
         for index in INDEX_NAMES:
             name = alias_name(pack, index)
             search.create(name, generation, embeddings.dimensions)
             docs = documents[index]
-            vectors = embeddings.embed([document["embedding_text"] for document in docs]) if docs else []
+            vectors: list[list[float]] = []
+            for start in range(0, len(docs), PROGRESS_CHUNK):
+                vectors.extend(embeddings.embed([document["embedding_text"] for document in docs[start:start + PROGRESS_CHUNK]]))
+                done += len(docs[start:start + PROGRESS_CHUNK])
+                if progress is not None:
+                    progress(done, total)
             search.write(name, [*points(name, docs, vectors), *carried.get(index, [])], generation)
             counts[index] = search.size(name, generation)
             expected = len(docs) + len(carried.get(index, []))
@@ -400,6 +414,7 @@ def compile_pack(
     registry: DocumentRegistry | None = None,
     documents_dir: Path | None = None,
     embedding_alias: str = "",
+    progress: Callable[[int, int], None] | None = None,
 ) -> CompileSummary:
     """Compile ``pack_dir``; with ``skip_index`` stop after the metric test-run and the access policies.
 
@@ -434,7 +449,7 @@ def compile_pack(
         )
         documents[KB_DOCS].extend(fresh)
     screen_documents(documents, screener or Screener(None), summary)
-    generation, counts = build_generation(search, embeddings, pack.name, documents, {KB_DOCS: carried})
+    generation, counts = build_generation(search, embeddings, pack.name, documents, {KB_DOCS: carried}, progress)
     compiled = CompiledPack(
         pack=pack, generation=generation, embedding_dimensions=embeddings.dimensions,
         coverage=summary.coverage, compiled_at=clock().isoformat(), embedding_alias=embedding_alias,

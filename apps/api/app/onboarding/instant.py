@@ -67,6 +67,10 @@ class InstantJob:
     def _set(self, step: str, state: str) -> None:
         next(item for item in self.steps if item["id"] == step)["state"] = state
 
+    def _progress(self, step: str, done: int, total: int) -> None:
+        """How much of a long step is done: the compile reports the texts it has embedded out of all of them."""
+        next(item for item in self.steps if item["id"] == step).update(done=done, total=total)
+
 
 class InstantWarehouse:
     """A clickhouse-connect client as the profiler's and compiler's ``Warehouse`` and ``AccessControl``."""
@@ -153,7 +157,7 @@ def _first_line(error: BaseException) -> str:
 
 class InstantPipeline:
     def __init__(self, *, store, client, packs_dir: Path, schema_dir: Path, drafter: Callable[[], object],
-                 compile_pack: Callable[[Path], object], activate: Callable[[str], None],
+                 compile_pack: Callable[..., object], activate: Callable[[str], None],
                  model_missing: Callable[[], str | None], clock: Callable[[], datetime] = lambda: datetime.now(UTC)):
         """``drafter`` builds the drafter when the draft step starts; ``model_missing`` says why no model can draft."""
         self._store = store
@@ -299,7 +303,7 @@ class InstantPipeline:
             state["previous"] = previous
         building.rename(target)
         state["swapped"] = True
-        self._compile_pack(target)
+        self._compile_pack(target, progress=lambda done, total: job._progress("compile", done, total))
 
     def _step_activate(self, job: InstantJob, pack: str, building: Path, state: dict) -> None:
         self._activate_pack(pack)
