@@ -140,6 +140,18 @@ describe("Sources page", () => {
     expect(assign).toHaveBeenCalledWith("/");
   });
 
+  it("reads a building pack again until it ends, and shows why it failed", async () => {
+    const building = { ...SHOP, pack: { name: "shop", status: "building" as const, datasets: 0, error: null } };
+    const failed = { ...SHOP, pack: { name: "shop", status: "failed" as const, datasets: 0, error: "embedding limit is used up" } };
+    const sources = fakeSources();
+    sources.list = vi.fn().mockResolvedValueOnce([building]).mockResolvedValue([failed]);
+    show(sources);
+    expect(within(await row("shop")).getByText("Getting ready…")).toBeTruthy();
+
+    expect(await within(await row("shop")).findByText("embedding limit is used up", {}, { timeout: 5000 })).toBeTruthy();
+    expect(within(await row("shop")).getByText("Could not get ready")).toBeTruthy();
+  });
+
   it("shows an empty state with a way to add a source", async () => {
     show(fakeSources([]));
     expect(await screen.findByText("No source yet.")).toBeTruthy();
