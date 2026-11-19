@@ -642,7 +642,8 @@
     "tablesOf_one": "{selected} of {count} table",
     "datasetCount": "{count} datasets",
     "manage": "Manage sources",
-    "answerFrom": "Answer from"
+    "answerFrom": "Answer from",
+    "datasetCount_one": "{count} dataset"
   },
   "owner": {
     "signInTitle": "Open fitcher",

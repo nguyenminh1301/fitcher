@@ -56,7 +56,7 @@ describe("the data source of a new conversation", () => {
     const menu = await screen.findByRole("menu");
 
     const items = within(menu).getAllByRole("menuitem").map((item) => item.textContent);
-    expect(items).toEqual(["shop1 datasets", "crm1 datasets", "Manage sources"]);
+    expect(items).toEqual(["shop1 dataset", "crm1 dataset", "Manage sources"]);
     await act(async () => fireEvent.click(within(menu).getByRole("menuitem", { name: /crm/ })));
     expect(api.auth.choosePack).toHaveBeenCalledWith("crm");
     expect(await screen.findByRole("button", { name: "Source: crm. Choose another" })).toBeTruthy();
