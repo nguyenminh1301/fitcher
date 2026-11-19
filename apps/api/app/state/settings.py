@@ -30,6 +30,10 @@ SPECS: dict[tuple[str, str], SettingSpec] = {
     # The embed tier's model and vector size; changing them needs a full reindex (DECISIONS §14).
     # The optional prompt-injection classifier (DECISIONS §9); the EN/VI rules always run.
     ("screening", "classifier_enabled"): SettingSpec(bool, False),
+    # Where the classifier runs: through a provider (the default) or on this computer (app/screening/engines.py).
+    ("screening", "classifier_engine"): SettingSpec(str, "provider", ("provider", "local_onnx")),
+    ("screening", "classifier_provider_id"): SettingSpec(str),
+    ("screening", "classifier_model"): SettingSpec(str, "meta-llama/llama-prompt-guard-2-86m"),
     # Unset until a provider proposes its embedding model or an admin chooses one.
     ("llm.embedding", "backend"): SettingSpec(str, None, ("local", "provider")),
     ("llm.embedding", "provider_id"): SettingSpec(str),

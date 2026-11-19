@@ -23,6 +23,8 @@ export type { TierChange } from "./tier_change";
 export type { ModeChange } from "./mode_change";
 export type { EmbeddingChange } from "./embedding_change";
 export type { ClassifierStatus } from "./classifier_status";
+export type { ClassifierChange } from "./classifier_change";
+export type { ClassifierDownload } from "./classifier_download";
 export type { DatasetView } from "./dataset_view";
 export type { EvidenceRef, ReviewedSpec, ReviewEvidence, ReviewItem, SpecFilter } from "./review_item";
 export type { ReviewItemPatch } from "./review_item_patch";

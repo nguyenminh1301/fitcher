@@ -2,6 +2,7 @@ import pytest
 
 from app.state import migrate
 from app.state.db import StateDb
+from app.state.settings import Settings
 
 
 def write_changes(directory, **files):
@@ -171,3 +172,19 @@ def test_a_new_instance_records_no_earlier_conversation_pack(tmp_path):
     migrate.apply_pending(db)
     assert db.connection().execute(
         "SELECT count(*) FROM settings WHERE group_name = 'pack' AND key = 'earlier_conversations'").fetchone() == (0,)
+
+
+def test_a_classifier_turned_on_before_the_engines_keeps_running_on_this_computer(tmp_path):
+    db = _state_before(tmp_path, 12)
+    with db.write() as conn:
+        conn.execute("INSERT INTO settings (group_name, key, value, updated_at) VALUES ('screening', 'classifier_enabled', 'true', 'x')")
+
+    migrate.apply_pending(db)
+
+    assert Settings(db).get("screening", "classifier_engine") == "local_onnx"
+
+
+def test_a_new_instance_runs_the_classifier_through_a_provider(tmp_path):
+    db = StateDb(tmp_path / "app.db")
+    migrate.apply_pending(db)
+    assert Settings(db).get("screening", "classifier_engine") == "provider"

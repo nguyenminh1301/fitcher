@@ -11,7 +11,7 @@ describe("generated contract types", () => {
   it("covers the backend contracts", () => {
     expect(schemas.sort()).toEqual([
       "ask_event.schema.json", "ask_request.schema.json", "audit_row.schema.json", "chart_spec.schema.json",
-      "classifier_status.schema.json", "conversation.schema.json", "conversation_group.schema.json",
+      "classifier_change.schema.json", "classifier_download.schema.json", "classifier_status.schema.json", "conversation.schema.json", "conversation_group.schema.json",
       "conversation_patch.schema.json", "conversation_thread.schema.json", "cost_row.schema.json",
       "dataset_view.schema.json", "document_list.schema.json", "document_roles_change.schema.json",
       "document_settings.schema.json", "document_settings_change.schema.json",

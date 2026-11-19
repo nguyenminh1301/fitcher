@@ -42,7 +42,7 @@ This document states the target. §16 lists each decision that differs from the 
 | LLM gateway | LiteLLM Python SDK inside `api` | one client for every provider; no proxy service |
 | Model | OpenAI, Anthropic, Gemini, Ollama and any OpenAI-compatible endpoint (LM Studio, OpenRouter and similar) | providers and keys are entered in the application (§15); chat tiers are called through the gateway |
 | Embeddings | A connected provider's embedding model by default; a local multilingual model through fastembed when no connected provider offers one, or by choice | the local models lost retrieval recall against the provider model ([local-embedding-report.md](eval/local-embedding-report.md)), so indexing a pack needs a key unless the provider is a local model server or the local model is chosen; changing the model needs a full reindex (§14) |
-| Input screening | EN/VI rules always; Llama Prompt Guard 2 86M (local ONNX) as an option | a security classifier, not an answering model (§9) |
+| Input screening | EN/VI rules always; Llama Prompt Guard 2 86M as an option, through a provider or as a local ONNX model | a security classifier, not an answering model (§9) |
 | Data database | ClickHouse | databases `raw`, `marts`; sources attached through engines or copied (§4) |
 | Logs / audit | ClickHouse | database `agent_logs`, dedicated user, 90-day TTL |
 | Semantic search | ClickHouse | database `search`: exact dense + BM25 sparse scoring fused with RRF, one table per collection generation, dedicated user; measured against Qdrant before it was removed (§14, §16) |
@@ -182,7 +182,7 @@ Documents are runtime content managed in the application, not files in Git; the 
 
 Nodes in order:
 
-0. **screen** (deterministic rules, plus the local classifier when it is enabled, §9): screens the new question before any LLM call. `block` ends the run with a `blocked` reply; `flag` continues and is logged.
+0. **screen** (deterministic rules, plus the classifier when it is enabled, §9): screens the new question before any LLM call. `block` ends the run with a `blocked` reply; `flag` continues and is logged.
 1. **load_context**: load business_profile (always), the last N chat turns, and the previous turn's QuerySpec and result.
 2. **router** (`fast`, structured output). Classifies intent as one of four:
    - `data_query`
@@ -335,9 +335,12 @@ Principles:
 - Retrieved content (documents, column values) is **data, not instructions**. Prompts must state this explicitly to resist prompt injection, and the LLM client sends instructions in a `system` message and untrusted content in the `user` message.
 - **Layer 0, input screening** (before any LLM call):
   - Screened: every new question (graph node `screen`), and document chunks and low-cardinality column values when they are indexed. History is not screened again: each turn was screened when asked, and a blocked turn is not stored. Reviewed pack content is trusted.
-  - Screener: EN/VI rules on folded text (known attack phrases, fake prompt boundaries), then the local classifier score over 512-token windows. Verdicts `allow`, `flag` and `block` by thresholds in `.env`; a rule hit blocks.
+  - Screener: EN/VI rules on folded text (known attack phrases, fake prompt boundaries), then the classifier's score over windows of its 512-token input; a text's score is its highest window's. Verdicts `allow`, `flag` and `block` by thresholds in `.env`; a rule hit blocks.
   - `SCREEN_MODE=log` records verdicts without blocking; `enforce` blocks. Enforcement starts only after `screen_eval.py` shows no false positive on the benign set and at least 90% recall on the attack set, in English and in Vietnamese.
-  - The classifier is optional. An instance starts with rules only; the owner can download and enable the classifier. **Fail closed:** when the classifier is enabled and cannot run, no question reaches an LLM; the reply is the `blocked` notice that screening is unavailable.
+  - The classifier is optional. An instance starts with rules only; the owner turns the classifier on on the Security page with one of two engines:
+    - **Through a provider** (the default): a configured provider that hosts Llama Prompt Guard 2 86M, such as Groq's `meta-llama/llama-prompt-guard-2-86m`, which replies with the malicious probability as a number. The text goes to that provider as it is, like a question goes to the answering model, and each call is an `llm_calls` row of the `screen` tier.
+    - **On this computer**: the model exported to ONNX and quantized, downloaded from the app from one pinned revision of `gravitee-io/Llama-Prompt-Guard-2-86M-onnx` (not gated, Llama 4 Community License). The download checks each file's size and SHA-256 against the pinned values and runs the screener's own check (benign questions below 0.5, an attack above) before the model replaces an earlier one. The Compose development stack can still export the gated original with the `guard-model` job.
+  - **Fail closed:** when the classifier is enabled and cannot score (no model, no provider, a failed call or a reply that is not a score), no question reaches an LLM; the reply is the `blocked` notice that screening is unavailable.
   - A blocked chunk is not indexed. A flagged column value is reported by the compiler and still indexed, because it is real data the filters need.
   - The LLM client in `api` is the only code that calls a provider. It rejects any call without `screening` metadata and reruns the rules on the whole request, which closes code paths that forgot to screen; it is not an authentication boundary.
   - Out of scope: scanning model output, and fine-tuning the classifier.

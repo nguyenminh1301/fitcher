@@ -248,7 +248,7 @@ def get_screener() -> Screener:
     global _screener
     with _screener_lock:
         if _screener is None:
-            _screener = Screener.from_settings(load_settings())
+            _screener = Screener.from_settings(load_settings(), call_log=_call_log)
         return _screener
 
 

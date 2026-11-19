@@ -1,0 +1,47 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "enabled": {
+      "title": "Enabled",
+      "type": "boolean"
+    },
+    "engine": {
+      "default": "provider",
+      "enum": [
+        "provider",
+        "local_onnx"
+      ],
+      "title": "Engine",
+      "type": "string"
+    },
+    "provider_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Provider Id"
+    },
+    "model": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Model"
+    }
+  },
+  "required": [
+    "enabled"
+  ],
+  "title": "ClassifierChange",
+  "type": "object"
+}

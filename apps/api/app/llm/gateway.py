@@ -234,6 +234,44 @@ def _attempts_text(tier: str, attempts: Sequence[tuple[str, str]]) -> str:
     return f"every model of the {tier} tier failed: {listed}"
 
 
+CLASSIFIER_TIER = "screen"
+
+
+def classifier_reply(route: Route, text: str, *, call_log: CallLog | None = None,
+                     completion: Callable[..., Any] | None = None, timeout: float = 30.0, retries: int = 1) -> str:
+    """The reply of a prompt-injection classifier model (such as Llama Prompt Guard) to one untrusted text.
+
+    This is the screen itself, so the text is sent as it is: the screening metadata and rules checks that guard
+    the answering models do not apply, and nothing else is added to the request. The model answers with a score,
+    never with text that reaches another model. The call writes its ``llm_calls`` row under the ``screen`` tier.
+    """
+    started_at, started = calls.now(), time.monotonic()
+
+    def log(status: str, error: str = "", response: Any = None, cost: float | None = None) -> None:
+        calls.write(call_log, calls.call_record(
+            metadata=llm_metadata(), tier=CLASSIFIER_TIER, provider=route.provider, model=route.model,
+            started_at=started_at, latency_ms=round((time.monotonic() - started) * 1000), status=status, error=error,
+            response=response, cost=cost, call_id=uuid.uuid4().hex,
+        ))
+
+    try:
+        response = (completion or _sdk_completion)(
+            model=route.model, api_key=route.api_key, api_base=route.api_base, timeout=timeout, num_retries=retries,
+            drop_params=True, messages=[{"role": "user", "content": text}],
+        )
+    except Exception as error:  # noqa: BLE001 - reported by type only, like every provider failure
+        kind = error_type(error)
+        log("failure", kind)
+        raise LLMError(f"classifier model {route.model} failed: {failure_text(kind)}") from None
+    log("success", response=response, cost=calls.estimate_cost(response, route.model, "completion"))
+    choices = calls.field(response, "choices")
+    message = calls.field(choices[0], "message") if isinstance(choices, list) and choices else None
+    content = calls.field(message, "content")
+    if not isinstance(content, str):
+        raise LLMError(f"classifier model {route.model} returned no score")
+    return content
+
+
 class Gateway:
     """Chat calls to a tier's model."""
 
