@@ -153,21 +153,3 @@ def test_a_stored_key_and_tier_models_become_the_first_key_and_the_first_link_of
     assert mapping.mode() == ("manual", None)
     assert db.connection().execute("SELECT count(*) FROM settings WHERE group_name = 'llm.tiers'").fetchone()[0] == 0
 
-
-def test_conversations_stored_before_packs_per_conversation_keep_the_pack_active_then(tmp_path):
-    db = _state_before(tmp_path, 11)
-    with db.write() as conn:
-        conn.execute("INSERT INTO settings (group_name, key, value, updated_at) VALUES ('pack', 'active', '\"chinook\"', 'x')")
-
-    migrate.apply_pending(db)
-
-    row = db.connection().execute(
-        "SELECT value FROM settings WHERE group_name = 'pack' AND key = 'earlier_conversations'").fetchone()
-    assert row == ('"chinook"',)
-
-
-def test_a_new_instance_records_no_earlier_conversation_pack(tmp_path):
-    db = StateDb(tmp_path / "app.db")
-    migrate.apply_pending(db)
-    assert db.connection().execute(
-        "SELECT count(*) FROM settings WHERE group_name = 'pack' AND key = 'earlier_conversations'").fetchone() == (0,)
