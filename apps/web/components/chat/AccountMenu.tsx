@@ -4,7 +4,7 @@
 // the theme and language, the chat, the console and the Security page, and signing out once an owner password
 // is set. While sign-in runs on sample data it also offers the pack's demo identities.
 
-import { useEffect, useState, type MouseEvent } from "react";
+import { useCallback, useEffect, useState, type MouseEvent } from "react";
 
 import { Icon } from "@/components/brand/Icon";
 import { Segmented } from "@/components/ui/controls";
@@ -25,9 +25,11 @@ export function AccountMenu({ onConsole, onChat, onSecurity }: { onConsole?: () 
   const [anchor, setAnchor] = useState<HTMLElement | null>(null);
   // Signing out is offered only once the owner has set a password; without one there is no session.
   const [password, setPassword] = useState(false);
-  useEffect(() => {
+  // Read again whenever the menu opens: a password set or removed on the Security page changes what it offers.
+  const refresh = useCallback(() => {
     void api.owner.status().then((status) => setPassword(status.password_set && status.signed_in)).catch(() => setPassword(false));
   }, [api]);
+  useEffect(refresh, [refresh]);
   const sample = isSample("auth", sources) && Boolean(identity);
   // The demo's identities keep their names; the owner is "Owner".
   const name = sample && identity ? identity.display_name : t("owner.name");
@@ -67,7 +69,10 @@ export function AccountMenu({ onConsole, onChat, onSecurity }: { onConsole?: () 
   );
 
   const label = t("owner.menu");
-  const toggle = (event: MouseEvent<HTMLElement>) => setAnchor(anchor ? null : event.currentTarget);
+  const toggle = (event: MouseEvent<HTMLElement>) => {
+    if (!anchor) refresh();
+    setAnchor(anchor ? null : event.currentTarget);
+  };
   return (
     <>
       <button type="button" className="acct" aria-label={label} aria-haspopup="menu" aria-expanded={!!anchor} onClick={toggle}>
