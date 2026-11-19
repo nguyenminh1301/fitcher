@@ -22,6 +22,12 @@ TEXT = "text/plain"
 MEDIA_TYPES = (PDF, DOCX, XLSX, MARKDOWN, TEXT)
 MAX_PDF_PAGES = 500
 MAX_SHEET_ROWS = 50_000
+# An Office archive is refused before anything is parsed when its members would expand past these limits, so a
+# decompression bomb (a few megabytes that inflate to gigabytes of sheet XML) costs a read of its directory.
+# A real workbook's XML compresses about 5 to 30 times; a member under the ratio floor is never judged by ratio.
+MAX_OFFICE_UNCOMPRESSED_BYTES = 1024 * 1024 * 1024
+MAX_OFFICE_RATIO = 100
+OFFICE_RATIO_FLOOR_BYTES = 1024 * 1024
 _MARKDOWN_NAMES = (".md", ".markdown")
 _HEADING = re.compile(r"^(#{1,6})\s+(.+?)\s*#*\s*$")
 _DOCX_HEADING = re.compile(r"^Heading (\d)$")
@@ -47,10 +53,27 @@ def _unsupported() -> DocumentRejected:
     return DocumentRejected("the file is not a supported type (PDF, DOCX, XLSX, Markdown or UTF-8 text)", 415)
 
 
+def _check_expansion(archive: zipfile.ZipFile) -> None:
+    """Refuse an archive whose central directory declares too much uncompressed data or too high a ratio.
+
+    The declared sizes bound what is read: Python's zip reader returns at most a member's declared size.
+    """
+    members = archive.infolist()
+    if sum(member.file_size for member in members) > MAX_OFFICE_UNCOMPRESSED_BYTES:
+        raise DocumentRejected(
+            f"the file expands to more than {MAX_OFFICE_UNCOMPRESSED_BYTES} bytes when unpacked", 413)
+    for member in members:
+        if member.file_size > OFFICE_RATIO_FLOOR_BYTES and member.file_size > MAX_OFFICE_RATIO * max(member.compress_size, 1):
+            raise DocumentRejected(
+                f"the file is compressed more than {MAX_OFFICE_RATIO} times, which a real document is not", 413)
+
+
 def _office_type(data: bytes | BinaryIO) -> str:
-    """DOCX or XLSX for an Office Open XML archive given as bytes or as a seekable file; macros are refused."""
+    """DOCX or XLSX for an Office Open XML archive given as bytes or as a seekable file; macros and archives
+    that would expand past the limits above are refused."""
     try:
         archive = zipfile.ZipFile(BytesIO(data) if isinstance(data, bytes) else data)
+        _check_expansion(archive)
         names = set(archive.namelist())
         content_types = archive.read("[Content_Types].xml").decode("utf-8", "replace") if "[Content_Types].xml" in names else ""
     except zipfile.BadZipFile:

@@ -14,6 +14,7 @@ read with openpyxl in read-only mode, first sheet only, and sent as CSV; formula
 import csv
 from datetime import UTC, date, datetime, time
 import hashlib
+from itertools import islice
 from io import BytesIO, StringIO
 import logging
 from pathlib import Path
@@ -36,6 +37,8 @@ HEAD_BYTES = 64 * 1024
 CHUNK_BYTES = 1024 * 1024
 SAMPLE_ROWS = 5
 INFERENCE_ROWS = 1000
+# Rows of a sheet read, empty ones included, while looking for the header and the inference sample.
+INFERENCE_SCAN_ROWS = 20_000
 MAX_TABLE_NAME = 40
 DELIMITERS = (",", ";", "\t", "|")
 # A column type is interpolated into DDL, so only these shapes pass.
@@ -171,8 +174,11 @@ def _cell(value) -> str:
     return str(value)
 
 
-def workbook_rows(data: bytes | BinaryIO) -> tuple[list[str], Iterator[list[str]]]:
-    """The header and the rows of the first sheet with data, as text; formulas show their cached values."""
+def workbook_rows(data: bytes | BinaryIO, max_rows: int | None = None) -> tuple[list[str], Iterator[list[str]]]:
+    """The header and the rows of the first sheet with data, as text; formulas show their cached values.
+
+    ``max_rows`` stops each sheet after that many rows, empty ones included, so a sample never reads a whole sheet.
+    """
     from openpyxl import load_workbook
 
     try:
@@ -180,7 +186,7 @@ def workbook_rows(data: bytes | BinaryIO) -> tuple[list[str], Iterator[list[str]
     except Exception as error:  # noqa: BLE001 - openpyxl raises many types for a corrupt workbook
         raise DocumentRejected(f"the workbook cannot be read: {type(error).__name__}") from None
     for sheet in book.worksheets:
-        rows = sheet.iter_rows(values_only=True)
+        rows = islice(sheet.iter_rows(values_only=True), max_rows)
         header = None
         for row in rows:
             if any(cell not in (None, "") for cell in row):
@@ -307,7 +313,7 @@ class FileService:
             sample = pq.ParquetFile(path).read_row_group(0).slice(0, SAMPLE_ROWS).to_pylist() if pq.ParquetFile(path).num_row_groups else []
             return columns, [[None if row[c.name] is None else str(row[c.name]) for c in columns] for row in sample]
         if kind == "xlsx":
-            header, rows = workbook_rows(path.open("rb"))
+            header, rows = workbook_rows(path.open("rb"), max_rows=INFERENCE_SCAN_ROWS)
             kept = []
             for row in rows:
                 kept.append(row)

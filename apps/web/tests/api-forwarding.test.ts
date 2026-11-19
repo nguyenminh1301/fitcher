@@ -25,4 +25,16 @@ describe("headers the web server forwards to the api", () => {
 
     expect(forwarded.get("x-forwarded-host")).toBe("evil.example:3000");
   });
+
+  it("passes the proxy evidence the web server recorded, so the api refuses a proxied loopback host", () => {
+    const forwarded = browserHeaders(new Headers({ host: "127.0.0.1:3002", "x-fitcher-proxy": "connection: close" }));
+
+    expect(forwarded.get("x-fitcher-proxy")).toBe("connection: close");
+  });
+
+  it("passes a proxy's forwarded-for list, which the api reads only from a trusted proxy", () => {
+    const forwarded = browserHeaders(new Headers({ host: "fitcher.example.com", "x-forwarded-for": "203.0.113.5" }));
+
+    expect(forwarded.get("x-forwarded-for")).toBe("203.0.113.5");
+  });
 });

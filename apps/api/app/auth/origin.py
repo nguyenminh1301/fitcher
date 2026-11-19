@@ -21,6 +21,13 @@ deliver them from elsewhere). The peer is the connection's address, or the
 connection's address on every request (``apps/web/peer-address.cjs``); the api
 listens on loopback or on the Compose network, so only the web server reaches it.
 
+A reverse proxy or tunnel on this computer connects to the published port like a local browser does, and a
+stock nginx ``proxy_pass`` even rewrites ``Host`` to the loopback address it forwards to, so the internet it
+relays would pass for this computer. The same hook therefore writes ``X-Fitcher-Proxy``: the signs that a proxy
+relayed the request (forwarding headers, ``Connection: close``, HTTP/1.0). A request carrying any of them whose
+browser host is a loopback name is refused; a proxy must send the public name, which ``FITCHER_ALLOWED_HOSTS``
+lists and which needs the owner password.
+
 A listed ``FITCHER_ALLOWED_HOSTS`` name makes the instance reachable by others,
 which ``/me`` reports as ``exposed`` so the interface can warn.
 
@@ -47,6 +54,7 @@ from app.state.db import shared_state
 LOOPBACK = frozenset({"localhost", "127.0.0.1", "::1"})
 SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
 PEER_HEADER = "x-fitcher-peer"
+PROXY_HEADER = "x-fitcher-proxy"
 ROUTE_TABLE = Path("/proc/net/route")
 
 
@@ -62,15 +70,28 @@ def internal_hosts(env: Mapping[str, str] | None = None) -> frozenset[str]:
     return _names((os.environ if env is None else env).get("FITCHER_INTERNAL_HOSTS"))
 
 
-def trusted_peers(env: Mapping[str, str] | None = None) -> list:
-    """The networks of ``FITCHER_TRUSTED_PEERS``; an entry that is not an address or a network is ignored."""
+def _networks(name: str, env: Mapping[str, str] | None) -> list:
     networks = []
-    for entry in _names((os.environ if env is None else env).get("FITCHER_TRUSTED_PEERS")):
+    for entry in _names((os.environ if env is None else env).get(name)):
         try:
             networks.append(ip_network(entry, strict=False))
         except ValueError:
             continue
     return networks
+
+
+def trusted_peers(env: Mapping[str, str] | None = None) -> list:
+    """The networks of ``FITCHER_TRUSTED_PEERS``; an entry that is not an address or a network is ignored."""
+    return _networks("FITCHER_TRUSTED_PEERS", env)
+
+
+def trusted_proxies(env: Mapping[str, str] | None = None) -> list:
+    """The networks of ``FITCHER_TRUSTED_PROXIES``, the reverse proxies whose ``X-Forwarded-For`` names the client."""
+    return _networks("FITCHER_TRUSTED_PROXIES", env)
+
+
+def _in(address, networks: list) -> bool:
+    return any(address.version == network.version and address in network for network in networks)
 
 
 @cache
@@ -107,8 +128,33 @@ def local_peer(value: str | None) -> bool:
     address = peer_address(value)
     if address is None:
         return False
-    return (address.is_loopback or address in default_gateways()
-            or any(address.version == network.version and address in network for network in trusted_peers()))
+    return address.is_loopback or address in default_gateways() or _in(address, trusted_peers())
+
+
+def at_this_computer(browser_host: str, peer: str | None, proxy: str | None) -> bool:
+    """Whether a request comes from a browser on this computer: a loopback name, a local peer and no proxy."""
+    return hostname(browser_host) in LOOPBACK and local_peer(peer) and not (proxy or "").strip()
+
+
+def client_address(peer: str | None, forwarded_for: str | None) -> str:
+    """The client a request comes from: the peer, or the address a trusted proxy names in ``X-Forwarded-For``.
+
+    The list is read from its right end, where each trusted proxy appended the address it received the request
+    from; the first address that is not itself a trusted proxy is the client, since anything left of it was
+    written by the client.
+    """
+    address = peer_address(peer)
+    if address is None:
+        return (peer or "unknown").strip() or "unknown"
+    proxies = trusted_proxies()
+    for entry in reversed((forwarded_for or "").split(",")):
+        if not _in(address, proxies):
+            break
+        named = peer_address(entry)
+        if named is None:
+            break
+        address = named
+    return str(address)
 
 
 def exposed(env: Mapping[str, str] | None = None) -> bool:
@@ -129,14 +175,19 @@ def https_forwarded(headers: Mapping[str, str]) -> bool:
     return bool(allowed_hosts()) and headers.get("x-forwarded-proto", "").strip().lower() == "https"
 
 
-def refusal(method: str, host: str, forwarded: str | None, origin: str | None, peer: str | None = None) -> str | None:
-    """Why a request is refused, or None when it is accepted."""
+def refusal(method: str, host: str, forwarded: str | None, origin: str | None, peer: str | None = None,
+            proxy: str | None = None) -> str | None:
+    """Why a request is refused, or None when it is accepted; ``proxy`` lists the signs of a relaying proxy."""
     accepted = LOOPBACK | allowed_hosts() | internal_hosts()
     browser_host = forwarded if forwarded is not None else host
     for value in (host, browser_host):
         if not value or hostname(value) not in accepted:
             return (f"the host {value!r} is not allowed; reach the instance through localhost or list the name "
                     "in FITCHER_ALLOWED_HOSTS")
+    if (proxy or "").strip() and hostname(browser_host) in LOOPBACK:
+        return (f"the request names {browser_host!r} but came through a reverse proxy ({proxy.strip()}), so it is not "
+                "this computer; make the proxy send the public host name (nginx: proxy_set_header Host $host), "
+                "list it in FITCHER_ALLOWED_HOSTS and set an owner password")
     claimed = next((value for value in (browser_host, host) if hostname(value) in LOOPBACK), None)
     if claimed is not None and not local_peer(peer):
         return (f"the request names {claimed!r} but comes from {peer!r}, which is not this computer; "
@@ -196,7 +247,8 @@ class HostOriginGuard:
         client = scope.get("client")
         peer = headers.get(PEER_HEADER, client[0] if client else None)
         forwarded = headers.get("x-forwarded-host")
-        reason = refusal(scope["method"], headers.get("host", ""), forwarded, headers.get("origin"), peer)
+        reason = refusal(scope["method"], headers.get("host", ""), forwarded, headers.get("origin"), peer,
+                         headers.get(PROXY_HEADER))
         refused = (403, reason) if reason is not None else owner_refusal(
             scope["method"], scope["path"], forwarded if forwarded is not None else headers.get("host", ""), headers.get("cookie"))
         if refused is None:

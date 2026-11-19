@@ -118,6 +118,38 @@ def test_a_loopback_host_claimed_by_another_machine_is_refused(client, peer):
     assert "FITCHER_TRUSTED_PEERS" in response.json()["detail"]
 
 
+@pytest.mark.parametrize("evidence", ["x-forwarded-for", "via", "connection: close", "http/1.0"])
+def test_a_loopback_host_relayed_by_a_proxy_on_this_computer_is_refused(client, evidence):
+    proxied = {"X-Forwarded-Host": "127.0.0.1:3002", "X-Fitcher-Peer": "172.17.0.1", "X-Fitcher-Proxy": evidence}
+
+    session = client.get("/me", headers=proxied)
+    password = client.put("/owner/password", json={"new_password": "attacker-owns-this"},
+                          headers={**proxied, "Origin": "http://127.0.0.1:3002"})
+
+    assert session.status_code == 403 and "reverse proxy" in session.json()["detail"]
+    assert password.status_code == 403
+    assert client.get("/owner/status").json()["password_set"] is False
+
+
+def test_a_request_without_proxy_evidence_from_the_gateway_is_still_this_computer(client):
+    local = {"X-Forwarded-Host": "localhost:3000", "X-Fitcher-Peer": "172.17.0.1", "X-Fitcher-Proxy": ""}
+
+    assert client.get("/me", headers=local).status_code == 200
+    assert client.put("/owner/password", json={"new_password": PASSWORD},
+                      headers={**local, "Origin": "http://localhost:3000"}).status_code == 204
+
+
+def test_a_proxy_that_sends_an_allowed_public_name_reaches_the_owner_password(client, monkeypatch):
+    monkeypatch.setenv("FITCHER_ALLOWED_HOSTS", "fitcher.example.com")
+    proxied = {"X-Forwarded-Host": "fitcher.example.com", "X-Fitcher-Peer": "172.17.0.1",
+               "X-Fitcher-Proxy": "x-forwarded-for, connection: close"}
+
+    assert client.get("/me", headers=proxied).status_code == 403
+    assert client.get("/owner/status", headers=proxied).json()["password_set"] is False
+    owner.set_password(shared_state(), PASSWORD)
+    assert client.get("/me", headers=proxied).status_code == 401
+
+
 def test_a_loopback_host_behind_an_internal_forwarded_host_still_needs_a_local_peer(client, monkeypatch):
     monkeypatch.setenv("FITCHER_INTERNAL_HOSTS", "api")
     headers = {"Host": "localhost:8000", "X-Forwarded-Host": "api:8000", "X-Fitcher-Peer": "172.17.0.9"}
@@ -168,3 +200,13 @@ def test_the_default_gateway_is_read_from_the_route_table(tmp_path):
 
     assert origin.default_gateways.__wrapped__(table) == frozenset({ip_address("172.17.0.1"), ip_address("172.19.0.1")})
     assert origin.default_gateways.__wrapped__(tmp_path / "missing") == frozenset()
+
+
+def test_the_client_behind_a_trusted_proxy_is_the_last_address_it_did_not_add(monkeypatch):
+    monkeypatch.setenv("FITCHER_TRUSTED_PROXIES", "172.17.0.1, 10.0.0.0/8")
+
+    assert origin.client_address("172.17.0.1", "198.51.100.1, 203.0.113.5, 10.2.3.4") == "203.0.113.5"
+    assert origin.client_address("172.17.0.1", "not-an-address") == "172.17.0.1"
+    assert origin.client_address("172.17.0.1", None) == "172.17.0.1"
+    assert origin.client_address("192.168.1.9", "203.0.113.5") == "192.168.1.9"
+    assert origin.client_address("::ffff:172.17.0.1", "203.0.113.5") == "203.0.113.5"

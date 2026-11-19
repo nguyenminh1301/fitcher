@@ -136,7 +136,8 @@ describe("onboarding routes", () => {
     const call = calls.at(-1) as Call;
     expect(call.url).toBe("http://api:8000/documents");
     expect(new Headers(call.init.headers).get("content-type")).toMatch(/^multipart\/form-data; boundary=/);
-    expect(new TextDecoder().decode(call.init.body as ArrayBuffer)).toContain('name="allowed_roles"');
+    expect(call.init.body).toBeInstanceOf(ReadableStream);
+    expect(await new Response(call.init.body as ReadableStream).text()).toContain('name="allowed_roles"');
     expect(new Headers(call.init.headers).get("cookie")).toBe(`${SESSION_COOKIE}=s-1`);
   });
 

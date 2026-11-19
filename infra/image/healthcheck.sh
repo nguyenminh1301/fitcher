@@ -3,19 +3,22 @@
 set -a
 . /data/secrets/api.env 2>/dev/null || exit 1
 set +a
+# http.client, not urllib: urllib asks for `Connection: close`, which the web server reads as a reverse proxy.
 exec python - <<'PY'
-import os, sys, urllib.request
+import http.client, os, sys
 
 checks = {
-    "web": "http://127.0.0.1:3000/",
-    "api": "http://127.0.0.1:8000/health",
-    "clickhouse": f"http://{os.environ['CLICKHOUSE_HOST']}:{os.environ['CLICKHOUSE_HTTP_PORT']}/ping",
+    "web": ("127.0.0.1", 3000, "/"),
+    "api": ("127.0.0.1", 8000, "/health"),
+    "clickhouse": (os.environ["CLICKHOUSE_HOST"], int(os.environ["CLICKHOUSE_HTTP_PORT"]), "/ping"),
 }
-for name, url in checks.items():
+for name, (host, port, path) in checks.items():
+    connection = http.client.HTTPConnection(host, port, timeout=3)
     try:
-        with urllib.request.urlopen(url, timeout=3) as response:
-            if response.status >= 400:
-                raise OSError(f"status {response.status}")
+        connection.request("GET", path)
+        status = connection.getresponse().status
+        if status >= 400:
+            raise OSError(f"status {status}")
     except Exception as error:
         print(f"{name} does not answer: {error}", file=sys.stderr)
         sys.exit(1)

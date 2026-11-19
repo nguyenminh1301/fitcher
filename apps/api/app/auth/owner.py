@@ -8,8 +8,10 @@ requests until a password is set, and keeps its password while it stays reachabl
 The password is stored as an Argon2id hash. A session id is 32 random bytes sent in an ``HttpOnly``,
 ``SameSite=Strict`` cookie; the app state keeps only its SHA-256 with its creation and last-use times. A
 session ends after 12 hours without a request, 30 days after it started, on sign-out and whenever the password
-changes or is removed. Sign-in attempts are counted per client address over a 15-minute window before the
-password is checked; a successful attempt releases only its own count.
+changes or is removed. Sign-in attempts are counted per client over a 15-minute window before the password is
+checked; a successful attempt releases only its own count. The owner at this computer is one client of its own, so
+wrong passwords sent through the published port from anywhere else never lock them out; the other clients also
+share a global limit, a backstop against a guesser that spreads its attempts over many addresses.
 """
 
 from collections.abc import Callable
@@ -32,6 +34,8 @@ LIFETIME_SECONDS = 30 * 24 * 3600
 TOUCH_SECONDS = 60
 WINDOW_SECONDS = 15 * 60
 FAILURE_LIMIT = 10
+GLOBAL_FAILURE_LIMIT = 100
+LOCAL_KEY = "local"
 
 Clock = Callable[[], float]
 _hasher = PasswordHasher()
@@ -132,23 +136,31 @@ def session_valid(db: StateDb, token: str | None, clock: Clock = time.time) -> b
 
 
 class SignInThrottle:
-    """Counts each sign-in attempt of a client address before its password is checked."""
+    """Counts each sign-in attempt of a client before its password is checked."""
 
     def __init__(self, db: StateDb, clock: Clock = time.time):
         self._db = db
         self._clock = clock
 
-    def reserve(self, address: str) -> tuple[int, list[int]]:
-        """``(0, rows)`` when the attempt may go ahead, or ``(seconds, [])`` until an attempt is accepted again."""
-        key = f"address:{address}"
+    def reserve(self, address: str | None) -> tuple[int, list[int]]:
+        """``(0, rows)`` when the attempt may go ahead, or ``(seconds, [])`` until an attempt is accepted again.
+
+        ``address`` is the client's address, or None for the owner at this computer, whose attempts count apart
+        and are not held by the global limit.
+        """
+        key = LOCAL_KEY if address is None else f"address:{address}"
         now = self._clock()
         with self._db.write() as conn:
             conn.execute("DELETE FROM sign_in_failures WHERE failed_at <= ?", (now - WINDOW_SECONDS,))
-            times = [row[0] for row in conn.execute(
-                "SELECT failed_at FROM sign_in_failures WHERE key = ? ORDER BY failed_at DESC", (key,))]
-            if len(times) >= FAILURE_LIMIT:
-                # Accepted again when the failure that reached the limit leaves the window.
-                return math.ceil(times[FAILURE_LIMIT - 1] + WINDOW_SECONDS - now), []
+            limits = [(FAILURE_LIMIT, [row[0] for row in conn.execute(
+                "SELECT failed_at FROM sign_in_failures WHERE key = ? ORDER BY failed_at DESC", (key,))])]
+            if address is not None:
+                limits.append((GLOBAL_FAILURE_LIMIT, [row[0] for row in conn.execute(
+                    "SELECT failed_at FROM sign_in_failures WHERE key != ? ORDER BY failed_at DESC", (LOCAL_KEY,))]))
+            # Accepted again when the failure that reached a limit leaves the window.
+            waits = [math.ceil(times[limit - 1] + WINDOW_SECONDS - now) for limit, times in limits if len(times) >= limit]
+            if waits:
+                return max(waits), []
             row = conn.execute("INSERT INTO sign_in_failures (key, failed_at) VALUES (?, ?)", (key, now)).lastrowid
         return 0, [row]
 
