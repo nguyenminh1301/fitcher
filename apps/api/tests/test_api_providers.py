@@ -352,3 +352,56 @@ def test_an_ollama_server_without_a_chat_model_is_not_added(client, fakes):
     response = client.post("/providers", headers=ADMIN, json={"kind": "ollama", "base_url": "http://host.docker.internal:11434"})
 
     assert response.status_code == 422 and "ollama pull" in response.json()["detail"]
+
+
+class FakeCatalog:
+    def __init__(self):
+        self.asked: list = []
+
+    def models(self, provider, api_key):
+        from app.llm.catalog import CatalogModel
+
+        self.asked.append((provider.id, api_key))
+        return [
+            CatalogModel(id="gpt-5.4", provider_id=provider.id, kind="chat", free="none", input_price=1.25,
+                         output_price=10.0, context=400000, structured_output=True, benchmark=55.0),
+            CatalogModel(id="text-embedding-3-small", provider_id=provider.id, kind="embedding", free="none"),
+        ]
+
+
+def test_the_catalog_describes_each_model_with_its_measured_latency(client):
+    catalog = FakeCatalog()
+    app.dependency_overrides[providers_api.get_catalog] = lambda: catalog
+    app.dependency_overrides[providers_api.get_latency] = lambda: lambda: {("openai", "gpt-5.4"): 910, ("other", "gpt-5.4"): 5}
+    add_openai(client)
+
+    body = client.get("/models/catalog", headers=ADMIN, params={"provider": "openai"}).json()
+
+    assert catalog.asked == [("openai", KEY)]
+    assert body["provider_id"] == "openai"
+    assert body["models"][0] == {
+        "id": "gpt-5.4", "provider_id": "openai", "kind": "chat", "free": "none", "input_price": 1.25, "output_price": 10.0,
+        "context": 400000, "structured_output": True, "benchmark": 55.0, "median_latency_ms": 910,
+    }
+    assert body["models"][1]["kind"] == "embedding" and body["models"][1]["median_latency_ms"] is None
+
+
+def test_the_catalog_of_an_unknown_provider_is_not_found(client):
+    app.dependency_overrides[providers_api.get_catalog] = lambda: FakeCatalog()
+    app.dependency_overrides[providers_api.get_latency] = lambda: dict
+
+    assert client.get("/models/catalog", headers=ADMIN, params={"provider": "nope"}).status_code == 404
+
+
+def test_a_catalog_the_provider_does_not_list_is_a_bad_gateway(client):
+    class Refusing:
+        def models(self, provider, api_key):
+            raise ModelListError("Groq returned HTTP 401 for its model list")
+
+    app.dependency_overrides[providers_api.get_catalog] = lambda: Refusing()
+    app.dependency_overrides[providers_api.get_latency] = lambda: dict
+    add_openai(client)
+
+    response = client.get("/models/catalog", headers=ADMIN, params={"provider": "openai"})
+
+    assert response.status_code == 502 and "HTTP 401" in response.json()["detail"]

@@ -208,6 +208,19 @@ class AdminLogs:
             for day, alias, provider, model, tier, calls, cost, input_tokens, output_tokens in rows
         ]
 
+    def median_latency(self, *, days: int = 7) -> dict[tuple[str, str], int]:
+        """The median latency of each provider's model over its successful calls of the last ``days`` days.
+
+        Keyed by provider id and the provider's own model name; every pack's calls count.
+        """
+        rows = self.query(
+            "SELECT provider, model, quantileExact(0.5)(latency_ms) FROM agent_logs.llm_calls "
+            "WHERE ts >= now() - toIntervalDay({days:UInt16}) AND status IN ('success', 'ok') AND provider != '' "
+            "GROUP BY provider, model",
+            {"days": days},
+        )
+        return {(provider, model_name(model)): int(median) for provider, model, median in rows}
+
     @staticmethod
     def _conversation(row: Sequence) -> AdminConversation:
         conversation_id, user_id, title, deleted, updated_at = row

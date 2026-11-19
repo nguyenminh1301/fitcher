@@ -161,3 +161,11 @@ def test_an_unreachable_log_store_is_503(client):
 
     use(AdminLogs(broken, "minimal"))
     assert client.get("/admin/runs", headers=ADMIN).status_code == 503
+
+
+def test_median_latency_is_read_per_provider_and_model_without_the_sdk_prefix():
+    reader, script = logs([(r"quantileExact", [("groq", "openai/openai/gpt-oss-120b", 840.0), ("gemini", "gemini/gemini-2.5-flash", 1200)])])
+
+    assert reader.median_latency() == {("groq", "openai/gpt-oss-120b"): 840, ("gemini", "gemini-2.5-flash"): 1200}
+    sql, parameters = script.calls[0]
+    assert "status IN ('success', 'ok')" in sql and parameters == {"days": 7}

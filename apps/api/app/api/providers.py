@@ -12,13 +12,16 @@ indexed with another model and must be recompiled.
 ``POST /providers/{id}/test`` lists the provider's models, then asks one model
 for a small structured reply through the gateway. For a hosted provider that
 call is billed, which the response states. A model that fails structured
-output is reported and stays selectable.
+output is reported and stays selectable. ``GET /models/catalog?provider=`` adds
+what each listed model is for, its price, context, structured output,
+benchmark and the median latency measured on this instance.
 
 An admin action that cannot be recorded is logged; the change itself stands,
 because a replaced key cannot be restored.
 """
 
 from collections.abc import Callable
+from functools import cache
 import json
 import logging
 from typing import Annotated, Protocol
@@ -27,14 +30,17 @@ from fastapi import APIRouter, Depends, HTTPException, Response, status
 from pydantic import BaseModel
 
 from app.api.console import require_admin
-from app.api.runtime import get_admin_action_log, get_compiled_or_none, get_model_store, get_vault, pack_identity
+from app.api.runtime import (
+    get_admin_action_log, get_admin_logs, get_compiled_or_none, get_model_store, get_vault, pack_identity,
+)
 from app.api.setup import get_state_db
 from app.auth.principal import Principal
 from app.contracts.providers import (
-    EmbeddingChange, EmbeddingView, EvalStatus, ModelTiersView, ProviderCreate, ProviderModels, ProviderTestRequest, ProviderTestResult,
+    CatalogEntry, EmbeddingChange, EmbeddingView, EvalStatus, ModelCatalog, ModelTiersView, ProviderCreate, ProviderModels, ProviderTestRequest, ProviderTestResult,
     ProviderUpdate, ProviderView, TierChange, TierView,
 )
 from app.llm import defaults
+from app.llm.catalog import Catalog, with_latency
 from app.llm.client import LLMError, Prompt
 from app.llm.eligibility import eligibility, ReportSummary
 from app.llm.gateway import Gateway, Route
@@ -86,6 +92,24 @@ def get_eval_reports() -> Callable[[], list[ReportSummary]]:
 
 def get_model_lister() -> Callable[[Provider, str | None], list[str]]:
     return list_models
+
+
+@cache
+def get_catalog() -> Catalog:
+    """The process's model catalog, kept per provider for six hours."""
+    return Catalog()
+
+
+def _measured_latency() -> dict[tuple[str, str], int]:
+    try:
+        return get_admin_logs().median_latency()
+    except Exception as error:  # noqa: BLE001 - the catalog stays usable without the run logs
+        logger.warning("model latency is unavailable: %s", type(error).__name__)
+        return {}
+
+
+def get_latency() -> Callable[[], dict[tuple[str, str], int]]:
+    return _measured_latency
 
 
 class _OneRoute:
@@ -244,6 +268,23 @@ def provider_models(
     except ModelListError as error:
         raise HTTPException(status.HTTP_502_BAD_GATEWAY, detail=str(error)) from None
     return ProviderModels(provider_id=provider_id, models=models)
+
+
+@router.get("/models/catalog")
+def model_catalog(
+    provider: str, _: Admin, store: Store, vault: Annotated[SecretVault, Depends(get_vault)],
+    catalog: Annotated[Catalog, Depends(get_catalog)], latency: Annotated[Callable, Depends(get_latency)],
+) -> ModelCatalog:
+    """The provider's models with their kind, price, limits, benchmark and measured median latency."""
+    found = _found(store, provider)
+    try:
+        models = catalog.models(found, _key(vault, found))
+    except ModelListError as error:
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, detail=str(error)) from None
+    measured = {model: ms for (provider_id, model), ms in latency().items() if provider_id == found.id}
+    return ModelCatalog(provider_id=found.id, models=[
+        CatalogEntry(**vars(model)) for model in with_latency(models, measured)
+    ])
 
 
 def _test_model(provider: Provider, mapping: TierMapping, listed: list[str]) -> str | None:

@@ -32,16 +32,8 @@ def _request(provider: Provider, api_key: str | None) -> tuple[str, dict[str, st
     return f"{provider.base_url}/models", {"Authorization": f"Bearer {api_key}"} if api_key else {}
 
 
-def _names(kind: str, body: dict) -> list[str]:
-    if kind == "gemini":
-        return [str(item["name"]).removeprefix("models/") for item in body["models"]]
-    if kind == "ollama":
-        return [str(item["name"]) for item in body["models"]]
-    return [str(item["id"]) for item in body["data"]]
-
-
-def list_models(provider: Provider, api_key: str | None, http: httpx.Client | None = None) -> list[str]:
-    """The provider's model names, sorted."""
+def fetch_listing(provider: Provider, api_key: str | None, http: httpx.Client | None = None) -> dict:
+    """The provider's model listing as it sent it, with whatever details it gives per model."""
     url, headers = _request(provider, api_key)
     http = http or httpx.Client(timeout=TIMEOUT_SECONDS)
     try:
@@ -51,6 +43,26 @@ def list_models(provider: Provider, api_key: str | None, http: httpx.Client | No
     if response.status_code != 200:
         raise ModelListError(f"{provider.name} returned HTTP {response.status_code} for its model list")
     try:
-        return sorted(set(_names(provider.kind, response.json())))
-    except (ValueError, KeyError, TypeError, AttributeError):
+        body = response.json()
+    except ValueError:
         raise ModelListError(f"{provider.name} listed its models in an unknown shape") from None
+    if not isinstance(body, dict):
+        raise ModelListError(f"{provider.name} listed its models in an unknown shape")
+    return body
+
+
+def listing_items(provider: Provider, body: dict) -> list[tuple[str, dict]]:
+    """Each listed model's name with the details the provider gave for it."""
+    try:
+        if provider.kind == "gemini":
+            return [(str(item["name"]).removeprefix("models/"), item) for item in body["models"]]
+        if provider.kind == "ollama":
+            return [(str(item["name"]), item) for item in body["models"]]
+        return [(str(item["id"]), item) for item in body["data"]]
+    except (KeyError, TypeError, AttributeError):
+        raise ModelListError(f"{provider.name} listed its models in an unknown shape") from None
+
+
+def list_models(provider: Provider, api_key: str | None, http: httpx.Client | None = None) -> list[str]:
+    """The provider's model names, sorted."""
+    return sorted({name for name, _ in listing_items(provider, fetch_listing(provider, api_key, http))})

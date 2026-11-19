@@ -42,6 +42,31 @@ class ProviderModels(ContractModel):
     models: list[str]
 
 
+class CatalogEntry(ContractModel):
+    """One model of a provider with what it is for, its price, limits and measured speed (``app/llm/catalog.py``)."""
+
+    id: str
+    provider_id: str
+    kind: Literal["chat", "embedding", "other"]
+    # free: calls cost nothing; free_tier: a rate-limited allowance the provider does not bill.
+    free: Literal["none", "free", "free_tier"]
+    # USD per million tokens; null when no source knows the price.
+    input_price: float | None
+    output_price: float | None
+    context: int | None
+    # Whether the model can answer in a JSON schema; null when no source says.
+    structured_output: bool | None
+    # Artificial Analysis' intelligence index as OpenRouter lists it.
+    benchmark: float | None
+    # The median latency of this instance's successful calls to the model over the last 7 days.
+    median_latency_ms: int | None
+
+
+class ModelCatalog(ContractModel):
+    provider_id: str
+    models: list[CatalogEntry]
+
+
 class ProviderTestRequest(ContractModel):
     # The model to call; by default the provider's model of the fast tier or its proposed one.
     model: str | None = None

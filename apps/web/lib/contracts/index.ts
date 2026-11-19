@@ -14,6 +14,7 @@ export type { ProviderView } from "./provider_view";
 export type { ProviderCreate } from "./provider_create";
 export type { ProviderUpdate } from "./provider_update";
 export type { ProviderModels } from "./provider_models";
+export type { CatalogEntry, ModelCatalog } from "./model_catalog";
 export type { ProviderTestRequest } from "./provider_test_request";
 export type { ProviderTestResult } from "./provider_test_result";
 export type { EmbeddingView, EvalStatus, ModelTiersView, TierView } from "./model_tiers_view";
