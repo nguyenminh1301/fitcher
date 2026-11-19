@@ -10,6 +10,7 @@
 
 ### Fixed
 
+- Notices in the chat (blocked, denied, failed, empty, lost connection, stopped, model errors) give their title and fixed explanation in the interface language; only a message the api wrote for the question keeps the question's language. A Vietnamese question in an English interface used to show a Vietnamese title under English buttons.
 - After an owner password is set on the Security page, the owner menu offers Sign out and says the browser is signed in without reloading the page; it read the password state only once.
 - When the model does not answer the question (a free model's rate limit, an outage), the chat says so in the question's language with the provider's message and a Try again button; it used to show the raw error in English as if fitcher were asking back, and the run is now recorded as failed.
 - A tab separated CSV file loads; ClickHouse refused it before, so the load failed after the columns were confirmed.
