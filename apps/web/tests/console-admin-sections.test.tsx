@@ -171,6 +171,32 @@ describe("runs and trace", () => {
     expect(within(timeline).getByText("ALLOW")).toBeTruthy();
   });
 
+  it("reads a running run again until it ends, so a failure shows without reloading", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const running = { trace_id: "t9", ts: new Date(Date.now() - 5000).toISOString(), user_id: "adm", role: "", question: "Slow one",
+      intent: "", status: "running", latency_ms: 0, cost_usd: 0 };
+    const trace = vi.fn()
+      .mockResolvedValueOnce({ run: running, items: [] })
+      .mockResolvedValue({ run: { ...running, status: "failed", latency_ms: 31000, error: "Timeout" }, items: [] });
+    Object.assign(api.runs, { trace });
+    try {
+      show("runs", <RunDetail traceId="t9" />);
+      expect(await screen.findByText(/^Running/)).toBeTruthy();
+      // While it runs, the duration counts from its start instead of showing 0 ms.
+      expect(screen.queryByText("0 ms")).toBeNull();
+
+      await act(async () => { await vi.advanceTimersByTimeAsync(2100); });
+
+      expect(await screen.findByText("Failed")).toBeTruthy();
+      expect(screen.getByText("31.0 s")).toBeTruthy();
+      const calls = trace.mock.calls.length;
+      await act(async () => { await vi.advanceTimersByTimeAsync(4500); });
+      expect(trace.mock.calls.length).toBe(calls);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("says when a trace does not exist", async () => {
     show("runs", <RunDetail traceId="missing" />);
 

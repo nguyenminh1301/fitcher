@@ -21,6 +21,7 @@
 
 ### Fixed
 
+- A run's page and the runs list read a running run again every two seconds and count its duration up, so a run that finished or failed shows its outcome without reloading; it used to stay "Running" with a duration of 0 ms after its model had already failed.
 - A question no longer waits minutes on one slow model: each task waits at most 30 to 120 seconds for a model, a timeout is never retried on the same model, and the next model of the task's chain answers instead. A model that timed out, was unavailable or is billed on an account without credit is skipped for a while by the following questions. A run used to wait 360 seconds on one model before failing.
 - A model reply that does not match the expected answer format, including JSON with a number too long to read, is answered by the chain's next model instead of failing the whole run with an internal error.
 - Z.ai's "insufficient balance" reply to a billed model is reported as a model that needs credit instead of a rate limit, Gemini's "exceeded your current quota" rests only that model while the key keeps serving the others.

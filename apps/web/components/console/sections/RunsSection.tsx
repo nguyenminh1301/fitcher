@@ -2,9 +2,10 @@
 
 // Runs and trace (DECISIONS §10, §15): every question asked, filtered by dates and status, and one run's trace:
 // its steps with their durations, the model calls with tokens and estimated cost, the SQL attempts with their
-// error, and the access decision.
+// error, and the access decision. While a run is still running, the list and its trace are read again every few
+// seconds and its duration counts up, so a finished or failed run shows its outcome without reloading the page.
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import { Icon } from "@/components/brand/Icon";
 import { useConsole } from "@/components/console/ConsoleLayout";
@@ -17,7 +18,28 @@ import { useLoad } from "@/lib/console/useLoad";
 import { useI18n } from "@/lib/i18n/react";
 import { langOf } from "@/lib/text";
 
-const STATUSES = ["all", "succeeded", "clarified", "failed", "error", "denied", "rejected", "blocked"];
+const STATUSES = ["all", "running", "succeeded", "clarified", "failed", "error", "denied", "rejected", "blocked"];
+/** How often a page with a running run reads it again. */
+export const REFRESH_MS = 2000;
+
+/** Calls ``reload`` every REFRESH_MS while ``active``, and returns the current time, which ticks meanwhile. */
+export function useWhileRunning(active: boolean, reload: () => Promise<void>): number {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (!active) return undefined;
+    const timer = window.setInterval(() => {
+      setNow(Date.now());
+      void reload();
+    }, REFRESH_MS);
+    return () => window.clearInterval(timer);
+  }, [active, reload]);
+  return now;
+}
+
+/** A run's duration: its recorded latency, or the time since it started while it is running. */
+export function runDuration(run: { status: string; ts: string; latency_ms: number }, now: number): number {
+  return run.status === "running" ? Math.max(0, now - Date.parse(run.ts)) : run.latency_ms;
+}
 
 /** An estimated cost in US dollars, to four decimals as model calls cost fractions of a cent. */
 export function useUsd(): (value: number, decimals?: number) => string {
@@ -31,7 +53,8 @@ export function RunsSection() {
   const { navigate } = useConsole();
   const duration = useDuration();
   const usd = useUsd();
-  const { data, failed } = useLoad(useCallback(() => api.runs.list(), [api]));
+  const { data, failed, reload } = useLoad(useCallback(() => api.runs.list(), [api]));
+  const now = useWhileRunning(!!data?.some((run) => run.status === "running"), reload);
   const [status, setStatus] = useState("all");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
@@ -73,7 +96,7 @@ export function RunsSection() {
             <button type="button" className="row-title link-button" lang={langOf(run.question)} onClick={() => navigate(`/console/runs/${encodeURIComponent(run.trace_id)}`)}>{run.question}</button>
           ) },
           { key: "status", label: t("ui.status"), render: (run) => <StatusLabel status={run.status}>{t(`ui.${run.status}`)}</StatusLabel> },
-          { key: "latency_ms", label: t("ui.duration"), numeric: true, nowrap: true, render: (run) => duration(run.latency_ms) },
+          { key: "latency_ms", label: t("ui.duration"), numeric: true, nowrap: true, render: (run) => duration(runDuration(run, now)) },
           { key: "cost_usd", label: t("ui.cost"), numeric: true, render: (run) => usd(run.cost_usd) },
         ]}
       />
@@ -87,8 +110,9 @@ export function RunDetail({ traceId }: { traceId: string }) {
   const { navigate } = useConsole();
   const duration = useDuration();
   const usd = useUsd();
-  const { data, failed } = useLoad(useCallback(async () => ({ trace: await api.runs.trace(traceId) }), [api, traceId]));
+  const { data, failed, reload } = useLoad(useCallback(async () => ({ trace: await api.runs.trace(traceId) }), [api, traceId]));
   const run = data?.trace?.run;
+  const now = useWhileRunning(run?.status === "running", reload);
   return (
     <DetailPage feature="runs" title={run?.question} titleLang={run ? langOf(run.question) : undefined} status={run?.status} backLabel={t("ui.nav_runs")}
       onBack={() => navigate("/console/runs")} loading={!data && !failed} missing={!run}>
@@ -106,7 +130,7 @@ export function RunDetail({ traceId }: { traceId: string }) {
               <div className="box-body">
                 <dl className="kv">
                   <dt>{t("ui.time")}</dt><dd>{formatDate(run.ts, { dateStyle: "medium", timeStyle: "medium" })}</dd>
-                  <dt>{t("ui.duration")}</dt><dd>{duration(run.latency_ms)}</dd>
+                  <dt>{t("ui.duration")}</dt><dd>{duration(runDuration(run, now))}</dd>
                   <dt>{t("ui.cost")}</dt><dd>{usd(run.cost_usd)}</dd>
                   {pack ? <><dt>{t("runsPage.pack")}</dt><dd>{pack.display_name || pack.name}</dd></> : null}
                   <dt>{t("runsPage.trace")}</dt><dd className="fc-mono trace-id">{run.trace_id}</dd>
