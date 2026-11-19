@@ -31,13 +31,18 @@ def _count(usage: Any, name: str) -> int:
     return int(field(usage, name) or 0)
 
 
-def estimate_cost(response: Any, model: str, call_type: str) -> float | None:
+def estimate_cost(response: Any, model: str, call_type: str, api_base: str | None = None) -> float | None:
     """The call's cost in USD from LiteLLM's price table for the model called, or None when it has no known price.
 
     The price is looked up by the route's model, not the name a provider echoes in its reply, so an
-    OpenAI-compatible server that reports a known model name is not priced as that model.
+    OpenAI-compatible server that reports a known model name is not priced as that model. A call to a free model
+    or a provider's free tier costs nothing: LiteLLM's table holds the paid price of a model a free key uses.
     """
+    from app.llm.catalog import free_call  # noqa: PLC0415 - the catalog imports the providers, which import this log
     from app.llm.gateway import litellm_module  # noqa: PLC0415 - shares the gateway's deferred import
+
+    if free_call(model, api_base, call_type):
+        return 0.0
 
     usage = field(response, "usage")
     try:
