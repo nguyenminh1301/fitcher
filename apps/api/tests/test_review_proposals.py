@@ -207,6 +207,16 @@ def test_feedback_is_listed_with_its_proposal(client):
     assert response.status_code == 200 and response.json()[0]["proposal"] == "proposed"
 
 
+def test_feedback_without_a_pack_says_so_without_logging_a_store_failure(client, caplog):
+    app.dependency_overrides[runtime.get_compiled_or_none] = lambda: None
+    app.dependency_overrides[runtime.get_proposal_store] = lambda: Store()
+
+    response = client.get("/admin/feedback", headers=REVIEWER)
+
+    assert response.status_code == 503 and "no pack is active" in response.json()["detail"]
+    assert "the feedback read failed" not in caplog.text
+
+
 def test_proposing_from_one_run(client):
     store = Store(runs={"t9": RUN, "t8": replace(RUN, trace_id="t8", status="denied")})
     app.dependency_overrides[runtime.get_proposal_store] = lambda: store

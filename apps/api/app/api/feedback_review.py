@@ -31,8 +31,9 @@ def list_feedback(
     _: Reviewer, store: Store, compiled: Compiled, rating: Literal["like", "dislike"] | None = None,
     start: Annotated[datetime | None, Query(alias="from")] = None, end: Annotated[datetime | None, Query(alias="to")] = None,
 ) -> list[FeedbackRow]:
+    pack = pack_identity(compiled).name
     try:
-        return store.feedback(pack_identity(compiled).name, rating, start, end)
+        return store.feedback(pack, rating, start, end)
     except Exception as error:  # noqa: BLE001 - ClickHouse unreachable or refused the reader
         logger.error("the feedback read failed", exc_info=error)
         raise unavailable("the feedback store is unavailable") from None
