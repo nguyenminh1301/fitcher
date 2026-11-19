@@ -121,10 +121,10 @@
       "type": "array"
     },
     "periods": {
+      "default": [],
       "items": {
         "$ref": "#/$defs/Period"
       },
-      "minItems": 1,
       "title": "Periods",
       "type": "array"
     },
@@ -195,7 +195,6 @@
   },
   "required": [
     "metric_ids",
-    "periods",
     "dataset"
   ],
   "title": "QuerySpec",

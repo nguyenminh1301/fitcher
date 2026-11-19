@@ -12,12 +12,12 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["id", "description", "grain", "time_column", "columns", "status", "evidence", "confidence"],
+        "required": ["id", "description", "grain", "columns", "status", "evidence", "confidence"],
         "properties": {
           "id": {"$ref": "common.schema.json#/$defs/id", "description": "Table name in the marts database."},
           "description": {"$ref": "common.schema.json#/$defs/text"},
           "grain": {"$ref": "common.schema.json#/$defs/text", "description": "What one row represents."},
-          "time_column": {"$ref": "common.schema.json#/$defs/name", "description": "Primary time column; a column with role time."},
+          "time_column": {"$ref": "common.schema.json#/$defs/name", "description": "Primary time column; a column with role time. Left out for a table without dates, whose questions take no period."},
           "allowed_roles": {
             "description": "Ignored: every dataset is read by the pack's one reader role. Kept so older packs still load.",
             "type": "array",

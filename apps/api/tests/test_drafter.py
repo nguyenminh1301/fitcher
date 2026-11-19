@@ -126,6 +126,23 @@ def test_estimate_counts_prompt_characters_per_file(files):
     assert set(estimate) == set(DRAFT_FILES) and all(count > 100 for count in estimate.values())
 
 
+def test_a_new_dataset_is_held_to_the_pack_rules_instead_of_failing_the_compile(files):
+    # A reply for a table without dates: a number marked indexable and a time column that is not a time column.
+    llm = FakeLLMClient([{"items": [{
+        "id": "catalog", "description": "Every catalog item.", "grain": "one row per item", "time_column": "item_no",
+        "evidence": [{"kind": "profile", "ref": "widget_sales"}], "confidence": 0.8,
+        "columns": [
+            {"name": "item_no", "type": "number", "role": "dimension", "description": "Item number.", "indexable": True},
+            {"name": "colour", "type": "string", "role": "dimension", "description": "Colour.", "indexable": True},
+        ],
+    }]}])
+
+    [item] = Drafter(llm, Warehouse()).draft("datasets.yaml", files, PROFILE, [])
+
+    assert "time_column" not in item
+    assert [column.get("indexable", False) for column in item["columns"]] == [False, True]
+
+
 def test_drafted_ids_and_references_are_made_valid_instead_of_failing_the_pack(files):
     llm = FakeLLMClient([{"items": [metric("sumIf_amount_status"), metric("Revenue-Total 2025"), metric("2nd_metric")]}])
 

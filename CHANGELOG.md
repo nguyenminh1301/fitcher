@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Changed
+
+- A table without a date column, such as a product catalog or a contact list, becomes a dataset of the pack instead of being left out. Its questions are answered over all its rows without asking for a period; a period the question names is dropped with a warning, the Datasets page shows no time column for it, and the pack build no longer fails when the model's draft gives such a table a time column or marks a number column as searchable.
+
 ## 0.0.3 - 2026-11-18
 
 ### Changed

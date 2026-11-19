@@ -1033,7 +1033,9 @@
     "type_number": "Số",
     "type_date": "Ngày",
     "type_datetime": "Ngày giờ",
-    "type_boolean": "Đúng/sai"
+    "type_boolean": "Đúng/sai",
+    "noTime": "Không có",
+    "summaryNoTime": "{description} Độ chi tiết: {grain}. Bảng không có cột ngày nên câu hỏi được trả lời trên toàn bộ dòng."
   },
   "documentsPage": {
     "size": "Kích thước",

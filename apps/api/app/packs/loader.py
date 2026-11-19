@@ -238,7 +238,9 @@ def check_references(pack: Pack, catalog: Catalog | None = None) -> list[PackIss
             names.add(column.name)
             if column.indexable and column.type != "string":
                 refs.add("datasets.yaml", [*path, "columns", position, "indexable"], "only string columns can be indexable")
-        if not any(column.name == dataset.time_column and column.role == "time" for column in dataset.columns):
+        if dataset.time_column is not None and not any(
+            column.name == dataset.time_column and column.role == "time" for column in dataset.columns
+        ):
             refs.add("datasets.yaml", [*path, "time_column"], "must name a column with role time")
         granted = [role.id for role in pack.policies.roles if any(grant.dataset == dataset.id for grant in role.datasets)]
         if set(dataset.allowed_roles) != set(granted):

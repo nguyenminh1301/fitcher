@@ -58,7 +58,8 @@ class Dataset(Draftable):
     id: str
     description: str
     grain: str
-    time_column: str
+    # The column periods filter on; None for a table without dates, which answers without a period.
+    time_column: str | None = None
     # Filled by the loader with the pack's one reader role; a value in an older pack file is ignored.
     allowed_roles: list[str] = []
     columns: list[Column]

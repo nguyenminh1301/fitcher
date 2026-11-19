@@ -156,6 +156,43 @@ def test_period_outside_coverage_adds_a_warning():
     ]
 
 
+def _without_dates(dataset_id: str):
+    """The fixture pack with ``dataset_id`` turned into a table without a time column."""
+    compiled = compiled_fixture()
+    datasets = [
+        item.model_copy(update={
+            "time_column": None,
+            "columns": [column.model_copy(update={"role": "dimension"}) if column.role == "time" else column
+                        for column in item.columns],
+        }) if item.id == dataset_id else item
+        for item in compiled.pack.datasets.datasets
+    ]
+    pack = compiled.pack.model_copy(update={"datasets": compiled.pack.datasets.model_copy(update={"datasets": datasets})})
+    coverage = {**compiled.coverage, dataset_id: compiled.coverage[dataset_id].model_copy(update={"min_date": None, "max_date": None})}
+    return compiled.model_copy(update={"pack": pack, "coverage": coverage})
+
+
+def test_a_table_without_dates_is_answered_without_asking_for_a_period():
+    extraction = extraction_reply(metric_terms=["refunded value"], rank_term=None, dimension_terms=[], top_n=None,
+                                  periods=[], compare=False)
+    # The resolve_time node leaves no periods when the question names none.
+    state = {**state_for(extraction_reply()), "extraction": Extraction.model_validate(extraction), "periods": []}
+
+    spec = make_spec(state, _without_dates("widget_refunds"))
+
+    assert (spec.dataset, spec.periods, spec.warnings) == ("widget_refunds", [], [])
+
+
+def test_a_period_named_for_a_table_without_dates_is_dropped_with_a_warning():
+    extraction = extraction_reply(metric_terms=["refunded value"], rank_term=None, dimension_terms=[], top_n=None,
+                                  compare=False)
+
+    spec = make_spec(state_for(extraction), _without_dates("widget_refunds"))
+
+    assert spec.periods == [] and not spec.compare
+    assert spec.warnings == ["widget_refunds has no date column, so the question was answered over all its rows"]
+
+
 def test_metric_found_only_by_search_uses_the_best_hit():
     retrieval = Retrieval(metric_terms={"money back": [hit("metrics", "refunded_value", 0.9), hit("metrics", "widget_revenue", 0.3)]})
     extraction = extraction_reply(metric_terms=["money back"], rank_term=None, dimension_terms=[], top_n=None)

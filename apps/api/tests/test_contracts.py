@@ -71,7 +71,6 @@ def test_invalid_filters(op, value, message):
 
 @pytest.mark.parametrize(("overrides", "message"), [
     ({"metric_ids": []}, "metric_ids"),
-    ({"periods": []}, "periods"),
     ({"rank_by": "other_metric"}, "rank_by"),
     ({"rank_period": "Q2 2025"}, "rank_period"),
     ({"periods": [Q1_2024], "rank_period": None}, "compare needs at least two periods"),

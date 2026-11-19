@@ -66,12 +66,15 @@ def test_a_string_column_with_few_values_is_indexed_and_a_key_never_is():
 def test_the_wide_view_comes_first_and_keeps_its_own_time_column():
     items = dataset_items(VIEWS, PROFILE)
 
-    assert [item["id"] for item in items] == ["shop__sales__wide", "shop__widgets", "shop__sales"]
+    assert [item["id"] for item in items] == ["shop__sales__wide", "shop__widgets", "shop__sales", "shop__refunds"]
     assert items[0]["time_column"] == "sold_on"
 
 
-def test_a_view_without_a_time_column_gets_no_dataset():
-    assert "shop__refunds" not in _by_id(dataset_items(VIEWS, PROFILE))
+def test_a_view_without_a_date_column_gets_a_dataset_without_a_time_column():
+    refunds = _by_id(dataset_items(VIEWS, PROFILE))["shop__refunds"]
+
+    assert "time_column" not in refunds
+    assert all(column["role"] != "time" for column in refunds["columns"])
 
 
 def test_the_written_pack_is_valid_with_one_role_reading_every_dataset(tmp_path):
@@ -86,10 +89,11 @@ def test_the_written_pack_is_valid_with_one_role_reading_every_dataset(tmp_path)
     assert not (pack_dir / "policies.yaml").exists()
     [role] = pack.policies.roles
     assert role.id == "reader" and role.status == "approved"
-    assert {grant.dataset for grant in role.datasets} == {"shop__sales__wide", "shop__widgets", "shop__sales"}
+    assert {grant.dataset for grant in role.datasets} == {"shop__sales__wide", "shop__widgets", "shop__sales", "shop__refunds"}
+    assert {dataset.id: dataset.time_column for dataset in pack.datasets.datasets}["shop__refunds"] is None
     assert [(item.from_dataset, item.status) for item in pack.relationships.relationships] == [("shop__sales", "approved")]
     assert not (pack_dir / "eval.yaml").exists()
-    assert summary == {"datasets": 3, "relationships": 1, "skipped": ["shop__refunds"]}
+    assert summary == {"datasets": 4, "relationships": 1, "skipped": []}
 
 
 def test_writing_again_replaces_the_files(tmp_path):

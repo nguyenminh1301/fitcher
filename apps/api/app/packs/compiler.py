@@ -206,9 +206,13 @@ def _iso(value: object) -> str | None:
 
 
 def read_coverage(pack: Pack, warehouse: Warehouse) -> dict[str, DateCoverage]:
-    """Row count and min/max of each dataset's time column."""
+    """Row count and min/max of each dataset's time column; a dataset without one has its row count only."""
     coverage: dict[str, DateCoverage] = {}
     for dataset in pack.datasets.datasets:
+        if dataset.time_column is None:
+            rows = warehouse.query(f"SELECT count() FROM {table_ref(dataset.id)}", settings=SCAN_SETTINGS)[0][0]
+            coverage[dataset.id] = DateCoverage(rows=rows, min_date=None, max_date=None)
+            continue
         column = quote(dataset.time_column)
         rows, low, high = warehouse.query(
             f"SELECT count(), min({column}), max({column}) FROM {table_ref(dataset.id)}", settings=SCAN_SETTINGS

@@ -1033,7 +1033,9 @@
     "type_number": "Number",
     "type_date": "Date",
     "type_datetime": "Date and time",
-    "type_boolean": "True or false"
+    "type_boolean": "True or false",
+    "noTime": "None",
+    "summaryNoTime": "{description} Grain: {grain}. The table has no date column, so questions are answered over all its rows."
   },
   "documentsPage": {
     "size": "Size",

@@ -81,7 +81,7 @@ class DatasetView(ContractModel):
     id: str
     description: str
     grain: str
-    time_column: str
+    time_column: str | None = None
     # Pack roles granted the dataset in policies.yaml, aggregate-only grants included.
     readable_roles: list[str]
     columns: list[DatasetColumnView]

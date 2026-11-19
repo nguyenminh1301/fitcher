@@ -82,7 +82,7 @@ class DraftedColumn(_Reply):
 class DraftedDataset(_Drafted):
     description: str
     grain: str
-    time_column: str
+    time_column: str | None = None
     columns: list[DraftedColumn]
 
 
@@ -243,9 +243,18 @@ class Drafter:
 
     @staticmethod
     def _new_dataset(item: dict) -> dict:
+        # The model's reply is held to the loader's rules: only string columns are indexable, and the time
+        # column must be a column whose role is time, or there is none.
         item["columns"] = [
-            {key: value for key, value in column.items() if key != "indexable" or value} for column in item["columns"]
+            {key: value for key, value in column.items()
+             if key != "indexable" or (value and column["type"] == "string")}
+            for column in item["columns"]
         ]
+        times = [column["name"] for column in item["columns"] if column["role"] == "time"]
+        if item.get("time_column") not in times:
+            item.pop("time_column", None)
+            if times:
+                item["time_column"] = times[0]
         return item
 
     def _test_run(self, file: str, item: dict) -> None:
