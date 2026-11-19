@@ -31,6 +31,7 @@
 
 ### Fixed
 
+- Wrong owner passwords sent through the published port or a reverse proxy no longer lock out the owner at this computer, whose sign-in attempts are counted apart; other clients are counted by their own address (from `X-Forwarded-For` when the proxy is listed in the new `FITCHER_TRUSTED_PROXIES`) and together share a limit of 100 failures in 15 minutes.
 - A reverse proxy or tunnel on the same computer no longer makes its visitors the owner: the web server records the signs that a proxy relayed a request (forwarding headers, `Connection: close`, HTTP/1.0), and the api refuses such a request when it names a loopback host, so a stock nginx `proxy_pass` to the published port can neither read the instance nor set the first owner password; a proxy must send the public name, list it in `FITCHER_ALLOWED_HOSTS` and use the owner password.
 - Leaving a conversation while it is answering, for the console or by closing the page, no longer stops the question: the api answers it and stores the answer, and the conversation shows that it is still answering and then the answer when it is opened again. Only the Stop button stops a question.
 - The count of column values checked for prompt injection moves every 25 values instead of every 500: a classifier on a provider such as Groq scores about 35 values a minute, so the count stayed at 0 for many minutes.

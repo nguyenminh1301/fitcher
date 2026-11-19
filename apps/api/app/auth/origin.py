@@ -70,15 +70,28 @@ def internal_hosts(env: Mapping[str, str] | None = None) -> frozenset[str]:
     return _names((os.environ if env is None else env).get("FITCHER_INTERNAL_HOSTS"))
 
 
-def trusted_peers(env: Mapping[str, str] | None = None) -> list:
-    """The networks of ``FITCHER_TRUSTED_PEERS``; an entry that is not an address or a network is ignored."""
+def _networks(name: str, env: Mapping[str, str] | None) -> list:
     networks = []
-    for entry in _names((os.environ if env is None else env).get("FITCHER_TRUSTED_PEERS")):
+    for entry in _names((os.environ if env is None else env).get(name)):
         try:
             networks.append(ip_network(entry, strict=False))
         except ValueError:
             continue
     return networks
+
+
+def trusted_peers(env: Mapping[str, str] | None = None) -> list:
+    """The networks of ``FITCHER_TRUSTED_PEERS``; an entry that is not an address or a network is ignored."""
+    return _networks("FITCHER_TRUSTED_PEERS", env)
+
+
+def trusted_proxies(env: Mapping[str, str] | None = None) -> list:
+    """The networks of ``FITCHER_TRUSTED_PROXIES``, the reverse proxies whose ``X-Forwarded-For`` names the client."""
+    return _networks("FITCHER_TRUSTED_PROXIES", env)
+
+
+def _in(address, networks: list) -> bool:
+    return any(address.version == network.version and address in network for network in networks)
 
 
 @cache
@@ -115,8 +128,33 @@ def local_peer(value: str | None) -> bool:
     address = peer_address(value)
     if address is None:
         return False
-    return (address.is_loopback or address in default_gateways()
-            or any(address.version == network.version and address in network for network in trusted_peers()))
+    return address.is_loopback or address in default_gateways() or _in(address, trusted_peers())
+
+
+def at_this_computer(browser_host: str, peer: str | None, proxy: str | None) -> bool:
+    """Whether a request comes from a browser on this computer: a loopback name, a local peer and no proxy."""
+    return hostname(browser_host) in LOOPBACK and local_peer(peer) and not (proxy or "").strip()
+
+
+def client_address(peer: str | None, forwarded_for: str | None) -> str:
+    """The client a request comes from: the peer, or the address a trusted proxy names in ``X-Forwarded-For``.
+
+    The list is read from its right end, where each trusted proxy appended the address it received the request
+    from; the first address that is not itself a trusted proxy is the client, since anything left of it was
+    written by the client.
+    """
+    address = peer_address(peer)
+    if address is None:
+        return (peer or "unknown").strip() or "unknown"
+    proxies = trusted_proxies()
+    for entry in reversed((forwarded_for or "").split(",")):
+        if not _in(address, proxies):
+            break
+        named = peer_address(entry)
+        if named is None:
+            break
+        address = named
+    return str(address)
 
 
 def exposed(env: Mapping[str, str] | None = None) -> bool:

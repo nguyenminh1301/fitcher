@@ -110,3 +110,31 @@ def test_a_successful_sign_in_releases_its_own_attempt(db):
     throttle.succeeded(rows)
 
     assert throttle.reserve("10.0.0.9")[0] == 0
+
+
+def test_one_address_failing_does_not_block_another_or_the_owner_at_this_computer(db):
+    throttle = owner.SignInThrottle(db, clock=lambda: 5000.0)
+    for _ in range(owner.FAILURE_LIMIT + 1):
+        throttle.reserve("172.17.0.1")
+
+    assert throttle.reserve("172.17.0.1")[0] > 0
+    assert throttle.reserve("203.0.113.7")[0] == 0
+    assert throttle.reserve(None)[0] == 0
+
+
+def test_the_global_limit_holds_every_address_but_not_the_owner_at_this_computer(db):
+    throttle = owner.SignInThrottle(db, clock=lambda: 5000.0)
+    for index in range(owner.GLOBAL_FAILURE_LIMIT):
+        assert throttle.reserve(f"10.1.{index // 200}.{index % 200}")[0] == 0
+
+    assert throttle.reserve("198.51.100.4")[0] > 0
+    assert throttle.reserve(None)[0] == 0
+
+
+def test_the_owner_at_this_computer_is_still_slowed_down_after_their_own_failures(db):
+    throttle = owner.SignInThrottle(db, clock=lambda: 5000.0)
+    for _ in range(owner.FAILURE_LIMIT):
+        throttle.reserve(None)
+
+    assert throttle.reserve(None)[0] > 0
+    assert throttle.reserve("203.0.113.7")[0] == 0

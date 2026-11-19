@@ -48,13 +48,15 @@ export async function forwardBody(request: Request, path: string): Promise<Respo
  * of the browser's connection, which peer-address.cjs writes over any value the client sent, so the api
  * refuses a loopback Host claimed from another machine. X-Fitcher-Proxy, written by the same hook, lists the
  * signs that a reverse proxy relayed the request, so the api never takes a proxied request for this computer.
- * A proxy's X-Forwarded-Proto is passed on; the api trusts it only when the instance lists its public hosts.
+ * A proxy's X-Forwarded-Proto and X-Forwarded-For are passed on; the api trusts the first only when the instance
+ * lists its public hosts, and the second only from an address in FITCHER_TRUSTED_PROXIES.
  */
 export function browserHeaders(incoming: Headers): Headers {
   const forwarded = new Headers();
   const host = incoming.get("host");
   const origin = incoming.get("origin");
   const proto = incoming.get("x-forwarded-proto");
+  const client = incoming.get("x-forwarded-for");
   const peer = incoming.get("x-fitcher-peer");
   const proxy = incoming.get("x-fitcher-proxy");
   if (host) forwarded.set("x-forwarded-host", host);
@@ -62,6 +64,7 @@ export function browserHeaders(incoming: Headers): Headers {
   if (proxy !== null) forwarded.set("x-fitcher-proxy", proxy);
   if (origin) forwarded.set("origin", origin);
   if (proto) forwarded.set("x-forwarded-proto", proto);
+  if (client) forwarded.set("x-forwarded-for", client);
   return forwarded;
 }
 

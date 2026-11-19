@@ -200,3 +200,13 @@ def test_the_default_gateway_is_read_from_the_route_table(tmp_path):
 
     assert origin.default_gateways.__wrapped__(table) == frozenset({ip_address("172.17.0.1"), ip_address("172.19.0.1")})
     assert origin.default_gateways.__wrapped__(tmp_path / "missing") == frozenset()
+
+
+def test_the_client_behind_a_trusted_proxy_is_the_last_address_it_did_not_add(monkeypatch):
+    monkeypatch.setenv("FITCHER_TRUSTED_PROXIES", "172.17.0.1, 10.0.0.0/8")
+
+    assert origin.client_address("172.17.0.1", "198.51.100.1, 203.0.113.5, 10.2.3.4") == "203.0.113.5"
+    assert origin.client_address("172.17.0.1", "not-an-address") == "172.17.0.1"
+    assert origin.client_address("172.17.0.1", None) == "172.17.0.1"
+    assert origin.client_address("192.168.1.9", "203.0.113.5") == "192.168.1.9"
+    assert origin.client_address("::ffff:172.17.0.1", "203.0.113.5") == "203.0.113.5"

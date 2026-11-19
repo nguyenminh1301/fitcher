@@ -26,8 +26,12 @@ def _browser_host(request: Request) -> str:
     return request.headers.get("x-forwarded-host") or request.headers.get("host", "")
 
 
-def _peer(request: Request) -> str:
-    return request.headers.get(origin.PEER_HEADER) or (request.client.host if request.client else "unknown")
+def _client(request: Request) -> str | None:
+    """The address the sign-in throttle counts, or None for the owner at this computer."""
+    peer = request.headers.get(origin.PEER_HEADER) or (request.client.host if request.client else None)
+    if origin.at_this_computer(_browser_host(request), peer, request.headers.get(origin.PROXY_HEADER)):
+        return None
+    return origin.client_address(peer, request.headers.get("x-forwarded-for"))
 
 
 def _cookie_options(request: Request) -> dict:
@@ -51,7 +55,7 @@ def sign_in(body: OwnerSignIn, request: Request, response: Response, db: State) 
     if not owner.password_set(db):
         raise HTTPException(status.HTTP_409_CONFLICT, detail="no owner password is set; there is nothing to sign in to")
     throttle = owner.SignInThrottle(db)
-    wait, attempt = throttle.reserve(_peer(request))
+    wait, attempt = throttle.reserve(_client(request))
     if wait:
         raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, detail="too many wrong passwords; try again later",
                             headers={"Retry-After": str(wait)})

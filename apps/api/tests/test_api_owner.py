@@ -108,3 +108,45 @@ def test_an_instance_reachable_from_other_machines_needs_a_password_first(client
     assert client.get("/me", headers=remote).status_code == 200
     kept = client.request("DELETE", "/owner/password", headers=local, json={"current_password": PASSWORD})
     assert kept.status_code == 409 and "reachable" in kept.json()["detail"]
+
+
+# A reverse proxy on the host that sends the public name it serves; the address checks are off in this module.
+PROXIED = {"X-Forwarded-Host": "fitcher.example.com", "X-Fitcher-Peer": "172.17.0.1",
+           "X-Fitcher-Proxy": "x-forwarded-for, connection: close"}
+
+
+def test_wrong_passwords_through_a_proxy_do_not_lock_out_the_owner_at_this_computer(client):
+    owner.set_password(shared_state(), PASSWORD)
+    answers = [client.post("/owner/session", json={"password": "wrong password"}, headers=PROXIED).status_code
+               for _ in range(owner.FAILURE_LIMIT + 1)]
+
+    assert answers == [401] * owner.FAILURE_LIMIT + [429]
+    local = {"X-Forwarded-Host": "localhost:3000", "X-Fitcher-Peer": "127.0.0.1", "X-Fitcher-Proxy": ""}
+    assert client.post("/owner/session", json={"password": PASSWORD}, headers=local).status_code == 204
+
+
+def test_a_trusted_proxy_has_each_client_counted_apart(client, monkeypatch):
+    monkeypatch.setenv("FITCHER_TRUSTED_PROXIES", "172.17.0.1")
+    owner.set_password(shared_state(), PASSWORD)
+    for _ in range(owner.FAILURE_LIMIT):
+        client.post("/owner/session", json={"password": "wrong password"},
+                    headers={**PROXIED, "X-Forwarded-For": "10.9.9.9, 203.0.113.66"})
+
+    blocked = client.post("/owner/session", json={"password": PASSWORD},
+                          headers={**PROXIED, "X-Forwarded-For": "203.0.113.66"})
+    other = client.post("/owner/session", json={"password": PASSWORD},
+                        headers={**PROXIED, "X-Forwarded-For": "198.51.100.20"})
+
+    assert blocked.status_code == 429
+    assert other.status_code == 204
+
+
+def test_a_forwarded_for_header_from_an_untrusted_peer_is_ignored(client, monkeypatch):
+    monkeypatch.delenv("FITCHER_TRUSTED_PROXIES", raising=False)
+    owner.set_password(shared_state(), PASSWORD)
+    for index in range(owner.FAILURE_LIMIT):
+        client.post("/owner/session", json={"password": "wrong password"},
+                    headers={**PROXIED, "X-Forwarded-For": f"10.0.0.{index}"})
+
+    assert client.post("/owner/session", json={"password": PASSWORD},
+                       headers={**PROXIED, "X-Forwarded-For": "10.0.0.200"}).status_code == 429
