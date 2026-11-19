@@ -11,17 +11,32 @@ from app.contracts.query_spec import ContractModel
 ProviderKind = Literal["openai", "anthropic", "gemini", "ollama", "openai_compatible"]
 
 
+class ProviderKeyView(ContractModel):
+    id: str
+    label: str
+    last4: str | None
+    created_at: str
+
+
 class ProviderView(ContractModel):
     id: str
     name: str
     kind: ProviderKind
     base_url: str | None
+    # Whether the provider has a key, and the last four characters of its first key.
     key_set: bool
     key_last4: str | None
     # A hosted provider bills its calls; the interface labels its test call as paid.
     hosted: bool
-    # A tier or the embedding uses it, so it cannot be removed.
+    # A tier or the embedding uses it.
     in_use: bool
+    # The keys the gateway rotates, oldest first; only their label and last four characters.
+    keys: list[ProviderKeyView] = []
+
+
+class ProviderKeyCreate(ContractModel):
+    api_key: str
+    label: str = ""
 
 
 class ProviderCreate(ContractModel):
@@ -91,11 +106,19 @@ class EvalStatus(ContractModel):
     report_ts: datetime | None = None
 
 
+class ChainLink(ContractModel):
+    provider_id: str
+    model: str
+
+
 class TierView(ContractModel):
     tier: str
+    # The chain's first model, which answers unless it fails.
     provider_id: str | None
     model: str | None
     eval: EvalStatus | None = None
+    # Every model the tier tries, in order.
+    chain: list[ChainLink] = []
 
 
 class EmbeddingView(ContractModel):
@@ -117,11 +140,25 @@ class EmbeddingChange(ContractModel):
     confirm_reindex: bool = False
 
 
+ModelMode = Literal["auto_free", "auto_best", "manual"]
+
+
 class ModelTiersView(ContractModel):
     tiers: list[TierView]
     embedding: EmbeddingView
+    # manual: the owner's chains; auto_free or auto_best: chosen from the model catalog.
+    mode: ModelMode = "manual"
+    # When an automatic mode last chose the chains.
+    refreshed_at: datetime | None = None
 
 
 class TierChange(ContractModel):
-    provider_id: str
-    model: str
+    """One model as the tier's whole chain (``provider_id`` and ``model``), or a whole ``chain``."""
+
+    provider_id: str | None = None
+    model: str | None = None
+    chain: list[ChainLink] | None = None
+
+
+class ModeChange(ContractModel):
+    mode: ModelMode

@@ -1,4 +1,4 @@
-// One chat tier's model, forwarded to the api's PUT /models/tiers/{tier} (admin only).
+// One chat tier's model or fallback chain, forwarded to the api's PUT /models/tiers/{tier} (admin only).
 
 import { forwardJson } from "@/lib/server/api";
 

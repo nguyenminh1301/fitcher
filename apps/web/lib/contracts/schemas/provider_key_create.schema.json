@@ -1,0 +1,19 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "api_key": {
+      "title": "Api Key",
+      "type": "string"
+    },
+    "label": {
+      "default": "",
+      "title": "Label",
+      "type": "string"
+    }
+  },
+  "required": [
+    "api_key"
+  ],
+  "title": "ProviderKeyCreate",
+  "type": "object"
+}

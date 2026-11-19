@@ -32,7 +32,7 @@ def shipped():
 def test_shipped_clickhouse_changes_keep_the_original_files_in_order():
     names = [c.label for c in migrate.discover(migrate.CLICKHOUSE_CHANGES_DIR)]
     assert names == ["0001_databases", "0002_agent_logs", "0003_model_tiers", "0004_documents", "0005_llm_calls_provider",
-                     "0006_search", "0007_keep_conversations"]
+                     "0006_search", "0007_keep_conversations", "0008_llm_calls_fallback"]
 
 
 def test_conversation_tables_lose_the_log_expiry_and_run_logs_keep_it():

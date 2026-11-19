@@ -122,3 +122,34 @@ def test_a_new_instance_stores_no_documents_setting(tmp_path):
     db = StateDb(tmp_path / "app.db")
     migrate.apply_pending(db)
     assert _documents_setting(db) is None
+
+
+def test_a_stored_key_and_tier_models_become_the_first_key_and_the_first_link_of_each_chain(tmp_path):
+    from app.llm.providers import ProviderStore
+    from app.llm.routes import TierMapping, TierModel
+    from app.state.secrets import SecretVault
+
+    db = _state_before(tmp_path, 10)
+    vault = SecretVault(db, bytes(32))
+    stored = "stored-before-1234"
+    with db.write() as conn:
+        conn.execute("INSERT INTO providers (id, name, kind, base_url, created_at) VALUES ('openai', 'OpenAI', 'openai', NULL, 'x')")
+        conn.execute("INSERT INTO providers (id, name, kind, base_url, created_at) VALUES ('ollama', 'Ollama', 'ollama', 'http://h:1', 'y')")
+        vault.set_in(conn, "provider:openai:api_key", stored)
+        for tier, value in (("fast", '{"provider_id": "openai", "model": "gpt-5.4-mini"}'),
+                            ("sql-gen", '{"provider_id": "gone", "model": "m"}')):
+            conn.execute("INSERT INTO settings (group_name, key, value, updated_at) VALUES ('llm.tiers', ?, ?, 'x')",
+                         (tier, value))
+
+    migrate.apply_pending(db)
+
+    store = ProviderStore(db, vault)
+    mapping = TierMapping(db, store)
+    assert [(key.id, key.last4) for key in store.get("openai").keys] == [("legacy", "1234")]
+    assert store.route("openai", "gpt-5.4-mini", vault.reader()).api_key == stored
+    assert store.get("ollama").keys == ()
+    assert mapping.chain("fast") == [TierModel("openai", "gpt-5.4-mini")]
+    assert mapping.chain("sql-gen") == []
+    assert mapping.mode() == ("manual", None)
+    assert db.connection().execute("SELECT count(*) FROM settings WHERE group_name = 'llm.tiers'").fetchone()[0] == 0
+

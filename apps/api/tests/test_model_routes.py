@@ -278,3 +278,37 @@ def test_otherwise_the_first_provider_offers_the_embedding(store, mapping, compi
     bootstrap_from_env(store, mapping, {"OPENAI_API_KEY": KEY}, compiled_embedding=lambda: compiled)
 
     assert mapping.embedding() == EmbeddingChoice("provider", "text-embedding-3-large", 1024, provider_id="openai")
+
+
+def test_a_chain_routes_each_model_through_every_key_of_its_provider(state, store, mapping):
+    store.create("openai", api_key="sk-first-1111")
+    store.add_key("openai", "sk-second-2222")
+    store.create("openai_compatible", base_url="http://lab:1234/v1")
+    mapping.set_chain("sql-gen", [TierModel("openai", "gpt-5.5"), TierModel("openai-compatible", "local"),
+                                  TierModel("openai", "gpt-5.5")])
+
+    chain = SettingsRoutes(mapping, store, state[1].reader()).chain("sql-gen")
+
+    assert mapping.chain("sql-gen") == [TierModel("openai", "gpt-5.5"), TierModel("openai-compatible", "local")]
+    assert [[route.api_key for route in routes] for routes in chain] == [["sk-first-1111", "sk-second-2222"], [None]]
+    assert mapping.tier("sql-gen") == TierModel("openai", "gpt-5.5")
+
+
+def test_an_override_is_the_whole_chain_of_its_tier(state, store, mapping):
+    store.create("openai", api_key="sk-first-1111")
+    mapping.set_chain("fast", [TierModel("openai", "gpt-5.4"), TierModel("openai", "gpt-5.5")])
+
+    chain = SettingsRoutes(mapping, store, state[1].reader(), {"fast": TierModel("openai", "gpt-x")}).chain("fast")
+
+    assert [[route.model for route in routes] for routes in chain] == [["openai/gpt-x"]]
+
+
+def test_a_chain_has_at_least_one_and_at_most_six_models(store, mapping):
+    store.create("openai", api_key="sk-first-1111")
+
+    with pytest.raises(ValueError, match="at least one"):
+        mapping.set_chain("fast", [])
+    with pytest.raises(ValueError, match="at most 6"):
+        mapping.set_chain("fast", [TierModel("openai", f"m{index}") for index in range(7)])
+    with pytest.raises(ValueError, match="unknown model mode"):
+        mapping.set_mode("fastest")

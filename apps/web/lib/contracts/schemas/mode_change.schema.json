@@ -1,0 +1,19 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "mode": {
+      "enum": [
+        "auto_free",
+        "auto_best",
+        "manual"
+      ],
+      "title": "Mode",
+      "type": "string"
+    }
+  },
+  "required": [
+    "mode"
+  ],
+  "title": "ModeChange",
+  "type": "object"
+}

@@ -1,9 +1,12 @@
 """Model providers kept in the app state (DECISIONS §2, §9, §15).
 
 A provider has a kind, a unique display name and, for a model server, a base
-URL. Its key is a secret in the vault (``provider:<id>:api_key``); this store
-reports only whether a key is set and its last four characters, and decrypts
-it only to build a ``Route`` for the gateway with a ``SecretReader``.
+URL. It may hold several API keys (``provider_keys``); each is a secret in the
+vault (``provider:<id>:key:<key id>``, or ``provider:<id>:api_key`` for the key
+with id ``legacy`` that was stored before providers had several keys). The
+gateway rotates the keys of a provider (``app/llm/key_pool.py``). This store
+reports only each key's label and last four characters, and decrypts a key only
+to build a ``Route`` for the gateway with a ``SecretReader``.
 
 Hosted kinds (``openai``, ``anthropic``, ``gemini``) need a key and take no
 base URL. A model server (``ollama``, ``openai_compatible``) needs an HTTP(S)
@@ -13,6 +16,7 @@ the Docker host is reached as ``host.docker.internal`` (DECISIONS §3).
 
 from dataclasses import dataclass
 from datetime import UTC, datetime
+import secrets
 from urllib.parse import urlsplit
 
 from app.llm.gateway import Route
@@ -43,21 +47,37 @@ class ProviderNotFound(LookupError):
 
 
 @dataclass(frozen=True)
+class ProviderKey:
+    id: str
+    label: str
+    last4: str | None
+    created_at: str
+
+
+@dataclass(frozen=True)
 class Provider:
     id: str
     name: str
     kind: str
     base_url: str | None
     key_set: bool
+    # The last four characters of the first key.
     key_last4: str | None
+    keys: tuple[ProviderKey, ...] = ()
 
     @property
     def hosted(self) -> bool:
         return self.kind in HOSTED
 
 
-def key_name(provider_id: str) -> str:
-    return f"provider:{provider_id}:api_key"
+LEGACY_KEY_ID = "legacy"
+
+
+def key_name(provider_id: str, key_id: str = LEGACY_KEY_ID) -> str:
+    """The vault secret of one key of the provider."""
+    if key_id == LEGACY_KEY_ID:
+        return f"provider:{provider_id}:api_key"
+    return f"provider:{provider_id}:key:{key_id}"
 
 
 def _base_url(kind: str, base_url: str | None) -> str | None:
@@ -92,10 +112,54 @@ class ProviderStore:
         self._db = db
         self._vault = vault
 
+    def keys(self, provider_id: str) -> "list[ProviderKey]":
+        """The provider's keys, oldest first."""
+        rows = self._db.connection().execute(
+            "SELECT id, label, created_at FROM provider_keys WHERE provider_id = ? ORDER BY created_at, id",
+            (provider_id,),
+        ).fetchall()
+        return [ProviderKey(key_id, label, self._vault.last_four(key_name(provider_id, key_id)), created)
+                for key_id, label, created in rows]
+
     def _provider(self, row) -> Provider:
         provider_id, name, kind, base_url = row
-        last4 = self._vault.last_four(key_name(provider_id))
-        return Provider(provider_id, name, kind, base_url, last4 is not None, last4)
+        keys = tuple(self.keys(provider_id))
+        return Provider(provider_id, name, kind, base_url, bool(keys), keys[0].last4 if keys else None, keys)
+
+    def _add_key_in(self, conn, provider_id: str, api_key: str, label: str = "") -> str:
+        key_id = secrets.token_hex(4)
+        conn.execute(
+            "INSERT INTO provider_keys (id, provider_id, label, created_at) VALUES (?, ?, ?, ?)",
+            (key_id, provider_id, label.strip()[:60], datetime.now(UTC).isoformat()),
+        )
+        self._vault.set_in(conn, key_name(provider_id, key_id), api_key)
+        return key_id
+
+    def _remove_keys_in(self, conn, provider_id: str) -> None:
+        for (key_id,) in conn.execute("SELECT id FROM provider_keys WHERE provider_id = ?", (provider_id,)).fetchall():
+            self._vault.delete_in(conn, key_name(provider_id, key_id))
+        conn.execute("DELETE FROM provider_keys WHERE provider_id = ?", (provider_id,))
+
+    def add_key(self, provider_id: str, api_key: str, label: str = "") -> ProviderKey:
+        """Add a key the gateway rotates with the provider's other keys."""
+        provider = self.get(provider_id)
+        if provider.kind == "ollama":
+            raise ProviderError("an ollama provider takes no API key")
+        if not api_key or not api_key.strip():
+            raise ProviderError("the key is empty")
+        with self._db.write() as conn:
+            key_id = self._add_key_in(conn, provider_id, api_key.strip(), label)
+        return next(key for key in self.keys(provider_id) if key.id == key_id)
+
+    def remove_key(self, provider_id: str, key_id: str) -> None:
+        provider = self.get(provider_id)
+        if key_id not in {key.id for key in provider.keys}:
+            raise ProviderNotFound(f"provider {provider_id!r} has no key {key_id!r}")
+        if provider.kind in HOSTED and len(provider.keys) == 1:
+            raise ProviderError(f"a {provider.kind} provider needs an API key; add another key before removing this one")
+        with self._db.write() as conn:
+            conn.execute("DELETE FROM provider_keys WHERE provider_id = ? AND id = ?", (provider_id, key_id))
+            self._vault.delete_in(conn, key_name(provider_id, key_id))
 
     def list(self) -> list[Provider]:
         rows = self._db.connection().execute(
@@ -136,7 +200,7 @@ class ProviderStore:
                 (provider_id, name, kind, url, datetime.now(UTC).isoformat()),
             )
             if api_key:
-                self._vault.set_in(conn, key_name(provider_id), api_key)
+                self._add_key_in(conn, provider_id, api_key)
         return self.get(provider_id)
 
     def update(self, provider_id: str, *, name: str | None = None, api_key: str | None = None,
@@ -158,20 +222,32 @@ class ProviderStore:
                 "UPDATE providers SET name = ?, base_url = ? WHERE id = ?",
                 (name if name is not None else current.name, url, provider_id),
             )
+            # A replaced key replaces every key: they all belonged to the old address or account.
             if api_key:
-                self._vault.set_in(conn, key_name(provider_id), api_key)
+                self._remove_keys_in(conn, provider_id)
+                self._add_key_in(conn, provider_id, api_key)
         return self.get(provider_id)
 
     def delete(self, provider_id: str) -> None:
         self.get(provider_id)
         # Removed together, so a provider created later with the same id never finds the old key.
         with self._db.write() as conn:
+            self._remove_keys_in(conn, provider_id)
             conn.execute("DELETE FROM providers WHERE id = ?", (provider_id,))
-            self._vault.delete_in(conn, key_name(provider_id))
+
+    def routes(self, provider_id: str, model: str, reader: SecretReader, *, embedding: bool = False) -> "list[Route]":
+        """One route per key of the provider, oldest key first, or one route without a key."""
+        provider = self.get(provider_id)
+        prefix = (EMBEDDING_PREFIX if embedding else SDK_PREFIX)[provider.kind]
+        target = f"{prefix}/{model}"
+        if not provider.keys:
+            return [Route(provider=provider.id, model=target, api_key=None, api_base=provider.base_url)]
+        return [
+            Route(provider=provider.id, model=target, api_key=reader.get(key_name(provider_id, key.id)),
+                  api_base=provider.base_url, key_id=key.id)
+            for key in provider.keys
+        ]
 
     def route(self, provider_id: str, model: str, reader: SecretReader, *, embedding: bool = False) -> Route:
-        """Where a chat call, or an ``embedding`` call, to ``model`` of the provider goes, with its decrypted key."""
-        provider = self.get(provider_id)
-        api_key = reader.get(key_name(provider_id)) if provider.key_set else None
-        prefix = (EMBEDDING_PREFIX if embedding else SDK_PREFIX)[provider.kind]
-        return Route(provider=provider.id, model=f"{prefix}/{model}", api_key=api_key, api_base=provider.base_url)
+        """Where a chat call, or an ``embedding`` call, to ``model`` of the provider goes, with its first key."""
+        return self.routes(provider_id, model, reader, embedding=embedding)[0]

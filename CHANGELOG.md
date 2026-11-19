@@ -4,6 +4,7 @@
 
 ### Added
 
+- Each chat tier has an ordered fallback chain of models: when a model is rate limited, times out, is unreachable, returns a server error or an empty reply, the next model answers, and the error after the last model lists every attempt. A provider can hold several API keys, which are used in turn; a rate-limited key rests for the provider's Retry-After time and a refused key is skipped. The chains can be chosen automatically from the model catalog, from free models only (`auto_free`) or the best benchmarked ones (`auto_best`), again whenever a provider or key changes and once a day. App-state change 0011 keeps each tier's model as the first link of its chain and the stored key as the provider's first key; ClickHouse change 0008 adds `fallback_of` to `llm_calls`.
 - `GET /api/models/catalog?provider=` describes each model of a provider: chat, embedding or other (speech, images, classifiers), whether it is free or has a free tier, its price per million tokens, context length, structured output, Artificial Analysis' intelligence index from OpenRouter's public list, and the median latency of this instance's own calls over the last 7 days. The catalog is kept six hours per provider and key.
 - The admin Costs rows report the input and output tokens of their calls, and each run reports its input and output tokens and the models that answered it, summed from the logged model calls.
 - Z.ai is offered among the model services when adding a provider, with its OpenAI-compatible endpoint and a link to its key page.

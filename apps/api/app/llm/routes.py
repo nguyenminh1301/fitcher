@@ -1,9 +1,12 @@
 """Which model of which provider serves each tier, and the gateway's resolver over it (DECISIONS §2).
 
-The mapping lives in the app state: setting group ``llm.tiers`` holds
-``{"provider_id", "model"}`` per chat tier, and ``llm.embedding`` the embed
-tier's backend, model and vector size. Any model of a configured provider may
-serve a chat tier; an eval result informs the choice and no longer gates it.
+The mapping lives in the app state: ``tier_chain`` holds each chat tier's
+ordered fallback chain of models (the first answers unless it fails), and
+setting group ``llm.embedding`` the embed tier's backend, model and vector
+size. Any model of a configured provider may serve a chat tier; an eval result
+informs the choice and does not gate it. ``model_mode`` says whether the owner
+sets the chains (``manual``) or they are chosen from the model catalog
+(``auto_free``, ``auto_best``; ``app/llm/auto.py``).
 Adding the first provider fills every unmapped chat tier from ``defaults``,
 and, while no embedding was chosen, the embed tier with the provider's
 embedding model: the local models lost retrieval recall against it
@@ -25,6 +28,7 @@ the embedding and recompiles.
 
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
+from datetime import UTC, datetime
 import logging
 import os
 
@@ -37,7 +41,6 @@ from app.state.db import shared_state, StateDb
 from app.state.secrets import SecretError, SecretReader, shared_vault
 from app.state.settings import Settings
 
-TIERS_GROUP = "llm.tiers"
 EMBEDDING_GROUP = "llm.embedding"
 DEFAULT_DIMENSIONS = 1024
 # The order in which environment providers are created; the first one maps the tiers.
@@ -64,6 +67,11 @@ LEGACY_ALIASES = {
 
 # The embedding model of the proxy era's openai-embed alias.
 LEGACY_EMBEDDING_ALIASES = {"openai-embed": ("openai", "text-embedding-3-large")}
+
+
+MODES = ("auto_free", "auto_best", "manual")
+# The most models a chain tries; more would only delay the error of a request every model refuses.
+MAX_CHAIN = 6
 
 
 class RouteError(LookupError):
@@ -96,26 +104,70 @@ LOCAL_DEFAULT = EmbeddingChoice("local", defaults.LOCAL_EMBEDDING_MODEL, LOCAL_M
 
 class TierMapping:
     def __init__(self, db: StateDb, store: ProviderStore):
+        self._db = db
         self._settings = Settings(db)
         self._store = store
 
-    def tier(self, tier: str) -> TierModel | None:
+    def chain(self, tier: str) -> list[TierModel]:
+        """The tier's models in the order they are tried."""
         check_chat_tier(tier)
-        value = self._settings.get(TIERS_GROUP, tier)
-        return TierModel(value["provider_id"], value["model"]) if value else None
+        rows = self._db.connection().execute(
+            "SELECT provider_id, model FROM tier_chain WHERE tier = ? ORDER BY position", (tier,),
+        ).fetchall()
+        return [TierModel(provider_id, model) for provider_id, model in rows]
+
+    def tier(self, tier: str) -> TierModel | None:
+        """The tier's first model."""
+        chain = self.chain(tier)
+        return chain[0] if chain else None
 
     def tiers(self) -> dict[str, TierModel]:
-        """Every mapped chat tier."""
+        """The first model of every mapped chat tier."""
         return {tier: model for tier in CHAT_TIERS if (model := self.tier(tier)) is not None}
 
-    def set_tier(self, tier: str, provider_id: str, model: str) -> TierModel:
+    def set_chain(self, tier: str, links: list[TierModel]) -> list[TierModel]:
+        """Replace the tier's chain; a model listed twice is kept at its first place."""
         check_chat_tier(tier)
-        if not model or not model.strip():
-            raise ValueError("a tier needs a model name")
-        self._store.get(provider_id)
-        mapped = TierModel(provider_id, model.strip())
-        self._settings.set(TIERS_GROUP, tier, {"provider_id": mapped.provider_id, "model": mapped.model})
-        return mapped
+        chain: list[TierModel] = []
+        for link in links:
+            if not link.model or not link.model.strip():
+                raise ValueError("a tier needs a model name")
+            self._store.get(link.provider_id)
+            mapped = TierModel(link.provider_id, link.model.strip())
+            if mapped not in chain:
+                chain.append(mapped)
+        if not chain:
+            raise ValueError("a tier needs at least one model")
+        if len(chain) > MAX_CHAIN:
+            raise ValueError(f"a tier tries at most {MAX_CHAIN} models")
+        with self._db.write() as conn:
+            conn.execute("DELETE FROM tier_chain WHERE tier = ?", (tier,))
+            conn.executemany(
+                "INSERT INTO tier_chain (tier, position, provider_id, model) VALUES (?, ?, ?, ?)",
+                [(tier, position, link.provider_id, link.model) for position, link in enumerate(chain)],
+            )
+        return chain
+
+    def set_tier(self, tier: str, provider_id: str, model: str) -> TierModel:
+        """Make one model the tier's whole chain."""
+        return self.set_chain(tier, [TierModel(provider_id, model)])[0]
+
+    def mode(self) -> tuple[str, datetime | None]:
+        """How the chains are chosen, and when an automatic mode last chose them."""
+        row = self._db.connection().execute("SELECT mode, refreshed_at FROM model_mode WHERE id = 1").fetchone()
+        if row is None:
+            return "manual", None
+        return row[0], datetime.fromisoformat(row[1]) if row[1] else None
+
+    def set_mode(self, mode: str, refreshed_at: datetime | None = None) -> None:
+        if mode not in MODES:
+            raise ValueError(f"unknown model mode {mode!r}; use one of {', '.join(MODES)}")
+        with self._db.write() as conn:
+            conn.execute(
+                "INSERT INTO model_mode (id, mode, refreshed_at) VALUES (1, ?, ?) "
+                "ON CONFLICT(id) DO UPDATE SET mode = excluded.mode, refreshed_at = excluded.refreshed_at",
+                (mode, refreshed_at.astimezone(UTC).isoformat() if refreshed_at else None),
+            )
 
     def embedding_chosen(self) -> bool:
         """Whether a provider or an admin set the embedding; until then it is the local default."""
@@ -151,8 +203,20 @@ class TierMapping:
         self._settings.set(EMBEDDING_GROUP, "backend", "local")
         return self.embedding()
 
+    def providers_needed(self) -> set[str]:
+        """The providers that alone serve a chat tier, or serve the embedding: removing one would leave it unserved."""
+        needed = set()
+        for tier in CHAT_TIERS:
+            providers = {link.provider_id for link in self.chain(tier)}
+            if len(providers) == 1:
+                needed |= providers
+        embedding = self.embedding()
+        if embedding.provider_id:
+            needed.add(embedding.provider_id)
+        return needed
+
     def providers_in_use(self) -> set[str]:
-        used = {model.provider_id for model in self.tiers().values()}
+        used = {link.provider_id for tier in CHAT_TIERS for link in self.chain(tier)}
         embedding = self.embedding()
         if embedding.provider_id:
             used.add(embedding.provider_id)
@@ -192,6 +256,27 @@ class SettingsRoutes:
 
     def _chat(self, tier: str) -> TierModel | None:
         return self._overrides.get(tier) or self._mapping.tier(tier)
+
+    def chain(self, tier: str) -> list[list[Route]]:
+        """The tier's chain for the gateway: per model, one route per key of its provider.
+
+        An eval run's override is the whole chain, so the run measures that model alone. A link whose key
+        cannot be read is skipped while another link remains.
+        """
+        if tier == EMBED_TIER:
+            return [[self.route(tier)]]
+        links = [self._overrides[tier]] if tier in self._overrides else self._mapping.chain(tier)
+        if not links:
+            raise RouteError(f"no model is mapped to the {tier} tier; add a provider on the Models page")
+        chain, unreadable = [], None
+        for link in links:
+            try:
+                chain.append(self._store.routes(link.provider_id, link.model, self._reader))
+            except SecretError:
+                unreadable = link.provider_id
+        if not chain:
+            raise RouteError(f"the key of provider {unreadable} cannot be read; enter it again on the Models page")
+        return chain
 
     def labels(self) -> dict[str, str]:
         """``provider/model`` of every mapped tier, as eval reports record them."""

@@ -1,5 +1,24 @@
 {
   "$defs": {
+    "ChainLink": {
+      "additionalProperties": false,
+      "properties": {
+        "provider_id": {
+          "title": "Provider Id",
+          "type": "string"
+        },
+        "model": {
+          "title": "Model",
+          "type": "string"
+        }
+      },
+      "required": [
+        "provider_id",
+        "model"
+      ],
+      "title": "ChainLink",
+      "type": "object"
+    },
     "EmbeddingView": {
       "additionalProperties": false,
       "properties": {
@@ -134,6 +153,14 @@
             }
           ],
           "default": null
+        },
+        "chain": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/ChainLink"
+          },
+          "title": "Chain",
+          "type": "array"
         }
       },
       "required": [
@@ -156,6 +183,29 @@
     },
     "embedding": {
       "$ref": "#/$defs/EmbeddingView"
+    },
+    "mode": {
+      "default": "manual",
+      "enum": [
+        "auto_free",
+        "auto_best",
+        "manual"
+      ],
+      "title": "Mode",
+      "type": "string"
+    },
+    "refreshed_at": {
+      "anyOf": [
+        {
+          "format": "date-time",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Refreshed At"
     }
   },
   "required": [

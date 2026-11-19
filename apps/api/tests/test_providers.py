@@ -6,7 +6,7 @@ import pytest
 from state_fixtures import new_state
 
 from app.llm import defaults
-from app.llm.providers import KINDS, ProviderError, ProviderNotFound, ProviderStore
+from app.llm.providers import key_name, KINDS, ProviderError, ProviderNotFound, ProviderStore
 
 KEY = "sk-test-provider-key-9876"
 
@@ -28,7 +28,8 @@ def test_a_hosted_provider_keeps_its_key_in_the_vault_and_shows_only_the_last_fo
 
     assert (provider.id, provider.name, provider.kind) == ("openai", "OpenAI", "openai")
     assert provider.key_set and provider.key_last4 == "9876"
-    assert vault.reader().get("provider:openai:api_key") == KEY
+    assert [key.last4 for key in provider.keys] == ["9876"]
+    assert vault.reader().get(key_name("openai", provider.keys[0].id)) == KEY
     dump = "\n".join(db.connection().iterdump())
     assert KEY not in dump
     assert KEY not in repr(provider)
@@ -92,7 +93,9 @@ def test_update_replaces_the_key_and_renames_without_touching_the_rest(state, st
     updated = store.update("anthropic", name="Claude", api_key="sk-ant-new-4321")
 
     assert (updated.name, updated.key_last4, updated.kind) == ("Claude", "4321", "anthropic")
-    assert state[1].reader().get("provider:anthropic:api_key") == "sk-ant-new-4321"
+    assert [key.last4 for key in updated.keys] == ["4321"]
+    assert state[1].reader().get(key_name("anthropic", updated.keys[0].id)) == "sk-ant-new-4321"
+    assert not state[1].has(key_name("anthropic", "legacy"))
     assert store.update("anthropic").key_last4 == "4321"
 
 
@@ -103,12 +106,14 @@ def test_update_checks_the_base_url_like_create(store):
 
 
 def test_delete_removes_the_row_and_its_key(state, store):
-    store.create("gemini", api_key=KEY)
+    created = store.create("gemini", api_key=KEY)
+    second = store.add_key("gemini", "AIza-second-5555")
 
     store.delete("gemini")
 
     assert store.list() == []
-    assert not state[1].has("provider:gemini:api_key")
+    assert not state[1].has(key_name("gemini", created.keys[0].id))
+    assert not state[1].has(key_name("gemini", second.id))
     with pytest.raises(ProviderNotFound):
         store.get("gemini")
     with pytest.raises(ProviderNotFound):
@@ -230,3 +235,48 @@ def test_an_ollama_embedding_route_uses_the_sdks_embedding_prefix(state, store):
 
     assert store.route("ollama", "nomic-embed-text", reader, embedding=True).model == "ollama/nomic-embed-text"
     assert store.route("ollama", "qwen2.5-coder:7b", reader).model == "ollama_chat/qwen2.5-coder:7b"
+
+
+def test_a_provider_holds_several_keys_and_routes_one_per_key_oldest_first(state, store):
+    store.create("openai_compatible", name="Groq", base_url="https://api.groq.com/openai/v1", api_key="gsk-first-1111")
+
+    added = store.add_key("openai-compatible", "gsk-second-2222", label=" spare ")
+    routes = store.routes("openai-compatible", "openai/gpt-oss-120b", state[1].reader())
+
+    assert (added.label, added.last4) == ("spare", "2222")
+    assert [route.api_key for route in routes] == ["gsk-first-1111", "gsk-second-2222"]
+    assert [route.key_id for route in routes] == [key.id for key in store.get("openai-compatible").keys]
+    assert {route.model for route in routes} == {"openai/openai/gpt-oss-120b"}
+    assert store.route("openai-compatible", "m", state[1].reader()).api_key == "gsk-first-1111"
+
+
+def test_a_key_is_removed_alone_but_a_hosted_provider_keeps_its_last_key(state, store):
+    first = store.create("openai", api_key=KEY).keys[0]
+    second = store.add_key("openai", "sk-second-2222")
+
+    store.remove_key("openai", first.id)
+
+    assert [key.id for key in store.get("openai").keys] == [second.id]
+    assert not state[1].has(key_name("openai", first.id))
+    with pytest.raises(ProviderError, match="needs an API key"):
+        store.remove_key("openai", second.id)
+    with pytest.raises(ProviderNotFound):
+        store.remove_key("openai", "missing")
+
+
+def test_keys_are_refused_where_they_do_not_fit(store):
+    store.create("ollama", base_url="http://host.docker.internal:11434")
+    store.create("openai", api_key=KEY)
+
+    with pytest.raises(ProviderError, match="no API key"):
+        store.add_key("ollama", "anything")
+    with pytest.raises(ProviderError, match="empty"):
+        store.add_key("openai", "  ")
+
+
+def test_a_provider_without_keys_routes_once_without_a_key(state, store):
+    store.create("openai_compatible", base_url="http://lab:1234/v1")
+
+    routes = store.routes("openai-compatible", "local-model", state[1].reader())
+
+    assert [(route.api_key, route.key_id) for route in routes] == [(None, None)]

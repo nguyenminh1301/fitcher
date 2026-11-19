@@ -26,8 +26,8 @@ from app.contracts.evaluation import EvalReportView, EvalRunStarted  # noqa: E40
 from app.contracts.events import AskEvent, AskRequest  # noqa: E402
 from app.contracts.feedback import FeedbackInput  # noqa: E402
 from app.contracts.providers import (  # noqa: E402
-    EmbeddingChange, EmbeddingView, ModelCatalog, ModelTiersView, ProviderCreate, ProviderModels, ProviderTestRequest,
-    ProviderTestResult, ProviderUpdate, ProviderView, TierChange, TierView,
+    EmbeddingChange, EmbeddingView, ModeChange, ModelCatalog, ModelTiersView, ProviderCreate, ProviderKeyCreate,
+    ProviderModels, ProviderTestRequest, ProviderTestResult, ProviderUpdate, ProviderView, TierChange, TierView,
 )
 from app.contracts.query_spec import QuerySpec  # noqa: E402
 from app.contracts.result import Result  # noqa: E402
@@ -59,6 +59,8 @@ CONTRACTS = {
     "provider_view": (ProviderView, "serialization"),
     "provider_create": (ProviderCreate, "validation"),
     "provider_update": (ProviderUpdate, "validation"),
+    "provider_key_create": (ProviderKeyCreate, "validation"),
+    "mode_change": (ModeChange, "validation"),
     "provider_models": (ProviderModels, "serialization"),
     "model_catalog": (ModelCatalog, "serialization"),
     "provider_test_request": (ProviderTestRequest, "validation"),

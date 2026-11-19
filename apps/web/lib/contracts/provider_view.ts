@@ -8,6 +8,11 @@ export type KeySet = boolean;
 export type KeyLast4 = string | null;
 export type Hosted = boolean;
 export type InUse = boolean;
+export type Id1 = string;
+export type Label = string;
+export type Last4 = string | null;
+export type CreatedAt = string;
+export type Keys = ProviderKeyView[];
 
 export interface ProviderView {
   id: Id;
@@ -18,4 +23,11 @@ export interface ProviderView {
   key_last4: KeyLast4;
   hosted: Hosted;
   in_use: InUse;
+  keys?: Keys;
+}
+export interface ProviderKeyView {
+  id: Id1;
+  label: Label;
+  last4: Last4;
+  created_at: CreatedAt;
 }

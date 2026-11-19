@@ -9,6 +9,17 @@ error types: a failed call raises ``LLMError`` or ``EmbeddingError`` naming
 the model and the error type only, because a provider's message can quote the
 request or part of the key.
 
+A resolver that has ``chain(tier)`` gives a chat tier an ordered fallback
+chain: each link is one model with one route per API key of its provider. The
+gateway tries the keys of a link in the ``KeyPool``'s round-robin order; a
+rate-limited key rests and a refused key is dropped, and the next key is
+tried. A rate limit with no key left, a timeout, a connection error, a 5xx, a
+missing model or an empty reply moves to the next model. A request the model
+rejected as invalid (400, 422, a context too long) stops the chain, because
+the next model would get the same request. When every model failed, the
+``LLMError`` lists each attempt. With a chain the SDK's own retries are off:
+the next key or model is the retry.
+
 Before any provider call the gateway checks screening (DECISIONS §9, Layer
 0): the call must carry the ``screening`` metadata of ``llm_metadata`` (the
 run's ``allow`` or ``flag`` verdict, or ``trusted_pack`` for reviewed pack
@@ -37,6 +48,7 @@ import json
 import os
 import time
 from typing import Any, Protocol, TypeVar
+import uuid
 
 from pydantic import BaseModel, ValidationError
 
@@ -44,6 +56,7 @@ from app.llm import call_log as calls
 from app.llm.call_log import CallLog
 from app.llm.client import GatewayBlocked, LLMError, Prompt
 from app.llm.embeddings import EmbeddingError
+from app.llm.key_pool import KeyPool, SHARED as SHARED_KEYS
 from app.llm.tiers import check_chat_tier, EMBED_TIER
 from app.observability.tracing import llm_metadata, TRUSTED_PACK
 from app.screening import rules
@@ -66,9 +79,11 @@ class Route:
     model: str
     api_key: str | None = None
     api_base: str | None = None
+    # The provider's key this route uses (``provider_keys``); None for a provider without keys.
+    key_id: str | None = None
 
     def __repr__(self) -> str:
-        return f"Route(provider={self.provider!r}, model={self.model!r}, api_base={self.api_base!r})"
+        return f"Route(provider={self.provider!r}, model={self.model!r}, api_base={self.api_base!r}, key_id={self.key_id!r})"
 
 
 class RouteResolver(Protocol):
@@ -108,7 +123,46 @@ def _sdk_embedding(**kwargs):
 
 
 class _ProviderFailure(Exception):
-    """The SDK call raised; carries only the error type's name."""
+    """The SDK call raised; carries only the error type's name, the provider's Retry-After and the logged call id."""
+
+    def __init__(self, error_type: str, retry_after: float | None = None, call_id: str = ""):
+        super().__init__(error_type)
+        self.error_type = error_type
+        self.retry_after = retry_after
+        self.call_id = call_id
+
+
+# Some OpenAI-compatible providers answer a refused key or a rate limit in a shape the SDK reports as another
+# error type; the HTTP status is what the chain acts on.
+STATUS_TYPES = {401: "AuthenticationError", 403: "PermissionDeniedError", 429: "RateLimitError"}
+
+
+def error_type(error: Exception) -> str:
+    """The SDK error's type name, or the type its HTTP status means when the SDK named another."""
+    status = getattr(error, "status_code", None)
+    return STATUS_TYPES.get(status, type(error).__name__) if isinstance(status, int) else type(error).__name__
+
+
+def _retry_after(error: Exception) -> float | None:
+    """The seconds a rate-limited provider asked to wait, from its Retry-After header."""
+    response = getattr(error, "response", None)
+    headers = getattr(response, "headers", None) or getattr(error, "litellm_response_headers", None) or {}
+    try:
+        value = headers.get("retry-after") or headers.get("Retry-After")
+        return float(value) if value is not None else None
+    except (AttributeError, TypeError, ValueError):
+        return None
+
+
+# What the chain does after a failure, by the SDK's error type: try the provider's next key and rest or
+# drop this one, stop because every model would get the same invalid request, or else move to the next model.
+REST_KEY = frozenset({"RateLimitError"})
+DROP_KEY = frozenset({"AuthenticationError", "PermissionDeniedError"})
+STOP_CHAIN = frozenset({
+    "BadRequestError", "UnprocessableEntityError", "ContextWindowExceededError", "ContentPolicyViolationError",
+    "UnsupportedParamsError",
+})
+EMPTY_REPLY = "EmptyReply"
 
 
 # What a person can do about a provider failure, by the SDK's error type. The provider's own message is never
@@ -142,16 +196,21 @@ class _Sender:
     timeout: float
     retries: int
 
-    def send(self, tier: str, route: Route, texts: Sequence[str], request: dict) -> Any:
+    def send(self, tier: str, route: Route, texts: Sequence[str], request: dict, *,
+             retries: int | None = None, fallback_of: str = "") -> tuple[Any, str]:
+        """The SDK's reply and the call id logged for it."""
         metadata = llm_metadata()
         started_at, started = calls.now(), time.monotonic()
+        attempt_id = uuid.uuid4().hex
 
-        def log(status: str, error: str = "", response: Any = None, cost: float | None = None) -> None:
-            calls.write(self.call_log, calls.call_record(
+        def log(status: str, error: str = "", response: Any = None, cost: float | None = None) -> str:
+            record = calls.call_record(
                 metadata=metadata, tier=tier, provider=route.provider, model=route.model, started_at=started_at,
                 latency_ms=round((time.monotonic() - started) * 1000), status=status, error=error,
-                response=response, cost=cost,
-            ))
+                response=response, cost=cost, fallback_of=fallback_of, call_id=attempt_id,
+            )
+            calls.write(self.call_log, record)
+            return record.call_id
 
         reason = screening_rejection(metadata.get("screening"), texts)
         if reason is not None:
@@ -160,13 +219,19 @@ class _Sender:
         try:
             response = self.sdk(
                 model=route.model, api_key=route.api_key, api_base=route.api_base, timeout=self.timeout,
-                num_retries=self.retries, drop_params=True, **request,
+                num_retries=self.retries if retries is None else retries, drop_params=True, **request,
             )
         except Exception as error:  # noqa: BLE001 - every SDK and provider failure is reported by type only
-            log("failure", type(error).__name__)
-            raise _ProviderFailure(type(error).__name__) from None
-        log("success", response=response, cost=calls.estimate_cost(response, route.model, self.call_type))
-        return response
+            kind = error_type(error)
+            call_id = log("failure", kind)
+            raise _ProviderFailure(kind, _retry_after(error), call_id) from None
+        call_id = log("success", response=response, cost=calls.estimate_cost(response, route.model, self.call_type))
+        return response, call_id
+
+
+def _attempts_text(tier: str, attempts: Sequence[tuple[str, str]]) -> str:
+    listed = "; ".join(f"{model}: {failure_text(reason)}" for model, reason in attempts)
+    return f"every model of the {tier} tier failed: {listed}"
 
 
 class Gateway:
@@ -181,10 +246,12 @@ class Gateway:
         temperature: float | None = None,
         timeout: float = TIMEOUT_SECONDS,
         retries: int = RETRIES,
+        keys: KeyPool | None = None,
     ):
         self._resolver = resolver
         self._sender = _Sender(completion or _sdk_completion, "completion", call_log, timeout, retries)
         self._temperature = temperature
+        self._keys = keys or SHARED_KEYS
 
     def structured(self, tier: str, prompt: Prompt, schema: type[ModelT]) -> ModelT:
         response_format = {
@@ -203,13 +270,22 @@ class Gateway:
     def text(self, tier: str, prompt: Prompt) -> str:
         return self._complete(tier, prompt, None)[1]
 
-    def _complete(self, tier: str, prompt: Prompt, response_format: dict | None) -> tuple[str, str]:
-        """The model ``tier`` resolved to, and its reply text."""
-        check_chat_tier(tier)
+    def _links(self, tier: str) -> list[list[Route]]:
+        """The tier's chain: per model, one route per key; a resolver without chains gives one model."""
         try:
-            route = self._resolver.route(tier)
+            chain = getattr(self._resolver, "chain", None)
+            links = chain(tier) if chain is not None else [[self._resolver.route(tier)]]
         except LookupError as error:  # no model mapped to the tier, or its provider is gone
             raise LLMError(str(error)) from None
+        links = [routes for routes in links if routes]
+        if not links:
+            raise LLMError(f"no model is mapped to the {tier} tier; add a provider on the Models page")
+        return links
+
+    def _complete(self, tier: str, prompt: Prompt, response_format: dict | None) -> tuple[str, str]:
+        """The model that answered ``tier``, and its reply text."""
+        check_chat_tier(tier)
+        links = self._links(tier)
         request: dict = {
             "messages": [{"role": "system", "content": prompt.system}, {"role": "user", "content": prompt.user}],
         }
@@ -217,21 +293,55 @@ class Gateway:
             request["response_format"] = response_format
         if self._temperature is not None:
             request["temperature"] = self._temperature
+        single = len(links) == 1 and len(links[0]) == 1
+        attempts: list[tuple[str, str]] = []
+        previous = ""
+        for routes in links:
+            usable = self._keys.order(routes)
+            if not usable:
+                attempts.append((routes[0].model, "RateLimitError"))
+                continue
+            for route in usable:
+                try:
+                    content, previous = self._ask(tier, route, prompt, request, None if single else 0, previous)
+                except _ProviderFailure as failure:
+                    previous = failure.call_id
+                    attempts.append((route.model, failure.error_type))
+                    if single or failure.error_type in STOP_CHAIN:
+                        raise LLMError(f"request to model {route.model} failed: {failure_text(failure.error_type)}",
+                                       tuple(attempts)) from None
+                    if failure.error_type in REST_KEY:
+                        self._keys.rest(route, failure.retry_after)
+                        continue
+                    if failure.error_type in DROP_KEY:
+                        self._keys.refuse(route)
+                        continue
+                    break
+                if content is None:
+                    attempts.append((route.model, EMPTY_REPLY))
+                    if single:
+                        raise LLMError(f"model {route.model} returned an empty reply", tuple(attempts))
+                    break
+                return route.model, content
+        raise LLMError(_attempts_text(tier, attempts), tuple(attempts))
+
+    def _ask(self, tier: str, route: Route, prompt: Prompt, request: dict, retries: int | None,
+             fallback_of: str) -> tuple[str | None, str]:
+        """The route's reply text, or None when it stayed empty, and the last call id logged."""
         # A reasoning model sometimes spends its whole reply on reasoning and returns no content; it is asked
-        # once more before the call fails.
+        # once more before the route counts as failed.
+        call_id = fallback_of
         for _ in range(EMPTY_REPLY_ATTEMPTS):
-            try:
-                response = self._sender.send(tier, route, (prompt.system, prompt.user), request)
-            except _ProviderFailure as failure:
-                raise LLMError(f"request to model {route.model} failed: {failure_text(str(failure))}") from None
+            response, call_id = self._sender.send(tier, route, (prompt.system, prompt.user), request,
+                                                  retries=retries, fallback_of=fallback_of)
             choices = calls.field(response, "choices")
             message = calls.field(choices[0], "message") if isinstance(choices, list) and choices else None
             content = calls.field(message, "content")
             if content is not None and not isinstance(content, str):
                 raise LLMError(f"model {route.model} returned a malformed reply")
             if content and content.strip():
-                return route.model, content
-        raise LLMError(f"model {route.model} returned an empty reply")
+                return content, call_id
+        return None, call_id
 
 
 class GatewayEmbeddings:
@@ -265,7 +375,7 @@ class GatewayEmbeddings:
         except LookupError as error:  # no embedding model set, or its provider is gone
             raise EmbeddingError(str(error)) from None
         try:
-            response = self._sender.send(EMBED_TIER, route, texts, {"input": texts, "dimensions": self.dimensions})
+            response, _ = self._sender.send(EMBED_TIER, route, texts, {"input": texts, "dimensions": self.dimensions})
         except _ProviderFailure as failure:
             raise EmbeddingError(f"embedding request to model {route.model} failed: {failure}") from None
         data = sorted(calls.field(response, "data") or [], key=lambda item: calls.field(item, "index"))

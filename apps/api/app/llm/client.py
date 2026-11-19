@@ -22,7 +22,14 @@ ModelT = TypeVar("ModelT", bound=BaseModel)
 
 
 class LLMError(RuntimeError):
-    """The gateway call failed or the reply did not match the requested schema."""
+    """The gateway call failed or the reply did not match the requested schema.
+
+    ``attempts`` lists each model the tier's chain tried, with the error type it failed with.
+    """
+
+    def __init__(self, message: str, attempts: tuple[tuple[str, str], ...] = ()):
+        super().__init__(message)
+        self.attempts = attempts
 
 
 class GatewayBlocked(Exception):
