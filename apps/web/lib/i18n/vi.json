@@ -642,7 +642,8 @@
     "tablesOf_one": "{selected} trên {count} bảng",
     "datasetCount": "{count} dataset",
     "manage": "Quản lý nguồn dữ liệu",
-    "answerFrom": "Trả lời từ"
+    "answerFrom": "Trả lời từ",
+    "datasetCount_one": "{count} dataset"
   },
   "owner": {
     "signInTitle": "Mở fitcher",
