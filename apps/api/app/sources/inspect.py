@@ -174,7 +174,9 @@ class Inspector:
             cols, unusual = grouped.get(name, ((), ()))
             result.append(TableInfo(
                 name=name, kind="view" if is_view else "table", rows=estimate,
-                size_bytes=None if is_view else int(pages) * PAGE_BYTES, columns=cols,
+                # A table never analysed reports no pages although it holds rows: its size is unknown, not 0 B.
+                size_bytes=None if is_view or (int(pages) == 0 and (estimate or 0) > 0) else int(pages) * PAGE_BYTES,
+                columns=cols,
                 primary_key=primary.get(name, ()), foreign_keys=tuple(foreign.get(name, ())), unusual_columns=unusual))
         return result
 

@@ -9,6 +9,7 @@
 
 ### Fixed
 
+- A PostgreSQL table that was never analysed shows an unknown size when choosing tables, instead of 0 B.
 - A question for "all time" is answered over every date the data has instead of failing with an internal error.
 - A CSV file separated by semicolons or tabs is read column by column; before, its columns were proposed as one text column.
 - English counts of one read in the singular ("1 table", "1 source", "Build the pack from 1 table") instead of "1 tables".
