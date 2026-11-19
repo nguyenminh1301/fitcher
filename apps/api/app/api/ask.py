@@ -115,6 +115,9 @@ class AnswerEvents:
         if state.get("clarification"):
             asked = state["clarification"]
             return [ClarifyEvent(**trace, question=asked.question, options=asked.options, lang=asked.lang), DoneEvent(**trace)]
+        if state.get("model_error"):
+            # The model did not answer: the client says so in its own language and offers to try again.
+            return [ErrorEvent(**trace, kind="model", message="The model did not answer.", error=state["model_error"])]
         if state.get("rejection"):
             # A question the flow cannot read at all is refused in English, without options.
             return [ClarifyEvent(**trace, question=state["rejection"], lang="en"), DoneEvent(**trace)]

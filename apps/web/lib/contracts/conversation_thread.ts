@@ -76,7 +76,7 @@ export type TraceId8 = string;
 export type Event8 = "done";
 export type TraceId9 = string;
 export type Event9 = "error";
-export type Kind = "failed" | "internal";
+export type Kind = "failed" | "internal" | "model";
 export type Message2 = string;
 export type Sql1 = string | null;
 export type Error = string | null;
@@ -194,7 +194,8 @@ export interface DoneEvent {
   event: Event8;
 }
 /**
- * ``failed``: no SQL attempt produced a result; ``internal``: the run broke, with no detail for the client.
+ * ``failed``: no SQL attempt produced a result; ``internal``: the run broke, with no detail for the client;
+ * ``model``: the model call that reads the question failed, with the provider's reason in ``error``.
  */
 export interface ErrorEvent {
   trace_id: TraceId9;

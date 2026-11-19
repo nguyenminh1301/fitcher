@@ -9,6 +9,7 @@
 
 ### Fixed
 
+- When the model does not answer the question (a free model's rate limit, an outage), the chat says so in the question's language with the provider's message and a Try again button; it used to show the raw error in English as if fitcher were asking back, and the run is now recorded as failed.
 - A tab separated CSV file loads; ClickHouse refused it before, so the load failed after the columns were confirmed.
 - Before building a pack, the setup says how many analysis tables the pack gets and that some join related tables, instead of a count that did not match the tables chosen.
 - Runs where fitcher asked a question back, or that were blocked or stopped, show "Asked back", "Blocked" or "Stopped" on the Runs and Overview pages instead of an untranslated key, and the Runs filter offers them.

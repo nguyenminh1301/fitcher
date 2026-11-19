@@ -67,6 +67,7 @@ def test_extract_refuses_when_the_gateway_fails():
     update = extract({"question": "q"}, deps([LLMError("alias fast returned HTTP 500")]))
 
     assert update["rejection"] == "the question could not be read: alias fast returned HTTP 500"
+    assert update["model_error"] == "alias fast returned HTTP 500"
 
 
 # retrieve

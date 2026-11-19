@@ -169,6 +169,15 @@ describe("answer", () => {
     expect(screen.queryByRole("radiogroup", { name: "Chart type" })).toBeNull();
   });
 
+  it("says the model did not answer, shows the provider's reason and offers a retry instead of asking back", () => {
+    const { onRetry } = show([status("extract"), { event: "error", kind: "model", message: "The model did not answer.", sql: null, error: "RateLimitError (the provider is limiting requests)", trace_id: T }]);
+
+    expect(screen.getByText("The model did not answer")).toBeTruthy();
+    expect(screen.getByText("RateLimitError (the provider is limiting requests)")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+    expect(onRetry).toHaveBeenCalled();
+  });
+
   it("sends a clarifying option as a follow-up question", () => {
     const { onFollowUp } = show([{ event: "clarify", question: "Which measure?", options: [{ id: "a", label: "Net sales" }, { id: "b", label: "Orders" }], lang: "en", trace_id: T }, { event: "done", trace_id: T }]);
 

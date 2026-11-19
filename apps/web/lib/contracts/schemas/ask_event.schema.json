@@ -358,7 +358,7 @@
     },
     "ErrorEvent": {
       "additionalProperties": false,
-      "description": "``failed``: no SQL attempt produced a result; ``internal``: the run broke, with no detail for the client.",
+      "description": "``failed``: no SQL attempt produced a result; ``internal``: the run broke, with no detail for the client;\n``model``: the model call that reads the question failed, with the provider's reason in ``error``.",
       "properties": {
         "trace_id": {
           "title": "Trace Id",
@@ -373,7 +373,8 @@
         "kind": {
           "enum": [
             "failed",
-            "internal"
+            "internal",
+            "model"
           ],
           "title": "Kind",
           "type": "string"

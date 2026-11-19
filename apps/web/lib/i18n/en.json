@@ -430,7 +430,10 @@
     "documentsOffText_one": "{n} document stays stored but is no longer searched.",
     "clarified": "Asked back",
     "blocked": "Blocked",
-    "cancelled": "Stopped"
+    "cancelled": "Stopped",
+    "modelTitle": "The model did not answer",
+    "modelText": "The model provider did not answer this time. It may be limiting requests, which free models do, or be out of reach. Try again in a moment, or choose another model on the Models page.",
+    "providerMessage": "Provider message"
   },
   "setup": {
     "failed": "The setup could not be saved. Try again.",

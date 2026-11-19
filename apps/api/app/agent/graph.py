@@ -114,6 +114,8 @@ def _outcome(state: AgentState) -> tuple[str, str, str]:
     intent = state.get("intent", "")
     if state.get("blocked"):
         return "blocked", intent, f"blocked: {state['blocked']}"
+    if state.get("model_error"):
+        return "failed", intent, state["model_error"]
     if state.get("rejection"):
         return "rejected", intent, state["rejection"]
     if state.get("clarification"):
