@@ -403,6 +403,11 @@ a.stat:hover { background: var(--bgColor-muted); }
 .prov-row:last-child { border-bottom: 0; }
 .prov-main { flex: 1; min-width: 200px; }
 .prov-name { display: flex; gap: 8px; align-items: center; font-weight: 500; }
+.prov-logo { width: 20px; height: 20px; display: block; }
+.prov-logo-mono { background: currentColor; -webkit-mask: var(--logo) center / contain no-repeat; mask: var(--logo) center / contain no-repeat; }
+.prov-logo-sm { width: 14px; height: 14px; }
+.prov-tag { display: inline-flex; align-items: center; gap: 4px; vertical-align: middle; }
+.prov-tag .fc-icon { width: 14px; height: 14px; }
 .prov-extra { flex-basis: 100%; display: flex; flex-direction: column; gap: 8px; padding-left: 48px; }
 .prov-key { display: flex; gap: 8px; align-items: flex-end; flex-wrap: wrap; }
 .prov-models { max-height: 160px; overflow: auto; font-family: var(--font-mono); font-size: 12px; line-height: 18px; color: var(--fgColor-muted); margin: 0; padding: 8px 12px; background: var(--bgColor-muted); border-radius: 8px; }

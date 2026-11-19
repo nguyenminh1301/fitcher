@@ -878,7 +878,11 @@
     "useTables_one": "Dùng {count} bảng",
     "startTitle_one": "Dựng gói từ {count} bảng",
     "leftTitle_one": "Còn {n} việc trước khi hỏi được",
-    "startText_one": "Gói có 1 bảng phân tích. fitcher gửi cấu trúc bảng, 3 dòng mẫu và các giá trị hay gặp của mỗi cột tới model để viết mô tả, chỉ số và câu hỏi mẫu. Đây là một lần gọi khoảng {tokens} token. Nhà cung cấp tính phí lần gọi này, trừ khi model miễn phí hoặc chạy trên máy này."
+    "startText_one": "Gói có 1 bảng phân tích. fitcher gửi cấu trúc bảng, 3 dòng mẫu và các giá trị hay gặp của mỗi cột tới model để viết mô tả, chỉ số và câu hỏi mẫu. Đây là một lần gọi khoảng {tokens} token. Nhà cung cấp tính phí lần gọi này, trừ khi model miễn phí hoặc chạy trên máy này.",
+    "providerName": "Tên",
+    "providerNameOptional": "Tên (không bắt buộc)",
+    "providerNamePlaceholder": "Ví dụ: Máy chủ công ty",
+    "providerNameHelp": "Hiện trong danh sách provider và khi chọn model; có thể đổi sau."
   },
   "instant": {
     "title": "Dựng gói dữ liệu",
@@ -1041,7 +1045,11 @@
     "tiersTitle": "Model cho từng tác vụ",
     "task": "Tác vụ",
     "latestEval": "Đánh giá gần nhất",
-    "evalNote": "Kết quả đánh giá chỉ để tham khảo, không chặn việc chọn."
+    "evalNote": "Kết quả đánh giá chỉ để tham khảo, không chặn việc chọn.",
+    "rename": "Đổi tên",
+    "renameOf": "Đổi tên {name}",
+    "renamed": "Đã đổi tên thành {name}.",
+    "saveName": "Lưu tên"
   },
   "datasetsPage": {
     "summary": "{description} Độ chi tiết: {grain}. Cột thời gian: {time}.",

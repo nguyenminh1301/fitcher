@@ -94,6 +94,20 @@ describe("models", () => {
     expect(screen.queryByText("Sample data")).toBeNull();
   });
 
+  it("renames a provider and shows its logo", async () => {
+    api.models.changeProvider = vi.fn(async () => ({ ...GEMINI, name: "Gemini work" }));
+    show();
+    const gemini = await screen.findByRole("group", { name: "Gemini" });
+    expect(gemini.querySelector('img[src="/providers/gemini.svg"]')).toBeTruthy();
+
+    fireEvent.click(within(gemini).getByRole("button", { name: "Rename Gemini" }));
+    const name = within(gemini).getByLabelText("Name");
+    fireEvent.change(name, { target: { value: "  Gemini work " } });
+    await act(async () => fireEvent.click(within(gemini).getByRole("button", { name: "Save name" })));
+
+    await waitFor(() => expect(api.models.changeProvider).toHaveBeenCalledWith("gemini", { name: "Gemini work" }));
+  });
+
   it("removes a provider in use after asking, saying where its tasks go", async () => {
     show();
     const openai = await screen.findByRole("group", { name: "OpenAI" });

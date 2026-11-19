@@ -9,6 +9,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 
 import { Icon } from "@/components/brand/Icon";
+import { ProviderTag } from "@/components/models/ProviderLogo";
 import { Chip } from "@/components/ui/controls";
 import { Dialog } from "@/components/ui/overlay";
 import type { FitcherApi } from "@/lib/api/client";
@@ -47,9 +48,6 @@ export function useCatalogs(models: Models, providers: ProviderView[]): { entrie
   return state;
 }
 
-function providerName(providers: ProviderView[], id: string): string {
-  return providers.find((provider) => provider.id === id)?.name ?? id;
-}
 
 function FreeLabel({ model }: { model: CatalogEntry }) {
   const { t } = useI18n();
@@ -137,7 +135,7 @@ export function TierChainDialog({ models, tier, providers, entries, onClose, onS
                   <span className="mp-order">{index + 1}</span>
                   <span className="mp-name">
                     <span className="fc-mono">{link.model}</span>
-                    <span className="fc-muted"> · {providerName(providers, link.provider_id)}{index === 0 ? ` · ${t("modelPicker.answersFirst")}` : ` · ${t("modelPicker.fallback")}`}</span>
+                    <span className="fc-muted"> · <ProviderTag providers={providers} id={link.provider_id} />{index === 0 ? ` · ${t("modelPicker.answersFirst")}` : ` · ${t("modelPicker.fallback")}`}</span>
                   </span>
                   {entry ? <ModelFacts model={entry} /> : null}
                   <span className="mp-actions">
@@ -182,7 +180,7 @@ export function TierChainDialog({ models, tier, providers, entries, onClose, onS
               <li key={id} className="mp-row">
                 <span className="mp-name">
                   <span className="fc-mono">{model.id}</span>
-                  <span className="fc-muted"> · {providerName(providers, model.provider_id)}</span>
+                  <span className="fc-muted"> · <ProviderTag providers={providers} id={model.provider_id} /></span>
                 </span>
                 <ModelFacts model={model} best={best.has(id)} />
                 <button type="button" className="fc-btn fc-btn-sm" disabled={added || chain.length >= MAX_CHAIN}
@@ -231,7 +229,7 @@ export function TierChainRow({ tier, providers, entries, onChange, extra }: {
                 <span className="mp-order">{index + 1}</span>
                 <span className="mp-name">
                   <span className="fc-mono">{link.model}</span>
-                  <span className="fc-muted"> · {providerName(providers, link.provider_id)}</span>
+                  <span className="fc-muted"> · <ProviderTag providers={providers} id={link.provider_id} /></span>
                 </span>
                 {entry ? <ModelFacts model={entry} /> : null}
               </li>

@@ -3,7 +3,7 @@
 // service, the usual address of a model server on this computer and the page where its key is created. Every
 // OpenAI-compatible service goes through the same `openai_compatible` kind; "Other" takes any endpoint.
 
-import type { ProviderCreate } from "@/lib/contracts";
+import type { ProviderCreate, ProviderView } from "@/lib/contracts";
 
 export type ProviderKind = ProviderCreate["kind"];
 export type PresetGroup = "hosted" | "service" | "local" | "other";
@@ -23,6 +23,11 @@ export type ProviderPreset = {
   /** Whether a key is required, optional or not taken at all. */
   key: "required" | "optional" | "none";
 };
+
+/** The presets with a logo in `public/providers/<id>.svg` (lobe-icons, MIT); the colored ones keep their own colors. */
+export const LOGOS = new Set(["openai", "anthropic", "gemini", "openrouter", "groq", "zai", "mistral", "deepseek", "xai",
+  "together", "fireworks", "cerebras", "ollama", "lmstudio", "vllm"]);
+export const COLORED_LOGOS = new Set(["gemini", "mistral", "deepseek", "together", "fireworks", "vllm"]);
 
 export const PRESETS: ProviderPreset[] = [
   { id: "openai", kind: "openai", group: "hosted", key: "required", keyUrl: "https://platform.openai.com/api-keys" },
@@ -106,10 +111,16 @@ export function asksAddress(preset: ProviderPreset): boolean {
   return !preset.baseUrl && preset.kind !== "openai" && preset.kind !== "anthropic" && preset.kind !== "gemini";
 }
 
-/** The api request that adds the preset with what the person typed. */
-export function providerCreate(preset: ProviderPreset, apiKey: string, address: string): ProviderCreate {
+/** Whether the person names the provider: an endpoint they choose themselves, which no preset names. */
+export function asksName(preset: ProviderPreset): boolean {
+  return preset.group === "other" || preset.group === "local";
+}
+
+/** The api request that adds the preset with what the person typed; a name they typed replaces the preset's. */
+export function providerCreate(preset: ProviderPreset, apiKey: string, address: string, name = ""): ProviderCreate {
   const body: ProviderCreate = { kind: preset.kind };
-  if (preset.name) body.name = preset.name;
+  const typed = asksName(preset) ? name.trim() : "";
+  if (typed || preset.name) body.name = typed || preset.name;
   if (apiKey && preset.key !== "none") body.api_key = apiKey;
   if (preset.baseUrl) body.base_url = preset.baseUrl;
   else if (asksAddress(preset)) body.base_url = address.trim();
@@ -117,6 +128,15 @@ export function providerCreate(preset: ProviderPreset, apiKey: string, address: 
 }
 
 /** Whether something the preset needs is still empty. */
-export function presetIncomplete(preset: ProviderPreset, apiKey: string, address: string): boolean {
-  return (preset.key === "required" && !apiKey.trim()) || (asksAddress(preset) && !address.trim());
+export function presetIncomplete(preset: ProviderPreset, apiKey: string, address: string, name = ""): boolean {
+  return (preset.key === "required" && !apiKey.trim()) || (asksAddress(preset) && !address.trim())
+    || (preset.group === "other" && !name.trim());
+}
+
+/** The preset a stored provider came from: its kind, the service its address belongs to, or a local server's port. */
+export function presetOf(provider: Pick<ProviderView, "kind" | "name" | "base_url">): ProviderPreset | null {
+  if (provider.kind !== "openai_compatible") return PRESETS.find((preset) => preset.kind === provider.kind) ?? null;
+  return PRESETS.find((preset) => preset.baseUrl && preset.baseUrl === provider.base_url)
+    ?? PRESETS.find((preset) => preset.name === provider.name)
+    ?? PRESETS.find((preset) => preset.suggestedUrl && preset.suggestedUrl === provider.base_url) ?? null;
 }

@@ -8,7 +8,8 @@
 import { useId, useState } from "react";
 
 import { Icon } from "@/components/brand/Icon";
-import { asksAddress, PRESETS, presetById, type ProviderPreset } from "@/components/models/presets";
+import { asksAddress, asksName, PRESETS, presetById, type ProviderPreset } from "@/components/models/presets";
+import { ProviderLogo } from "@/components/models/ProviderLogo";
 import { useI18n } from "@/lib/i18n/react";
 
 const MAIN = ["openai", "anthropic", "gemini", "openrouter", "ollama"];
@@ -29,12 +30,6 @@ function description(preset: ProviderPreset): string {
   return `desc_${preset.group}`;
 }
 
-function icon(preset: ProviderPreset): string {
-  if (preset.group === "hosted") return "sparkles";
-  if (preset.group === "local") return "laptop";
-  return "cloud";
-}
-
 type Props = {
   presetId: string;
   onPreset: (id: string) => void;
@@ -42,12 +37,15 @@ type Props = {
   onApiKey: (value: string) => void;
   address: string;
   onAddress: (value: string) => void;
+  /** The name the person gives an endpoint of their own; the presets of known services are named already. */
+  name?: string;
+  onName?: (value: string) => void;
   /** Why the last check failed, said under the key or address field. */
   error?: string | null;
   disabled?: boolean;
 };
 
-export function ProviderPicker({ presetId, onPreset, apiKey, onApiKey, address, onAddress, error, disabled }: Props) {
+export function ProviderPicker({ presetId, onPreset, apiKey, onApiKey, address, onAddress, name, onName, error, disabled }: Props) {
   const { t } = useI18n();
   const chosen = presetById(presetId);
   const [more, setMore] = useState(!MAIN.includes(chosen.id));
@@ -57,7 +55,7 @@ export function ProviderPicker({ presetId, onPreset, apiKey, onApiKey, address, 
     const button = (
       <button key={preset.id} type="button" className="opt" role="radio" aria-checked={selected} disabled={disabled}
         onClick={() => onPreset(preset.id)}>
-        <span className="opt-icon"><Icon name={icon(preset)} /></span>
+        <span className="opt-icon"><ProviderLogo preset={preset} /></span>
         <span className="opt-body">
           <span className="opt-title">{presetName(preset, t)}</span>
           <span className="opt-desc">{t(`onboarding.${description(preset)}`)}</span>
@@ -70,7 +68,7 @@ export function ProviderPicker({ presetId, onPreset, apiKey, onApiKey, address, 
     return (
       <div key={preset.id} className="opt-group">
         {button}
-        <div className="opt-more"><Fields preset={preset} apiKey={apiKey} onApiKey={onApiKey} address={address} onAddress={onAddress} error={error} disabled={disabled} /></div>
+        <div className="opt-more"><Fields preset={preset} apiKey={apiKey} onApiKey={onApiKey} address={address} onAddress={onAddress} name={name} onName={onName} error={error} disabled={disabled} /></div>
       </div>
     );
   };
@@ -94,9 +92,10 @@ export function ProviderPicker({ presetId, onPreset, apiKey, onApiKey, address, 
   );
 }
 
-function Fields({ preset, apiKey, onApiKey, address, onAddress, error, disabled }: Omit<Props, "presetId" | "onPreset"> & { preset: ProviderPreset }) {
+function Fields({ preset, apiKey, onApiKey, address, onAddress, name, onName, error, disabled }: Omit<Props, "presetId" | "onPreset"> & { preset: ProviderPreset }) {
   const { t } = useI18n();
   const id = useId();
+  const nameId = `${id}-name`;
   const keyId = `${id}-key`;
   const addressId = `${id}-address`;
   const errorId = `${id}-error`;
@@ -104,6 +103,15 @@ function Fields({ preset, apiKey, onApiKey, address, onAddress, error, disabled 
   const errorLine = error ? <span className="fc-field-error" id={errorId} role="alert"><Icon name="alert" />{t("onboarding.testFailed", { reason: error })}</span> : null;
   return (
     <>
+      {onName && asksName(preset) ? (
+        <div className="fc-field">
+          <label className="fc-field-label" htmlFor={nameId}>{preset.group === "other" ? t("onboarding.providerName") : t("onboarding.providerNameOptional")}</label>
+          <input id={nameId} className="fc-input" type="text" value={name ?? ""} maxLength={60} disabled={disabled}
+            placeholder={preset.group === "other" ? t("onboarding.providerNamePlaceholder") : presetName(preset, t)}
+            aria-describedby={`${nameId}-help`} onChange={(event) => onName(event.target.value)} />
+          <span className="fc-field-help" id={`${nameId}-help`}>{t("onboarding.providerNameHelp")}</span>
+        </div>
+      ) : null}
       {address_ ? (
         <div className="fc-field">
           <label className="fc-field-label" htmlFor={addressId}>{t("onboarding.address")}</label>
