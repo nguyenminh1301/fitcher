@@ -8,6 +8,7 @@
 
 ### Fixed
 
+- Loading icons turn again, including the one above "Building the pack" and the circle of the step that is running; they stood still before.
 - The Feedback page without an active pack no longer logs a feedback store failure with a traceback; the api answers that no pack is active.
 
 ## 0.0.3 - 2026-11-18

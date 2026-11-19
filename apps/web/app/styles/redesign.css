@@ -62,7 +62,7 @@
 .prog li:last-child { border-bottom: 0; }
 .prog-dot { width: 24px; height: 24px; border-radius: 9999px; display: flex; align-items: center; justify-content: center; flex: none; border: 1.5px solid var(--borderColor-default); color: var(--fgColor-muted); }
 .prog-dot[data-state="done"] { background: var(--fgColor-success); border-color: var(--fgColor-success); color: #fff; }
-.prog-dot[data-state="running"] { border-color: var(--fgColor-default); border-right-color: transparent; }
+.prog-dot[data-state="running"] { border-color: var(--fgColor-default); border-right-color: transparent; animation: fc-spin 1s linear infinite; }
 .prog-dot .fc-icon { width: 14px; height: 14px; stroke-width: 3; }
 .chip { display: inline-flex; align-items: center; gap: 8px; min-height: 36px; padding: 8px 14px; border: 1px solid var(--borderColor-default); border-radius: 9999px; background: var(--bgColor-default); font: 400 14px/20px var(--font-sans); color: var(--fgColor-default); cursor: pointer; text-align: left; }
 .chip:hover { background: var(--bgColor-muted); }
