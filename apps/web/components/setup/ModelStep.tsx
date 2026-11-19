@@ -38,6 +38,7 @@ export function ModelStep({ models, meta, onNext, onSkip, disabled = false }: {
   const [presetId, setPresetId] = useState("openai");
   const [apiKey, setApiKey] = useState("");
   const [address, setAddress] = useState("");
+  const [providerName, setProviderName] = useState("");
   const [phase, setPhase] = useState<Phase>({ kind: "form" });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -64,7 +65,7 @@ export function ModelStep({ models, meta, onNext, onSkip, disabled = false }: {
     setError(null);
     let provider: ProviderView | null = null;
     try {
-      provider = await models.addProvider(providerCreate(preset, apiKey, address));
+      provider = await models.addProvider(providerCreate(preset, apiKey, address, providerName));
       const tiers = await models.tiers();
       const proposed = tiers.tiers.some((tier) => tier.provider_id === provider?.id && tier.model);
       if (!proposed) {
@@ -150,10 +151,10 @@ export function ModelStep({ models, meta, onNext, onSkip, disabled = false }: {
     <>
       <StepHead icon={<Icon name="cpu" size="xl" />} title={t("onboarding.modelTitle")}>{t("onboarding.modelSub")}</StepHead>
       <ProviderPicker presetId={presetId} onPreset={choose} apiKey={apiKey} onApiKey={setApiKey} address={address} onAddress={setAddress}
-        error={error} disabled={busy || disabled} />
+        name={providerName} onName={setProviderName} error={error} disabled={busy || disabled} />
       <div className="ob-foot">
         <button type="button" className="fc-btn fc-btn-primary fc-btn-xl fc-btn-block" aria-busy={busy || undefined}
-          disabled={busy || disabled || presetIncomplete(preset, apiKey, address)} onClick={() => void check()}>
+          disabled={busy || disabled || presetIncomplete(preset, apiKey, address, providerName)} onClick={() => void check()}>
           {busy ? <span className="fc-spin fc-spinning" aria-hidden="true" /> : null}
           {busy ? t(usesKey ? "onboarding.testingKey" : "onboarding.testingConnection") : t(usesKey ? "onboarding.testKey" : "onboarding.testConnection")}
         </button>

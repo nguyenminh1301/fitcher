@@ -14,8 +14,9 @@ import { useCallback, useEffect, useState } from "react";
 import { Icon } from "@/components/brand/Icon";
 import { useConsole } from "@/components/console/ConsoleLayout";
 import { ListPage } from "@/components/console/ListPage";
-import { billing, PRESETS, presetById, presetIncomplete, providerCreate, type ProviderPreset } from "@/components/models/presets";
+import { billing, presetById, presetIncomplete, presetOf, providerCreate } from "@/components/models/presets";
 import { presetName, ProviderPicker } from "@/components/models/ProviderPicker";
+import { ProviderLogo } from "@/components/models/ProviderLogo";
 import { ClassifierBox } from "@/components/models/ClassifierBox";
 import { TierChainDialog, TierChainRow, useCatalogs } from "@/components/models/TierChainPicker";
 import { Segmented } from "@/components/ui/controls";
@@ -36,13 +37,6 @@ type Page = { providers: ProviderView[]; tiers: ModelTiersView; classifier: Clas
 type Models = FitcherApi["models"];
 type Mode = ModeChange["mode"];
 
-/** The preset a stored provider came from: its kind, or the service its address belongs to. */
-function presetOf(provider: ProviderView): ProviderPreset | null {
-  if (provider.kind !== "openai_compatible") return PRESETS.find((preset) => preset.kind === provider.kind) ?? null;
-  return PRESETS.find((preset) => preset.baseUrl && preset.baseUrl === provider.base_url)
-    ?? PRESETS.find((preset) => preset.name === provider.name) ?? null;
-}
-
 /** What a test call found, in one line: fine, usable with a warning, or failed. */
 function outcome(result: ProviderTestResult, t: (key: string, values?: Record<string, string | number>) => string): { ok: boolean; text: string } {
   if (result.structured_output) return { ok: true, text: t("models.testPassed", { model: result.model ?? "", count: result.models.length }) };
@@ -55,6 +49,7 @@ function AddDialog({ models, onClose, onAdded }: { models: Models; onClose: () =
   const [presetId, setPresetId] = useState("openai");
   const [apiKey, setApiKey] = useState("");
   const [address, setAddress] = useState("");
+  const [providerName, setProviderName] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const preset = presetById(presetId);
@@ -65,7 +60,7 @@ function AddDialog({ models, onClose, onAdded }: { models: Models; onClose: () =
     setError(null);
     let provider: ProviderView | null = null;
     try {
-      provider = await models.addProvider(providerCreate(preset, apiKey, address));
+      provider = await models.addProvider(providerCreate(preset, apiKey, address, providerName));
       const result = await models.testProvider(provider.id);
       if (!result.model) throw new Error(result.error ?? t("onboarding.noReply"));
       onAdded(provider);
@@ -82,12 +77,13 @@ function AddDialog({ models, onClose, onAdded }: { models: Models; onClose: () =
       actions={<>
         {cost === "billed" ? <span className="fc-muted dlg-status">{t("onboarding.paidCheck", { name })}</span> : null}
         <button type="button" className="fc-btn" onClick={onClose}>{t("common.cancel")}</button>
-        <button type="button" className="fc-btn fc-btn-primary" disabled={busy || presetIncomplete(preset, apiKey, address)} onClick={() => void add()}>
+        <button type="button" className="fc-btn fc-btn-primary" disabled={busy || presetIncomplete(preset, apiKey, address, providerName)} onClick={() => void add()}>
           {busy ? <span className="fc-spin fc-spinning" aria-hidden="true" /> : null}{t("modelsPage.checkAndAdd")}
         </button>
       </>}>
       <ProviderPicker presetId={presetId} onPreset={(id) => { setPresetId(id); setAddress(presetById(id).suggestedUrl ?? ""); setError(null); }}
-        apiKey={apiKey} onApiKey={setApiKey} address={address} onAddress={setAddress} error={error} disabled={busy} />
+        apiKey={apiKey} onApiKey={setApiKey} address={address} onAddress={setAddress} name={providerName} onName={setProviderName}
+        error={error} disabled={busy} />
     </Dialog>
   );
 }
@@ -100,9 +96,10 @@ function ProviderRow({ models, provider, onChanged, onRemove }: {
   const [result, setResult] = useState<{ ok: boolean; text: string } | null>(null);
   const [listed, setListed] = useState<string[] | null>(null);
   const [key, setKey] = useState<string | null>(null);
-  const [busy, setBusy] = useState<"test" | "list" | "key" | null>(null);
+  const [rename, setRename] = useState<string | null>(null);
+  const [busy, setBusy] = useState<"test" | "list" | "key" | "name" | null>(null);
 
-  async function act(kind: "test" | "list" | "key", action: () => Promise<void>) {
+  async function act(kind: "test" | "list" | "key" | "name", action: () => Promise<void>) {
     setBusy(kind);
     try {
       await action();
@@ -119,7 +116,7 @@ function ProviderRow({ models, provider, onChanged, onRemove }: {
   const takesKey = (preset?.key ?? "optional") !== "none";
   return (
     <div className="prov-row" aria-label={provider.name} role="group">
-      <span className="opt-icon"><Icon name={group === "hosted" ? "sparkles" : group === "local" ? "laptop" : "cloud"} /></span>
+      <span className="opt-icon"><ProviderLogo preset={preset} /></span>
       <div className="prov-main">
         <div className="prov-name">{provider.name}{provider.in_use ? <span className="fc-label fc-label-success">{t("models.inUse")}</span> : null}</div>
         <div className="fc-muted">{where} · {keyText}</div>
@@ -133,13 +130,30 @@ function ProviderRow({ models, provider, onChanged, onRemove }: {
           onClick={() => (listed ? setListed(null) : void act("list", async () => setListed((await models.providerModels(provider.id)).models)))}>
           {t("models.listModels")}
         </button>
+        <button type="button" className="fc-btn fc-btn-ghost fc-btn-icon fc-btn-sm" aria-label={t("modelsPage.renameOf", { name: provider.name })}
+          title={t("modelsPage.rename")} disabled={busy !== null} onClick={() => setRename(rename === null ? provider.name : null)}><Icon name="pencil" /></button>
         {takesKey ? <button type="button" className="fc-btn fc-btn-sm" disabled={busy !== null} onClick={() => setKey(key === null ? "" : null)}>{t("models.replaceKey")}</button> : null}
         <button type="button" className="fc-btn fc-btn-ghost fc-btn-icon fc-btn-sm" aria-label={t("modelsPage.removeOf", { name: provider.name })}
           onClick={onRemove}><Icon name="trash" /></button>
       </div>
-      {result || listed || key !== null || (provider.hosted && preset && billing(preset) === "billed") ? (
+      {result || listed || key !== null || rename !== null || (provider.hosted && preset && billing(preset) === "billed") ? (
         <div className="prov-extra">
           {provider.hosted && preset && billing(preset) === "billed" ? <span className="fc-field-help">{t("onboarding.paidCheck", { name: provider.name })}</span> : null}
+          {rename !== null ? (
+            <form className="prov-key" onSubmit={(event) => { event.preventDefault(); void act("name", async () => {
+              await models.changeProvider(provider.id, { name: rename.trim() });
+              setRename(null);
+              await onChanged(t("modelsPage.renamed", { name: rename.trim() }));
+            }); }}>
+              <div className="fc-field">
+                <label className="fc-field-label" htmlFor={`name-${provider.id}`}>{t("onboarding.providerName")}</label>
+                <input id={`name-${provider.id}`} className="fc-input fc-input-sm" type="text" maxLength={60} autoFocus
+                  value={rename} onChange={(event) => setRename(event.target.value)} />
+              </div>
+              <button type="button" className="fc-btn fc-btn-sm" onClick={() => setRename(null)}>{t("common.cancel")}</button>
+              <button type="submit" className="fc-btn fc-btn-primary fc-btn-sm" disabled={!rename.trim() || rename.trim() === provider.name || busy !== null}>{t("modelsPage.saveName")}</button>
+            </form>
+          ) : null}
           {key !== null ? (
             <form className="prov-key" onSubmit={(event) => { event.preventDefault(); void act("key", async () => {
               await models.changeProvider(provider.id, { api_key: key });

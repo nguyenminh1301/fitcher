@@ -4,6 +4,8 @@
 
 ### Added
 
+- Model providers show their logos on the provider cards, the provider list and the model picker, and an OpenAI-compatible endpoint or a server on this computer takes a name of its own when it is added; any provider can be renamed on the Models page.
+
 - The Sources page says for each source whether it can answer questions, with a button that gets a source ready (builds its pack) and an Ask button for a ready source, and a new conversation lets you choose which ready source it is answered from. Sources added after the setup used to have no pack and no visible way to build one, so questions about them could not be asked.
 - The Models page shows each task's ordered chain of models and lets you choose how they are picked (free models automatically, best models automatically, or by hand). The picker lists only chat models of every provider with search, provider, free and JSON-output filters, and shows each model's price, context, measured speed and benchmark with the models that suit the task marked as recommended.
 - The prompt-injection classifier runs through a provider that hosts Llama Prompt Guard 2 86M (Groq's `meta-llama/llama-prompt-guard-2-86m`), the default, or on this computer from a model the app downloads itself: `PUT /api/screening/classifier` chooses the engine, provider and model, and `POST`, `GET` and `DELETE /api/screening/classifier/download` start, follow and cancel the download of a pinned ONNX export, checked by size, SHA-256 and the screener's own benign and attack questions before it replaces the earlier model. A provider call that fails or a reply that is not a score keeps screening closed. App-state change 0013 keeps an instance that already used the classifier on this computer.
@@ -22,8 +24,8 @@
 
 ### Fixed
 
+- The image serves the web app's static files (`apps/web/public`), so the browser tab icon and the provider logos load instead of returning 404.
 - A Vietnamese question now gets its clarifying question, summary and refusals in Vietnamese even when the model reports the question as English; Vietnamese letters in the question decide the reply language first.
-
 - Models measured on this application to misread questions (Groq's `qwen/qwen3.8-27b`, which asked again for the measure and the period of a clear question) go after every other model of an automatic chain, whatever their published benchmark says.
 - The quick tasks no longer put the smallest models first: a lite model on the question-reading task missed the period a question named, so "How many orders in 2025?" and the choice of a period both came back as the same "Which period should I use?" question. The quick tasks keep the most capable models that answer without reasoning first.
 - An automatic chain tries six models instead of four, so a task still has models of the same provider (such as another Gemini model with its own quota, or Groq's larger model) after the best one of each provider failed; building a pack used to fail once four models had used their quota or returned JSON that did not match.

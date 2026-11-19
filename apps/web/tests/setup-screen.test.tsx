@@ -162,6 +162,22 @@ describe("setup models step", () => {
     expect(models.addProvider).toHaveBeenCalledWith({ kind: "ollama", base_url: "http://192.168.1.20:11434" });
   });
 
+  it("asks a name for any other OpenAI-compatible endpoint and sends it", async () => {
+    const models = fakeModels();
+    wrap(<SetupScreen sources={noSources} setup={fakeSetup(MODELS_PENDING)} models={models} {...exits()} />);
+
+    await userEvent.click(await screen.findByRole("button", { name: "More providers" }));
+    await userEvent.click(screen.getByRole("radio", { name: /Other OpenAI-compatible endpoint/ }));
+    await userEvent.type(screen.getByLabelText("Address"), "https://llm.example.test/v1");
+    const check = screen.getByRole("button", { name: /Check the/ }) as HTMLButtonElement;
+    expect(check.disabled).toBe(true);
+    await userEvent.type(screen.getByLabelText("Name"), "Company server");
+    await userEvent.click(check);
+    expect(models.addProvider).toHaveBeenCalledWith({
+      kind: "openai_compatible", name: "Company server", base_url: "https://llm.example.test/v1",
+    });
+  });
+
   it("lists more providers by group, and adds a service from its preset with no address to type", async () => {
     const models = fakeModels();
     wrap(<SetupScreen sources={noSources} setup={fakeSetup(MODELS_PENDING)} models={models} {...exits()} />);

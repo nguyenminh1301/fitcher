@@ -71,6 +71,7 @@ COPY infra/clickhouse/users.d ./infra/clickhouse/users.d
 COPY infra/image/clickhouse ./infra/image/clickhouse
 COPY --from=web-build /app/.next/standalone /opt/web/
 COPY --from=web-build /app/.next/static /opt/web/.next/static
+COPY --from=web-build /app/public /opt/web/public
 COPY apps/web/peer-address.cjs /opt/web/
 COPY infra/image/s6-rc.d /etc/s6-overlay/s6-rc.d
 COPY infra/image/user-bundles.d /etc/s6-overlay/user-bundles.d

@@ -878,7 +878,11 @@
     "useTables_one": "Use {count} table",
     "startTitle_one": "Build the pack from {count} table",
     "leftTitle_one": "{n} thing left before you can ask",
-    "startText_one": "The pack gets 1 analysis table. fitcher sends the table structure, 3 sample rows and the most common values of each column to the model, which writes descriptions, metrics and example questions. This is one call of about {tokens} tokens. The provider bills it unless the model is free or runs on this computer."
+    "startText_one": "The pack gets 1 analysis table. fitcher sends the table structure, 3 sample rows and the most common values of each column to the model, which writes descriptions, metrics and example questions. This is one call of about {tokens} tokens. The provider bills it unless the model is free or runs on this computer.",
+    "providerName": "Name",
+    "providerNameOptional": "Name (optional)",
+    "providerNamePlaceholder": "For example: Company server",
+    "providerNameHelp": "Shown in the provider list and the model picker; you can change it later."
   },
   "instant": {
     "title": "Build the pack",
@@ -1041,7 +1045,11 @@
     "tiersTitle": "Model for each task",
     "task": "Task",
     "latestEval": "Latest evaluation",
-    "evalNote": "The evaluation result is for reference and never blocks a choice."
+    "evalNote": "The evaluation result is for reference and never blocks a choice.",
+    "rename": "Rename",
+    "renameOf": "Rename {name}",
+    "renamed": "Renamed to {name}.",
+    "saveName": "Save name"
   },
   "datasetsPage": {
     "summary": "{description} Grain: {grain}. Time column: {time}.",
