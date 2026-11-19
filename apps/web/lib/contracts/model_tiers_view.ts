@@ -8,22 +8,30 @@ export type Passed = boolean;
 export type Reason = string;
 export type ReportId = string | null;
 export type ReportTs = string | null;
+export type ProviderId1 = string;
+export type Model1 = string;
+export type Chain = ChainLink[];
 export type Tiers = TierView[];
 export type Backend = "local" | "provider";
-export type ProviderId1 = string | null;
-export type Model1 = string;
+export type ProviderId2 = string | null;
+export type Model2 = string;
 export type Dimensions = number;
 export type NeedsReindex = boolean;
+export type Mode = "auto_free" | "auto_best" | "manual";
+export type RefreshedAt = string | null;
 
 export interface ModelTiersView {
   tiers: Tiers;
   embedding: EmbeddingView;
+  mode?: Mode;
+  refreshed_at?: RefreshedAt;
 }
 export interface TierView {
   tier: Tier;
   provider_id: ProviderId;
   model: Model;
   eval?: EvalStatus | null;
+  chain?: Chain;
 }
 /**
  * The latest eval report of the active pack that ran the tier on this model; it informs and never gates.
@@ -35,10 +43,14 @@ export interface EvalStatus {
   report_id?: ReportId;
   report_ts?: ReportTs;
 }
-export interface EmbeddingView {
-  backend: Backend;
+export interface ChainLink {
   provider_id: ProviderId1;
   model: Model1;
+}
+export interface EmbeddingView {
+  backend: Backend;
+  provider_id: ProviderId2;
+  model: Model2;
   dimensions: Dimensions;
   needs_reindex: NeedsReindex;
 }

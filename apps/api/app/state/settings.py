@@ -11,7 +11,6 @@ from datetime import UTC, datetime
 import json
 from typing import Any
 
-from app.llm.tiers import CHAT_TIERS
 from app.state.db import StateDb
 
 
@@ -28,8 +27,6 @@ class SettingSpec:
 
 SPECS: dict[tuple[str, str], SettingSpec] = {
     ("setup", "complete"): SettingSpec(bool, False),
-    # Each chat tier's model: {"provider_id": ..., "model": ...} (app/llm/routes.py).
-    **{("llm.tiers", tier): SettingSpec(dict) for tier in CHAT_TIERS},
     # The embed tier's model and vector size; changing them needs a full reindex (DECISIONS §14).
     # The optional prompt-injection classifier (DECISIONS §9); the EN/VI rules always run.
     ("screening", "classifier_enabled"): SettingSpec(bool, False),

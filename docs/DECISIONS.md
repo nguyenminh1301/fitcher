@@ -58,7 +58,7 @@ This document states the target. §16 lists each decision that differs from the 
 
 ### Model tiers
 
-The engine calls a task tier; each tier maps to one model of a configured provider:
+The engine calls a task tier; each chat tier maps to an ordered fallback chain of models of the configured providers:
 
 - `fast`: router, extractor, summarizer, chart tie-break
 - `sql-small`: SQL generation for a query spec the complexity rule scores as simple (§6)
@@ -67,6 +67,13 @@ The engine calls a task tier; each tier maps to one model of a configured provid
 - `embed`: embeddings
 
 Code may only call tiers, never model names directly. Providers, their keys or base URLs and the tier mapping are stored in the app state and edited in the setup and on the Models page (§15). Adding a provider proposes a default model for every chat tier. A model that has no passing pack eval for its tier is allowed and shown as not evaluated; the eval informs the choice and no longer gates it. Changing `embed` is a separate, confirmed action because it reindexes the pack (§14).
+
+**Chains, keys and automatic choice.**
+
+- The first model of a chain answers unless it fails. A rate limit with no key left, a timeout, a connection error, a 5xx, a missing model or an empty reply moves the call to the next model; a request the model rejects as invalid (400, 422, a context too long) stops the chain, because every model would get the same request. Each attempt writes its own `llm_calls` row, and a row that replaced a failed call names it in `fallback_of`. When every model failed, the error lists each attempt's model and error type, never the provider's message.
+- A provider may hold several API keys, used round robin. A rate-limited key rests for the provider's `Retry-After` time (60 s when it gives none, at most an hour), and a key the provider refused (401, 403) is not tried again until it is replaced. This state lives in the api process.
+- The chains are set by the owner (`manual`) or chosen from the model catalog (`app/llm/catalog.py`): `auto_free` takes only models that cost nothing or have a free tier, ordered by benchmark then measured latency; `auto_best` takes any chat model, ordered by benchmark then price. Each automatic chain starts with the best model, then the best model of each other provider, four models in all; `fast` needs a model known to answer in a JSON schema. The choice is made again when a provider or key changes and once a day. Setting a tier by hand returns to `manual`.
+- A chain is at most six models. The embedding keeps one model and its provider's first key, because its vectors must stay in one space.
 
 ## 3. Deployment
 

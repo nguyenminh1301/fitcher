@@ -1,4 +1,42 @@
 {
+  "$defs": {
+    "ProviderKeyView": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "label": {
+          "title": "Label",
+          "type": "string"
+        },
+        "last4": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Last4"
+        },
+        "created_at": {
+          "title": "Created At",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "label",
+        "last4",
+        "created_at"
+      ],
+      "title": "ProviderKeyView",
+      "type": "object"
+    }
+  },
   "additionalProperties": false,
   "properties": {
     "id": {
@@ -53,6 +91,14 @@
     "in_use": {
       "title": "In Use",
       "type": "boolean"
+    },
+    "keys": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/ProviderKeyView"
+      },
+      "title": "Keys",
+      "type": "array"
     }
   },
   "required": [

@@ -1,19 +1,68 @@
 {
-  "additionalProperties": false,
-  "properties": {
-    "provider_id": {
-      "title": "Provider Id",
-      "type": "string"
-    },
-    "model": {
-      "title": "Model",
-      "type": "string"
+  "$defs": {
+    "ChainLink": {
+      "additionalProperties": false,
+      "properties": {
+        "provider_id": {
+          "title": "Provider Id",
+          "type": "string"
+        },
+        "model": {
+          "title": "Model",
+          "type": "string"
+        }
+      },
+      "required": [
+        "provider_id",
+        "model"
+      ],
+      "title": "ChainLink",
+      "type": "object"
     }
   },
-  "required": [
-    "provider_id",
-    "model"
-  ],
+  "additionalProperties": false,
+  "description": "One model as the tier's whole chain (``provider_id`` and ``model``), or a whole ``chain``.",
+  "properties": {
+    "provider_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Provider Id"
+    },
+    "model": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Model"
+    },
+    "chain": {
+      "anyOf": [
+        {
+          "items": {
+            "$ref": "#/$defs/ChainLink"
+          },
+          "type": "array"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Chain"
+    }
+  },
   "title": "TierChange",
   "type": "object"
 }

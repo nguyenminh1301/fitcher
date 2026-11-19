@@ -65,6 +65,8 @@ def client(tmp_path, fakes, actions):
     app.dependency_overrides[providers_api.get_probe] = lambda: fakes.probe
     app.dependency_overrides[runtime.get_admin_action_log] = lambda: actions
     app.dependency_overrides[providers_api.get_compiled_embedding] = lambda: fakes.compiled
+    app.dependency_overrides[providers_api.get_catalog] = lambda: catalog_with({})
+    app.dependency_overrides[providers_api.get_latency] = lambda: dict
     yield TestClient(app)
     app.dependency_overrides.clear()
 
@@ -78,8 +80,10 @@ def add_openai(client):
 def test_adding_the_first_provider_shows_only_the_key_ending_and_fills_the_tiers(client, actions):
     body = add_openai(client).json()
 
+    keys = body.pop("keys")
     assert body == {"id": "openai", "name": "OpenAI", "kind": "openai", "base_url": None, "key_set": True,
                     "key_last4": "7777", "hosted": True, "in_use": True}
+    assert [(key["label"], key["last4"]) for key in keys] == [("", "7777")]
     tiers = client.get("/models/tiers", headers=ADMIN).json()
     fast = tiers["tiers"][0]
     assert (fast["tier"], fast["provider_id"], fast["model"], fast["eval"]["evaluated"]) == ("fast", "openai", "gpt-5.4-mini", False)
@@ -190,7 +194,8 @@ def test_a_chat_tier_is_mapped_to_any_model_of_a_configured_provider(client, act
 
     response = client.put("/models/tiers/sql-gen", headers=ADMIN, json={"provider_id": "openai", "model": "gpt-5.5"})
 
-    assert response.json() == {"tier": "sql-gen", "provider_id": "openai", "model": "gpt-5.5", "eval": None}
+    assert response.json() == {"tier": "sql-gen", "provider_id": "openai", "model": "gpt-5.5", "eval": None,
+                               "chain": [{"provider_id": "openai", "model": "gpt-5.5"}]}
     change = actions.records[-1]
     assert (change.action, change.target, change.old_value, change.new_value) == (
         "model_tier", "sql-gen", "openai/gpt-5.4", "openai/gpt-5.5",
@@ -405,3 +410,121 @@ def test_a_catalog_the_provider_does_not_list_is_a_bad_gateway(client):
     response = client.get("/models/catalog", headers=ADMIN, params={"provider": "openai"})
 
     assert response.status_code == 502 and "HTTP 401" in response.json()["detail"]
+
+
+
+def catalog_with(models):
+    from app.llm.catalog import CatalogModel
+
+    class Fixed:
+        def __init__(self):
+            self.asked = []
+
+        def models(self, provider, api_key):
+            self.asked.append((provider.id, api_key))
+            return [CatalogModel(provider_id=provider.id, **model) for model in models.get(provider.id, [])]
+
+    return Fixed()
+
+
+FREE_MODELS = {
+    "openai": [
+        {"id": "gpt-free", "kind": "chat", "free": "free_tier", "structured_output": True, "benchmark": 40.0},
+        {"id": "gpt-paid", "kind": "chat", "free": "none", "structured_output": True, "benchmark": 70.0,
+         "input_price": 1.0, "output_price": 4.0},
+    ],
+    "openai-compatible": [
+        {"id": "lab-free", "kind": "chat", "free": "free", "structured_output": True, "benchmark": 30.0},
+        {"id": "lab-loose", "kind": "chat", "free": "free", "structured_output": None, "benchmark": 50.0},
+    ],
+}
+
+
+def add_lab(client):
+    response = client.post("/providers", headers=ADMIN,
+                           json={"kind": "openai_compatible", "base_url": "http://lab:1234/v1", "api_key": "lab-key-1"})
+    assert response.status_code == 201, response.text
+
+
+def test_a_provider_takes_more_keys_and_removes_them_one_at_a_time(client, actions):
+    add_openai(client)
+
+    added = client.post("/providers/openai/keys", headers=ADMIN, json={"api_key": "sk-second-8888", "label": "spare"})
+    keys = added.json()["keys"]
+    removed = client.delete(f"/providers/openai/keys/{keys[0]['id']}", headers=ADMIN)
+    last = client.delete(f"/providers/openai/keys/{keys[1]['id']}", headers=ADMIN)
+
+    assert added.status_code == 201 and [(key["label"], key["last4"]) for key in keys] == [("", "7777"), ("spare", "8888")]
+    assert [key["last4"] for key in removed.json()["keys"]] == ["8888"]
+    assert removed.json()["key_last4"] == "8888"
+    assert last.status_code == 409 and "needs an API key" in last.json()["detail"]
+    assert client.delete("/providers/openai/keys/nope", headers=ADMIN).status_code == 404
+    logged = " ".join(f"{record.old_value} {record.new_value}" for record in actions.records)
+    assert "sk-second-8888" not in logged and "8888" in logged
+
+
+def test_a_tier_takes_a_whole_chain_and_shows_it_in_order(client):
+    add_openai(client)
+    add_lab(client)
+
+    response = client.put("/models/tiers/sql-gen", headers=ADMIN, json={"chain": [
+        {"provider_id": "openai-compatible", "model": "lab-free"}, {"provider_id": "openai", "model": "gpt-5.5"},
+    ]})
+    tiers = client.get("/models/tiers", headers=ADMIN).json()
+
+    assert response.status_code == 200
+    sql_gen = next(tier for tier in tiers["tiers"] if tier["tier"] == "sql-gen")
+    assert (sql_gen["provider_id"], sql_gen["model"]) == ("openai-compatible", "lab-free")
+    assert [link["model"] for link in sql_gen["chain"]] == ["lab-free", "gpt-5.5"]
+    assert tiers["mode"] == "manual"
+    bad = client.put("/models/tiers/sql-gen", headers=ADMIN, json={"chain": [{"provider_id": "nope", "model": "m"}]})
+    assert bad.status_code == 422
+    assert client.put("/models/tiers/sql-gen", headers=ADMIN, json={}).status_code == 422
+
+
+def test_a_provider_that_shares_every_tier_with_another_can_be_removed(client):
+    add_openai(client)
+    add_lab(client)
+    for tier in ("fast", "sql-small", "sql-gen", "sql-gen-hard"):
+        client.put(f"/models/tiers/{tier}", headers=ADMIN, json={"chain": [
+            {"provider_id": "openai", "model": "gpt-5.4"}, {"provider_id": "openai-compatible", "model": "lab-free"},
+        ]})
+
+    assert client.delete("/providers/openai-compatible", headers=ADMIN).status_code == 204
+    tiers = client.get("/models/tiers", headers=ADMIN).json()["tiers"]
+    assert {len(tier["chain"]) for tier in tiers} == {1}
+    # The embedding and the tiers it alone serves keep the last provider.
+    assert client.delete("/providers/openai", headers=ADMIN).status_code == 409
+
+
+def test_auto_free_chooses_free_models_across_providers_and_a_manual_tier_ends_it(client):
+    catalog = catalog_with(FREE_MODELS)
+    app.dependency_overrides[providers_api.get_catalog] = lambda: catalog
+    app.dependency_overrides[providers_api.get_latency] = lambda: dict
+    add_openai(client)
+    add_lab(client)
+
+    body = client.put("/models/mode", headers=ADMIN, json={"mode": "auto_free"}).json()
+
+    chains = {tier["tier"]: [(link["provider_id"], link["model"]) for link in tier["chain"]] for tier in body["tiers"]}
+    assert body["mode"] == "auto_free" and body["refreshed_at"] is not None
+    # fast needs structured output; the other tiers take a model that does not say.
+    assert chains["fast"] == [("openai", "gpt-free"), ("openai-compatible", "lab-free")]
+    assert chains["sql-gen"] == [("openai-compatible", "lab-loose"), ("openai", "gpt-free"), ("openai-compatible", "lab-free")]
+    assert ("openai", KEY) in catalog.asked
+
+    client.put("/models/tiers/fast", headers=ADMIN, json={"provider_id": "openai", "model": "gpt-paid"})
+    assert client.get("/models/tiers", headers=ADMIN).json()["mode"] == "manual"
+
+
+def test_auto_best_puts_the_best_benchmark_first(client):
+    app.dependency_overrides[providers_api.get_catalog] = lambda: catalog_with(FREE_MODELS)
+    app.dependency_overrides[providers_api.get_latency] = lambda: dict
+    add_openai(client)
+    add_lab(client)
+
+    body = client.put("/models/mode", headers=ADMIN, json={"mode": "auto_best"}).json()
+
+    fast = next(tier for tier in body["tiers"] if tier["tier"] == "fast")
+    assert [link["model"] for link in fast["chain"]] == ["gpt-paid", "lab-free", "gpt-free"]
+    assert client.put("/models/mode", headers=ADMIN, json={"mode": "fastest"}).status_code == 422

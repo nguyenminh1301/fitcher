@@ -52,12 +52,14 @@ def estimate_cost(response: Any, model: str, call_type: str) -> float | None:
 
 def call_record(
     *, metadata: dict, tier: str, provider: str, model: str, started_at: datetime, latency_ms: int, status: str,
-    error: str = "", response: Any = None, cost: float | None = None,
+    error: str = "", response: Any = None, cost: float | None = None, fallback_of: str = "", call_id: str = "",
 ) -> LlmCallRecord:
+    """The row of one call; its id is the provider's reply id, else ``call_id``, so a failed call has one too."""
     usage = field(response, "usage")
     return LlmCallRecord(
         trace_id=str(metadata.get("trace_id") or ""), ts=started_at, node=str(metadata.get("node") or ""),
-        alias="", tier=tier, provider=provider, model=model, call_id=str(field(response, "id") or ""),
+        alias="", tier=tier, provider=provider, model=model, call_id=str(field(response, "id") or call_id),
+        fallback_of=fallback_of,
         prompt_tokens=_count(usage, "prompt_tokens"), completion_tokens=_count(usage, "completion_tokens"),
         total_tokens=_count(usage, "total_tokens"), cost_usd=cost, latency_ms=max(latency_ms, 0), status=status,
         error=error[:ERROR_LIMIT],

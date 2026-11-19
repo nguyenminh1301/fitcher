@@ -12,7 +12,14 @@ indexed with another model and must be recompiled.
 ``POST /providers/{id}/test`` lists the provider's models, then asks one model
 for a small structured reply through the gateway. For a hosted provider that
 call is billed, which the response states. A model that fails structured
-output is reported and stays selectable. ``GET /models/catalog?provider=`` adds
+output is reported and stays selectable. A provider may hold several keys
+(``POST``/``DELETE /providers/{id}/keys``), which the gateway rotates.
+
+Each chat tier has an ordered fallback chain (``PUT /models/tiers/{tier}``
+takes one model or a whole chain, and sets the mode to ``manual``).
+``PUT /models/mode`` chooses ``auto_free`` or ``auto_best`` instead, which
+choose the chains from the model catalog of every provider at once, again
+whenever a provider or key changes and once a day (``app/llm/auto.py``). ``GET /models/catalog?provider=`` adds
 what each listed model is for, its price, context, structured output,
 benchmark and the median latency measured on this instance.
 
@@ -36,10 +43,11 @@ from app.api.runtime import (
 from app.api.setup import get_state_db
 from app.auth.principal import Principal
 from app.contracts.providers import (
-    CatalogEntry, EmbeddingChange, EmbeddingView, EvalStatus, ModelCatalog, ModelTiersView, ProviderCreate, ProviderModels, ProviderTestRequest, ProviderTestResult,
+    CatalogEntry, ChainLink, EmbeddingChange, EmbeddingView, EvalStatus, ModeChange, ModelCatalog, ModelTiersView,
+    ProviderKeyCreate, ProviderKeyView, ProviderCreate, ProviderModels, ProviderTestRequest, ProviderTestResult,
     ProviderUpdate, ProviderView, TierChange, TierView,
 )
-from app.llm import defaults
+from app.llm import auto, defaults
 from app.llm.catalog import Catalog, with_latency
 from app.llm.client import LLMError, Prompt
 from app.llm.eligibility import eligibility, ReportSummary
@@ -47,7 +55,7 @@ from app.llm.gateway import Gateway, Route
 from app.llm.provider_models import list_models, ModelListError
 from app.llm.providers import check_fields, key_name, Provider, ProviderError, ProviderNotFound, ProviderStore
 from app.llm.clients import compiled_embedding
-from app.llm.routes import EmbeddingChoice, fill_defaults, TierMapping
+from app.llm.routes import EmbeddingChoice, fill_defaults, TierMapping, TierModel
 from app.llm.tiers import CHAT_TIERS, EMBED_TIER
 from app.observability.events import AdminActionRecord, utc_now
 from app.observability.tracing import trusted_pack_calls
@@ -112,6 +120,27 @@ def get_latency() -> Callable[[], dict[tuple[str, str], int]]:
     return _measured_latency
 
 
+Vault = Annotated[SecretVault, Depends(get_vault)]
+CatalogDep = Annotated[Catalog, Depends(get_catalog)]
+Latency = Annotated[Callable, Depends(get_latency)]
+
+
+def _refresh_auto(mapping: TierMapping, store: ProviderStore, vault: SecretVault, catalog: Catalog,
+                  latency: Callable, *, force: bool) -> None:
+    """Choose the chains again in an automatic mode; a failure leaves the current chains and is logged."""
+    try:
+        reader = vault.reader()
+
+        def models(provider: Provider):
+            key = reader.get(key_name(provider.id, provider.keys[0].id)) if provider.keys else None
+            return catalog.models(provider, key)
+
+        if mapping.mode()[0] in auto.AUTO_MODES:
+            auto.refresh(mapping, store.list(), models, latency(), force=force)
+    except Exception as error:  # noqa: BLE001 - the change that asked for it already happened
+        logger.warning("the automatic model choice was not refreshed: %s", type(error).__name__)
+
+
 class _OneRoute:
     def __init__(self, route: Route):
         self._route = route
@@ -147,6 +176,8 @@ def _view(provider: Provider, in_use: set[str]) -> ProviderView:
     return ProviderView(
         id=provider.id, name=provider.name, kind=provider.kind, base_url=provider.base_url, key_set=provider.key_set,
         key_last4=provider.key_last4, hosted=provider.hosted, in_use=provider.id in in_use,
+        keys=[ProviderKeyView(id=key.id, label=key.label, last4=key.last4, created_at=key.created_at)
+              for key in provider.keys],
     )
 
 
@@ -208,7 +239,8 @@ def _ollama_models(body: ProviderCreate, lister: Callable) -> list[str]:
 @router.post("/providers", status_code=status.HTTP_201_CREATED)
 def add_provider(body: ProviderCreate, admin: Admin, store: Store, mapping: Mapping, log: Log,
                  db: Annotated[StateDb, Depends(get_state_db)],
-                 lister: Annotated[Callable, Depends(get_model_lister)]) -> ProviderView:
+                 lister: Annotated[Callable, Depends(get_model_lister)], vault: Vault, catalog: CatalogDep,
+                 latency: Latency) -> ProviderView:
     # An Ollama server is asked for its models first: the tiers are proposed only from installed models, and a
     # server the container cannot reach is refused with how to reach it, instead of failing every question later.
     installed = _ollama_models(body, lister) if body.kind == "ollama" else None
@@ -217,6 +249,7 @@ def add_provider(body: ProviderCreate, admin: Admin, store: Store, mapping: Mapp
     except ProviderError as error:
         raise _refused(error) from None
     fill_defaults(mapping, provider, installed)
+    _refresh_auto(mapping, store, vault, catalog, latency, force=True)
     setup.mark_done(db, "models")
     _record(log, admin, "provider_add", provider.id, "", _described(provider))
     return _view(provider, mapping.providers_in_use())
@@ -224,25 +257,61 @@ def add_provider(body: ProviderCreate, admin: Admin, store: Store, mapping: Mapp
 
 @router.patch("/providers/{provider_id}")
 def change_provider(provider_id: str, body: ProviderUpdate, admin: Admin, store: Store, mapping: Mapping,
-                    log: Log) -> ProviderView:
+                    log: Log, vault: Vault, catalog: CatalogDep, latency: Latency) -> ProviderView:
     before = _found(store, provider_id)
     try:
         provider = store.update(provider_id, name=body.name, api_key=body.api_key, base_url=body.base_url)
     except ProviderError as error:
         raise _refused(error) from None
+    if body.api_key or body.base_url is not None:
+        _refresh_auto(mapping, store, vault, catalog, latency, force=True)
     _record(log, admin, "provider_change", provider_id, _described(before), _described(provider))
     return _view(provider, mapping.providers_in_use())
 
 
 @router.delete("/providers/{provider_id}", status_code=status.HTTP_204_NO_CONTENT)
-def remove_provider(provider_id: str, admin: Admin, store: Store, mapping: Mapping, log: Log) -> Response:
+def remove_provider(provider_id: str, admin: Admin, store: Store, mapping: Mapping, log: Log, vault: Vault,
+                    catalog: CatalogDep, latency: Latency) -> Response:
     before = _found(store, provider_id)
-    if provider_id in mapping.providers_in_use():
+    # A chain keeps its other models when one provider goes; a tier the provider alone serves, or the
+    # embedding, must be mapped elsewhere first.
+    if provider_id in mapping.providers_needed():
         raise HTTPException(status.HTTP_409_CONFLICT,
                             detail=f"{before.name} is in use by a model tier or the embedding; map them elsewhere first")
     store.delete(provider_id)
+    _refresh_auto(mapping, store, vault, catalog, latency, force=True)
     _record(log, admin, "provider_remove", provider_id, _described(before), "")
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.post("/providers/{provider_id}/keys", status_code=status.HTTP_201_CREATED)
+def add_key(provider_id: str, body: ProviderKeyCreate, admin: Admin, store: Store, mapping: Mapping, log: Log,
+            vault: Vault, catalog: CatalogDep, latency: Latency) -> ProviderView:
+    """Add a key the gateway rotates with the provider's other keys."""
+    _found(store, provider_id)
+    try:
+        key = store.add_key(provider_id, body.api_key, body.label)
+    except ProviderError as error:
+        raise _refused(error) from None
+    _refresh_auto(mapping, store, vault, catalog, latency, force=True)
+    _record(log, admin, "provider_key_add", provider_id, "", json.dumps({"key": key.id, "last4": key.last4}))
+    return _view(store.get(provider_id), mapping.providers_in_use())
+
+
+@router.delete("/providers/{provider_id}/keys/{key_id}")
+def remove_key(provider_id: str, key_id: str, admin: Admin, store: Store, mapping: Mapping, log: Log,
+               vault: Vault, catalog: CatalogDep, latency: Latency) -> ProviderView:
+    before = _found(store, provider_id)
+    try:
+        store.remove_key(provider_id, key_id)
+    except ProviderNotFound as error:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail=str(error)) from None
+    except ProviderError as error:
+        raise HTTPException(status.HTTP_409_CONFLICT, detail=str(error)) from None
+    _refresh_auto(mapping, store, vault, catalog, latency, force=True)
+    last4 = next((key.last4 for key in before.keys if key.id == key_id), None)
+    _record(log, admin, "provider_key_remove", provider_id, json.dumps({"key": key_id, "last4": last4}), "")
+    return _view(store.get(provider_id), mapping.providers_in_use())
 
 
 def _unreadable(provider: Provider) -> HTTPException:
@@ -252,7 +321,7 @@ def _unreadable(provider: Provider) -> HTTPException:
 
 def _key(vault: SecretVault, provider: Provider) -> str | None:
     try:
-        return vault.reader().get(key_name(provider.id)) if provider.key_set else None
+        return vault.reader().get(key_name(provider.id, provider.keys[0].id)) if provider.keys else None
     except SecretError:
         raise _unreadable(provider) from None
 
@@ -333,19 +402,42 @@ def _eval(reports: list[ReportSummary], tier: str, provider_id: str, model: str)
                       report_id=found.report_id, report_ts=found.report_ts)
 
 
+def _tier_view(tier: str, chain: list[TierModel], reports: list[ReportSummary] | None = None) -> TierView:
+    if not chain:
+        return TierView(tier=tier, provider_id=None, model=None)
+    first = chain[0]
+    return TierView(
+        tier=tier, provider_id=first.provider_id, model=first.model,
+        eval=_eval(reports, tier, first.provider_id, first.model) if reports is not None else None,
+        chain=[ChainLink(provider_id=link.provider_id, model=link.model) for link in chain],
+    )
+
+
 def _tiers(mapping: TierMapping, compiled: tuple[str, int] | None, reports: list[ReportSummary]) -> ModelTiersView:
-    mapped = mapping.tiers()
+    mode, refreshed_at = mapping.mode()
     return ModelTiersView(
-        tiers=[TierView(tier=tier, provider_id=mapped[tier].provider_id, model=mapped[tier].model,
-                        eval=_eval(reports, tier, mapped[tier].provider_id, mapped[tier].model))
-               if tier in mapped else TierView(tier=tier, provider_id=None, model=None) for tier in CHAT_TIERS],
-        embedding=_embedding(mapping.embedding(), compiled),
+        tiers=[_tier_view(tier, mapping.chain(tier), reports) for tier in CHAT_TIERS],
+        embedding=_embedding(mapping.embedding(), compiled), mode=mode, refreshed_at=refreshed_at,
     )
 
 
 @router.get("/models/tiers")
-def model_tiers(_: Admin, mapping: Mapping, compiled: Compiled,
+def model_tiers(_: Admin, mapping: Mapping, compiled: Compiled, store: Store, vault: Vault, catalog: CatalogDep,
+                latency: Latency, reports: Annotated[Callable, Depends(get_eval_reports)]) -> ModelTiersView:
+    # An automatic mode chooses again once a day, when the tiers are next read.
+    _refresh_auto(mapping, store, vault, catalog, latency, force=False)
+    return _tiers(mapping, compiled, reports())
+
+
+@router.put("/models/mode")
+def change_mode(body: ModeChange, admin: Admin, mapping: Mapping, compiled: Compiled, store: Store, vault: Vault,
+                catalog: CatalogDep, latency: Latency, log: Log,
                 reports: Annotated[Callable, Depends(get_eval_reports)]) -> ModelTiersView:
+    """Choose the chains automatically (free or best models), or keep them as the owner sets them."""
+    before = mapping.mode()[0]
+    mapping.set_mode(body.mode)
+    _refresh_auto(mapping, store, vault, catalog, latency, force=True)
+    _record(log, admin, "model_mode", "tiers", before, body.mode)
     return _tiers(mapping, compiled, reports())
 
 
@@ -375,13 +467,19 @@ def map_tier(tier: str, body: TierChange, admin: Admin, mapping: Mapping, log: L
                             detail="the embedding model changes with a full reindex, not as a tier")
     if tier not in CHAT_TIERS:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail=f"unknown model tier {tier!r}")
-    before = mapping.tier(tier)
+    before = mapping.chain(tier)
+    if body.chain is not None:
+        links = [TierModel(link.provider_id, link.model) for link in body.chain]
+    elif body.provider_id and body.model:
+        links = [TierModel(body.provider_id, body.model)]
+    else:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, detail="give a provider and a model, or a chain")
     try:
-        mapped = mapping.set_tier(tier, body.provider_id, body.model)
-    except ProviderNotFound as error:
+        chain = mapping.set_chain(tier, links)
+    except (ProviderNotFound, ValueError) as error:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(error)) from None
-    except ValueError as error:
-        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(error)) from None
-    _record(log, admin, "model_tier", tier, f"{before.provider_id}/{before.model}" if before else "",
-            f"{mapped.provider_id}/{mapped.model}")
-    return TierView(tier=tier, provider_id=mapped.provider_id, model=mapped.model)
+    # A chain the owner sets is kept: the automatic choice no longer replaces it.
+    mapping.set_mode("manual")
+    _record(log, admin, "model_tier", tier, " > ".join(f"{link.provider_id}/{link.model}" for link in before),
+            " > ".join(f"{link.provider_id}/{link.model}" for link in chain))
+    return _tier_view(tier, chain)

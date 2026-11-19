@@ -82,6 +82,8 @@ class LlmCallRecord(LogRecord):
     # success, failure or blocked
     status: str
     error: str
+    # The call id of the failed call of the tier's chain this call replaced; empty for a first attempt.
+    fallback_of: str = ""
 
 
 class SqlRunRecord(LogRecord):

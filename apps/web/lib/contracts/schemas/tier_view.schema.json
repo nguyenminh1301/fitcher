@@ -1,5 +1,24 @@
 {
   "$defs": {
+    "ChainLink": {
+      "additionalProperties": false,
+      "properties": {
+        "provider_id": {
+          "title": "Provider Id",
+          "type": "string"
+        },
+        "model": {
+          "title": "Model",
+          "type": "string"
+        }
+      },
+      "required": [
+        "provider_id",
+        "model"
+      ],
+      "title": "ChainLink",
+      "type": "object"
+    },
     "EvalStatus": {
       "additionalProperties": false,
       "description": "The latest eval report of the active pack that ran the tier on this model; it informs and never gates.",
@@ -89,6 +108,14 @@
         }
       ],
       "default": null
+    },
+    "chain": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/ChainLink"
+      },
+      "title": "Chain",
+      "type": "array"
     }
   },
   "required": [
