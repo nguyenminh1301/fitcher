@@ -32,6 +32,7 @@
 
 ### Fixed
 
+- A Parquet file with list, struct or map columns or a decimal wider than 38 digits loads: a list of scalars becomes an array, a nested column is loaded as JSON text and a wide decimal as `Decimal(76, s)`. A file that ClickHouse cannot load names the column and type it refused when its error says which.
 - A PostgreSQL `numeric` column declared without a precision is copied as `Decimal(76, 38)` instead of ClickHouse's `Decimal(38, 19)`, so a value with more than 19 digits before the point no longer fails the copy, and a pack build leaves out a column whose values ClickHouse cannot read and lists it in the build result instead of failing the build.
 - A source sync reads each selected table on its own: a table that ClickHouse cannot read (a PostgreSQL table name with a quote, a value too large for its column type, an empty table) no longer stops the other tables, the sync ends as partly synced with each failed table and its reason, and these ClickHouse refusals get reasons of their own instead of "unknown". A PostgreSQL table whose name has a quote or a backslash is proposed as a copy and cannot be chosen live.
 - Signing in with the owner password after opening the chat no longer sends the browser back and forth between the chat and the sign-in page: the page kept its earlier signed-out answer and asked the browser to sign in again.

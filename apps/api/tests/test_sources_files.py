@@ -1,5 +1,6 @@
 """Uploaded CSV, XLSX and Parquet files become ``raw`` tables with column types the user confirmed (DECISIONS §4)."""
 
+from decimal import Decimal
 from io import BytesIO
 import zipfile
 
@@ -132,12 +133,14 @@ def test_header_names_are_trimmed_filled_in_and_made_unique():
 
 
 @pytest.mark.parametrize("type_name", ["String", "Nullable(Int64)", "Float64", "Date", "DateTime64(6)",
-                                       "DateTime64(6, 'UTC')", "Decimal(18, 4)", "Nullable(Bool)", "UInt8"])
+                                       "DateTime64(6, 'UTC')", "Decimal(18, 4)", "Nullable(Bool)", "UInt8",
+                                       "Decimal(76, 2)", "Array(Nullable(String))", "Array(Int64)"])
 def test_allowed_column_types_pass(type_name):
     files.check_columns([FileColumn("a", type_name)])
 
 
-@pytest.mark.parametrize("type_name", ["String) ENGINE = Memory --", "Array(String)", "Nullable(Nullable(String))", "",
+@pytest.mark.parametrize("type_name", ["String) ENGINE = Memory --", "Nullable(Array(String))", "Array(Array(String))",
+                                       "Nullable(Nullable(String))", "Decimal(100, 2)", "",
                                        "Int64; DROP TABLE x", "Enum8('a'=1)"])
 def test_a_column_type_outside_the_allowed_set_is_refused_before_it_reaches_ddl(type_name):
     with pytest.raises(ValueError, match="type"):
@@ -165,6 +168,64 @@ def test_a_workbook_becomes_csv_rows_with_the_first_non_empty_row_as_header():
 
     assert header == ["id", "when", "note"]
     assert list(rows) == [["1", "2024-01-02", "a,b"], ["2", "", ""]]
+
+
+def nested_parquet() -> bytes:
+    buffer = BytesIO()
+    pq.write_table(pa.table({
+        "tags": pa.array([["a", "b"], None], pa.list_(pa.string())),
+        "point": pa.array([{"x": 1, "label": "á"}, None], pa.struct([("x", pa.int32()), ("label", pa.string())])),
+        "grid": pa.array([[[1], [2, 3]], []], pa.list_(pa.list_(pa.int64()))),
+        "amount": pa.array([Decimal("1.2345"), None], pa.decimal128(38, 4)),
+        "huge": pa.array([Decimal("1" * 48 + ".25"), None], pa.decimal256(50, 2)),
+    }), buffer)
+    return buffer.getvalue()
+
+
+def test_parquet_lists_structs_and_wide_decimals_map_to_types_clickhouse_loads():
+    assert files.parquet_columns(nested_parquet()) == [
+        FileColumn("tags", "Array(Nullable(String))"), FileColumn("point", "Nullable(String)"),
+        FileColumn("grid", "Nullable(String)"), FileColumn("amount", "Nullable(Decimal(38, 4))"),
+        FileColumn("huge", "Nullable(Decimal(76, 2))")]
+    files.check_columns(files.parquet_columns(nested_parquet()))
+
+
+def test_a_parquet_file_with_nested_columns_is_sent_with_them_as_json_text(parts):
+    _, clickhouse, service = parts
+    upload = service.upload("nested.parquet", BytesIO(nested_parquet()), uploaded_by=None)
+
+    service.load(upload.id, None, [FileColumn(c.name, c.type) for c in upload.columns])
+
+    sent = pq.read_table(BytesIO(clickhouse.inserted[0][3]))
+    assert sent.column("point").to_pylist() == ['{"x": 1, "label": "á"}', None]
+    assert sent.column("grid").to_pylist() == ["[[1], [2, 3]]", "[]"]
+    assert sent.column("tags").to_pylist() == [["a", "b"], None], "a list of scalars is sent as it is"
+
+
+@pytest.mark.parametrize(("error", "named"), [
+    ("Code: 53. Requested type of column point doesn't match parquet schema: parquet type is Tuple", "point"),
+    ("Cannot parse input: expected ',' before: 'x'. Row 1: Column 1, name: amount, type: Decimal(38, 4), parsed text: 'x'",
+     "amount"),
+    ("Cannot parse input: expected ',' before: 'x'", None),
+])
+def test_a_failed_load_names_the_column_clickhouse_refused(error, named):
+    columns = [FileColumn("point", "String"), FileColumn("amount", "Decimal(38, 4)")]
+
+    found = files.failing_column(RuntimeError(error), columns)
+
+    assert (found.name if found else None) == named
+
+
+def test_a_failed_load_says_which_column_and_type_failed(parts):
+    _, clickhouse, service = parts
+    upload = service.upload("a.csv", BytesIO(CSV), uploaded_by=None)
+    clickhouse.fail_on = "raw_insert"
+    clickhouse.error = RuntimeError(f"Row 1: Column 0, name: {upload.columns[0].name}, type: Int64, parsed text: 'x'")
+
+    with pytest.raises(files.LoadFailed) as raised:
+        service.load(upload.id, None, confirmed(upload))
+
+    assert f"column {upload.columns[0].name!r} as {upload.columns[0].type}" in str(raised.value)
 
 
 def test_a_parquet_schema_maps_to_clickhouse_types():

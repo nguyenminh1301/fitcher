@@ -12,6 +12,7 @@ read with openpyxl in read-only mode, first sheet only, and sent as CSV; formula
 """
 
 import csv
+import json
 from datetime import UTC, date, datetime, time
 import hashlib
 from itertools import islice
@@ -42,10 +43,10 @@ INFERENCE_SCAN_ROWS = 20_000
 MAX_TABLE_NAME = 40
 DELIMITERS = (",", ";", "\t", "|")
 # A column type is interpolated into DDL, so only these shapes pass.
-_TYPE = re.compile(
-    r"^(?:Nullable\()?(?:U?Int(?:8|16|32|64)|Float(?:32|64)|Bool|String|Date|Date32|DateTime|DateTime64\(\d(?:, '[A-Za-z_/+-]+')?\)"
-    r"|Decimal\(\d{1,2}, \d{1,2}\))\)?$"
-)
+_SCALAR = (r"(?:U?Int(?:8|16|32|64)|Float(?:32|64)|Bool|String|Date|Date32|DateTime|DateTime64\(\d(?:, '[A-Za-z_/+-]+')?\)"
+           r"|Decimal\(\d{1,2}, \d{1,2}\))")
+# A Parquet list of scalars loads as an array; ClickHouse has no nullable array, so it is never wrapped.
+_TYPE = re.compile(rf"^(?:(?:Nullable\()?{_SCALAR}\)?|Array\((?:Nullable\()?{_SCALAR}\)?\))$")
 
 
 class FileTooLarge(ValueError):
@@ -215,25 +216,78 @@ _ARROW = {
 }
 
 
-def _arrow_type(field) -> str:
+def _nested(kind) -> bool:
+    """A struct, a map or a list of anything but scalars: loaded as JSON text, since ClickHouse reads it as a tuple."""
     import pyarrow as pa
 
-    kind = field.type
+    if pa.types.is_struct(kind) or pa.types.is_map(kind) or pa.types.is_union(kind):
+        return True
+    if pa.types.is_list(kind) or pa.types.is_large_list(kind) or pa.types.is_fixed_size_list(kind):
+        return _nested(kind.value_type) or _is_list(kind.value_type)
+    return False
+
+
+def _is_list(kind) -> bool:
+    import pyarrow as pa
+
+    return pa.types.is_list(kind) or pa.types.is_large_list(kind) or pa.types.is_fixed_size_list(kind)
+
+
+def _scalar_type(kind) -> str:
+    import pyarrow as pa
+
     if pa.types.is_integer(kind):
         return f"{'Int' if pa.types.is_signed_integer(kind) else 'UInt'}{kind.bit_width}"
     if pa.types.is_timestamp(kind):
         zone = f", '{kind.tz}'" if kind.tz and re.fullmatch(r"[A-Za-z_/+-]+", kind.tz) else ""
         return f"DateTime64(6{zone})"
     if pa.types.is_decimal(kind) and kind.precision <= 76:
-        return f"Decimal({min(kind.precision, 38)}, {min(kind.scale, 38)})"
+        # Up to 38 digits fit a 128-bit decimal; a wider one needs ClickHouse's widest, Decimal(76, s).
+        return f"Decimal({kind.precision if kind.precision <= 38 else 76}, {kind.scale})"
     return _ARROW.get(str(kind), "String")
+
+
+def _arrow_type(field) -> str:
+    """The ClickHouse type of a Parquet column, with the Nullable wrapper it is loaded with."""
+    kind = field.type
+    if _nested(kind):
+        return "Nullable(String)"
+    if _is_list(kind):
+        return f"Array(Nullable({_scalar_type(kind.value_type)}))"
+    return f"Nullable({_scalar_type(kind)})"
 
 
 def parquet_columns(data: bytes | BinaryIO) -> list[FileColumn]:
     import pyarrow.parquet as pq
 
     schema = pq.read_schema(BytesIO(data) if isinstance(data, bytes) else data)
-    return [FileColumn(field.name, f"Nullable({_arrow_type(field)})") for field in schema]
+    return [FileColumn(field.name, _arrow_type(field)) for field in schema]
+
+
+def _parquet_batches(path: Path) -> Iterator[bytes] | None:
+    """The file rewritten with each nested column as JSON text, in row groups; None when nothing is nested."""
+    import pyarrow as pa
+    import pyarrow.parquet as pq
+
+    source = pq.ParquetFile(path)
+    nested = [field.name for field in source.schema_arrow if _nested(field.type)]
+    if not nested:
+        return None
+
+    def as_json(column) -> pa.Array:
+        return pa.array([None if value is None else json.dumps(value, default=str, ensure_ascii=False)
+                         for value in column.to_pylist()], pa.string())
+
+    def batches() -> Iterator[bytes]:
+        for group in range(source.num_row_groups):
+            table = source.read_row_group(group)
+            for name in nested:
+                table = table.set_column(table.schema.get_field_index(name), name, as_json(table.column(name)))
+            buffer = BytesIO()
+            pq.write_table(table, buffer)
+            yield buffer.getvalue()
+
+    return batches()
 
 
 def _csv_text(header: list[str], rows: list[list[str]]) -> str:
@@ -264,6 +318,20 @@ def _read_csv_head(path: Path) -> tuple[str, str]:
         raise DocumentRejected("the CSV file has no header row")
     header = normalize_header(reader[0])
     return delimiter, _csv_text(header, [row + [""] * (len(header) - len(row)) for row in reader[1:]])
+
+
+_COLUMN_IN_ERROR = (re.compile(r"\bname: (.+?), type: "), re.compile(r"\bcolumn [`'\"]?([^`'\"\s:,]+)", re.IGNORECASE))
+
+
+def failing_column(error: BaseException, columns: list[FileColumn]) -> FileColumn | None:
+    """The confirmed column that ClickHouse's error names, if it names one; nothing else of the text is kept."""
+    by_name = {column.name: column for column in columns}
+    text = str(error)
+    for pattern in _COLUMN_IN_ERROR:
+        for match in pattern.finditer(text):
+            if match.group(1) in by_name:
+                return by_name[match.group(1)]
+    return None
 
 
 class FileService:
@@ -384,9 +452,13 @@ class FileService:
             self._client.command(f"CREATE TABLE {loading} ({structure}) ENGINE = MergeTree ORDER BY tuple()")
             self._insert(loading, stored)
             rows = int(self._client.command(f"SELECT count() FROM {loading}"))
-        except Exception:
+        except Exception as error:
             self._client.command(f"DROP TABLE IF EXISTS {loading}")
             logger.warning("loading the uploaded file %s failed", stored.id)
+            column = failing_column(error, columns)
+            if column is not None:
+                raise LoadFailed(f"ClickHouse could not load the column {column.name!r} as {column.type}; "
+                                 "choose another type for it") from None
             raise LoadFailed("ClickHouse could not load the file with these column types") from None
         publish_copy(self._client, source, table)
         return rows
@@ -394,6 +466,11 @@ class FileService:
     def _insert(self, loading: str, stored: StoredFile) -> None:
         path = Path(stored.stored_path)
         if stored.format == "parquet":
+            rewritten = _parquet_batches(path)
+            if rewritten is not None:
+                for block in rewritten:
+                    self._client.raw_insert(loading, insert_block=block, fmt="Parquet")
+                return
             with path.open("rb") as handle:
                 self._client.raw_insert(loading, insert_block=handle.read() if path.stat().st_size < CHUNK_BYTES else _chunks(handle),
                                         fmt="Parquet")
