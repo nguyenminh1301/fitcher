@@ -45,6 +45,9 @@ class InstantResult(ContractModel):
     dropped: list[str] = []
     # Wide views that read a live table: ClickHouse joins the live rows itself, so copying the tables is faster.
     slow: list[str] = []
+    # Columns ("mart.column") whose values ClickHouse could not read, such as a number too large for its type; the
+    # pack was drafted without them.
+    unreadable_columns: list[str] = []
     suggested_questions: list[str] = []
 
 

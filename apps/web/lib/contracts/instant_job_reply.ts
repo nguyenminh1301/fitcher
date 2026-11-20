@@ -18,6 +18,7 @@ export type Relationships = number;
 export type Skipped = string[];
 export type Dropped = string[];
 export type Slow = string[];
+export type UnreadableColumns = string[];
 export type SuggestedQuestions = string[];
 export type StartedAt = string;
 export type FinishedAt = string | null;
@@ -51,5 +52,6 @@ export interface InstantResult {
   skipped?: Skipped;
   dropped?: Dropped;
   slow?: Slow;
+  unreadable_columns?: UnreadableColumns;
   suggested_questions?: SuggestedQuestions;
 }

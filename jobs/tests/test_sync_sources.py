@@ -16,6 +16,10 @@ class FakeClient:
         self.sql = []
         self.fail_on = fail_on
 
+    def query(self, sql):
+        """The source catalog: no table of these sources has a PostgreSQL numeric without precision."""
+        return type("Result", (), {"result_rows": []})()
+
     def command(self, sql):
         self.sql.append(sql)
         if self.fail_on and self.fail_on in sql:

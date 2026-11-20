@@ -73,6 +73,31 @@ def test_profile_reads_rows_dates_distincts_top_values_samples_and_join_candidat
     # A string column above the low-cardinality limit gets no top values.
     assert "top_values" not in profile["tables"]["lines"]["columns"]["note"]
     assert profile["join_candidates"] == [{"left": "lines.ticket_ref", "right": "orders.ticket_ref", "overlap": 1.0}]
+    assert profile["unreadable_columns"] == []
+
+
+class RefusingWarehouse(ScriptedWarehouse):
+    """Refuses every query that reads ``amount``, as ClickHouse does for a value too large for its decimal type."""
+
+    def query(self, sql, settings=None):
+        if "`amount`" in sql or ("SELECT *" in sql and "`orders`" in sql):
+            self.queries.append((sql, settings))
+            raise RuntimeError("Cannot parse PostgreSQL value '1e30' as Decimal(38, 19): Decimal value is too big")
+        return super().query(sql, settings)
+
+
+def test_a_column_that_cannot_be_read_is_left_out_of_the_profile_instead_of_failing_it():
+    answers = standard_answers() + [(r"SELECT `ticket_ref`, `placed_on`, `venue` FROM `marts`\.`orders` LIMIT 3",
+                                     [("o1", date(2024, 1, 1), "web")])]
+    warehouse = RefusingWarehouse(COLUMNS, answers)
+
+    profile = profile_marts(warehouse, ["orders", "lines"], sample_rows=3, clock=CLOCK)
+
+    orders = profile["tables"]["orders"]
+    assert "amount" not in orders["columns"] and set(orders["columns"]) == {"ticket_ref", "placed_on", "venue"}
+    assert orders["sample_rows"] == [["o1", "2024-01-01", "web"]]
+    assert profile["unreadable_columns"] == ["orders.amount"]
+    assert profile["tables"]["lines"]["sample_rows"] == [["o1", "gift"]]
 
 
 def test_every_profile_query_carries_the_scan_limits():

@@ -315,6 +315,7 @@ class InstantPipeline:
         job.result = {
             "pack": pack, **state["summary"], "dropped": state.get("dropped", []),
             "slow": [view.name for view in state["views"] if view.slow],
+            "unreadable_columns": list(state["profile"].get("unreadable_columns", [])),
             "suggested_questions": [str(item["question"]) for item in examples[:SUGGESTED_QUESTIONS]],
         }
 
