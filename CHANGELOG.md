@@ -36,6 +36,7 @@
 
 ### Fixed
 
+- The chat no longer scrolls as a whole page in a window shorter than 600 px, such as a phone held sideways: the composer stays in view and the sidebar logo is not cut off.
 - An answer grouped by month, quarter or year shows its periods as "Jan 2026", "Q1 2026" or "2026" in the table, chart axis and tooltip, headed "Month", "Quarter" or "Year" in the question's language, instead of the first day of each period under an internal column name.
 - A question that names its period outright, such as "năm 2026", "Q1 2025" or "March 2024", is answered for that period instead of being asked back when the extraction model misses it.
 - A question that asks for a time grain outright, such as "theo tháng", "by quarter" or "monthly", is grouped by that grain when the extraction model misses it, instead of being answered with one total.

@@ -312,7 +312,7 @@ textarea.fc-input { height: auto; min-height: 80px; padding: var(--base-size-8) 
 .fc-menu-sep { height: 1px; background: var(--borderColor-muted); margin: var(--base-size-4) calc(var(--base-size-8) * -1); }
 
 /* Chat app shell */
-.fc-app { position: relative; display: flex; height: 100%; min-height: 600px; background: var(--bgColor-default); container-type: inline-size; container-name: app; overflow: hidden; }
+.fc-app { position: relative; display: flex; height: 100%; min-height: 0; background: var(--bgColor-default); container-type: inline-size; container-name: app; overflow: hidden; }
 /* A page in document flow (setup, sign-in): it grows with its content and the window scrolls it. */
 .fc-side { position: relative; width: var(--sidebar-width); flex: none; display: flex; flex-direction: column; background: var(--bgColor-muted); border-right: 1px solid var(--borderColor-muted); }
 .fc-side-resize { position: absolute; top: 0; right: -4px; bottom: 0; width: 8px; cursor: col-resize; z-index: 5; touch-action: none; }
