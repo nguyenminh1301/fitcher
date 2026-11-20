@@ -30,6 +30,8 @@ The command publishes the app on the local machine only. To use another host por
 | `documents/` | Uploaded company documents |
 | `models/` | Downloaded local models |
 
+The volume belongs to the `app` user (uid 10001), which runs the api, ClickHouse and the jobs; every start makes `/data` mode 0700. The web server runs as `web` (uid 10002), which reads nothing under `/data`. A bind-mounted directory must be writable by uid 10001; one owned by root is given to it on the first start.
+
 Back up a running instance with `fitcher backup` and restore it into a new volume with `fitcher restore`; [operations.md](operations.md) shows both. Without the secret key in the backup, provider keys and source passwords are entered again after a restore.
 
 ## Settings

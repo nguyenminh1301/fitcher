@@ -79,11 +79,13 @@ COPY infra/image/scripts /etc/s6-overlay/scripts
 COPY infra/image/healthcheck.sh /usr/local/bin/fitcher-healthcheck
 COPY infra/image/fitcher /usr/local/bin/fitcher
 
-# Every service runs as the application user; s6-overlay needs /run writable by it. Docker copies the owner
-# of /data into a new named volume, so the user owns a fresh volume.
+# s6 starts as root and runs each service as its own user (infra/image/s6-rc.d/*/run): api, ClickHouse and the
+# jobs as `app`, which owns /data; the internet-facing web server as `web`, which can read neither /data nor the
+# rendered ClickHouse configuration. Docker copies the owner and mode of /data into a new named volume.
 RUN useradd --create-home --uid 10001 app \
-    && mkdir -p /data /run/fitcher \
-    && chown app:app /data /run /run/fitcher \
+    && useradd --no-create-home --home-dir /tmp/web --shell /usr/sbin/nologin --uid 10002 web \
+    && install -d -m 0700 -o app -g app /data /run/fitcher /tmp/app \
+    && install -d -m 0700 -o web -g web /tmp/web \
     && chmod 0755 /usr/local/bin/fitcher /usr/local/bin/fitcher-healthcheck /etc/s6-overlay/scripts/* \
         /etc/s6-overlay/s6-rc.d/*/run /etc/s6-overlay/s6-rc.d/*/finish
 
@@ -106,7 +108,6 @@ ENV PATH="/app/.venv/bin:/command:$PATH" \
     S6_KILL_GRACETIME=1000 \
     S6_VERBOSITY=1
 
-USER app
 VOLUME /data
 EXPOSE 3000
 HEALTHCHECK --interval=10s --timeout=5s --start-period=60s --retries=6 CMD ["/usr/local/bin/fitcher-healthcheck"]

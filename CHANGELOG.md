@@ -72,6 +72,10 @@
 - Loading icons turn again, including the one above "Building the pack" and the circle of the step that is running; they stood still before.
 - The Feedback page without an active pack no longer logs a feedback store failure with a traceback; the api answers that no pack is active.
 
+### Security
+
+- The release image's web server, the only process on the published port, runs as its own user (`web`, uid 10002) with only the variables it reads, so code running in it can no longer read `/data`, the instance key, the services' secrets, the rendered ClickHouse configuration or a `FITCHER_SECRET_KEY` or ClickHouse password given to the container; the api, ClickHouse and the jobs keep running as `app` (uid 10001), the owner of `/data`, which every start makes mode 0700. The container now starts as root so that s6 can start each service as its user, `docker exec fitcher fitcher <job>` still runs the job as `app`, and `scripts/check_image_isolation.sh` checks all of it on every image audit.
+
 ### Removed
 
 - The animated walkthrough for creating an OpenRouter key is gone from the setup's provider card; the "Get a key" link and the note on OpenRouter's free models stay.
