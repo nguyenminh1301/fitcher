@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { TypeSwitcher } from "@/components/chat/TypeSwitcher";
 import { DataTable } from "@/components/chat/DataTable";
-import { formatTick, toCsv, toEChartsOption } from "@/lib/chart/toEChartsOption";
+import { formatCell, formatDate, formatTick, toCsv, toEChartsOption } from "@/lib/chart/toEChartsOption";
 import type { ChartSpec, Result } from "@/lib/contracts";
 import { I18nProvider } from "@/lib/i18n/react";
 
@@ -191,5 +191,20 @@ describe("data table", () => {
 
     const cells = screen.getAllByRole("row").slice(1).map((row) => row.querySelector("td")?.textContent);
     expect(cells).toEqual(["A", "B", "C"]);
+  });
+});
+
+describe("dates of a column grouped to a grain", () => {
+  it("name the period in the interface language", () => {
+    expect(formatDate("2026-01-01", "month", "en")).toBe("Jan 2026");
+    expect(formatDate("2026-01-01", "month", "vi")).toMatch(/2026/);
+    expect(formatDate("2026-04-01", "quarter", "en")).toBe("Q2 2026");
+    expect(formatDate("2026-04-01", "quarter", "vi")).toBe("Quý 2 2026");
+    expect(formatDate("2026-01-01", "year", "en")).toBe("2026");
+  });
+
+  it("keep a plain date as it is", () => {
+    expect(formatDate("2026-01-15", null, "en")).toBe("2026-01-15");
+    expect(formatCell("2026-01-15", { type: "date", format: null }, "vi")).toBe("2026-01-15");
   });
 });

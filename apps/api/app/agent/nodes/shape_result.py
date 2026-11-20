@@ -79,8 +79,26 @@ def to_result(output: QueryOutput, pack: Pack, dataset: str) -> Result:
     return Result(columns=columns, rows=rows, row_count=len(output.rows), truncated=len(output.rows) > MAX_RESULT_ROWS)
 
 
+# The heading of a time column grouped to a grain, in the question's language.
+GRAIN_HEADINGS = {
+    "en": {"day": "Day", "week": "Week", "month": "Month", "quarter": "Quarter", "year": "Year"},
+    "vi": {"day": "Ngày", "week": "Tuần", "month": "Tháng", "quarter": "Quý", "year": "Năm"},
+}
+
+
+def with_grain(result: Result, grain: str | None, language: str) -> Result:
+    """``result`` with its date columns marked as grouped to ``grain``, headed by the grain's name."""
+    if grain is None:
+        return result
+    headings = GRAIN_HEADINGS.get(language, GRAIN_HEADINGS["en"])
+    columns = [column.model_copy(update={"grain": grain, "label": column.label or headings[grain]})
+               if column.role == "time" and column.type in ("date", "datetime") else column for column in result.columns]
+    return result.model_copy(update={"columns": columns})
+
+
 def shape_result(state: AgentState, deps: AgentDeps) -> dict:
     result = to_result(state["output"], deps.compiled.pack, state["spec"].dataset)
+    result = with_grain(result, state.get("time_grain"), question_language(state))
     warnings = list(state.get("warnings", []))
     if result.truncated:
         warnings.append(warning(question_language(state), "first_rows", rows=MAX_RESULT_ROWS))

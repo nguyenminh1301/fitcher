@@ -20,6 +20,9 @@ class ColumnInfo(ContractModel):
     # The heading people read: a metric's display name from the pack, with the period of a compared column
     # (``Revenue 2026``); None when the name itself is the heading.
     label: str | None = None
+    # A time column grouped to a grain (``toStartOfMonth``): its dates stand for whole months, quarters or years,
+    # so the interface shows "Jan 2026" rather than the first day.
+    grain: Literal["day", "week", "month", "quarter", "year"] | None = None
 
 
 class Result(ContractModel):

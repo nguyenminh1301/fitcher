@@ -36,6 +36,7 @@
 
 ### Fixed
 
+- An answer grouped by month, quarter or year shows its periods as "Jan 2026", "Q1 2026" or "2026" in the table, chart axis and tooltip, headed "Month", "Quarter" or "Year" in the question's language, instead of the first day of each period under an internal column name.
 - A question that names its period outright, such as "năm 2026", "Q1 2025" or "March 2024", is answered for that period instead of being asked back when the extraction model misses it.
 - A question that asks for a time grain outright, such as "theo tháng", "by quarter" or "monthly", is grouped by that grain when the extraction model misses it, instead of being answered with one total.
 - A model call now stops at its timeout even when the provider keeps the connection open with keep-alive lines, as OpenRouter does while a free model is queued, so the next model in the chain answers instead of the question waiting for minutes.
