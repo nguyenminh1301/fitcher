@@ -1,5 +1,7 @@
 #!/command/with-contenv sh
 # Waits for ClickHouse, restores a pending backup (jobs/restore.py), then applies the pending schema changes as the ClickHouse admin (jobs/migrate.py).
+# s6 starts it as root; it runs as `app`, the owner of /data.
+[ "$(id -u)" = 0 ] && exec env HOME=/home/app TMPDIR=/tmp/app /command/s6-setuidgid app "$0" "$@"
 set -a
 . /data/secrets/admin.env
 set +a

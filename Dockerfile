@@ -79,13 +79,24 @@ COPY infra/image/scripts /etc/s6-overlay/scripts
 COPY infra/image/healthcheck.sh /usr/local/bin/fitcher-healthcheck
 COPY infra/image/fitcher /usr/local/bin/fitcher
 
-# Every service runs as the application user; s6-overlay needs /run writable by it. Docker copies the owner
-# of /data into a new named volume, so the user owns a fresh volume.
+# s6 starts as root and runs each service as its own user (infra/image/s6-rc.d/*/run): api, ClickHouse and the
+# jobs as `app`, which owns /data; the internet-facing web server as `web`, which can read neither /data nor the
+# rendered ClickHouse configuration. Docker copies the owner and mode of /data into a new named volume.
 RUN useradd --create-home --uid 10001 app \
-    && mkdir -p /data /run/fitcher \
-    && chown app:app /data /run /run/fitcher \
+    && useradd --no-create-home --home-dir /tmp/web --shell /usr/sbin/nologin --uid 10002 web \
+    && install -d -m 0700 -o app -g app /data /run/fitcher /tmp/app \
+    && install -d -m 0700 -o web -g web /tmp/web \
     && chmod 0755 /usr/local/bin/fitcher /usr/local/bin/fitcher-healthcheck /etc/s6-overlay/scripts/* \
         /etc/s6-overlay/s6-rc.d/*/run /etc/s6-overlay/s6-rc.d/*/finish
+
+# Packages the running image never uses, removed once the users exist: the package manager, the util-linux tools,
+# login and mount, and Perl with the debconf and init scripts written in it. Their advisories leave the image with
+# them; the advisories of the libraries it does use are reviewed in SECURITY.md, Unfixed image advisories.
+RUN dpkg --purge --force-remove-essential --force-remove-protected --force-depends \
+        apt libapt-pkg7.0 sqv libudev1 adduser debconf init-system-helpers \
+        util-linux mount login bsdutils liblastlog2-2 libsmartcols1 libmount1 libblkid1 \
+    && dpkg --purge --force-remove-essential --force-remove-protected --force-depends perl-base \
+    && rm -rf /var/cache/apt /var/lib/apt /var/log/apt /var/cache/debconf /etc/apt
 
 # A failing init-data or migrate stops the container; at shutdown services get 8 s, within the 10 s of docker stop.
 ENV PATH="/app/.venv/bin:/command:$PATH" \
@@ -106,7 +117,6 @@ ENV PATH="/app/.venv/bin:/command:$PATH" \
     S6_KILL_GRACETIME=1000 \
     S6_VERBOSITY=1
 
-USER app
 VOLUME /data
 EXPOSE 3000
 HEALTHCHECK --interval=10s --timeout=5s --start-period=60s --retries=6 CMD ["/usr/local/bin/fitcher-healthcheck"]

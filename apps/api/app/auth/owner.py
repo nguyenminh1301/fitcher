@@ -27,7 +27,9 @@ from argon2.exceptions import InvalidHashError, VerificationError
 from app.state.db import StateDb
 
 SESSION_COOKIE = "fitcher_session"
-MIN_LENGTH = 8
+# An instance listed in FITCHER_ALLOWED_HOSTS answers the internet with this password alone; a password set
+# before the minimum was raised still signs in.
+MIN_LENGTH = 12
 IDLE_SECONDS = 12 * 3600
 LIFETIME_SECONDS = 30 * 24 * 3600
 # last_used_at is written at most this often, so reads do not each take the write lock.

@@ -20,9 +20,15 @@ describe("security headers", () => {
     expect(first).not.toBe(second);
   });
 
-  it("sends nosniff, a same-origin referrer and frame denial", () => {
+  it("sends nosniff, a same-origin referrer, frame denial, no camera, microphone or location and an isolated window", () => {
     expect(Object.fromEntries(STATIC_HEADERS.map(({ key, value }) => [key, value]))).toEqual({
       "X-Content-Type-Options": "nosniff", "Referrer-Policy": "same-origin", "X-Frame-Options": "DENY",
+      "Permissions-Policy": "camera=(), microphone=(), geolocation=()", "Cross-Origin-Opener-Policy": "same-origin",
     });
+  });
+
+  it("does not name the framework in X-Powered-By", async () => {
+    const { default: config } = await import("@/next.config");
+    expect(config.poweredByHeader).toBe(false);
   });
 });

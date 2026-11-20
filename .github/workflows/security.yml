@@ -82,6 +82,9 @@ jobs:
             docker compose pull "$SERVICE"
           fi
           echo "IMAGE=$image" >> "$GITHUB_ENV"
+      - name: Check that the web server cannot read the instance secrets
+        if: matrix.service == 'release'
+        run: bash scripts/check_image_isolation.sh "$IMAGE"
       - name: Save all advisories and block fixable High or Critical findings
         # Exceptions apply only to this image and expire; see SECURITY.md, Image exceptions.
         run: bash scripts/scan_image.sh "$IMAGE" ".github/trivy/${SERVICE}.trivyignore.yaml"

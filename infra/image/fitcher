@@ -2,6 +2,10 @@
 # Runs a job module of the release image: `docker exec fitcher fitcher <job> [args]` (DECISIONS §3).
 # Jobs get the admin environment written by init-data, which the long-running api never holds.
 set -e
+# `docker exec` runs as root; a job runs as `app`, the owner of /data, so the files it writes stay the api's.
+if [ "$(id -u)" = 0 ]; then
+    exec env HOME=/home/app TMPDIR=/tmp/app /command/s6-setuidgid app "$0" "$@"
+fi
 if [ $# -eq 0 ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
     echo "usage: fitcher <job> [args]; jobs:" >&2
     ls /app/jobs | sed -n 's/^\([a-z_]*\)\.py$/  \1/p' | grep -v '__init__' >&2

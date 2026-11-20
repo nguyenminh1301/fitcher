@@ -1,9 +1,13 @@
 import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+vi.mock("next/headers", () => ({ headers: async () => new Headers({ host: "localhost:3000" }), cookies: async () => ({ get: () => undefined }) }));
 
 import { GET } from "@/app/api/sample/[file]/route";
+
+let meStatus = 200;
 
 let packs: string;
 
@@ -13,11 +17,17 @@ beforeEach(() => {
   writeFileSync(join(packs, "shop", "sample_data", "console.json"), JSON.stringify({ pack: { name: "shop" } }));
   process.env.PACKS_DIR = packs;
   process.env.ACTIVE_PACK = "shop";
+  meStatus = 200;
+  vi.stubGlobal("fetch", vi.fn(async (url: string) => {
+    expect(url).toMatch(/\/me$/);
+    return new Response("{}", { status: meStatus });
+  }));
 });
 
 afterEach(() => {
   delete process.env.PACKS_DIR;
   delete process.env.ACTIVE_PACK;
+  vi.unstubAllGlobals();
 });
 
 const call = (file: string) => GET(new Request(`http://web/api/sample/${file}`), { params: Promise.resolve({ file }) });
@@ -56,5 +66,16 @@ describe("sample data route", () => {
 
     expect((await call("console")).status).toBe(404);
     expect(await (await call("scenarios")).json()).toEqual({ suggestions: [], scenarios: [] });
+  });
+
+  it("reads no pack file for a request the api refuses, such as one without the owner's session", async () => {
+    meStatus = 401;
+    const signedOut = await call("console");
+    expect(signedOut.status).toBe(401);
+    expect(await signedOut.json()).toEqual({ error: "signed_out" });
+
+    meStatus = 403;
+    expect((await call("console")).status).toBe(403);
+    expect((await call("scenarios")).status).toBe(403);
   });
 });

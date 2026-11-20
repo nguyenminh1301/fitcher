@@ -4,6 +4,7 @@
 
 ### Added
 
+- The install guide shows how to reach fitcher from other machines: list the public name, set the owner password on this computer first, then start an nginx, Caddy or Cloudflare Tunnel proxy that sends the public name as `Host`, with the settings for uploads and streamed answers.
 - One source switcher in the chat's question box and at the top of the console sidebar: a menu of the sources that can answer, with their kind and dataset count, the current one checked and a way to the Sources page. Choosing a source makes its pack the current one on the api (`PUT /pack`), so the console's pages and a new conversation use the same source.
 - The Runs page lists every source's runs together, with a Source column and filter (`GET /admin/runs?all=true`), and a run of any source opens its trace; the Overview and Costs pages count every source's runs.
 - While a pack compiles, the build page also counts the column values the prompt-injection classifier has checked, the step that comes before indexing and takes longest when the classifier is on.
@@ -31,6 +32,8 @@
 
 ### Fixed
 
+- Signing in with the owner password after opening the chat no longer sends the browser back and forth between the chat and the sign-in page: the page kept its earlier signed-out answer and asked the browser to sign in again.
+- A browser the api refuses outright, such as one behind a reverse proxy that sends a loopback host or a name missing from `FITCHER_ALLOWED_HOSTS`, sees the api's reason and what to change in a banner on the chat and setup pages, instead of a page that never finishes loading.
 - An XLSX or DOCX file whose ZIP directory declares more than 1 GiB of unpacked data, or a member compressed more than 100 times, is refused with 413 before it is parsed, so a few-megabyte decompression bomb no longer keeps the api busy for minutes; the column types of an uploaded workbook are inferred from at most its first 20 000 rows.
 - The web server no longer reads an unbounded request body into memory before the api checks the request: JSON routes refuse bodies over 1 MiB, and uploads are streamed to the api and refused with 413 once they pass the api's own file limit (`SOURCE_FILE_MAX_BYTES` or `DOCUMENT_MAX_BYTES`) plus 1 MiB of multipart framing, so a 1.5 GB body can no longer exhaust the container's memory.
 - Wrong owner passwords sent through the published port or a reverse proxy no longer lock out the owner at this computer, whose sign-in attempts are counted apart; other clients are counted by their own address (from `X-Forwarded-For` when the proxy is listed in the new `FITCHER_TRUSTED_PROXIES`) and together share a limit of 100 failures in 15 minutes.
@@ -71,6 +74,14 @@
 - After a failed pack build the Sources page says no pack is turned on and offers "Build the pack", instead of showing only a succeeded sync while the other pages ask to connect data that is already connected; those pages now say the pack is missing and that it is built from the Sources page.
 - Loading icons turn again, including the one above "Building the pack" and the circle of the step that is running; they stood still before.
 - The Feedback page without an active pack no longer logs a feedback store failure with a traceback; the api answers that no pack is active.
+
+### Security
+
+- The release image no longer contains the package manager, the util-linux tools, `login`, `mount` or Perl, which nothing in it runs, so their advisories left with them (47 High findings without a Debian fix down to 13); the remaining ones are listed with their reason and a review date in SECURITY.md, Unfixed image advisories.
+- A new owner password needs at least 12 characters instead of 8, because an instance open to other machines answers them with that password alone; the Security page says so, suggests a phrase of a few words and rates a long enough password as fair or strong. A password set earlier still signs in.
+- Every page is sent with a `Permissions-Policy` that turns off the camera, microphone and location and with `Cross-Origin-Opener-Policy: same-origin`, and without the `X-Powered-By: Next.js` header. The sample data route (`/api/sample/<file>`) reads a pack's files only for a request the api accepts, like every other route, except in the demo build, which has no api.
+- An exported CSV result can no longer run a formula when it is opened in a spreadsheet: a cell or column name that starts with `=`, `+`, `-`, `@`, a tab or a carriage return gets a leading `'` (a plain number such as `-5` stays a number). The file also starts with a UTF-8 byte order mark and ends its lines with CRLF, so Excel shows Vietnamese text instead of mojibake.
+- The release image's web server, the only process on the published port, runs as its own user (`web`, uid 10002) with only the variables it reads, so code running in it can no longer read `/data`, the instance key, the services' secrets, the rendered ClickHouse configuration or a `FITCHER_SECRET_KEY` or ClickHouse password given to the container; the api, ClickHouse and the jobs keep running as `app` (uid 10001), the owner of `/data`, which every start makes mode 0700. The container now starts as root so that s6 can start each service as its user, `docker exec fitcher fitcher <job>` still runs the job as `app`, and `scripts/check_image_isolation.sh` checks all of it on every image audit.
 
 ### Removed
 

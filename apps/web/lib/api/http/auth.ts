@@ -4,16 +4,36 @@
 import type { FitcherApi } from "../client";
 import type { Identity } from "../provisional";
 
+/**
+ * The api refused this browser before signing in could help (403 from its address checks): a name missing from
+ * FITCHER_ALLOWED_HOSTS, a reverse proxy relaying a loopback host, or another machine before a password is set.
+ * `reason` is the api's own explanation, which says what to change.
+ */
+export class AccessRefused extends Error {
+  constructor(readonly reason: string) {
+    super(reason);
+  }
+}
+
 async function json<T>(response: Response): Promise<T> {
+  if (response.status === 403) {
+    const body = (await response.json().catch(() => ({}))) as { detail?: unknown };
+    throw new AccessRefused(typeof body.detail === "string" ? body.detail : "");
+  }
   if (!response.ok) throw new Error(`${response.url || "request"} answered ${response.status}`);
   return (await response.json()) as T;
 }
 
 export function createHttpAuth(fetcher: typeof fetch = (...args) => fetch(...args)): FitcherApi["auth"] {
-  // The signed-in user is read once per page load and shared by every caller.
+  // The signed-in user is read once per page load and shared by every caller. A signed-out answer is not kept:
+  // after signing in, the app moves to the chat without loading the page again, and must see the new session.
   let current: Promise<Identity | null> | null = null;
   const load = () =>
-    (current ??= fetcher("/api/session", { cache: "no-store" }).then((response) => (response.status === 401 ? null : json<Identity>(response))).catch((error) => {
+    (current ??= fetcher("/api/session", { cache: "no-store" }).then((response) => {
+      if (response.status !== 401) return json<Identity>(response);
+      current = null;
+      return null;
+    }).catch((error) => {
       current = null;
       throw error;
     }));
