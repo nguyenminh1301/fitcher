@@ -43,3 +43,14 @@ On or before expiry, rescan the newest upstream tag, update the pin if it fixes 
 | --- | --- | --- | --- | --- |
 | `clickhouse/clickhouse-server:26.8.36.3` | CVE-2026-109518 in the base image's apt ([list](.github/trivy/clickhouse.trivyignore.yaml)) | Newest 26.8 release on 2026-11-05; apt ships in the upstream Ubuntu base and the server never runs it | @nguyenminh1301 | 2026-12-31 |
 
+## Unfixed image advisories
+
+High advisories in the Debian 13 packages of the release image that Debian has not fixed yet. The image gate blocks fixable findings only, so these do not fail it; they are reviewed by hand. The release image removes the packages it never uses (the package manager, the util-linux tools, `login`, `mount` and Perl), which took the count from 47 to 13 on 2026-11-20. Rebuild the image as soon as Debian publishes a fixed version, and review this list again by the review date.
+
+| Package | Advisories | Why it is accepted until a fix | Owner | Review by |
+| --- | --- | --- | --- | --- |
+| `libsqlite3-0` 3.46.1 | CVE-2026-119373, CVE-2026-119374 (FTS5), CVE-2026-119379 (session changesets) | The api's app state is SQLite, so the library stays; the app never creates an FTS5 table or applies a changeset, and only the api writes `app.db` | @nguyenminh1301 | 2026-12-31 |
+| `libncursesw6`, `libtinfo6`, `ncurses-base`, `ncurses-bin` 6.5 | CVE-2025-69720 | Needed by the shell and Python; no service draws a terminal interface or reads terminal descriptions from untrusted input | @nguyenminh1301 | 2026-12-31 |
+| `libuuid1` 2.41.5 | CVE-2026-76642, CVE-2026-78408, CVE-2026-78409, CVE-2026-78410 | The advisories are in util-linux's mount and nsenter tools, removed from the image; only the shared library Python's `uuid` module loads remains | @nguyenminh1301 | 2026-12-31 |
+| `libsystemd0` 257.13 | CVE-2026-16742 | The advisory is in systemd-homed, which the image does not contain; the library stays for coreutils | @nguyenminh1301 | 2026-12-31 |
+| `libacl1` 2.3.2 | CVE-2026-54369 | Needed by coreutils; the services run as unprivileged users and change no access control lists | @nguyenminh1301 | 2026-12-31 |

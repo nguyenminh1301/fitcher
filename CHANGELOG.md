@@ -75,6 +75,7 @@
 
 ### Security
 
+- The release image no longer contains the package manager, the util-linux tools, `login`, `mount` or Perl, which nothing in it runs, so their advisories left with them (47 High findings without a Debian fix down to 13); the remaining ones are listed with their reason and a review date in SECURITY.md, Unfixed image advisories.
 - A new owner password needs at least 12 characters instead of 8, because an instance open to other machines answers them with that password alone; the Security page says so, suggests a phrase of a few words and rates a long enough password as fair or strong. A password set earlier still signs in.
 - Every page is sent with a `Permissions-Policy` that turns off the camera, microphone and location and with `Cross-Origin-Opener-Policy: same-origin`, and without the `X-Powered-By: Next.js` header. The sample data route (`/api/sample/<file>`) reads a pack's files only for a request the api accepts, like every other route, except in the demo build, which has no api.
 - An exported CSV result can no longer run a formula when it is opened in a spreadsheet: a cell or column name that starts with `=`, `+`, `-`, `@`, a tab or a carriage return gets a leading `'` (a plain number such as `-5` stays a number). The file also starts with a UTF-8 byte order mark and ends its lines with CRLF, so Excel shows Vietnamese text instead of mojibake.

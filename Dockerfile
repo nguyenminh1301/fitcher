@@ -89,6 +89,15 @@ RUN useradd --create-home --uid 10001 app \
     && chmod 0755 /usr/local/bin/fitcher /usr/local/bin/fitcher-healthcheck /etc/s6-overlay/scripts/* \
         /etc/s6-overlay/s6-rc.d/*/run /etc/s6-overlay/s6-rc.d/*/finish
 
+# Packages the running image never uses, removed once the users exist: the package manager, the util-linux tools,
+# login and mount, and Perl with the debconf and init scripts written in it. Their advisories leave the image with
+# them; the advisories of the libraries it does use are reviewed in SECURITY.md, Unfixed image advisories.
+RUN dpkg --purge --force-remove-essential --force-remove-protected --force-depends \
+        apt libapt-pkg7.0 sqv libudev1 adduser debconf init-system-helpers \
+        util-linux mount login bsdutils liblastlog2-2 libsmartcols1 libmount1 libblkid1 \
+    && dpkg --purge --force-remove-essential --force-remove-protected --force-depends perl-base \
+    && rm -rf /var/cache/apt /var/lib/apt /var/log/apt /var/cache/debconf /etc/apt
+
 # A failing init-data or migrate stops the container; at shutdown services get 8 s, within the 10 s of docker stop.
 ENV PATH="/app/.venv/bin:/command:$PATH" \
     PYTHONDONTWRITEBYTECODE=1 \
