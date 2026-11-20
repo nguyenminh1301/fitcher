@@ -864,6 +864,7 @@
     "background": "Làm tiếp ở nền, mở Bảng điều khiển",
     "buildFailed": "Dựng gói thất bại",
     "buildFailedText": "{step} thất bại: {error}. Những câu bạn hỏi được trước đây vẫn hỏi được.",
+    "buildFailedTextFirst": "{step} thất bại: {error}.",
     "retry": "Thử lại",
     "openConsole": "Mở Bảng điều khiển",
     "ready": "Gói đã sẵn sàng",

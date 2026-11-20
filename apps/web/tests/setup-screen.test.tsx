@@ -431,6 +431,25 @@ describe("setup data and start steps", () => {
     expect(sources.instantStart).toHaveBeenCalledTimes(2);
   });
 
+  it("words a step ClickHouse refused by its reason and says an earlier pack still answers only when there is one", async () => {
+    const refused = { ...JOB("failed", { marts: "done", profile: "failed" }), failed_step: "profile",
+      error: "a value of the data does not fit the column type ClickHouse reads it as", error_reason: "value_out_of_range" as const };
+    for (const [hadPack, earlier] of [[false, false], [true, true]] as const) {
+      const sources = fakeSources({ instantStart: vi.fn(async () => ({ job: { ...refused, had_pack: hadPack } })) });
+      const view = wrap(<SetupScreen sources={sources} models={fakeModels()} setup={fakeSetup(DATA_PENDING)} {...exits()} />);
+
+      await connectDatabase();
+      await userEvent.click(await screen.findByRole("button", { name: "Choose tables" }));
+      await userEvent.click(await screen.findByRole("button", { name: "Use 1 table" }));
+      await userEvent.click(await screen.findByRole("button", { name: "Build the pack" }));
+
+      const alert = (await screen.findByRole("alert")).textContent ?? "";
+      expect(alert).toContain("A value of the table does not fit the column type ClickHouse reads it as.");
+      expect(alert.includes("Questions you could ask before still work")).toBe(earlier);
+      view.unmount();
+    }
+  });
+
   it("counts the items the compile has indexed with a bar and the time the build has run", async () => {
     const running = JOB("running", { marts: "done", profile: "done", files: "done", draft: "done", approve: "done", compile: "running" });
     running.steps = running.steps.map((step) => (step.id === "compile" ? { ...step, phase: "index" as const, done: 1500, total: 6000 } : step));

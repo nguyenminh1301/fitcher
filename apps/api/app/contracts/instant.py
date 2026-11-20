@@ -3,6 +3,7 @@
 from typing import Literal
 
 from app.contracts.query_spec import ContractModel
+from app.contracts.sources import FailureReason
 
 
 class InstantEstimateRequest(ContractModel):
@@ -59,6 +60,10 @@ class InstantJobView(ContractModel):
     steps: list[InstantStep]
     failed_step: str | None = None
     error: str | None = None
+    # Set when ClickHouse refused the failed step: the reason the interface words instead of ClickHouse's text.
+    error_reason: FailureReason | None = None
+    # Whether the source had a pack before this build; a failed build leaves that pack answering.
+    had_pack: bool = False
     result: InstantResult | None = None
     started_at: str
     finished_at: str | None = None

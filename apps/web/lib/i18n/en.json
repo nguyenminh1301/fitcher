@@ -864,6 +864,7 @@
     "background": "Keep going in the background and open the console",
     "buildFailed": "Building the pack failed",
     "buildFailedText": "{step} failed: {error}. Questions you could ask before still work.",
+    "buildFailedTextFirst": "{step} failed: {error}.",
     "retry": "Try again",
     "openConsole": "Open the console",
     "ready": "The pack is ready",

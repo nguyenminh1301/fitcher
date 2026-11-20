@@ -196,7 +196,10 @@ export function StartStep({ sources, chosen, meta, onAsk, onConsole, onModel, po
         </ol>
         {failed ? (
           <div className="fc-banner fc-banner-danger" role="alert"><Icon name="alert" />
-            <div>{t("onboarding.buildFailedText", { step: t(`onboarding.group_${failedGroup}`), error: job.error ?? "" })}</div>
+            <div>{t(job.had_pack ? "onboarding.buildFailedText" : "onboarding.buildFailedTextFirst", {
+              step: t(`onboarding.group_${failedGroup}`),
+              error: (job.error_reason ? t(`sources.reason_${job.error_reason}`) : job.error ?? "").replace(/\.$/, ""),
+            })}</div>
           </div>
         ) : null}
         {errorLine}

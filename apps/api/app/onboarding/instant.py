@@ -15,6 +15,7 @@ Jobs live in the api process; one runs at a time.
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
+import logging
 import re
 import secrets
 import shutil
@@ -33,7 +34,9 @@ from app.onboarding.pack_yaml import ITEM_LISTS, PackFiles
 from app.onboarding.profiler import profile_marts
 from app.packs.loader import file_issues
 from app.sources.attach import quote
+from app.sources.inspect import classify_error
 
+logger = logging.getLogger(__name__)
 STEPS = ("marts", "profile", "files", "draft", "approve", "compile", "activate")
 CHARS_PER_TOKEN = 4
 SUGGESTED_QUESTIONS = 3
@@ -61,6 +64,11 @@ class InstantJob:
     steps: list[dict] = field(default_factory=lambda: [{"id": step, "state": "pending"} for step in STEPS])
     failed_step: str | None = None
     error: str | None = None
+    # When ClickHouse refused a step, one reason of ``app.sources.inspect.REASONS``: the interface words it, and
+    # ``error`` holds a plain sentence instead of ClickHouse's text, which can quote data values.
+    error_reason: str | None = None
+    # Whether the source had a pack before this build, which a failed build leaves answering.
+    had_pack: bool = False
     result: dict | None = None
     finished_at: str | None = None
 
@@ -151,6 +159,26 @@ def fallback_metrics(datasets: Sequence[dict]) -> list[dict]:
     return metrics
 
 
+# Plain sentences for a step ClickHouse refused, by reason; the interface shows its own translation of the reason.
+CLICKHOUSE_REASONS = {
+    "value_out_of_range": "a value of the data does not fit the column type ClickHouse reads it as",
+    "unsupported_name": "ClickHouse cannot read a table of the source by its name",
+    "empty_or_unreadable": "a table has no rows or ClickHouse cannot read its format",
+    "unreachable": "the source could not be reached",
+    "refused": "the source refused the connection",
+    "authentication": "the source refused the user or password",
+    "tls": "the TLS settings do not match the source",
+    "database_not_found": "the source's database was not found",
+    "permission": "the source's user may not read a table",
+    "unknown": "ClickHouse refused a query of this step",
+}
+_CLICKHOUSE_TEXT = re.compile(r"DB::Exception|\bCode: \d+\.")
+
+
+def _from_clickhouse(error: BaseException) -> bool:
+    return bool(_CLICKHOUSE_TEXT.search(str(error)))
+
+
 def _first_line(error: BaseException) -> str:
     return (" ".join(str(error).split()) or type(error).__name__)[:ERROR_LIMIT]
 
@@ -205,7 +233,7 @@ class InstantPipeline:
             if any(job.status == "running" for job in self._jobs.values()):
                 raise InstantRefused("an instant pack is already being built; wait for it to finish", 409)
             job = InstantJob(id=secrets.token_hex(8), source_id=source_id, tables=list(tables), started_by=started_by,
-                             started_at=self._clock().isoformat())
+                             started_at=self._clock().isoformat(), had_pack=(self._packs_dir / source_id).is_dir())
             self._jobs[job.id] = job
         return job
 
@@ -244,6 +272,11 @@ class InstantPipeline:
             job._set(current, "failed")
             job.status, job.failed_step = "failed", current
             job.error = state.get("missing") or _first_line(error)
+            if not state.get("missing") and _from_clickhouse(error):
+                # The full text stays in the log for the console; the job carries the reason only.
+                logger.warning("instant pack %s failed at step %s: %s", pack, current, job.error)
+                job.error_reason = classify_error(error)
+                job.error = CLICKHOUSE_REASONS.get(job.error_reason, CLICKHOUSE_REASONS["unknown"])
             self._restore(pack, state)
         else:
             job.status = "succeeded"
