@@ -35,7 +35,8 @@ export function ModelStep({ models, meta, onNext, onSkip, disabled = false }: {
   disabled?: boolean;
 }) {
   const { t } = useI18n();
-  const [presetId, setPresetId] = useState("openai");
+  // OpenRouter is chosen first: it has free models, so a first setup costs nothing.
+  const [presetId, setPresetId] = useState("openrouter");
   const [apiKey, setApiKey] = useState("");
   const [address, setAddress] = useState("");
   const [providerName, setProviderName] = useState("");

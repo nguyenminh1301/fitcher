@@ -46,7 +46,8 @@ function outcome(result: ProviderTestResult, t: (key: string, values?: Record<st
 
 function AddDialog({ models, onClose, onAdded }: { models: Models; onClose: () => void; onAdded: (provider: ProviderView) => void }) {
   const { t } = useI18n();
-  const [presetId, setPresetId] = useState("openai");
+  // OpenRouter is chosen first: it has free models, so a first setup costs nothing.
+  const [presetId, setPresetId] = useState("openrouter");
   const [apiKey, setApiKey] = useState("");
   const [address, setAddress] = useState("");
   const [providerName, setProviderName] = useState("");

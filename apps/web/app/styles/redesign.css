@@ -392,7 +392,7 @@ a.stat:hover { background: var(--bgColor-muted); }
 .dlg-wide { width: min(980px, 100%); }
 .tables-scroll { overflow-x: auto; }
 .tables-edit { min-width: 900px; }
-.tables-edit .sel { min-width: 128px; }
+.tables-edit .sel { min-width: 176px; }
 .tables-edit td .fc-muted { white-space: nowrap; }
 .tables-edit td:nth-child(5) .fc-field-help { display: block; max-width: 180px; margin-top: 4px; }
 

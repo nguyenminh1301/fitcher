@@ -244,7 +244,7 @@
     "searchChats": "Search chats",
     "noChats": "No conversations match",
     "heroTitle": "What would you like to know, {name}?",
-    "heroSub": "Answers come from read-only SQL on {pack} data. You can open every query.",
+    "heroSub": "Ask about {pack} data in your own words.",
     "suggested": "Suggested questions",
     "assistant": "fitcher",
     "closeSidebar": "Close sidebar",

@@ -12,7 +12,7 @@ import { asksAddress, asksName, PRESETS, presetById, type ProviderPreset } from 
 import { ProviderLogo } from "@/components/models/ProviderLogo";
 import { useI18n } from "@/lib/i18n/react";
 
-const MAIN = ["openai", "anthropic", "gemini", "openrouter", "ollama"];
+const MAIN = ["openrouter", "ollama", "gemini", "openai", "anthropic"];
 const MORE_GROUPS = ["service", "local", "other"] as const;
 
 /** The card title of a preset; the api's kinds and the two generic presets are named in the interface language. */

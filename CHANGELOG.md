@@ -21,6 +21,7 @@
 
 ### Changed
 
+- Adding a model provider starts on OpenRouter, which has free models, instead of OpenAI, and lists OpenRouter and Ollama first; the chat's empty state no longer repeats the read-only SQL sentence of the composer hint; the setup's Live and Copy pills have their own colours, and the table chooser's "New rows only" choice shows its whole text.
 - The local multilingual model is the default embedding: adding OpenAI or Gemini no longer moves the embedding to the provider's model, because a free key's embedding limit cannot index a pack with many values. An Ollama server still proposes its embedding model, and a provider's model can be chosen on the Models page.
 - The owner menu opens as wide as the sidebar it is opened from instead of a fixed 288 pixels that overhung the sidebar.
 

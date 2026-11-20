@@ -102,8 +102,12 @@ describe("setup models step", () => {
     const models = fakeModels();
     wrap(<SetupScreen sources={noSources} setup={setup} models={models} {...exits()} />);
 
+    // A provider with free models is chosen first, so nothing paid is preselected.
+    expect((await screen.findByRole("radio", { name: /OpenRouter/ })).getAttribute("aria-checked")).toBe("true");
+    expect(screen.getByRole("radio", { name: /^OpenAI/ }).getAttribute("aria-checked")).toBe("false");
+    await userEvent.click(screen.getByRole("radio", { name: /^OpenAI/ }));
     expect(await screen.findByText("The check sends one small request to OpenAI, and OpenAI bills it.")).toBeTruthy();
-    expect(screen.getByRole("radio", { name: /OpenAI/ }).getAttribute("aria-checked")).toBe("true");
+    expect(screen.getByRole("radio", { name: /^OpenAI/ }).getAttribute("aria-checked")).toBe("true");
     expect(screen.getByRole("link", { name: /Get a key from OpenAI/ }).getAttribute("href")).toBe("https://platform.openai.com/api-keys");
     await userEvent.type(screen.getByLabelText("API key"), "sk-test-0000-7777");
     await userEvent.click(screen.getByRole("button", { name: "Check the key" }));

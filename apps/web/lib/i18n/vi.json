@@ -244,7 +244,7 @@
     "searchChats": "Tìm cuộc trò chuyện",
     "noChats": "Không có cuộc trò chuyện nào khớp",
     "heroTitle": "Bạn muốn biết điều gì, {name}?",
-    "heroSub": "Câu trả lời đến từ SQL chỉ-đọc trên dữ liệu của {pack}. Bạn có thể mở mọi truy vấn.",
+    "heroSub": "Hỏi về dữ liệu {pack} bằng lời của bạn.",
     "suggested": "Câu hỏi gợi ý",
     "assistant": "fitcher",
     "closeSidebar": "Đóng thanh bên",
