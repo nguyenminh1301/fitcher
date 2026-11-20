@@ -2,7 +2,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testi
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ConsoleLayout } from "@/components/console/ConsoleLayout";
-import { SecuritySection } from "@/components/console/sections/SecuritySection";
+import { SecuritySection, passwordStrength } from "@/components/console/sections/SecuritySection";
 import { createMockApi, type MockApi } from "@/lib/api/mock";
 import type { ConsoleFile } from "@/lib/api/provisional";
 import { ChatProvider } from "@/lib/chat/ChatContext";
@@ -46,15 +46,38 @@ describe("security", () => {
     show({ password_set: false, signed_in: false, exposed: false });
     const form = await screen.findByRole("form", { name: "Set an owner password" });
 
-    fireEvent.change(within(form).getByLabelText("New password"), { target: { value: "long enough" } });
+    fireEvent.change(within(form).getByLabelText("New password"), { target: { value: "long enough phrase" } });
     fireEvent.change(within(form).getByLabelText("Repeat it"), { target: { value: "long enougX" } });
     expect(within(form).getByRole("alert").textContent).toContain("The two passwords are not the same.");
     expect((within(form).getByRole("button", { name: "Set password" }) as HTMLButtonElement).disabled).toBe(true);
 
-    fireEvent.change(within(form).getByLabelText("Repeat it"), { target: { value: "long enough" } });
+    fireEvent.change(within(form).getByLabelText("Repeat it"), { target: { value: "long enough phrase" } });
     await act(async () => fireEvent.click(within(form).getByRole("button", { name: "Set password" })));
-    expect(api.owner.setPassword).toHaveBeenCalledWith("long enough", undefined);
+    expect(api.owner.setPassword).toHaveBeenCalledWith("long enough phrase", undefined);
     expect(screen.getByText(/no way to recover it/)).toBeTruthy();
+  });
+
+  it("asks for at least 12 characters and says how strong a long enough password is", async () => {
+    show({ password_set: false, signed_in: false, exposed: false });
+    const form = await screen.findByRole("form", { name: "Set an owner password" });
+    const button = within(form).getByRole("button", { name: "Set password" }) as HTMLButtonElement;
+
+    fireEvent.change(within(form).getByLabelText("New password"), { target: { value: "elevenchars" } });
+    fireEvent.change(within(form).getByLabelText("Repeat it"), { target: { value: "elevenchars" } });
+    expect(within(form).getByRole("alert").textContent).toContain("Use at least 12 characters.");
+    expect(button.disabled).toBe(true);
+
+    fireEvent.change(within(form).getByLabelText("New password"), { target: { value: "twelvechars!" } });
+    fireEvent.change(within(form).getByLabelText("Repeat it"), { target: { value: "twelvechars!" } });
+    expect(within(form).getByRole("status").textContent).toContain("Strength: fair");
+    expect(button.disabled).toBe(false);
+  });
+
+  it("rates a password by its length and the kinds of characters it mixes", () => {
+    expect(passwordStrength("short")).toBe("short");
+    expect(passwordStrength("twelvechars!")).toBe("fair");
+    expect(passwordStrength("Twelve-char5")).toBe("strong");
+    expect(passwordStrength("a phrase of words")).toBe("strong");
   });
 
   it("changes the password with the current one, and keeps it while fitcher is open to other machines", async () => {

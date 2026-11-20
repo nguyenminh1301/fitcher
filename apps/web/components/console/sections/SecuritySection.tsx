@@ -14,7 +14,15 @@ import { useChat } from "@/lib/chat/ChatContext";
 import { useLoad } from "@/lib/console/useLoad";
 import { useI18n } from "@/lib/i18n/react";
 
-const MIN_LENGTH = 8;
+// The api's minimum (app/auth/owner.py): an instance open to other machines answers them with this password alone.
+const MIN_LENGTH = 12;
+
+/** How hard a new password is to guess: long enough, then longer or mixing kinds of characters. */
+export function passwordStrength(password: string): "short" | "fair" | "strong" {
+  if (password.length < MIN_LENGTH) return "short";
+  const kinds = [/[a-z]/, /[A-Z]/, /[0-9]/, /[^A-Za-z0-9]/].filter((kind) => kind.test(password)).length;
+  return password.length >= 16 || kinds >= 3 ? "strong" : "fair";
+}
 
 function Field({ id, label, value, onChange, autoComplete, disabled, help, error }: {
   id: string; label: string; value: string; onChange: (value: string) => void; autoComplete: string; disabled?: boolean; help?: string; error?: string;
@@ -43,6 +51,7 @@ export function SecuritySection() {
 
   const mismatch = again.length > 0 && next !== again;
   const short = next.length > 0 && next.length < MIN_LENGTH;
+  const strength = passwordStrength(next);
 
   async function run(action: () => Promise<void>, done: string) {
     setBusy(true);
@@ -88,6 +97,9 @@ export function SecuritySection() {
               {set ? <Field id="owner-current" label={t("owner.currentPassword")} autoComplete="current-password" value={current} disabled={busy} onChange={setCurrent} /> : null}
               <Field id="owner-new" label={t("owner.newPassword")} autoComplete="new-password" value={next} disabled={busy}
                 help={t("owner.rule", { count: MIN_LENGTH })} error={short ? t("owner.tooShort", { count: MIN_LENGTH }) : undefined} onChange={setNext} />
+              {next.length > 0 && strength !== "short" ? (
+                <p className="fc-field-help" role="status" style={{ margin: 0 }}>{t(`owner.strength_${strength}`)}</p>
+              ) : null}
               <Field id="owner-again" label={t("owner.repeatPassword")} autoComplete="new-password" value={again} disabled={busy}
                 error={mismatch ? t("owner.mismatch") : undefined} onChange={setAgain} />
               <div>

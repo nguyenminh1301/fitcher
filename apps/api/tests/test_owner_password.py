@@ -32,7 +32,18 @@ def test_a_password_is_stored_as_an_argon2id_hash_and_verified(db):
 def test_a_short_password_is_refused(db):
     with pytest.raises(owner.WeakPassword):
         owner.set_password(db, "short")
+    with pytest.raises(owner.WeakPassword, match="at least 12 characters"):
+        owner.set_password(db, "x" * 11)
     assert owner.password_set(db) is False
+
+    owner.set_password(db, "x" * 12)
+    assert owner.verify(db, "x" * 12)
+
+
+def test_a_password_set_before_the_minimum_was_raised_still_signs_in(db):
+    db.connection().execute("INSERT INTO owner_password (id, password_hash, updated_at) VALUES (1, ?, ?)",
+                            (owner._hasher.hash("eight888"), "2026-11-01T00:00:00+00:00"))
+    assert owner.verify(db, "eight888")
 
 
 def test_changing_the_password_needs_the_current_one_and_ends_every_session(db):
