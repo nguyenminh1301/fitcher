@@ -78,11 +78,12 @@ export type ChipProps = ButtonHTMLAttributes<HTMLButtonElement> & { selected?: b
 /** A toggle or suggestion pill; a selected chip shows a check mark, never colour alone. */
 /** An on/off switch; the label names what is turned on. */
 export function Switch({ label, checked, disabled, onChange }: { label: string; checked: boolean; disabled?: boolean; onChange: (checked: boolean) => void }) {
+  const id = useId();
   return (
     <label className="fc-switch">
-      <button type="button" role="switch" className="fc-switch-track" aria-checked={checked} disabled={disabled}
+      <button type="button" role="switch" className="fc-switch-track" aria-checked={checked} aria-labelledby={id} disabled={disabled}
         onClick={() => onChange(!checked)} />
-      {label}
+      <span id={id}>{label}</span>
     </label>
   );
 }

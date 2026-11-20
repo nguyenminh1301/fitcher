@@ -26,6 +26,10 @@ class RunRow(ContractModel):
     # The models whose calls answered, in the order they first answered, without the
     # gateway's SDK prefix; a failed or blocked call is not listed.
     models: list[str] = []
+    # A call that answered had no known price, so ``cost_usd`` sums the priced calls only.
+    cost_unknown: bool = False
+    # For a run that answered a question asked back, the question the previous turn asked; else empty.
+    answer_to: str = ""
 
 
 class TraceItem(ContractModel):

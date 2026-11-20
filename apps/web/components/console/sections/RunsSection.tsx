@@ -19,7 +19,7 @@ import { useLoad } from "@/lib/console/useLoad";
 import { useI18n } from "@/lib/i18n/react";
 import { langOf } from "@/lib/text";
 
-const STATUSES = ["all", "running", "succeeded", "clarified", "failed", "error", "denied", "rejected", "blocked"];
+const STATUSES = ["all", "running", "succeeded", "clarified", "cancelled", "failed", "error", "denied", "rejected", "blocked"];
 /** How often a page with a running run reads it again. */
 export const REFRESH_MS = 2000;
 
@@ -48,12 +48,19 @@ export function useUsd(): (value: number, decimals?: number) => string {
   return (value, decimals = 4) => formatNumber(value, { style: "currency", currency: "USD", minimumFractionDigits: decimals, maximumFractionDigits: decimals });
 }
 
+/** A run's cost: unknown when a call that answered had no price, or a lower bound when the others had one. */
+export function useRunCost(): (run: { cost_usd: number; cost_unknown?: boolean }) => string {
+  const { t } = useI18n();
+  const usd = useUsd();
+  return (run) => (!run.cost_unknown ? usd(run.cost_usd) : run.cost_usd > 0 ? t("runsPage.costAtLeast", { cost: usd(run.cost_usd) }) : t("runsPage.costUnknown"));
+}
+
 export function RunsSection() {
   const { t, formatDate } = useI18n();
   const { api } = useChat();
   const { navigate } = useConsole();
   const duration = useDuration();
-  const usd = useUsd();
+  const cost = useRunCost();
   // Every source's runs, so a conversation on one source and one on another show in one list.
   const { data, failed, reload } = useLoad(useCallback(() => api.runs.list({ all: true }), [api]));
   const [source, setSource] = useState("");
@@ -110,12 +117,17 @@ export function RunsSection() {
         columns={[
           { key: "ts", label: t("ui.time"), nowrap: true, render: (run) => formatDate(run.ts, { dateStyle: "medium", timeStyle: "short" }) },
           { key: "question", label: t("ui.question"), render: (run) => (
-            <button type="button" className="row-title link-button" lang={langOf(run.question)} onClick={() => navigate(`/console/runs/${encodeURIComponent(run.trace_id)}`)}>{run.question}</button>
+            <>
+              <button type="button" className="row-title link-button" lang={langOf(run.question)} onClick={() => navigate(`/console/runs/${encodeURIComponent(run.trace_id)}`)}>{run.question}</button>
+              {run.answer_to ? (
+                <div className="fc-muted row-sub">{t("runsPage.answerTo")} <span lang={langOf(run.answer_to)}>{run.answer_to}</span></div>
+              ) : null}
+            </>
           ) },
           ...(sources.length > 1 ? [{ key: "pack", label: t("runsPage.source"), nowrap: true, render: (run: RunRow) => <span className="fc-mono">{run.pack}</span> }] : []),
           { key: "status", label: t("ui.status"), render: (run) => <StatusLabel status={run.status}>{t(`ui.${run.status}`)}</StatusLabel> },
           { key: "latency_ms", label: t("ui.duration"), numeric: true, nowrap: true, render: (run) => duration(runDuration(run, now)) },
-          { key: "cost_usd", label: t("ui.cost"), numeric: true, render: (run) => usd(run.cost_usd) },
+          { key: "cost_usd", label: t("ui.cost"), numeric: true, render: (run) => cost(run) },
         ]}
       />
     </ListPage>
@@ -127,7 +139,7 @@ export function RunDetail({ traceId }: { traceId: string }) {
   const { api, pack } = useChat();
   const { navigate } = useConsole();
   const duration = useDuration();
-  const usd = useUsd();
+  const cost = useRunCost();
   const { data, failed, reload } = useLoad(useCallback(async () => ({ trace: await api.runs.trace(traceId) }), [api, traceId]));
   const run = data?.trace?.run;
   const now = useWhileRunning(run?.status === "running", reload);
@@ -149,7 +161,8 @@ export function RunDetail({ traceId }: { traceId: string }) {
                 <dl className="kv">
                   <dt>{t("ui.time")}</dt><dd>{formatDate(run.ts, { dateStyle: "medium", timeStyle: "medium" })}</dd>
                   <dt>{t("ui.duration")}</dt><dd>{duration(runDuration(run, now))}</dd>
-                  <dt>{t("ui.cost")}</dt><dd>{usd(run.cost_usd)}</dd>
+                  <dt>{t("ui.cost")}</dt><dd>{cost(run)}</dd>
+                  {run.answer_to ? <><dt>{t("runsPage.answerToLabel")}</dt><dd lang={langOf(run.answer_to)}>{run.answer_to}</dd></> : null}
                   {pack ? <><dt>{t("runsPage.pack")}</dt><dd>{pack.display_name || pack.name}</dd></> : null}
                   <dt>{t("runsPage.trace")}</dt><dd className="fc-mono trace-id">{run.trace_id}</dd>
                 </dl>

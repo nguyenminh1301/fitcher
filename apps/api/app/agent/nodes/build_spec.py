@@ -30,6 +30,7 @@ from pydantic import ValidationError
 
 from app.agent.nodes.clarify import Need
 from app.agent.nodes.retrieve import Hit, Retrieval
+from app.agent.nodes.screen import question_language
 from app.agent.state import AgentDeps, AgentState
 from app.contracts.query_spec import Filter, Period, QuerySpec
 from app.packs.compiler import CompiledPack, DateCoverage
@@ -264,9 +265,35 @@ def _require_period(state: AgentState, dataset: Dataset) -> None:
         raise NeedsChoice(Need(kind="period"))
 
 
-def coverage_warnings(periods: list[Period], dataset: str, coverage: DateCoverage | None) -> list[str]:
+# The warnings shown with an answer, in the language of the question (the design keeps a warning in the question's
+# language, like the summary).
+WARNINGS = {
+    "en": {
+        "no_data": "{dataset} has no data",
+        "outside": "{period} is outside the data, which covers {low} to {high}",
+        "partly": "{period} is only partly covered by the data, which covers {low} to {high}",
+        "no_dates": "{dataset} has no date column, so the question was answered over all its rows",
+        "one_period": "only one period was named, so nothing is compared",
+        "first_rows": "only the first {rows} rows are shown",
+    },
+    "vi": {
+        "no_data": "{dataset} không có dữ liệu",
+        "outside": "{period} nằm ngoài dữ liệu, dữ liệu có từ {low} đến {high}",
+        "partly": "Dữ liệu chỉ có một phần của {period}: dữ liệu có từ {low} đến {high}",
+        "no_dates": "{dataset} không có cột ngày, nên câu hỏi được trả lời trên toàn bộ các dòng",
+        "one_period": "Câu hỏi chỉ nêu một khoảng thời gian nên không có gì để so sánh",
+        "first_rows": "Chỉ hiển thị {rows} dòng đầu tiên",
+    },
+}
+
+
+def warning(language: str, key: str, **values) -> str:
+    return WARNINGS["vi" if language == "vi" else "en"][key].format(**values)
+
+
+def coverage_warnings(periods: list[Period], dataset: str, coverage: DateCoverage | None, language: str = "en") -> list[str]:
     if coverage is None or coverage.rows == 0:
-        return [f"{dataset} has no data"]
+        return [warning(language, "no_data", dataset=dataset)]
     if coverage.min_date is None or coverage.max_date is None:
         return []
     low, high = date.fromisoformat(coverage.min_date), date.fromisoformat(coverage.max_date)
@@ -274,9 +301,9 @@ def coverage_warnings(periods: list[Period], dataset: str, coverage: DateCoverag
     for period in periods:
         last = period.end.toordinal() - 1
         if period.start > high or last < low.toordinal():
-            warnings.append(f"{period.label} is outside the data, which covers {low} to {high}")
+            warnings.append(warning(language, "outside", period=period.label, low=low, high=high))
         elif period.start < low or last > high.toordinal():
-            warnings.append(f"{period.label} is only partly covered by the data, which covers {low} to {high}")
+            warnings.append(warning(language, "partly", period=period.label, low=low, high=high))
     return warnings
 
 
@@ -315,17 +342,18 @@ def _reviewed_spec(state: AgentState, compiled: CompiledPack, example: Hit) -> Q
 def _finish(state: AgentState, compiled: CompiledPack, metric_ids: list[str], dataset: Dataset, dimensions: list[str],
             filters: list[Filter], top_n: int | None, rank_by: str | None) -> QuerySpec:
     extraction, periods = state["extraction"], state["periods"]
+    language = question_language(state)
     warnings = []
     if dataset.time_column is None:
         # A table without dates is read whole: a named period or time grain cannot narrow it.
         if periods or state.get("time_grain"):
-            warnings.append(f"{dataset.id} has no date column, so the question was answered over all its rows")
+            warnings.append(warning(language, "no_dates", dataset=dataset.id))
         periods = []
     compare = extraction.compare and len(periods) > 1
     if extraction.compare and not compare:
-        warnings.append("only one period was named, so nothing is compared")
+        warnings.append(warning(language, "one_period"))
     rank_period = max(periods, key=lambda period: period.start).label if rank_by and len(periods) > 1 else None
-    warnings += coverage_warnings(periods, dataset.id, compiled.coverage.get(dataset.id))
+    warnings += coverage_warnings(periods, dataset.id, compiled.coverage.get(dataset.id), language)
     return QuerySpec(
         metric_ids=metric_ids, dimensions=list(dict.fromkeys(dimensions)), periods=periods, filters=filters,
         top_n=top_n, rank_by=rank_by, rank_period=rank_period, compare=compare, dataset=dataset.id,

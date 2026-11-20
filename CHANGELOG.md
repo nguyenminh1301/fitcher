@@ -21,6 +21,7 @@
 
 ### Changed
 
+- Adding a model provider starts on OpenRouter, which has free models, instead of OpenAI, and lists OpenRouter and Ollama first; the chat's empty state no longer repeats the read-only SQL sentence of the composer hint; the setup's Live and Copy pills have their own colours, and the table chooser's "New rows only" choice shows its whole text.
 - The local multilingual model is the default embedding: adding OpenAI or Gemini no longer moves the embedding to the provider's model, because a free key's embedding limit cannot index a pack with many values. An Ollama server still proposes its embedding model, and a provider's model can be chosen on the Models page.
 - The owner menu opens as wide as the sidebar it is opened from instead of a fixed 288 pixels that overhung the sidebar.
 
@@ -32,6 +33,12 @@
 
 ### Fixed
 
+- Accessibility: switches are named by their label, the sidebar's icon-only items keep a name when it is collapsed, the Overview's done marks use the success colours instead of white on green, screen-reader-only text is hidden the standard way, the Sources table turns into cards by the width it gets so a 768 px tablet no longer scrolls sideways, and row links, back links, switches and the setup's step bars have a 44 by 24 px or larger touch target below 768 px.
+- The Runs page filters stopped runs, shows a run that answered a question asked back with that question ("Answer to: …"), says a cost is unknown, or at least the priced part, when a model call had no price instead of $0.0000, and the trace names an OpenAI-compatible model once instead of with a doubled `openai/` prefix.
+- Answers head a metric column, a KPI and a chart series with the metric's display name instead of its internal id (the id stays in the tooltip), bold the figures of a summary the model did not mark (thousands grouped by dots, commas or spaces, narrow ones included), and cut a long category label with an ellipsis inside the chart instead of clipping it at the edge.
+- An answer's warnings (a period outside or partly outside the data, a table without dates, a single period for a comparison, a cut result) are written in the language of the question, and each metric column of a result carries the metric's display name from the pack as its `label`, with the period of a compared column.
+- The standing "This address is open to other machines" banner no longer says fitcher has no owner password once a password is set: `/me` reports `exposed` only while names other than loopback are listed in `FITCHER_ALLOWED_HOSTS` and no owner password is set.
+- The Sources page shows a sync started from it as syncing until the list has the sync's own outcome, so a retry that succeeded no longer leaves "Failed" on screen; a partly synced source, the Overview and the setup's build step name each table that could not be read with its reason instead of "The connection failed for another reason", and the setup builds the pack from the tables that were read.
 - A pack build that ClickHouse refused shows a plain, translated reason (a value too large for its type, a table name it cannot read, an unreachable source) instead of ClickHouse's own message with data values and internal types, which stays in the api log; the setup says questions asked before still work only when the source already had a pack.
 - A SQL Server table's row estimate equals its row count: it was multiplied by the number of allocation units (in-row, large object, row overflow) of each partition, so a table with text columns showed three times its rows.
 - Uploading a CSV that is not UTF-8 works: a UTF-16 file (Excel's Unicode Text) is recognised by its byte-order mark and a Windows-1258, Windows-1252 or Latin-1 file is read in that encoding, and both are stored as UTF-8 with the encoding reported in the upload. A CSV with a header but no rows, a JSON file, or a sample ClickHouse cannot read types from is refused with 422 or 415 and a reason instead of 503 "ClickHouse or the app state is unavailable".

@@ -160,6 +160,25 @@ describe("runs and trace", () => {
     expect(navigate).toHaveBeenCalledWith("/console/runs/t2");
   });
 
+  it("filters stopped runs, links an answer to the question asked back and says when a cost is unknown", async () => {
+    const list = vi.fn(async () => [
+      { trace_id: "t5", pack: "shop", ts: "2026-11-02T08:16:00Z", user_id: "ana", role: "analyst", question: "Năm nay", intent: "data_query",
+        status: "succeeded", latency_ms: 10, cost_usd: 0, cost_unknown: true, answer_to: "Tổng amount theo region" },
+      { trace_id: "t6", pack: "shop", ts: "2026-11-02T08:20:00Z", user_id: "ana", role: "analyst", question: "Stopped one", intent: "",
+        status: "cancelled", latency_ms: 10, cost_usd: 0.002, cost_unknown: true },
+    ]);
+    Object.assign(api.runs, { list });
+    show("runs", <RunsSection />);
+
+    const answer = (await screen.findByRole("button", { name: "Năm nay" })).closest("tr") as HTMLElement;
+    expect(answer.textContent).toContain("Answer to: Tổng amount theo region");
+    expect(within(answer).getByText("Unknown")).toBeTruthy();
+    expect(screen.getByText("At least $0.0020")).toBeTruthy();
+    fireEvent.change(screen.getByRole("combobox", { name: "Status" }), { target: { value: "cancelled" } });
+    expect(screen.queryByText("Năm nay")).toBeNull();
+    expect(screen.getByRole("option", { name: "Stopped" })).toBeTruthy();
+  });
+
   it("lists every source's runs together, with a Source column and filter", async () => {
     const list = vi.fn(async () => [
       { trace_id: "t1", pack: "shop", ts: "2026-11-02T08:15:00Z", user_id: "ana", role: "analyst", question: "Totals by month", intent: "data_query", status: "succeeded", latency_ms: 10, cost_usd: 0 },

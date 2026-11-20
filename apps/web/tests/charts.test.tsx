@@ -84,6 +84,14 @@ describe("chart adapter", () => {
     expect(scatter.series[0].data).toEqual([[8, 10], [20, 30], [25, 20]]);
   });
 
+  it("names a series after the metric's display name and cuts a long category label inside the chart", () => {
+    const labelled: Result = { ...BRANDS, columns: [BRANDS.columns[0], { ...BRANDS.columns[1], label: "Sales 2025" }, BRANDS.columns[2]] };
+    const bar = option(spec({ orientation: "horizontal", y: ["sales_2025", "sales_2024"] }), labelled) as unknown as
+      Option & { yAxis: { axisLabel: { width: number; overflow: string } } };
+    expect(bar.series.map((item) => (item as unknown as { name: string }).name)).toEqual(["Sales 2025", "sales_2024"]);
+    expect(bar.yAxis.axisLabel).toMatchObject({ width: 140, overflow: "truncate" });
+  });
+
   it("has no ECharts option for a KPI or a table", () => {
     expect(toEChartsOption(spec({ type: "kpi" }), BRANDS, PALETTE, "en")).toBeNull();
     expect(toEChartsOption(spec({ type: "table" }), BRANDS, PALETTE, "en")).toBeNull();
@@ -164,6 +172,16 @@ describe("data table", () => {
     expect(screen.getByText("Showing first 45 of 120 rows")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Next" }));
     expect(screen.getByText("21")).toBeTruthy();
+  });
+
+  it("heads a metric column with its display name and keeps the column name for sorting", () => {
+    const labelled: Result = { ...BRANDS, columns: [BRANDS.columns[0], { ...BRANDS.columns[1], label: "Sales 2025" }, BRANDS.columns[2]] };
+    render(<I18nProvider initial="en"><DataTable result={labelled} /></I18nProvider>);
+    const header = screen.getByRole("columnheader", { name: /Sales 2025/ });
+    expect(header.querySelector("button")?.getAttribute("title")).toContain("sales_2025");
+    expect(screen.getByRole("columnheader", { name: /sales_2024/ })).toBeTruthy();
+    // A narrow table stacks each row as a card whose lines are named the same way.
+    expect(screen.getAllByRole("cell")[1].getAttribute("data-label")).toBe("Sales 2025");
   });
 
   it("sorts by a column when its header is clicked", () => {

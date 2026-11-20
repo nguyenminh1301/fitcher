@@ -7,7 +7,7 @@
 body { margin: 0; font-family: var(--font-sans); font-size: 14px; line-height: 20px; background: var(--bgColor-default); color: var(--fgColor-default); -webkit-font-smoothing: antialiased; }
 button, input, textarea, select { font: inherit; color: inherit; }
 :where(button, a, input, textarea, select, [tabindex]):focus-visible { outline: 2px solid var(--focus-outlineColor); outline-offset: 2px; }
-.fc-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.fc-sr { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; border: 0; overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; }
 .fc-num { font-variant-numeric: tabular-nums; }
 .fc-mono { font-family: var(--font-mono); }
 .fc-muted { color: var(--fgColor-muted); }

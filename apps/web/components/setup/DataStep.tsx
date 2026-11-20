@@ -494,7 +494,7 @@ function TablesScreen({ sources, meta, disabled, source, onBack, onChosen }: Pro
                     <td className="num">{table.size_bytes === null ? <span className="fc-muted">{t("onboarding.unknown")}</span> : formatBytes(table.size_bytes)}</td>
                     <td>
                       <span className="tip-wrap">
-                        <button type="button" className="fc-label" aria-describedby={`${id}-why`}>{t(`sources.${table.mode}`)}</button>
+                        <button type="button" className={`fc-label ${table.mode === "live" ? "fc-label-accent" : "fc-label-done"}`} aria-describedby={`${id}-why`}>{t(`sources.${table.mode}`)}</button>
                         <span className="tip" role="tooltip" id={`${id}-why`}>
                           {t("onboarding.proposedWhy", { mode: t(`sources.${table.proposed_mode}`), why: t(`sources.why_${table.reason}`) })}
                         </span>

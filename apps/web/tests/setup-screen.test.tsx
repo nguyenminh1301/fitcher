@@ -102,8 +102,12 @@ describe("setup models step", () => {
     const models = fakeModels();
     wrap(<SetupScreen sources={noSources} setup={setup} models={models} {...exits()} />);
 
+    // A provider with free models is chosen first, so nothing paid is preselected.
+    expect((await screen.findByRole("radio", { name: /OpenRouter/ })).getAttribute("aria-checked")).toBe("true");
+    expect(screen.getByRole("radio", { name: /^OpenAI/ }).getAttribute("aria-checked")).toBe("false");
+    await userEvent.click(screen.getByRole("radio", { name: /^OpenAI/ }));
     expect(await screen.findByText("The check sends one small request to OpenAI, and OpenAI bills it.")).toBeTruthy();
-    expect(screen.getByRole("radio", { name: /OpenAI/ }).getAttribute("aria-checked")).toBe("true");
+    expect(screen.getByRole("radio", { name: /^OpenAI/ }).getAttribute("aria-checked")).toBe("true");
     expect(screen.getByRole("link", { name: /Get a key from OpenAI/ }).getAttribute("href")).toBe("https://platform.openai.com/api-keys");
     await userEvent.type(screen.getByLabelText("API key"), "sk-test-0000-7777");
     await userEvent.click(screen.getByRole("button", { name: "Check the key" }));
@@ -412,6 +416,33 @@ describe("setup data and start steps", () => {
     await userEvent.click(screen.getByRole("button", { name: "Orders per month?" }));
     await waitFor(() => expect(ways.onOpenChat).toHaveBeenCalledWith("Orders per month?"));
     expect(setup.complete).toHaveBeenCalled();
+  });
+
+  it("names the table a sync could not read with its reason and builds the pack from the others", async () => {
+    const quoted = { ...TABLE, name: "it's", mode: "live" as const, proposed_mode: "live" as const, reason: "small" };
+    const sources = fakeSources({
+      test: vi.fn(async () => ({ tables: [TABLE, quoted] })),
+      create: vi.fn(async () => ({ ...CREATED, table_count: 2, tables: [TABLE, quoted] })),
+      changeTables: vi.fn(async () => [{ ...TABLE, selected: true }, { ...quoted, selected: true }]),
+      syncs: vi.fn(async () => [{ id: 1, status: "partial", error: "unsupported_name", results: [
+        { table: "it's", mode: "live", rows: null, error: "unsupported_name" }, { table: "orders", mode: "copy", rows: 1200 }] }]),
+    });
+    wrap(<SetupScreen sources={sources} models={fakeModels()} setup={fakeSetup(DATA_PENDING)} {...exits()} />);
+
+    await connectDatabase();
+    await userEvent.click(await screen.findByRole("button", { name: "Choose tables" }));
+    expect(((await screen.findByRole("checkbox", { name: "it's" })) as HTMLInputElement).checked).toBe(true);
+    await userEvent.click(screen.getByRole("button", { name: "Use 2 tables" }));
+
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).toContain("1 table could not be read:");
+    expect(alert.textContent).toContain("it's: ClickHouse cannot read this table");
+    const progress = screen.getByRole("list", { name: /chosen tables/i });
+    expect(within(progress).getByText("Could not be read")).toBeTruthy();
+    expect(within(progress).getByText("Copied · 1,200 rows")).toBeTruthy();
+    await waitFor(() => expect(sources.instantEstimate).toHaveBeenCalledWith({ source_id: "erp", tables: ["orders"] }));
+    await userEvent.click(await screen.findByRole("button", { name: "Build the pack" }));
+    expect(sources.instantStart).toHaveBeenCalledWith({ source_id: "erp", tables: ["orders"], confirm_billable: true });
   });
 
   it("shows the build as five lines and offers a retry when it fails", async () => {

@@ -53,9 +53,15 @@ export function ProgressSteps({ steps, live, onStop }: { steps: Step[]; live: bo
   );
 }
 
-/** The summary, with **figures** in bold, in the language the answer was written in. */
+// A figure of a summary: a number with thousands separators or decimals, a percentage, an amount with a currency
+// sign, or a number of five digits or more. A plain year or a small count stays as it is.
+const FIGURE = /((?:[$€£₫]\s?)?\d{1,3}(?:[.,\u00a0\u202f\u2009 ]\d{3})+(?:[.,]\d+)?(?:\s?%)?|(?:[$€£₫]\s?)\d+(?:[.,]\d+)?|\d+[.,]\d+(?:\s?%)?|\d+\s?%|\d{5,})/g;
+
+/** The summary in the language the answer was written in, with its figures in bold: the ones the model marked
+ * with ``**``, or, when it marked none, every figure the text holds. */
 export function Summary({ text, lang }: { text: string; lang: string }) {
-  const parts = text.split(/\*\*(.+?)\*\*/g);
+  const marked = /\*\*(.+?)\*\*/.test(text);
+  const parts = marked ? text.split(/\*\*(.+?)\*\*/g) : text.split(FIGURE);
   return (
     <p className="fc-answer-summary" lang={lang}>
       {parts.map((part, index) => (index % 2 ? <b key={index}>{part}</b> : <Fragment key={index}>{part}</Fragment>))}

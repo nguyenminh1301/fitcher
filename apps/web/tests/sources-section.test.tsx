@@ -221,6 +221,37 @@ describe("Sources page", () => {
     expect(within(crm).getByRole("button", { name: "Sync crm now" }).textContent).toContain("Retry");
   });
 
+  it("shows a retried sync as syncing until the list has its outcome, then the new status without a reload", async () => {
+    const failed = { ...SHOP, last_sync: { ...SYNC, status: "failed" as const, error: "refused" as const } };
+    const sources = fakeSources([failed]);
+    // The first read after the retry still returns the old failed sync; the next returns the retry's success.
+    vi.mocked(sources.list)
+      .mockResolvedValueOnce([failed])
+      .mockResolvedValueOnce([failed])
+      .mockResolvedValue([{ ...SHOP, last_sync: { ...SYNC, id: 2, status: "succeeded" as const } }]);
+    show(sources);
+
+    fireEvent.click(within(await row("shop")).getByRole("button", { name: "Sync shop now" }));
+
+    await waitFor(() => expect(within(screen.getByRole("row", { name: "shop" })).getAllByText("Syncing").length).toBeGreaterThan(0));
+    expect(within(screen.getByRole("row", { name: "shop" })).queryByText("Failed")).toBeNull();
+    await waitFor(() => expect(within(screen.getByRole("row", { name: "shop" })).getByText("Succeeded")).toBeTruthy(), { timeout: 5000 });
+  });
+
+  it("names each table a partial sync could not read with its reason", async () => {
+    const partial = { ...SHOP, last_sync: { ...SYNC, status: "partial" as const, error: "unsupported_name" as const, results: [
+      { table: "orders", mode: "live", rows: 3, full: null },
+      { table: "it's", mode: "live", rows: null, full: null, error: "unsupported_name" },
+    ] } };
+    show(fakeSources([partial]));
+
+    const shop = await row("shop");
+    expect(within(shop).getByText("Partly synced")).toBeTruthy();
+    expect(within(shop).getByText("1 table could not be read:")).toBeTruthy();
+    expect(within(shop).getByText("it's").closest("li")?.textContent).toContain("name or a column name has a quote");
+    expect(within(shop).queryByText(/failed for another reason/)).toBeNull();
+  });
+
   it("edits a connection and keeps the stored password when the field is left empty", async () => {
     const sources = fakeSources();
     show(sources);

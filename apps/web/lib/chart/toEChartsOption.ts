@@ -103,12 +103,17 @@ export function toEChartsOption(spec: ChartSpec, result: Result, palette: string
     }));
   } else {
     categories = rows.map((row) => String(row[spec.x]));
-    series = spec.y.map((name) => ({ name, data: rows.map((row) => row[name]) }));
+    series = spec.y.map((name) => ({ name: columns[name]?.label ?? name, data: rows.map((row) => row[name]) }));
   }
 
   const kind = spec.type === "line" ? "line" : "bar";
   const horizontal = kind === "bar" && spec.orientation === "horizontal";
-  const categoryAxis = { type: "category", data: categories, axisLabel: { hideOverlap: true } };
+  // A long category is cut with an ellipsis inside the chart instead of running past its edge; the axis tooltip
+  // still names it in full.
+  const categoryAxis = {
+    type: "category", data: categories,
+    axisLabel: { hideOverlap: true, width: horizontal ? 140 : 96, overflow: "truncate", ellipsis: "…" },
+  };
   const valueAxis = { type: "value", axisLabel: valueLabel, splitLine: { lineStyle: { color: gridColor } } };
   return {
     tooltip: { trigger: "axis", valueFormatter: (value: number) => formatCell(value, measure, locale) },

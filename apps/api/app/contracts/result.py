@@ -17,6 +17,9 @@ class ColumnInfo(ContractModel):
     type: Literal["string", "number", "date", "datetime", "boolean"]
     role: Literal["dimension", "measure", "time"]
     format: ValueFormat | None = None
+    # The heading people read: a metric's display name from the pack, with the period of a compared column
+    # (``Revenue 2026``); None when the name itself is the heading.
+    label: str | None = None
 
 
 class Result(ContractModel):

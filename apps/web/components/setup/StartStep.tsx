@@ -74,14 +74,23 @@ type Props = {
 export function StartStep({ sources, chosen, meta, onAsk, onConsole, onModel, pollMs = 2000 }: Props) {
   const { t, formatNumber } = useI18n();
   const sourceId = chosen.source.id;
-  const names = chosen.tables.map((table) => table.name);
+  const chosenNames = chosen.tables.map((table) => table.name);
   const copies = chosen.tables.some((table) => table.mode === "copy");
   const [sync, setSync] = useState<SyncView | null>(null);
   const [estimate, setEstimate] = useState<InstantEstimate | null>(null);
   const [job, setJob] = useState<InstantJobView | null>(null);
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const copyState: "waiting" | "done" | "failed" = !sync || sync.status === "running" ? "waiting" : sync.status === "succeeded" ? "done" : "failed";
+  // Each table has its own outcome: one that could not be read is named with its reason, and the pack is built
+  // from the tables that were read.
+  const tableError = (name: string) => {
+    const error = sync?.results.find((row) => row.table === name)?.error;
+    return typeof error === "string" ? error : null;
+  };
+  const unread = sync && sync.status !== "running" ? chosenNames.filter((name) => tableError(name)) : [];
+  const copyState: "waiting" | "done" | "partial" | "failed" = !sync || sync.status === "running" ? "waiting"
+    : sync.status === "succeeded" ? "done" : sync.status === "partial" ? "partial" : "failed";
+  const names = copyState === "partial" ? chosenNames.filter((name) => !unread.includes(name)) : chosenNames;
 
   // The analysis tables read the copies, so the pack is built only once the latest sync has finished.
   useEffect(() => {
@@ -93,7 +102,10 @@ export function StartStep({ sources, chosen, meta, onAsk, onConsole, onModel, po
         if (stopped) return;
         setSync(latest ?? null);
         if (latest?.status === "running") timer = setTimeout(() => void check(), pollMs);
-        else if (!latest || latest.status === "succeeded") setEstimate(await sources.instantEstimate({ source_id: sourceId, tables: names }));
+        else if (!latest || latest.status === "succeeded" || latest.status === "partial") {
+          const read = chosenNames.filter((name) => !latest?.results.some((row) => row.table === name && typeof row.error === "string"));
+          setEstimate(await sources.instantEstimate({ source_id: sourceId, tables: read }));
+        }
       } catch (cause) {
         if (!stopped) setError(errorText(cause));
       }
@@ -219,7 +231,8 @@ export function StartStep({ sources, chosen, meta, onAsk, onConsole, onModel, po
   }
 
   const line = (name: string, mode: string): [DotState, string] => {
-    if (mode === "live") return ["done", t("onboarding.readLive")];
+    if (copyState !== "waiting" && tableError(name)) return ["failed", t("onboarding.unreadable")];
+    if (mode === "live") return copyState === "waiting" && sync ? ["running", t("onboarding.checking")] : ["done", t("onboarding.readLive")];
     if (copyState === "waiting") return ["running", t("onboarding.copying")];
     const result = sync?.results.find((row) => row.table === name);
     if (copyState === "failed" && !(result && typeof result.rows === "number")) return ["failed", t("onboarding.copyFailed")];
@@ -242,7 +255,17 @@ export function StartStep({ sources, chosen, meta, onAsk, onConsole, onModel, po
           );
         })}
       </ol>
-      {copyState === "failed" && copies ? (
+      {unread.length ? (
+        <div className={`fc-banner ${copyState === "partial" ? "fc-banner-attention" : "fc-banner-danger"}`} role="alert"><Icon name="alert" />
+          <div>
+            <div>{t("sourcesPage.tablesFailed", { n: unread.length })}</div>
+            <ul className="src-problem-list">
+              {unread.map((name) => <li key={name}><span className="fc-mono">{name}</span>: {t(`sources.reason_${tableError(name)}`)}</li>)}
+            </ul>
+            {copyState === "partial" ? <div>{t("onboarding.buildWithout")}</div> : null}
+          </div>
+        </div>
+      ) : copyState === "failed" && copies ? (
         <div className="fc-banner fc-banner-danger" role="alert"><Icon name="alert" /><div>{t("onboarding.copyFailedBanner")}</div></div>
       ) : null}
       {missing ? (
@@ -252,7 +275,7 @@ export function StartStep({ sources, chosen, meta, onAsk, onConsole, onModel, po
       ) : null}
       {errorLine}
       <div className="ob-foot">
-        {copyState === "failed" && copies ? (
+        {copyState === "failed" && (copies || unread.length) ? (
           <button type="button" className="fc-btn fc-btn-xl fc-btn-block" onClick={() => onConsole("/console/sources")}>{t("onboarding.openSources")}</button>
         ) : (
           <>

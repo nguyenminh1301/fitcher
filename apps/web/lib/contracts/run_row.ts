@@ -14,6 +14,8 @@ export type Error = string;
 export type InputTokens = number;
 export type OutputTokens = number;
 export type Models = string[];
+export type CostUnknown = boolean;
+export type AnswerTo = string;
 
 export interface RunRow {
   trace_id: TraceId;
@@ -30,4 +32,6 @@ export interface RunRow {
   input_tokens?: InputTokens;
   output_tokens?: OutputTokens;
   models?: Models;
+  cost_unknown?: CostUnknown;
+  answer_to?: AnswerTo;
 }

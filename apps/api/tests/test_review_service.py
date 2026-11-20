@@ -119,7 +119,7 @@ def test_test_run_returns_a_result_with_the_review_limits(pack_dir, registry):
     warehouse = Warehouse()
     item = service(pack_dir, registry, warehouse).test_run("metrics.widget_revenue")
     assert item.test_result.rows == [[1234.5]]
-    assert item.test_result.columns[0].model_dump() == {"name": "value", "type": "number", "role": "measure", "format": None}
+    assert item.test_result.columns[0].model_dump() == {"name": "value", "type": "number", "role": "measure", "format": None, "label": None}
     sql, settings = warehouse.queries[0]
     assert sql == "SELECT sum(sale_amount) AS value FROM `marts`.`widget_sales` LIMIT 1"
     assert settings["readonly"] == 2 and settings["max_execution_time"] == 30 and settings["max_result_rows"] == 100
