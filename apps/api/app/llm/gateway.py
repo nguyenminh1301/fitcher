@@ -47,6 +47,8 @@ file into the environment. Unit tests pass a fake in place of the SDK call.
 """
 
 from collections.abc import Callable, Sequence
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeout
+import contextvars
 from dataclasses import dataclass
 import json
 import os
@@ -253,6 +255,28 @@ def failure_text(error_type: str) -> str:
     return f"{error_type} ({hint})" if hint else error_type
 
 
+class Timeout(Exception):  # noqa: N818 - named like the SDK's own timeout so error_type reads it the same way
+    """The whole call ran past its deadline."""
+
+
+# The SDK's timeout bounds each wait for bytes, not the call: a provider that sends keep-alive lines (OpenRouter
+# while a free model is queued) can hold a call for minutes. Calls run here so the caller stops waiting at the
+# deadline; the abandoned call finishes in the background and its reply is dropped.
+_CALLS = ThreadPoolExecutor(max_workers=32, thread_name_prefix="llm-call")
+# A little time past the SDK's own timeout, so a provider that answers on time is never cut off.
+DEADLINE_GRACE_SECONDS = 2.0
+
+
+def within_deadline(call: Callable[[], Any], seconds: float) -> Any:
+    """``call()``'s result, or ``Timeout`` once ``seconds`` have passed."""
+    future = _CALLS.submit(contextvars.copy_context().run, call)
+    try:
+        return future.result(timeout=seconds)
+    except FutureTimeout:
+        future.cancel()
+        raise Timeout(f"no answer within {seconds:.0f} s") from None
+
+
 @dataclass(frozen=True)
 class _Sender:
     """Screens one call, sends it through the SDK and writes its ``llm_calls`` row."""
@@ -283,12 +307,12 @@ class _Sender:
         if reason is not None:
             log("blocked", reason)
             raise GatewayBlocked(reason)
+        limit = self.timeout if timeout is None else timeout
         try:
-            response = self.sdk(
-                model=route.model, api_key=route.api_key, api_base=route.api_base,
-                timeout=self.timeout if timeout is None else timeout,
+            response = within_deadline(lambda: self.sdk(
+                model=route.model, api_key=route.api_key, api_base=route.api_base, timeout=limit,
                 num_retries=self.retries if retries is None else retries, drop_params=True, **request,
-            )
+            ), limit * ((self.retries if retries is None else retries) + 1) + DEADLINE_GRACE_SECONDS)
         except Exception as error:  # noqa: BLE001 - every SDK and provider failure is reported by type only
             kind = error_type(error)
             call_id = log("failure", kind)

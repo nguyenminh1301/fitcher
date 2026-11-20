@@ -468,3 +468,26 @@ def test_a_provider_error_quoting_the_key_keeps_it_out_of_the_llm_calls_row_and_
         gateway(sdk, call_log=rows).text("fast", PROMPT)
 
     assert all(key not in text for text in [str(raised.value), repr(rows.records), caplog.text])
+
+
+def test_a_call_that_keeps_the_connection_open_past_its_timeout_fails_as_a_timeout(screened, monkeypatch):
+    import threading
+    import time as clock
+
+    from app.llm import gateway as gateway_module
+
+    monkeypatch.setattr(gateway_module, "DEADLINE_GRACE_SECONDS", 0.0)
+    released = threading.Event()
+
+    def slow_sdk(**_):
+        # A provider that sends keep-alive lines: the SDK's read timeout never fires.
+        released.wait(5)
+        return chat_reply("too late")
+
+    started = clock.monotonic()
+    with pytest.raises(LLMError) as raised:
+        Gateway(Routes(), completion=slow_sdk, timeout=0.2, retries=0).text("fast", PROMPT)
+    released.set()
+
+    assert clock.monotonic() - started < 2
+    assert "took too long" in str(raised.value)
