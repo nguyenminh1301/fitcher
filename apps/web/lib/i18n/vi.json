@@ -1138,7 +1138,8 @@
     "byTask": "Theo tác vụ",
     "byModel": "Theo model",
     "calls": "Lượt gọi",
-    "byDayLabel_one": "Chi phí ước tính theo ngày, {n} ngày"
+    "byDayLabel_one": "Chi phí ước tính theo ngày, {n} ngày",
+    "noSpend": "Không có chi phí trong khoảng này: mọi lần gọi đều dùng model miễn phí hoặc gói miễn phí."
   },
   "auditPage": {
     "dataset": "Bộ dữ liệu",

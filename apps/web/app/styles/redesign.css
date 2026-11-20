@@ -61,7 +61,7 @@
 .prog li { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--borderColor-muted); }
 .prog li:last-child { border-bottom: 0; }
 .prog li:has(.prog-bar) { flex-wrap: wrap; }
-.prog-bar { flex-basis: 100%; height: 6px; margin-left: 36px; max-width: calc(100% - 36px); accent-color: var(--fgColor-accent); }
+.prog .prog-bar { flex-basis: 100%; height: 6px; margin-left: 36px; max-width: calc(100% - 36px); accent-color: var(--fgColor-accent); }
 .prog-dot { width: 24px; height: 24px; border-radius: 9999px; display: flex; align-items: center; justify-content: center; flex: none; border: 1.5px solid var(--borderColor-default); color: var(--fgColor-muted); }
 .prog-dot[data-state="done"] { background: var(--fgColor-success); border-color: var(--fgColor-success); color: #fff; }
 .prog-dot[data-state="running"] { border-color: var(--fgColor-default); border-right-color: transparent; animation: fc-spin 1s linear infinite; }
@@ -361,6 +361,7 @@
 .gs-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .gs-head > .sect-title { flex: 1; }
 .gs-head > .fc-muted { font-size: 13px; }
+.gs-head > .prog-bar { order: 1; flex-basis: 100%; width: auto; }
 .gs-name { font-weight: 500; }
 .gs-note { font-size: 13px; }
 .gs-action { align-self: flex-start; margin-top: auto; }
@@ -523,3 +524,27 @@ button.fc-composer-pack.src-switch:hover { background: var(--control-transparent
   .fc-switch-track[aria-checked="true"]::after { left: 22px; }
   .ob-step { height: 44px; margin: -20px 0; padding: 20px 0; }
 }
+.nowrap { white-space: nowrap; }
+.tbl-review { table-layout: fixed; width: 100%; }
+.tbl-review .col-kind { width: 110px; }
+.tbl-review .col-origin { width: 24%; }
+.tbl-review .col-confidence { width: 130px; }
+.tbl-review .col-status { width: 130px; }
+.tbl-review td { overflow-wrap: anywhere; }
+/* A console table turns into cards by the width it gets (below 640 px, as the design asks), so a tablet with the
+   console sidebar open shows whole rows instead of one word per line or a column cut off at the edge. */
+.card-table { container-type: inline-size; overflow-x: auto; }
+@container (max-width: 640px) {
+  .card-table .tbl-cards thead, .card-table .tbl-cards colgroup { display: none; }
+  .card-table .tbl-cards, .card-table .tbl-cards tbody, .card-table .tbl-cards tr, .card-table .tbl-cards td { display: block; width: 100%; }
+  .card-table .tbl-cards tr { border-bottom: 1px solid var(--borderColor-default); padding: 12px 16px; }
+  .card-table .tbl-cards td { border: 0; padding: 2px 0; display: flex; justify-content: space-between; gap: 12px; text-align: right; white-space: normal !important; }
+  .card-table .tbl-cards td::before { content: attr(data-label); color: var(--fgColor-muted); font-size: 12px; text-align: left; flex-shrink: 0; }
+  .card-table .tbl-cards td:first-child { display: block; text-align: left; font-weight: 600; padding-bottom: 6px; }
+  .card-table .tbl-cards td:first-child::before { content: none; }
+}
+/* Five Get started cards need about 720 px; a narrower panel (a tablet with the console sidebar) lays them out in
+   rows of three or two, so a step's title is not broken one word per line. */
+.gs { container-type: inline-size; }
+@container (max-width: 720px) { .gs-list { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@container (max-width: 480px) { .gs-list { grid-template-columns: 1fr; } }

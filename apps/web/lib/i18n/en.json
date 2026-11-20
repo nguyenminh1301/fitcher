@@ -1138,7 +1138,8 @@
     "byTask": "By task",
     "byModel": "By model",
     "calls": "Calls",
-    "byDayLabel_one": "Estimated cost by day, {n} day"
+    "byDayLabel_one": "Estimated cost by day, {n} day",
+    "noSpend": "No spend in this period: every call used a free model or a free tier."
   },
   "auditPage": {
     "dataset": "Dataset",

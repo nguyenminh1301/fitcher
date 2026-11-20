@@ -36,6 +36,7 @@
 
 ### Fixed
 
+- Console pages read cleanly on a tablet and in a narrow panel: the Overview's Get started bar lines up with its card and its steps wrap into rows; the Datasets, Runs, Query log and Review tables turn into cards below 640 px of panel width instead of breaking text one word per line or cutting columns off; the Review tables of the pack's files line up column for column; and Costs says there was no spend instead of drawing an empty chart, and no longer breaks a model id inside its name.
 - The chat no longer scrolls as a whole page in a window shorter than 600 px, such as a phone held sideways: the composer stays in view and the sidebar logo is not cut off.
 - An answer grouped by month, quarter or year shows its periods as "Jan 2026", "Q1 2026" or "2026" in the table, chart axis and tooltip, headed "Month", "Quarter" or "Year" in the question's language, instead of the first day of each period under an internal column name.
 - A question that names its period outright, such as "năm 2026", "Q1 2025" or "March 2024", is answered for that period instead of being asked back when the extraction model misses it.

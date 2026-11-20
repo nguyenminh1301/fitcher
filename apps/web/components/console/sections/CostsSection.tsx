@@ -48,6 +48,13 @@ function Bars({ days, label }: { days: [string, number][]; label: string }) {
   );
 }
 
+/** A model id that may wrap only after a "/", never inside a name such as "flash-lite". */
+function modelSegments(model: string) {
+  return model.split("/").map((part, index, parts) => (
+    <span key={index}><span className="nowrap">{part}{index < parts.length - 1 ? "/" : ""}</span>{index < parts.length - 1 ? <wbr /> : null}</span>
+  ));
+}
+
 export function CostsSection() {
   const { t, formatNumber } = useI18n();
   const { api } = useChat();
@@ -78,7 +85,9 @@ export function CostsSection() {
       </section>
       <section className="box" aria-labelledby="by-day-title">
         <div className="box-head"><h2 id="by-day-title" className="box-title">{t("costsPage.byDay")}</h2></div>
-        <div className="box-pad"><Bars days={days} label={t("costsPage.byDayLabel", { n: DAYS[range] })} /></div>
+        <div className="box-pad">
+          {total > 0 ? <Bars days={days} label={t("costsPage.byDayLabel", { n: DAYS[range] })} /> : <p className="fc-muted">{t("costsPage.noSpend")}</p>}
+        </div>
       </section>
       <div className="split">
         <div className="split-main">
@@ -101,7 +110,7 @@ export function CostsSection() {
               <thead><tr><th>{t("models.tierModel")}</th><th className="num">{t("overview.cost")}</th></tr></thead>
               <tbody>
                 {sum(costs, (row) => row.model).map(([model, value]) => (
-                  <tr key={model}><td><span className="fc-mono">{model}</span></td><td className="num">{usd(value.cost, 2)}</td></tr>
+                  <tr key={model}><td><span className="fc-mono" title={model}>{modelSegments(model)}</span></td><td className="num">{usd(value.cost, 2)}</td></tr>
                 ))}
               </tbody>
             </table>
