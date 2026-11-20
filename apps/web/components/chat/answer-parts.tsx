@@ -55,7 +55,7 @@ export function ProgressSteps({ steps, live, onStop }: { steps: Step[]; live: bo
 
 // A figure of a summary: a number with thousands separators or decimals, a percentage, an amount with a currency
 // sign, or a number of five digits or more. A plain year or a small count stays as it is.
-const FIGURE = /((?:[$€£₫]\s?)?\d{1,3}(?:[.,\u00a0 ]\d{3})+(?:[.,]\d+)?(?:\s?%)?|(?:[$€£₫]\s?)\d+(?:[.,]\d+)?|\d+[.,]\d+(?:\s?%)?|\d+\s?%|\d{5,})/g;
+const FIGURE = /((?:[$€£₫]\s?)?\d{1,3}(?:[.,\u00a0\u202f\u2009 ]\d{3})+(?:[.,]\d+)?(?:\s?%)?|(?:[$€£₫]\s?)\d+(?:[.,]\d+)?|\d+[.,]\d+(?:\s?%)?|\d+\s?%|\d{5,})/g;
 
 /** The summary in the language the answer was written in, with its figures in bold: the ones the model marked
  * with ``**``, or, when it marked none, every figure the text holds. */

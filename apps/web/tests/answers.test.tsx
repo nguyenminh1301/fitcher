@@ -237,6 +237,11 @@ describe("answer", () => {
     expect([...container.querySelectorAll("b")].map((item) => item.textContent)).toEqual(["1.234.567", "12,5%", "98.000"]);
   });
 
+  it("reads a figure grouped with narrow spaces as one figure", () => {
+    const { container } = render(<Summary lang="vi" text={"HCM – 54\u202f839\u202f627,31; Hà Nội – 54 825 467,84."} />);
+    expect([...container.querySelectorAll("b")].map((item) => item.textContent)).toEqual(["54\u202f839\u202f627,31", "54 825 467,84"]);
+  });
+
   it("keeps the figures the model marked and bolds nothing else", () => {
     const { container } = render(<Summary lang="en" text="Revenue was **$1,200** in 2026, up 5% from 1,000." />);
     expect([...container.querySelectorAll("b")].map((item) => item.textContent)).toEqual(["$1,200"]);
