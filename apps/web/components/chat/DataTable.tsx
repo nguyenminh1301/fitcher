@@ -41,7 +41,7 @@ export function DataTable({ result, title, fileName = "fitcher-result" }: { resu
       {title === false ? null : (
         <div className="fc-card-head">
           <h3 className="fc-card-title">{title ?? t("ui.data")}</h3>
-          <Button variant="ghost" size="sm" icon="download" onClick={() => download(new Blob([toCsv(result)], { type: "text/csv" }), `${fileName}.csv`)}>{t("ui.exportCsv")}</Button>
+          <Button variant="ghost" size="sm" icon="download" onClick={() => download(new Blob([toCsv(result)], { type: "text/csv;charset=utf-8" }), `${fileName}.csv`)}>{t("ui.exportCsv")}</Button>
         </div>
       )}
       <div className="fc-table-wrap">

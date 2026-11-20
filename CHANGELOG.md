@@ -74,6 +74,7 @@
 
 ### Security
 
+- An exported CSV result can no longer run a formula when it is opened in a spreadsheet: a cell or column name that starts with `=`, `+`, `-`, `@`, a tab or a carriage return gets a leading `'` (a plain number such as `-5` stays a number). The file also starts with a UTF-8 byte order mark and ends its lines with CRLF, so Excel shows Vietnamese text instead of mojibake.
 - The release image's web server, the only process on the published port, runs as its own user (`web`, uid 10002) with only the variables it reads, so code running in it can no longer read `/data`, the instance key, the services' secrets, the rendered ClickHouse configuration or a `FITCHER_SECRET_KEY` or ClickHouse password given to the container; the api, ClickHouse and the jobs keep running as `app` (uid 10001), the owner of `/data`, which every start makes mode 0700. The container now starts as root so that s6 can start each service as its user, `docker exec fitcher fitcher <job>` still runs the job as `app`, and `scripts/check_image_isolation.sh` checks all of it on every image audit.
 
 ### Removed

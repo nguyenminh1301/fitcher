@@ -39,7 +39,7 @@ export function ChartCard({ spec, result, type, onType, orientation, onOrientati
         <div className="fc-row">
           <TypeSwitcher value={type} allowed={spec.allowed_types} onChange={onType} />
           {type === "table" ? (
-            <Button variant="ghost" size="sm" iconOnly icon="download" label={t("ui.exportCsv")} onClick={() => download(new Blob([toCsv(result)], { type: "text/csv" }), "fitcher-result.csv")} />
+            <Button variant="ghost" size="sm" iconOnly icon="download" label={t("ui.exportCsv")} onClick={() => download(new Blob([toCsv(result)], { type: "text/csv;charset=utf-8" }), "fitcher-result.csv")} />
           ) : type !== "kpi" ? (
             <Button variant="ghost" size="sm" iconOnly icon="download" label={t("ui.exportPng")} onClick={exportPng} />
           ) : null}

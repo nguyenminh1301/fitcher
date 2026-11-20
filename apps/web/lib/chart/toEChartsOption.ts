@@ -125,13 +125,25 @@ export function toEChartsOption(spec: ChartSpec, result: Result, palette: string
   };
 }
 
-/** The result as CSV: a header row, then one line per row; commas, quotes and line breaks are quoted. */
+// A spreadsheet runs a cell that starts with one of these as a formula (OWASP, CSV injection).
+const FORMULA_START = /^[=+\-@\t\r]/;
+const PLAIN_NUMBER = /^[+-]?(\d+(\.\d*)?|\.\d+)([eE][+-]?\d+)?$/;
+/** Excel reads a CSV file as UTF-8 only when it starts with a byte order mark. */
+const UTF8_BOM = "\uFEFF";
+
+/**
+ * The result as CSV for a spreadsheet: a byte order mark, a header row, then one CRLF-terminated line per row.
+ * Commas, quotes and line breaks are quoted, and a text that a spreadsheet would run as a formula gets a leading
+ * `'` so it is shown as written; a plain number such as `-5` is left as it is.
+ */
 export function toCsv(result: Result): string {
   const quote = (value: unknown) => {
-    const text = value === null || value === undefined ? "" : String(value);
-    return /[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+    let text = value === null || value === undefined ? "" : String(value);
+    if (FORMULA_START.test(text) && !PLAIN_NUMBER.test(text)) text = `'${text}`;
+    return /[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
   };
-  return [result.columns.map((column) => quote(column.name)).join(","), ...result.rows.map((row) => row.map(quote).join(","))].join("\n");
+  const lines = [result.columns.map((column) => quote(column.name)), ...result.rows.map((row) => row.map(quote))];
+  return UTF8_BOM + lines.map((line) => `${line.join(",")}\r\n`).join("");
 }
 
 /** Start a download of ``blob`` as ``name`` in the browser. */
