@@ -30,7 +30,7 @@ from app.sources.attach import Source, Table, loading_table, publish_copy, quote
 from app.sources.store import (
     DuplicateSource, NewSource, SourceStore, StoredFile, StoredSource, TableChange,
 )
-from app.sources.inspect import CatalogColumn, TableInfo
+from app.sources.inspect import CatalogColumn, TableInfo, classify_error
 
 logger = logging.getLogger(__name__)
 
@@ -42,6 +42,8 @@ INFERENCE_ROWS = 1000
 INFERENCE_SCAN_ROWS = 20_000
 MAX_TABLE_NAME = 40
 DELIMITERS = (",", ";", "\t", "|")
+UTF16_BOMS = (b"\xff\xfe", b"\xfe\xff")
+LEGACY_ENCODINGS = ("cp1258", "cp1252")
 # A column type is interpolated into DDL, so only these shapes pass.
 _SCALAR = (r"(?:U?Int(?:8|16|32|64)|Float(?:32|64)|Bool|String|Date|Date32|DateTime|DateTime64\(\d(?:, '[A-Za-z_/+-]+')?\)"
            r"|Decimal\(\d{1,2}, \d{1,2}\))")
@@ -76,9 +78,9 @@ class FileColumn:
 
 class Upload:
     def __init__(self, id: str, file_name: str, format: str, size_bytes: int, columns: list[FileColumn],
-                 sample: list[list[str | None]]):
+                 sample: list[list[str | None]], encoding: str | None = None):
         self.id, self.file_name, self.format, self.size_bytes = id, file_name, format, size_bytes
-        self.columns, self.sample = columns, sample
+        self.columns, self.sample, self.encoding = columns, sample, encoding
 
 
 # Type from the content
@@ -113,11 +115,57 @@ def detect_format(data: bytes | BinaryIO, file_name: str) -> str:
         if _office_type(source) != XLSX:
             raise DocumentRejected("only XLSX workbooks are accepted among Office files", 415)
         return "xlsx"
+    if head.startswith(UTF16_BOMS):
+        return "csv"
     if head.startswith(b"%PDF-") or b"\x00" in head[:8192]:
         raise DocumentRejected("the file is not a CSV, XLSX or Parquet file", 415)
-    if not _decodes(head):
-        raise DocumentRejected("a CSV file must be UTF-8 text")
+    if _looks_like_json(head):
+        raise DocumentRejected("the file is JSON; save it as CSV, XLSX or Parquet and upload that", 415)
     return "csv"
+
+
+def _looks_like_json(head: bytes) -> bool:
+    text = head.decode("utf-8-sig", errors="ignore").lstrip()
+    if not text or text[0] not in "[{":
+        return False
+    try:
+        json.loads(text)
+        return True
+    except ValueError:
+        # Only the start of a large file was read: an object or a list of objects or values is still JSON.
+        return bool(re.match(r'^(?:\{\s*"|\[\s*[\[{"\d-])', text))
+
+
+def csv_encoding(head: bytes) -> str:
+    """The encoding a CSV file is read in: UTF-16 by its byte-order mark, UTF-8, else a Windows code page.
+
+    Vietnamese Windows exports are often Windows-1258 and Western European ones Windows-1252; Latin-1 decodes any
+    byte, so it is the last resort.
+    """
+    if head.startswith(UTF16_BOMS):
+        return "utf-16"
+    if _decodes(head):
+        return "utf-8"
+    for encoding in LEGACY_ENCODINGS:
+        try:
+            head.decode(encoding)
+            return encoding
+        except UnicodeDecodeError:
+            continue
+    return "latin-1"
+
+
+def transcode_to_utf8(path: Path, encoding: str) -> None:
+    """Rewrite a CSV file in UTF-8, composed (NFC), so ClickHouse and the reload read it like any other."""
+    target = path.with_name(path.name + ".utf8")
+    try:
+        with path.open(encoding=encoding, newline="") as source, target.open("w", encoding="utf-8", newline="") as out:
+            for line in source:
+                out.write(unicodedata.normalize("NFC", line))
+    except UnicodeDecodeError:
+        target.unlink(missing_ok=True)
+        raise DocumentRejected(f"the file is not valid {encoding} text; save it as CSV UTF-8 and upload it again") from None
+    target.replace(path)
 
 
 # Names and columns
@@ -352,6 +400,10 @@ class FileService:
             size, digest = self._write(body, path)
             with path.open("rb") as handle:
                 kind = detect_format(handle, file_name)
+                handle.seek(0)
+                encoding = csv_encoding(handle.read(HEAD_BYTES)) if kind == "csv" else None
+            if encoding not in (None, "utf-8"):
+                transcode_to_utf8(path, encoding)
             columns, sample = self._infer(kind, path)
         except BaseException:
             shutil.rmtree(folder, ignore_errors=True)
@@ -360,7 +412,7 @@ class FileService:
             id=file_id, source_id=None, file_name=file_name, format=kind, size_bytes=size, sha256=digest,
             columns=tuple((c.name, c.type) for c in columns), stored_path=str(path), uploaded_by=uploaded_by,
             created_at=datetime.now(UTC).isoformat()))
-        return Upload(file_id, file_name, kind, size, columns, sample)
+        return Upload(file_id, file_name, kind, size, columns, sample, encoding)
 
     def _write(self, body: BinaryIO, path: Path) -> tuple[int, str]:
         digest, size = hashlib.sha256(), 0
@@ -390,12 +442,19 @@ class FileService:
             sample_text = _csv_text(header, kept)
         else:
             _, sample_text = _read_csv_head(path)
+        if len(list(csv.reader(StringIO(sample_text)))) < 2:
+            raise DocumentRejected("the file has a header row but no data rows")
         # The sample is rewritten with commas whatever the file's delimiter, so it is described as comma separated;
         # the load reads the file itself with its own delimiter.
-        result = self._client.query(
-            "DESCRIBE TABLE format(CSVWithNames, {sample:String})", parameters={"sample": sample_text},
-            settings={"format_csv_delimiter": ",", "schema_inference_make_columns_nullable": 1,
-                      "input_format_csv_use_best_effort_in_schema_inference": 1})
+        try:
+            result = self._client.query(
+                "DESCRIBE TABLE format(CSVWithNames, {sample:String})", parameters={"sample": sample_text},
+                settings={"format_csv_delimiter": ",", "schema_inference_make_columns_nullable": 1,
+                          "input_format_csv_use_best_effort_in_schema_inference": 1})
+        except Exception as error:  # noqa: BLE001 - only ClickHouse's refusal of the content is the user's to fix
+            if classify_error(error) == "empty_or_unreadable":
+                raise DocumentRejected("ClickHouse cannot read column types from the first rows of the file") from None
+            raise
         columns = [FileColumn(row[0], row[1]) for row in result.result_rows]
         parsed = list(csv.reader(StringIO(sample_text)))[1:][:SAMPLE_ROWS]
         return columns, parsed

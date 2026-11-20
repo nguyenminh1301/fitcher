@@ -2,6 +2,8 @@
 
 from decimal import Decimal
 from io import BytesIO
+from pathlib import Path
+import unicodedata
 import zipfile
 
 from openpyxl import Workbook
@@ -65,13 +67,77 @@ def test_the_type_comes_from_the_content_not_the_name(data, name, kind):
 
 
 @pytest.mark.parametrize(("data", "status"), [
-    (b"", 422), (b"%PDF-1.7 x", 415), (b"\x00\x01\x02binary", 415), (b"\xff\xfe bad utf8 \xc3(", 422),
+    (b"", 422), (b"%PDF-1.7 x", 415), (b"\x00\x01\x02binary", 415), (b'[{"a": 1}]', 415),
+    (b'  {"rows": [1, 2', 415),
     (workbook([["a"]], macro=True), 415), (b"PK\x03\x04 not a zip", 415),
 ])
 def test_content_that_is_not_a_supported_table_is_rejected(data, status):
     with pytest.raises(DocumentRejected) as raised:
         files.detect_format(data, "x")
     assert raised.value.status == status
+
+
+_TONES = {"\u0300", "\u0301", "\u0303", "\u0309", "\u0323"}
+
+
+def cp1258(text: str) -> bytes:
+    """Encode Vietnamese text as Windows-1258 does: a precomposed vowel where the code page has one, plus a tone mark."""
+    out = []
+    for char in text:
+        try:
+            out.append(char.encode("cp1258"))
+        except UnicodeEncodeError:
+            parts = unicodedata.normalize("NFD", char)
+            base = unicodedata.normalize("NFC", parts[0] + "".join(m for m in parts[1:] if m not in _TONES))
+            out.append((base + "".join(m for m in parts[1:] if m in _TONES)).encode("cp1258"))
+    return b"".join(out)
+
+
+@pytest.mark.parametrize(("data", "encoding"), [
+    (CSV, "utf-8"), (b"\xef\xbb\xbf" + CSV, "utf-8"), ("a,b\n1,2\n".encode("utf-16"), "utf-16"),
+    (cp1258("Tên,Số\nHà Nội,1\n"), "cp1258"), (b"id,name\n1,caf\xe9\n", "cp1258"),
+])
+def test_a_csv_encoding_is_detected_from_its_first_bytes(data, encoding):
+    assert files.csv_encoding(data) == encoding
+
+
+@pytest.mark.parametrize(("encoded", "encoding"), [
+    ("Mã đơn,Số tiền,Ngày\nA1,10.5,2024-01-02\n".encode("utf-16"), "utf-16"),
+    ("Mã đơn,Số tiền,Ngày\nA1,10.5,2024-01-02\n".encode("utf-16-le").join([b"\xff\xfe", b""]), "utf-16"),
+    (cp1258("Mã đơn,Số tiền,Ngày\nA1,10.5,2024-01-02\n"), "cp1258"),
+])
+def test_a_utf16_or_windows_csv_is_stored_as_utf8_and_read_like_any_other(parts, encoded, encoding):
+    store, clickhouse, service = parts
+
+    upload = service.upload("export.csv", BytesIO(encoded), uploaded_by=None)
+
+    assert (upload.format, upload.encoding) == ("csv", encoding)
+    assert upload.sample[0] == ["A1", "10.5", "2024-01-02"]
+    assert clickhouse.parameters["sample"].startswith("Mã đơn,Số tiền,Ngày\n")
+    stored = Path(store.get_file(upload.id).stored_path).read_bytes()
+    assert stored.decode("utf-8") == "Mã đơn,Số tiền,Ngày\nA1,10.5,2024-01-02\n"
+
+
+def test_a_csv_with_a_header_only_is_refused_with_a_reason_and_nothing_is_kept(parts, tmp_path):
+    _, _, service = parts
+
+    with pytest.raises(DocumentRejected, match="no data rows") as raised:
+        service.upload("header_only.csv", BytesIO(b"a,b,c\n"), uploaded_by=None)
+
+    assert raised.value.status == 422
+    assert not any((tmp_path / "uploads").iterdir())
+
+
+def test_a_sample_clickhouse_cannot_infer_types_from_is_a_422_not_an_outage(parts):
+    _, clickhouse, service = parts
+
+    def refuse(sql, parameters=None, settings=None):
+        raise RuntimeError("Code: 636. DB::Exception: The table structure cannot be extracted. (CANNOT_EXTRACT_TABLE_STRUCTURE)")
+
+    clickhouse.query = refuse
+    with pytest.raises(DocumentRejected, match="column types") as raised:
+        service.upload("odd.csv", BytesIO(CSV), uploaded_by=None)
+    assert raised.value.status == 422
 
 
 def test_a_macro_enabled_workbook_is_rejected_by_the_document_readers_rule():

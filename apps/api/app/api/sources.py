@@ -194,7 +194,8 @@ def upload_file(admin: Admin, service: Files, file: Annotated[UploadFile, File()
         raise _refusal(error) from None
     return FileUploadView(
         id=upload.id, file_name=upload.file_name, format=upload.format, size_bytes=upload.size_bytes,
-        columns=[FileColumn(name=c.name, type=c.type) for c in upload.columns], sample=upload.sample)
+        columns=[FileColumn(name=c.name, type=c.type) for c in upload.columns], sample=upload.sample,
+        encoding=upload.encoding)
 
 
 @router.post("/files/{file_id}/load", status_code=status.HTTP_201_CREATED)

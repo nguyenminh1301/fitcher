@@ -167,6 +167,9 @@ class FileUploadView(ContractModel):
     columns: list[FileColumn]
     # The first rows of the file as text, so the page can show what the types describe.
     sample: list[list[str | None]]
+    # The text encoding a CSV file was read in and converted to UTF-8 from ("utf-8", "utf-16", "cp1258", "cp1252",
+    # "latin-1"); None for XLSX and Parquet.
+    encoding: str | None = None
 
 
 class FileLoad(ContractModel):
