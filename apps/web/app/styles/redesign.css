@@ -515,9 +515,9 @@ button.fc-composer-pack.src-switch:hover { background: var(--control-transparent
 .cs-navtop > .src-switch { flex: 1; min-width: 0; }
 .fc-menu-hint { margin-left: auto; padding-left: 8px; font-size: 12px; color: var(--fgColor-muted); white-space: nowrap; }
 
-/* Touch targets below 768 px are at least 44 px tall (design: 40-44 px; WCAG 2.5.8): the links of table and card
+/* Touch targets below 768 px, or on any touch screen (a phone held sideways is wider), are at least 44 px tall (design: 40-44 px; WCAG 2.5.8): the links of table and card
    rows and the setup's step bars grow their hit area without changing how they look. */
-@media (max-width: 767px) {
+@media (max-width: 767px), (pointer: coarse) {
   .tbl .src-link, .tbl .fc-link, .tbl .link-button, .back { display: inline-flex; align-items: center; min-height: 44px; min-width: 44px; }
   .fc-switch-track { width: 44px; height: 24px; }
   .fc-switch-track::after { top: 2px; width: 20px; height: 20px; }
