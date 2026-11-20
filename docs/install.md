@@ -50,6 +50,62 @@ The application keeps its settings in `app.db`; these environment variables set 
 
 The embedded ClickHouse sizes itself from the container's memory limit (`--memory`): the server takes half of it (at least 768 MiB) and one query at most half of the server's share, and large sorts and aggregations spill to disk.
 
+## Reaching fitcher from other machines
+
+Without further setup fitcher answers only the computer it runs on. To open it from elsewhere, put an HTTPS reverse proxy or a tunnel in front of the published port, in this order:
+
+1. Start fitcher with the public name listed, still published on loopback: `-e FITCHER_ALLOWED_HOSTS=fitcher.example.com` and, so that one visitor's wrong passwords do not slow down the others, `-e FITCHER_TRUSTED_PROXIES=172.17.0.1` (the address the proxy's connections arrive from: for a proxy on the host, the gateway of the container's network, which `docker network inspect bridge` shows).
+2. Open [localhost:3000](http://localhost:3000) on this computer and set the owner password on the Security page. Until it is set, fitcher refuses every request through the public name.
+3. Start the proxy. It must send the public name as `Host`: a proxy that sends `127.0.0.1` or `localhost` instead is refused, and the page says so.
+
+Serve the name on the standard HTTPS port. The browser's `Origin` and the forwarded `Host` must match, and nginx's `$host` leaves out a port.
+
+**nginx** (uploads up to 256 MiB, answers streamed as they are written):
+
+```nginx
+server {
+    listen 443 ssl;
+    server_name fitcher.example.com;
+    # ssl_certificate and ssl_certificate_key as for any other site
+    client_max_body_size 300m;
+
+    location / {
+        proxy_pass http://127.0.0.1:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header Connection "";
+        proxy_buffering off;
+        proxy_read_timeout 300s;
+    }
+}
+```
+
+**Caddy** keeps the `Host`, sets the forwarding headers, streams answers and gets the certificate by itself:
+
+```caddyfile
+fitcher.example.com {
+	request_body {
+		max_size 300MB
+	}
+	reverse_proxy 127.0.0.1:3000
+}
+```
+
+**Cloudflare Tunnel** (`cloudflared`) with a named tunnel and the public hostname `fitcher.example.com`:
+
+```yaml
+tunnel: <tunnel id>
+credentials-file: /etc/cloudflared/<tunnel id>.json
+ingress:
+  - hostname: fitcher.example.com
+    service: http://127.0.0.1:3000
+  - service: http_status:404
+```
+
+Do not set `httpHostHeader`: cloudflared then sends the public hostname, as fitcher needs. Cloudflare's own upload limit (100 MB on the free plan) caps uploads through the tunnel.
+
 ## Upgrades
 
 Pull the new image and start it on the same volume:

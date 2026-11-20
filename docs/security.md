@@ -31,7 +31,7 @@ Secrets in logs: tests fail when a provider key, a source password or the instan
 
 ## Hardening checklist
 
-- Keep the published port on `127.0.0.1`. Before listing a name in `FITCHER_ALLOWED_HOSTS`, set an owner password on the Security page, and serve the name over HTTPS behind a reverse proxy.
+- Keep the published port on `127.0.0.1`. Before listing a name in `FITCHER_ALLOWED_HOSTS`, set an owner password on the Security page, and serve the name over HTTPS behind a reverse proxy that sends the public name as `Host`; [install.md](install.md#reaching-fitcher-from-other-machines) gives the order and the nginx, Caddy and Cloudflare Tunnel settings. A new owner password needs at least 12 characters.
 - Supply `FITCHER_SECRET_KEY` from a secret store instead of the generated `secret.key`.
 - Back up with `fitcher backup` (see [operations.md](operations.md)); keep archives made with `--include-secret-key` as safe as the volume.
 - Give each source connection a read-only database account.

@@ -4,6 +4,7 @@
 
 ### Added
 
+- The install guide shows how to reach fitcher from other machines: list the public name, set the owner password on this computer first, then start an nginx, Caddy or Cloudflare Tunnel proxy that sends the public name as `Host`, with the settings for uploads and streamed answers.
 - One source switcher in the chat's question box and at the top of the console sidebar: a menu of the sources that can answer, with their kind and dataset count, the current one checked and a way to the Sources page. Choosing a source makes its pack the current one on the api (`PUT /pack`), so the console's pages and a new conversation use the same source.
 - The Runs page lists every source's runs together, with a Source column and filter (`GET /admin/runs?all=true`), and a run of any source opens its trace; the Overview and Costs pages count every source's runs.
 - While a pack compiles, the build page also counts the column values the prompt-injection classifier has checked, the step that comes before indexing and takes longest when the classifier is on.
