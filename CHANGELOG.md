@@ -32,6 +32,7 @@
 
 ### Fixed
 
+- An answer's warnings (a period outside or partly outside the data, a table without dates, a single period for a comparison, a cut result) are written in the language of the question, and each metric column of a result carries the metric's display name from the pack as its `label`, with the period of a compared column.
 - The standing "This address is open to other machines" banner no longer says fitcher has no owner password once a password is set: `/me` reports `exposed` only while names other than loopback are listed in `FITCHER_ALLOWED_HOSTS` and no owner password is set.
 - The Sources page shows a sync started from it as syncing until the list has the sync's own outcome, so a retry that succeeded no longer leaves "Failed" on screen; a partly synced source, the Overview and the setup's build step name each table that could not be read with its reason instead of "The connection failed for another reason", and the setup builds the pack from the tables that were read.
 - A pack build that ClickHouse refused shows a plain, translated reason (a value too large for its type, a table name it cannot read, an unreachable source) instead of ClickHouse's own message with data values and internal types, which stays in the api log; the setup says questions asked before still work only when the source already had a pack.

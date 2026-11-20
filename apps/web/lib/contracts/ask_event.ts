@@ -51,6 +51,7 @@ export type Name = string;
 export type Type = "string" | "number" | "date" | "datetime" | "boolean";
 export type Role1 = "dimension" | "measure" | "time";
 export type Format = ("currency" | "count" | "ratio" | "percent" | "days" | "number") | null;
+export type Label1 = string | null;
 /**
  * @maxItems 5000
  */
@@ -142,6 +143,7 @@ export interface ColumnInfo {
   type: Type;
   role: Role1;
   format?: Format;
+  label?: Label1;
 }
 export interface ChartSpecEvent {
   trace_id: TraceId6;

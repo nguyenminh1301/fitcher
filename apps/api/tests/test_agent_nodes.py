@@ -157,6 +157,16 @@ def test_period_outside_coverage_adds_a_warning():
     ]
 
 
+def test_a_coverage_warning_is_in_the_language_of_the_question():
+    extraction = extraction_reply(periods=[{"kind": "year", "year": 2025}])
+    state = {**state_for(extraction), "question": "Doanh thu năm 2025 là bao nhiêu?"}
+
+    spec = make_spec(state, compiled_fixture())
+
+    assert spec.warnings == ["Câu hỏi chỉ nêu một khoảng thời gian nên không có gì để so sánh",
+                             "Dữ liệu chỉ có một phần của 2025: dữ liệu có từ 2023-01-02 đến 2025-06-30"]
+
+
 def _without_dates(dataset_id: str):
     """The fixture pack with ``dataset_id`` turned into a table without a time column."""
     compiled = compiled_fixture()
@@ -511,6 +521,8 @@ def test_result_columns_take_types_roles_and_formats_from_the_pack():
         ("lines", "number", "measure", None),
     ]
     assert result.rows == [["Blue", "2025-01-02", 12.3, None, 1.5, 3]]
+    name = next(metric.name for metric in compiled_fixture().pack.metrics.metrics if metric.id == "widget_revenue")
+    assert [c.label for c in result.columns] == [None, None, f"{name} Q1 2025", None, None, None]
 
 
 def test_result_is_capped_at_5000_rows():

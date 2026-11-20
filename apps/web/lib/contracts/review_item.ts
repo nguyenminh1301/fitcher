@@ -22,6 +22,7 @@ export type Name1 = string;
 export type Type = "string" | "number" | "date" | "datetime" | "boolean";
 export type Role = "dimension" | "measure" | "time";
 export type Format = ("currency" | "count" | "ratio" | "percent" | "days" | "number") | null;
+export type Label = string | null;
 /**
  * @maxItems 5000
  */
@@ -85,6 +86,7 @@ export interface ColumnInfo {
   type: Type;
   role: Role;
   format?: Format;
+  label?: Label;
 }
 /**
  * The QuerySpec a proposal's example settles for its question, without periods (DECISIONS §6 step 7).
