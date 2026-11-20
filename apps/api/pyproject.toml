@@ -29,9 +29,11 @@ dependencies = [
     # Reads the schema of an uploaded Parquet file (app/sources/files.py); the jobs read Hugging Face datasets with it too.
     "pyarrow==26.0.0",
     # Company documents (app/onboarding): read-only parsers; uploads are multipart forms.
-    "openpyxl==3.1.5",
     "pydantic==2.14.1",
     "pypdf==6.21.4",
+    # Reads XLSX uploads and documents (app/sources/files.py, app/onboarding/docs_parser.py) with a Rust reader:
+    # 50 000 rows in well under a second, against about two with openpyxl.
+    "python-calamine==0.9.1",
     "python-docx==1.2.0",
     "python-multipart==0.0.32",
     "pyyaml==6.0.3",
@@ -46,6 +48,8 @@ dependencies = [
 
 [dependency-groups]
 dev = [
+    # The tests build XLSX workbooks with it; the app reads them with python-calamine.
+    "openpyxl==3.1.5",
     "pytest==9.2.0",
 ]
 jobs = [

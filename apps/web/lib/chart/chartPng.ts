@@ -5,7 +5,7 @@ import type { EChartsInstance } from "echarts-for-react";
 
 /** The PNG of ``chart`` at its on-screen size times ``pixelRatio``, on ``background``, in the chart's own font. */
 export async function chartPng(chart: EChartsInstance, background: string, pixelRatio = 2): Promise<Blob> {
-  const echarts = await import("echarts");
+  const { echarts } = await import("@/lib/chart/echarts");
   const canvasChart = echarts.init(document.createElement("div"), null, { renderer: "canvas", width: chart.getWidth(), height: chart.getHeight() });
   try {
     // "inherit" means nothing on a canvas, so the font the page resolved for the chart is named outright.

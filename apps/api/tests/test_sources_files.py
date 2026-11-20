@@ -466,3 +466,24 @@ def test_an_unknown_upload_is_not_found(parts):
 
     with pytest.raises(files.UploadNotFound):
         service.load("missing", None, [FileColumn("a", "String")])
+
+
+@pytest.mark.parametrize(("value", "text"), [
+    (3.0, "3"), (-2.0, "-2"), (1.5, "1.5"), (1e20, "1e+20"), ("Hà Nội", "Hà Nội"), ("", ""), (None, ""), (True, "True"),
+])
+def test_a_workbook_cell_is_written_as_the_sheet_shows_it(value, text):
+    assert files._cell(value) == text
+
+
+def test_workbook_numbers_dates_and_times_keep_the_text_they_had_before_the_faster_reader():
+    from datetime import date, datetime, time
+
+    header, rows = files.workbook_rows(workbook([
+        ["n", "x", "d", "at", "t"],
+        [7, 2.25, date(2025, 1, 2), datetime(2025, 1, 2, 3, 4, 5), time(6, 7)],
+        [8, None, datetime(2025, 1, 3), datetime(2025, 1, 2, 3, 4, 5, 250000), None],
+    ]))
+
+    assert header == ["n", "x", "d", "at", "t"]
+    assert list(rows) == [["7", "2.25", "2025-01-02", "2025-01-02 03:04:05", "06:07:00"],
+                          ["8", "", "2025-01-03", "2025-01-02 03:04:05.250000", ""]]

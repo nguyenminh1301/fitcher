@@ -250,3 +250,17 @@ def test_the_raw_database_rejects_a_second_running_sync_even_when_written_direct
         with store._db.write() as conn:
             conn.execute("INSERT INTO source_syncs (source_id, started_by, status, started_at, heartbeat_at) "
                          "VALUES ('shop', 'manual', 'running', 'x', 'x')")
+
+
+def test_the_list_reads_every_source_s_table_counts_and_latest_sync_at_once(store):
+    store.create(new())
+    store.create(new("crm"))
+    store.save_catalog("shop", catalog())
+    store.set_tables("shop", [TableChange("orders", selected=True)])
+    first = store.start_sync("shop", "manual", NOW)
+    store.finish_sync(first.id, "failed", results=[], error="refused", finished_at=NOW)
+    second = store.start_sync("shop", "manual", NOW + timedelta(minutes=1))
+
+    assert store.table_counts() == {"shop": (2, 1)}
+    latest = store.latest_syncs()
+    assert set(latest) == {"shop"} and (latest["shop"].id, latest["shop"].status) == (second.id, "running")
