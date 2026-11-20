@@ -32,6 +32,7 @@
 
 ### Fixed
 
+- A source sync reads each selected table on its own: a table that ClickHouse cannot read (a PostgreSQL table name with a quote, a value too large for its column type, an empty table) no longer stops the other tables, the sync ends as partly synced with each failed table and its reason, and these ClickHouse refusals get reasons of their own instead of "unknown". A PostgreSQL table whose name has a quote or a backslash is proposed as a copy and cannot be chosen live.
 - Signing in with the owner password after opening the chat no longer sends the browser back and forth between the chat and the sign-in page: the page kept its earlier signed-out answer and asked the browser to sign in again.
 - A browser the api refuses outright, such as one behind a reverse proxy that sends a loopback host or a name missing from `FITCHER_ALLOWED_HOSTS`, sees the api's reason and what to change in a banner on the chat and setup pages, instead of a page that never finishes loading.
 - An XLSX or DOCX file whose ZIP directory declares more than 1 GiB of unpacked data, or a member compressed more than 100 times, is refused with 413 before it is parsed, so a few-megabyte decompression bomb no longer keeps the api busy for minutes; the column types of an uploaded workbook are inferred from at most its first 20 000 rows.

@@ -19,7 +19,8 @@ import re
 
 from app.sources.attach import SourceLike, literal, scope_arguments
 
-REASONS = ("unreachable", "refused", "authentication", "tls", "database_not_found", "permission", "unknown")
+REASONS = ("unreachable", "refused", "authentication", "tls", "database_not_found", "permission", "unsupported_name",
+           "value_out_of_range", "empty_or_unreadable", "unknown")
 PAGE_BYTES = 8192
 # Source column types ClickHouse cannot map one to one; it reads them as strings (or arrays) and the table list marks them.
 POSTGRES_UNUSUAL = frozenset({"ARRAY", "USER-DEFINED", "json", "jsonb", "xml", "point", "line", "lseg", "box", "path",
@@ -40,6 +41,13 @@ _PATTERNS = (
     ("unreachable", re.compile(
         r"could not translate host name|Name or service not known|Unknown server host|ERROR 2005|timeout expired|"
         r"Timeout exceeded|No route to host|Network is unreachable|ERROR 2013|ERROR 2006|timed out", re.IGNORECASE)),
+    # ClickHouse's own refusals while it reads a table (code 36 BAD_ARGUMENTS carries both of the first two).
+    ("unsupported_name", re.compile(r"table name cannot contain", re.IGNORECASE)),
+    ("value_out_of_range", re.compile(
+        r"Decimal value is too big|Cannot parse \w+ value|ARGUMENT_OUT_OF_BOUND|DECIMAL_OVERFLOW|value is out of range",
+        re.IGNORECASE)),
+    ("empty_or_unreadable", re.compile(
+        r"CANNOT_EXTRACT_TABLE_STRUCTURE|EMPTY_DATA_PASSED|Code: 636\b|Code: 92\b", re.IGNORECASE)),
 )
 
 

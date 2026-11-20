@@ -114,8 +114,8 @@ def _table_view(table: StoredTable, slow: set[str]) -> TableView:
     )
 
 
-def _probe_view(table: TableInfo, copy_only: bool = False) -> TableView:
-    proposal = propose(table, copy_only)
+def _probe_view(table: TableInfo, copy_only: bool = False, kind: str | None = None) -> TableView:
+    proposal = propose(table, copy_only, kind)
     return TableView(
         name=table.name, kind=table.kind, rows=table.rows, size_bytes=table.size_bytes,
         columns=_column_views(table.columns), primary_key=list(table.primary_key),
@@ -228,7 +228,8 @@ def list_sources(_: Admin, store: Store, status_of: Annotated[Callable, Depends(
 def test_connection(body: SourceConnection, _: Admin, service: Service) -> ProbeResult:
     try:
         copy_only = body.kind in COPY_ONLY_KINDS
-        return ProbeResult(tables=[_probe_view(table, copy_only) for table in service.probe(_connection(body))])
+        return ProbeResult(tables=[_probe_view(table, copy_only, body.kind)
+                                    for table in service.probe(_connection(body))])
     except Exception as error:  # noqa: BLE001 - each failure maps to its status in _refusal
         raise _refusal(error) from None
 

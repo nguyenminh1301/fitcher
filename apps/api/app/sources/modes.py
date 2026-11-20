@@ -18,14 +18,24 @@ GIB = 1024**3
 @dataclass(frozen=True)
 class Proposal:
     mode: str
-    # small, unknown_size, rows, size, view or copy_only: the interface words the reason from this code.
+    # small, unknown_size, rows, size, view, copy_only or unsupported_name: the interface words the reason from this code.
     reason: str
 
 
-def propose(table: TableInfo, copy_only: bool = False) -> Proposal:
+def live_name_refused(kind: str, name: str) -> bool:
+    """ClickHouse's PostgreSQL database engine cannot read a table whose name holds a quote or a backslash.
+
+    The ``postgresql`` table function that a copy uses reads it, so such a table can still be copied.
+    """
+    return kind == "postgres" and ("'" in name or "\\" in name)
+
+
+def propose(table: TableInfo, copy_only: bool = False, kind: str | None = None) -> Proposal:
     """The mode of a table; a source that cannot be read live (SQL Server) always gets a copy."""
     if copy_only:
         return Proposal("copy", "copy_only")
+    if kind is not None and live_name_refused(kind, table.name):
+        return Proposal("copy", "unsupported_name")
     if table.kind == "view":
         return Proposal("copy", "view")
     if table.rows is not None and table.rows >= LIVE_ROW_LIMIT:

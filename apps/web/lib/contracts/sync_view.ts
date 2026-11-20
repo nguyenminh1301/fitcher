@@ -1,7 +1,7 @@
 // Generated from the backend Pydantic contract by npm run contracts:generate; do not edit.
 
 export type Id = number;
-export type Status = "running" | "succeeded" | "failed" | "cancelled";
+export type Status = "running" | "succeeded" | "partial" | "failed" | "cancelled";
 export type StartedBy = "manual" | "schedule" | "setup";
 export type StartedAt = string;
 export type FinishedAt = string | null;
@@ -16,6 +16,9 @@ export type Error =
       | "tls"
       | "database_not_found"
       | "permission"
+      | "unsupported_name"
+      | "value_out_of_range"
+      | "empty_or_unreadable"
       | "unknown"
       | "interrupted"
     )

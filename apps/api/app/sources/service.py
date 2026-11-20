@@ -16,7 +16,9 @@ import secrets
 import threading
 
 from app.api.limits import one_job
-from app.sources.attach import RAW_DATABASE, Source, Table, attach_live, copy_table, drop_source, valid_name
+from app.sources.attach import (
+    RAW_DATABASE, Source, Table, copy_table, count_live, define_live, drop_source, valid_name,
+)
 from app.sources.collections import CollectionAdmin, CollectionError, ca_key
 from app.sources.connection import COPY_ONLY_KINDS, Connection, validate
 from app.sources.inspect import InspectError, Inspector, TableInfo, classify_error
@@ -305,25 +307,34 @@ class SourceService:
             if live:
                 source = Source(stored.id, stored.kind, tuple(Table(t.name) for t in live),
                                 database=stored.database, schema=stored.schema)
-                counts = attach_live(client, source)
-                results += [{"table": t.name, "mode": "live", "rows": counts[t.name], "full": None} for t in live]
+                define_live(client, source)
+                for table in live:
+                    results.append(self._table_result(record.id, table, "live", lambda table=table, source=source: {
+                        "table": table.name, "mode": "live", "rows": count_live(client, source, Table(table.name)),
+                        "full": None}))
             for table in (t for t in selected if t.mode == "copy"):
-                results.append(self._copy(client, stored, table, record.id))
+                results.append(self._table_result(
+                    record.id, table, "copy", lambda table=table: self._copy(client, stored, table, record.id)))
         except Exception as failure:  # noqa: BLE001 - only the reason is kept: the text can name hosts and users
-            error = failure.reason if isinstance(failure, InspectError) else classify_error(failure)
+            error = self._reason(failure)
             status = "failed"
-            if record.id in self._cancelled or "QUERY_WAS_CANCELLED" in str(failure):
+            if self._was_cancelled(record.id, failure):
                 status, error = "cancelled", None
-            # The tables that did not finish keep their copy and are tried again after their interval.
-            finished = {result["table"] for result in results}
-            for table in (t for t in selected if t.mode == "copy" and t.name not in finished):
-                self._store.defer_table(stored.id, table.name, self._clock() + timedelta(seconds=table.interval_seconds))
+        else:
+            failed = [result for result in results if result.get("error")]
+            if failed:
+                # One table that cannot be read does not stop the others; the sync names it and its reason.
+                status, error = ("failed" if len(failed) == len(results) else "partial"), failed[0]["error"]
         finally:
             done.set()
             self._cancelled.discard(record.id)
             self._store.set_query_id(record.id, None)
+        # The copies that did not finish keep their copy and are tried again after their interval.
+        finished = {result["table"] for result in results if not result.get("error")}
+        for table in (t for t in selected if t.mode == "copy" and t.name not in finished):
+            self._store.defer_table(stored.id, table.name, self._clock() + timedelta(seconds=table.interval_seconds))
         self._store.finish_sync(record.id, status, results=results, error=error, finished_at=self._clock())
-        if status == "succeeded" and stored.kind != "file":
+        if status in ("succeeded", "partial") and stored.kind != "file":
             # The catalog is read again after each sync, so the Sources page shows the columns an instant pack's
             # tables gained, lost or retyped since it was built (app/onboarding/drift.py).
             try:
@@ -331,6 +342,24 @@ class SourceService:
             except Exception:  # noqa: BLE001 - the sync itself succeeded; the next one reads the catalog again
                 pass
         return self._store.sync(record.id)
+
+    @staticmethod
+    def _reason(failure: BaseException) -> str:
+        return failure.reason if isinstance(failure, InspectError) else classify_error(failure)
+
+    def _was_cancelled(self, record_id: int, failure: BaseException) -> bool:
+        return record_id in self._cancelled or "QUERY_WAS_CANCELLED" in str(failure)
+
+    def _table_result(self, record_id: int, table: StoredTable, mode: str, sync: Callable[[], dict]) -> dict:
+        """Sync one table; its failure becomes its own result unless the whole sync was cancelled."""
+        if record_id in self._cancelled:
+            raise RuntimeError("the sync was cancelled")
+        try:
+            return sync()
+        except Exception as failure:  # noqa: BLE001 - only the reason is kept: the text can quote data
+            if self._was_cancelled(record_id, failure):
+                raise
+            return {"table": table.name, "mode": mode, "rows": None, "full": None, "error": self._reason(failure)}
 
     def _copy(self, client, stored: StoredSource, table: StoredTable, record_id: int) -> dict:
         source = Source(stored.id, stored.kind, (Table(table.name),), database=stored.database, schema=stored.schema)

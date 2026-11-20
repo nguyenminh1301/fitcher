@@ -3,7 +3,7 @@
 import pytest
 
 from app.sources.inspect import ForeignKey, TableInfo
-from app.sources.modes import GIB, LIVE_ROW_LIMIT, joined_live_tables, propose
+from app.sources.modes import GIB, LIVE_ROW_LIMIT, Proposal, joined_live_tables, propose
 
 
 def table(name="orders", rows=1000, size=10_000, kind="table", **fields):
@@ -62,3 +62,9 @@ def test_a_table_that_is_not_selected_is_not_flagged():
     orders = table("orders", foreign_keys=(ForeignKey(("buyer_ref",), "customers", ("id",)),))
 
     assert joined_live_tables([orders, table("customers")], {"orders": "live"}) == set()
+
+
+def test_a_postgres_table_named_with_a_quote_or_a_backslash_is_proposed_as_a_copy():
+    for name in ("it's", "back\\slash"):
+        assert propose(TableInfo(name, "table", 10, 8192), kind="postgres") == Proposal("copy", "unsupported_name")
+    assert propose(TableInfo("it's", "table", 10, 8192), kind="mysql") == Proposal("live", "small")

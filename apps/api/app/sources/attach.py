@@ -257,14 +257,21 @@ def copy_table(client, source: SourceLike, table: TableLike, *, cursor_column: s
     return CopyOutcome(total - before, _cursor(client, target, cursor_column) or after, False)
 
 
-def attach_live(client, source: SourceLike) -> dict[str, int]:
-    """Define ``src_<source>`` and count each table through it, which proves the source answers."""
+def define_live(client, source: SourceLike) -> None:
+    """Define ``src_<source>``; a failure here means the source itself cannot be reached."""
     for statement in live_statements(source):
         client.command(statement)
-    return {
-        table.name: int(client.command(f"SELECT count() FROM {relation}"))
-        for table, relation in zip(source.tables, relations(_as_live(source)).values(), strict=True)
-    }
+
+
+def count_live(client, source: SourceLike, table: TableLike) -> int:
+    """Count one table through ``src_<source>``, which proves ClickHouse can read it."""
+    return int(client.command(f"SELECT count() FROM {relations(_as_live(source))[table.name]}"))
+
+
+def attach_live(client, source: SourceLike) -> dict[str, int]:
+    """Define ``src_<source>`` and count each table through it, which proves the source answers."""
+    define_live(client, source)
+    return {table.name: count_live(client, source, table) for table in source.tables}
 
 
 def _as_live(source: SourceLike) -> Source:

@@ -15,8 +15,8 @@ from app.contracts.query_spec import ContractModel
 SourceKind = Literal["postgres", "mysql", "sqlserver", "file"]
 Mode = Literal["live", "copy"]
 TlsMode = Literal["prefer", "require", "verify"]
-FailureReason = Literal["unreachable", "refused", "authentication", "tls", "database_not_found", "permission", "unknown",
-                        "interrupted"]
+FailureReason = Literal["unreachable", "refused", "authentication", "tls", "database_not_found", "permission",
+                        "unsupported_name", "value_out_of_range", "empty_or_unreadable", "unknown", "interrupted"]
 
 
 class SourceConnection(ContractModel):
@@ -98,11 +98,11 @@ class ProbeResult(ContractModel):
 
 class SyncView(ContractModel):
     id: int
-    status: Literal["running", "succeeded", "failed", "cancelled"]
+    status: Literal["running", "succeeded", "partial", "failed", "cancelled"]
     started_by: Literal["manual", "schedule", "setup"]
     started_at: datetime
     finished_at: datetime | None
-    # One entry per table: {"table", "mode", "rows", "full"}.
+    # One entry per table: {"table", "mode", "rows", "full"} and, for a table that failed, its "error" reason.
     results: list[dict]
     error: FailureReason | None
 
