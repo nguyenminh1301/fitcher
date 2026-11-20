@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 // ECharts needs a real browser; these tests check which chart is chosen, not how it is drawn.
 vi.mock("@/components/chat/ChartView", () => ({ ChartView: ({ spec }: { spec: { type: string } }) => <div data-testid="chart">{spec.type}</div> }));
 
+import { Summary } from "@/components/chat/answer-parts";
 import { AssistantTurn } from "@/components/chat/AssistantTurn";
 import type { AskEvent } from "@/lib/api/events";
 import type { Turn } from "@/lib/api/conversations";
@@ -229,5 +230,15 @@ describe("answer", () => {
     fireEvent.click(screen.getByRole("button", { name: /Retry/ }));
 
     expect(onRetry).toHaveBeenCalled();
+  });
+
+  it("bolds the figures of a summary the model did not mark, but not a year or a small count", () => {
+    const { container } = render(<Summary lang="vi" text="Năm 2026 có 3 vùng, tổng 1.234.567 ₫, tăng 12,5% so với 98.000." />);
+    expect([...container.querySelectorAll("b")].map((item) => item.textContent)).toEqual(["1.234.567", "12,5%", "98.000"]);
+  });
+
+  it("keeps the figures the model marked and bolds nothing else", () => {
+    const { container } = render(<Summary lang="en" text="Revenue was **$1,200** in 2026, up 5% from 1,000." />);
+    expect([...container.querySelectorAll("b")].map((item) => item.textContent)).toEqual(["$1,200"]);
   });
 });

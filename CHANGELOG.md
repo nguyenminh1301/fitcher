@@ -32,6 +32,7 @@
 
 ### Fixed
 
+- Answers head a metric column, a KPI and a chart series with the metric's display name instead of its internal id (the id stays in the tooltip), bold the figures of a summary the model did not mark, and cut a long category label with an ellipsis inside the chart instead of clipping it at the edge.
 - An answer's warnings (a period outside or partly outside the data, a table without dates, a single period for a comparison, a cut result) are written in the language of the question, and each metric column of a result carries the metric's display name from the pack as its `label`, with the period of a compared column.
 - The standing "This address is open to other machines" banner no longer says fitcher has no owner password once a password is set: `/me` reports `exposed` only while names other than loopback are listed in `FITCHER_ALLOWED_HOSTS` and no owner password is set.
 - The Sources page shows a sync started from it as syncing until the list has the sync's own outcome, so a retry that succeeded no longer leaves "Failed" on screen; a partly synced source, the Overview and the setup's build step name each table that could not be read with its reason instead of "The connection failed for another reason", and the setup builds the pack from the tables that were read.

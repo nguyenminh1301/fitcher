@@ -19,7 +19,7 @@ export function DataTable({ result, title, fileName = "fitcher-result" }: { resu
   const { t, locale, formatNumber } = useI18n();
   const [sorting, setSorting] = useState<SortingState>([]);
   const columns = useMemo<ColumnDef<Cell[]>[]>(
-    () => result.columns.map((column, index) => ({ id: column.name, accessorFn: (row) => row[index], header: column.name, cell: (info) => formatCell(info.getValue(), column, locale) })),
+    () => result.columns.map((column, index) => ({ id: column.name, accessorFn: (row) => row[index], header: column.label ?? column.name, cell: (info) => formatCell(info.getValue(), column, locale) })),
     [result.columns, locale],
   );
   const table = useReactTable({
@@ -33,6 +33,9 @@ export function DataTable({ result, title, fileName = "fitcher-result" }: { resu
     initialState: { pagination: { pageSize: PAGE_SIZE } },
   });
   const numeric = (name: string) => result.columns.find((column) => column.name === name)?.type === "number";
+  // A display name is read as text; a bare column name keeps the monospace of an identifier.
+  const labelOf = (name: string) => result.columns.find((column) => column.name === name)?.label;
+  const labelled = (name: string) => Boolean(labelOf(name));
   const pages = table.getPageCount();
   const page = table.getState().pagination.pageIndex;
 
@@ -54,7 +57,7 @@ export function DataTable({ result, title, fileName = "fitcher-result" }: { resu
                     const sorted = header.column.getIsSorted();
                     return (
                       <th key={header.id} scope="col" className={numeric(header.id) ? "fc-r" : undefined} aria-sort={sorted ? (sorted === "asc" ? "ascending" : "descending") : "none"}>
-                        <button type="button" className="fc-th-btn fc-mono" title={t("ui.sortBy", { col: header.id })} onClick={header.column.getToggleSortingHandler()}>
+                        <button type="button" className={labelled(header.id) ? "fc-th-btn" : "fc-th-btn fc-mono"} title={t("ui.sortBy", { col: header.id })} onClick={header.column.getToggleSortingHandler()}>
                           {flexRender(header.column.columnDef.header, header.getContext())}
                           <Icon name={sorted === "asc" ? "chevronUp" : sorted === "desc" ? "chevronDown" : "arrowUpDown"} />
                         </button>
@@ -68,7 +71,7 @@ export function DataTable({ result, title, fileName = "fitcher-result" }: { resu
               {table.getRowModel().rows.map((row) => (
                 <tr key={row.id}>
                   {row.getVisibleCells().map((cell) => (
-                    <td key={cell.id} data-label={cell.column.id} className={cx(numeric(cell.column.id) && "fc-r fc-num")}>
+                    <td key={cell.id} data-label={labelOf(cell.column.id) ?? cell.column.id} className={cx(numeric(cell.column.id) && "fc-r fc-num")}>
                       {flexRender(cell.column.columnDef.cell, cell.getContext())}
                     </td>
                   ))}

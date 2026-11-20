@@ -47,9 +47,9 @@ export function ChartView({ spec, result, onReady }: { spec: ChartSpec; result: 
     const column = result.columns.find((item) => item.name === spec.y[0]) ?? result.columns[0];
     const value = result.rows[0]?.[result.columns.indexOf(column)];
     return (
-      <div className="fc-kpi" role="img" aria-label={`${column.name}: ${formatCell(value, column, locale)}`}>
+      <div className="fc-kpi" role="img" aria-label={`${column.label ?? column.name}: ${formatCell(value, column, locale)}`}>
         <div className="fc-kpi-value fc-num">{formatCell(value, column, locale)}</div>
-        <div className="fc-kpi-label fc-mono">{column.name}</div>
+        <div className={column.label ? "fc-kpi-label" : "fc-kpi-label fc-mono"} title={column.name}>{column.label ?? column.name}</div>
       </div>
     );
   }
