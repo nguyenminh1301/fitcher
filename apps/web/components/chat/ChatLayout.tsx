@@ -28,7 +28,7 @@ type DialogState = { kind: "rename-conv" | "rename-group" | "delete-conv" | "del
 
 export function ChatLayout({ children, onConsole }: { children: ReactNode; onConsole?: () => void }) {
   const { t } = useI18n();
-  const { api, conversations, groups, activeId, navigate, refresh, now, identity } = useChat();
+  const { api, conversations, groups, activeId, navigate, refresh, now, identity, refused } = useChat();
   const [drawer, setDrawer] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
   const [width, setWidth] = useState(SIDE_DEFAULT);
@@ -315,7 +315,7 @@ export function ChatLayout({ children, onConsole }: { children: ReactNode; onCon
           <SampleDataBadge feature="chat" />
           <Button variant="ghost" iconOnly icon="squarePen" label={t("ui.newChat")} className="fc-drawer-only" onClick={() => open(null)} />
         </header>
-        <ExposureBanner identity={identity} />
+        <ExposureBanner identity={identity} refused={refused} />
         {children}
       </div>
       {drawer ? <div className="fc-drawer-scrim" onClick={() => setDrawer(false)} /> : null}

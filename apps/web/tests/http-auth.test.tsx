@@ -2,7 +2,7 @@ import { cleanup, render, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { createMockApi } from "@/lib/api/mock";
-import { createHttpAuth } from "@/lib/api/http/auth";
+import { AccessRefused, createHttpAuth } from "@/lib/api/http/auth";
 import { ChatProvider } from "@/lib/chat/ChatContext";
 
 const IDENTITY = { user_id: "dev.viewer", display_name: "Lab Viewer", roles: ["viewer", "admin"], mode: "team" as const, exposed: false };
@@ -49,5 +49,14 @@ describe("http auth", () => {
     const mock = createMockApi({ identity: async () => IDENTITY });
 
     expect(await mock.auth.current()).toEqual(IDENTITY);
+  });
+
+  it("passes the api's reason on when the api refuses this browser outright", async () => {
+    const reason = "the request names '127.0.0.1:3000' but came through a reverse proxy (connection: close)";
+    const auth = createHttpAuth(fetcher({ "/api/session": () => Response.json({ detail: reason }, { status: 403 }) }));
+
+    const refused = await auth.current().catch((error: unknown) => error);
+    expect(refused).toBeInstanceOf(AccessRefused);
+    expect((refused as AccessRefused).reason).toBe(reason);
   });
 });

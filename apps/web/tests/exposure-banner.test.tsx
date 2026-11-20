@@ -22,4 +22,12 @@ describe("exposure banner", () => {
 
     expect(container.textContent).toBe("");
   });
+
+  it("gives the api's reason when the api refused this browser, such as through a misconfigured reverse proxy", () => {
+    const reason = "the request names '127.0.0.1:3000' but came through a reverse proxy (connection: close)";
+    render(<I18nProvider initial="en"><ExposureBanner identity={null} refused={reason} /></I18nProvider>);
+
+    expect(screen.getByText("fitcher refused this browser")).toBeTruthy();
+    expect(screen.getByText(reason)).toBeTruthy();
+  });
 });

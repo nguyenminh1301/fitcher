@@ -31,6 +31,7 @@
 
 ### Fixed
 
+- A browser the api refuses outright, such as one behind a reverse proxy that sends a loopback host or a name missing from `FITCHER_ALLOWED_HOSTS`, sees the api's reason and what to change in a banner on the chat and setup pages, instead of a page that never finishes loading.
 - An XLSX or DOCX file whose ZIP directory declares more than 1 GiB of unpacked data, or a member compressed more than 100 times, is refused with 413 before it is parsed, so a few-megabyte decompression bomb no longer keeps the api busy for minutes; the column types of an uploaded workbook are inferred from at most its first 20 000 rows.
 - The web server no longer reads an unbounded request body into memory before the api checks the request: JSON routes refuse bodies over 1 MiB, and uploads are streamed to the api and refused with 413 once they pass the api's own file limit (`SOURCE_FILE_MAX_BYTES` or `DOCUMENT_MAX_BYTES`) plus 1 MiB of multipart framing, so a 1.5 GB body can no longer exhaust the container's memory.
 - Wrong owner passwords sent through the published port or a reverse proxy no longer lock out the owner at this computer, whose sign-in attempts are counted apart; other clients are counted by their own address (from `X-Forwarded-For` when the proxy is listed in the new `FITCHER_TRUSTED_PROXIES`) and together share a limit of 100 failures in 15 minutes.

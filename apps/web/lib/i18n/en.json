@@ -255,6 +255,8 @@
     "password": "Password",
     "exposedTitle": "This address is open to other machines",
     "exposedText": "fitcher has no owner password, so anyone who can reach this address controls fitcher and its data. Set a password in the console under Security, or remove the name from FITCHER_ALLOWED_HOSTS.",
+    "accessRefusedTitle": "fitcher refused this browser",
+    "accessRefusedText": "The api did not accept this address.",
     "newAccount": "New account",
     "create": "Create",
     "resetPassword": "Reset password",

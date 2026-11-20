@@ -255,6 +255,8 @@
     "password": "Mật khẩu",
     "exposedTitle": "Địa chỉ này mở cho máy khác",
     "exposedText": "fitcher chưa có mật khẩu chủ, nên ai vào được địa chỉ này cũng điều khiển được fitcher và dữ liệu. Đặt mật khẩu ở Bảng điều khiển › Bảo mật, hoặc bỏ tên này khỏi FITCHER_ALLOWED_HOSTS.",
+    "accessRefusedTitle": "fitcher từ chối trình duyệt này",
+    "accessRefusedText": "Api không chấp nhận địa chỉ này.",
     "newAccount": "Tài khoản mới",
     "create": "Tạo",
     "resetPassword": "Đặt lại mật khẩu",
