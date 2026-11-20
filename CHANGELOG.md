@@ -32,6 +32,7 @@
 
 ### Fixed
 
+- A SQL Server table's row estimate equals its row count: it was multiplied by the number of allocation units (in-row, large object, row overflow) of each partition, so a table with text columns showed three times its rows.
 - Uploading a CSV that is not UTF-8 works: a UTF-16 file (Excel's Unicode Text) is recognised by its byte-order mark and a Windows-1258, Windows-1252 or Latin-1 file is read in that encoding, and both are stored as UTF-8 with the encoding reported in the upload. A CSV with a header but no rows, a JSON file, or a sample ClickHouse cannot read types from is refused with 422 or 415 and a reason instead of 503 "ClickHouse or the app state is unavailable".
 - A Parquet file with list, struct or map columns or a decimal wider than 38 digits loads: a list of scalars becomes an array, a nested column is loaded as JSON text and a wide decimal as `Decimal(76, s)`. A file that ClickHouse cannot load names the column and type it refused when its error says which.
 - A PostgreSQL `numeric` column declared without a precision is copied as `Decimal(76, 38)` instead of ClickHouse's `Decimal(38, 19)`, so a value with more than 19 digits before the point no longer fails the copy, and a pack build leaves out a column whose values ClickHouse cannot read and lists it in the build result instead of failing the build.
