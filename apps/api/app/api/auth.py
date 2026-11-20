@@ -16,6 +16,7 @@ from app.api.runtime import (
     pack_identity,
 )
 from app.auth import origin
+from app.auth import owner as owner_password
 from app.auth.principal import Principal, owner
 from app.auth.roles import RoleError, active_role, known_roles
 from app.packs.compiler import CompiledPack
@@ -55,7 +56,8 @@ class Me(BaseModel):
     display_name: str
     roles: list[str]
     active_role: str | None
-    # Reachable through a name other than loopback: the interface shows a standing warning.
+    # Reachable through a name other than loopback while no owner password is set: anyone who can reach the name
+    # controls the instance, so the interface shows a standing warning. A password set ends the warning.
     exposed: bool
 
 
@@ -82,8 +84,16 @@ def me(
         role = None
     return Me(
         user_id=principal.user_id, display_name=principal.display_name,
-        roles=known_roles(principal.roles, roles), active_role=role, exposed=origin.exposed(),
+        roles=known_roles(principal.roles, roles), active_role=role, exposed=origin.exposed() and not _password_set(),
     )
+
+
+def _password_set() -> bool:
+    """Whether the owner password is set; an unreadable app state keeps the warning, which is the safe side."""
+    try:
+        return owner_password.password_set(runtime.get_state_db())
+    except Exception:  # noqa: BLE001 - only the warning depends on it
+        return False
 
 
 @router.get("/pack")

@@ -53,15 +53,16 @@ def test_a_foreign_host_is_refused(client, host):
     assert "FITCHER_ALLOWED_HOSTS" in response.json()["detail"]
 
 
-def test_an_allowed_host_passes_the_address_check_and_is_reported_as_exposed(client, monkeypatch):
+def test_an_allowed_host_passes_the_address_check_and_is_no_longer_exposed_once_a_password_is_set(client, monkeypatch):
     monkeypatch.setenv("FITCHER_ALLOWED_HOSTS", "fitcher.lan, 192.168.1.20")
+    assert client.get("/me").json()["exposed"] is True, "listed names and no password: anyone there controls it"
     owner.set_password(shared_state(), PASSWORD)
     client.post("/owner/session", json={"password": PASSWORD}, headers={"Origin": "http://localhost:3000"})
 
     response = client.get("/me", headers={"Host": "fitcher.lan:3000"})
 
     assert response.status_code == 200
-    assert response.json()["exposed"] is True
+    assert response.json()["exposed"] is False
     assert client.get("/me", headers={"Host": "192.168.1.20"}).status_code == 200
 
 
