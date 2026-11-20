@@ -239,3 +239,19 @@ def test_role_without_the_table_is_rejected_by_the_guard():
 
 def test_unknown_role_reads_nothing():
     assert allowlist_for(_pack_with_refunds_clerk(), "nobody").tables == {}
+
+
+def test_an_alias_that_reuses_a_column_name_for_another_expression_is_sent_back_for_a_rewrite():
+    sql = ("SELECT toStartOfMonth(sold_on) AS sold_on, sum(sale_amount) AS total FROM marts.widget_sales "
+           "WHERE sold_on >= toDate('2026-01-01') AND sold_on < toDate('2027-01-01') GROUP BY sold_on")
+
+    result = guard_sql(sql, ALLOWLIST, MAX_ROWS)
+
+    assert result.sql is None
+    assert result.error.category == "sql"
+    assert "sold_on_period" in result.error.message
+
+
+def test_an_alias_that_names_its_own_column_or_a_new_name_is_accepted():
+    accepted("SELECT widget_name AS widget_name, sum(sale_amount) AS sale_total FROM marts.widget_sales GROUP BY widget_name")
+    accepted("SELECT toStartOfMonth(sold_on) AS month, sum(sale_amount) AS total FROM marts.widget_sales GROUP BY month")

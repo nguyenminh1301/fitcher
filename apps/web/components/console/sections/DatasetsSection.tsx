@@ -26,7 +26,7 @@ export function DatasetsSection() {
     <ListPage section="datasets" loading={!data} failed={failed}>
       <section className="box" aria-labelledby="datasets-title">
         <div className="box-head"><h2 id="datasets-title" className="box-title">{t("ui.nav_datasets")}</h2></div>
-        <div style={{ overflowX: "auto" }}>
+        <div className="card-table">
           <table className="tbl tbl-cards">
             <thead><tr><th>{t("ui.name")}</th><th>{t("ui.description")}</th><th>{t("ui.grain")}</th><th>{t("ui.timeColumn")}</th></tr></thead>
             <tbody>

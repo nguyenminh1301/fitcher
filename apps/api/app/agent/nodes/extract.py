@@ -14,7 +14,7 @@ import json
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.agent.nodes.load_context import spec_json, turn_lines
-from app.agent.nodes.resolve_time import PeriodDescriptor, PeriodShift
+from app.agent.nodes.resolve_time import PeriodDescriptor, PeriodShift, explicit_time_grain
 from app.agent.prompts import render
 from app.agent.state import AgentDeps, AgentState, TimeGrain
 from app.contracts.query_spec import FilterOp, Scalar
@@ -67,4 +67,5 @@ def extract(state: AgentState, deps: AgentDeps) -> dict:
     except LLMError as error:
         # The run ends here like a refusal, but the answer reports the model failure rather than asking back.
         return {"rejection": f"the question could not be read: {error}", "model_error": str(error)}
-    return {"extraction": extraction, "time_grain": extraction.time_grain}
+    # The model can miss a grain the question spells out ("theo tháng"); a total would then answer a trend question.
+    return {"extraction": extraction, "time_grain": extraction.time_grain or explicit_time_grain(state["question"])}

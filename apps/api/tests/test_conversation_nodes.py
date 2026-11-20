@@ -180,3 +180,17 @@ def test_what_about_last_year_reuses_the_previous_question():
     )
     assert spec_now.rank_period == "Q1 2024"
     assert state["result"] is not None
+
+
+def test_a_year_the_question_spells_out_is_used_when_the_extraction_misses_it():
+    extraction = extract({"question": "Số đơn hàng theo tháng năm 2026"}, deps([extraction_reply(periods=[])]))["extraction"]
+
+    update = resolve_time({"question": "Số đơn hàng theo tháng năm 2026", "extraction": extraction, "previous_spec": None}, deps([]))
+
+    assert [(p.start.isoformat(), p.end.isoformat()) for p in update["periods"]] == [("2026-01-01", "2027-01-01")]
+
+
+def test_a_grain_the_question_spells_out_is_kept_when_the_extraction_misses_it():
+    update = extract({"question": "Tổng số tiền theo tháng năm 2026"}, deps([extraction_reply(periods=[])]))
+
+    assert update["time_grain"] == "month"

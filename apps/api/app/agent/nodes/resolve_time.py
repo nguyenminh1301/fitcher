@@ -14,6 +14,7 @@ pass UTC (DECISIONS §6).
 
 from collections.abc import Sequence
 from datetime import UTC, date, datetime, timedelta
+import re
 from typing import TYPE_CHECKING, Literal, Self
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
@@ -204,6 +205,72 @@ def resolve_periods(
     return periods
 
 
+_YEAR = r"((?:19|20|21)\d{2})"
+_MONTH_NAMES = ("january", "february", "march", "april", "may", "june", "july", "august", "september", "october",
+                "november", "december")
+# Spelled-out periods in English and Vietnamese, most specific first: a quarter or month claims its year.
+_EXPLICIT = (
+    ("quarter", re.compile(rf"\b(?:q|quý|quy)\s*([1-4])\s*(?:/|-|,|năm|nam|of)?\s*{_YEAR}\b", re.IGNORECASE)),
+    ("month", re.compile(rf"\b(?:tháng|thang)\s*(1[0-2]|0?[1-9])\s*(?:/|-|,|năm|nam)?\s*{_YEAR}\b", re.IGNORECASE)),
+    ("month_name", re.compile(rf"\b({'|'.join(_MONTH_NAMES)})\s*,?\s*{_YEAR}\b", re.IGNORECASE)),
+    ("year", re.compile(rf"\b(?:năm|nam|year|fy|in)\s*{_YEAR}\b", re.IGNORECASE)),
+)
+
+
+def explicit_periods(question: str) -> list[PeriodDescriptor]:
+    """Years, quarters and months the question names outright ("năm 2026", "Q1 2025", "March 2024"), in order.
+
+    Only used when the extraction returned no period: relative phrases stay with the model, and a year that is
+    part of a quarter or month is not counted again. Duplicates are dropped.
+    """
+    found: list[tuple[int, PeriodDescriptor]] = []
+    claimed: list[range] = []
+    for kind, pattern in _EXPLICIT:
+        for match in pattern.finditer(question or ""):
+            if any(match.start() in span for span in claimed):
+                continue
+            claimed.append(range(match.start(), match.end()))
+            if kind == "quarter":
+                descriptor = PeriodDescriptor(kind="quarter", quarter=int(match[1]), year=int(match[2]))
+            elif kind == "month":
+                descriptor = PeriodDescriptor(kind="month", month=int(match[1]), year=int(match[2]))
+            elif kind == "month_name":
+                descriptor = PeriodDescriptor(kind="month", month=_MONTH_NAMES.index(match[1].lower()) + 1, year=int(match[2]))
+            else:
+                descriptor = PeriodDescriptor(kind="year", year=int(match[1]))
+            found.append((match.start(), descriptor))
+    unique: list[PeriodDescriptor] = []
+    for _, descriptor in sorted(found, key=lambda item: item[0]):
+        if descriptor not in unique:
+            unique.append(descriptor)
+    return unique
+
+
+_GRAIN_WORDS = {
+    "day": ("ngày", "ngay", "day", "daily"), "week": ("tuần", "tuan", "week", "weekly"),
+    "month": ("tháng", "thang", "month", "monthly"), "quarter": ("quý", "quy", "quarter", "quarterly"),
+    "year": ("năm", "nam", "year", "yearly", "annually"),
+}
+_GRAIN = re.compile(
+    r"\b(?:(?:theo|từng|tung|mỗi|moi|hàng|hang|by|per|each)\s+(\w+)|(daily|weekly|monthly|quarterly|yearly|annually))\b",
+    re.IGNORECASE,
+)
+
+
+def explicit_time_grain(question: str) -> Unit | None:
+    """The time grain a question asks for outright ("theo tháng", "by quarter", "monthly"), or None.
+
+    Used only when the extraction returned no grain. A word right after "theo"/"by" that is not a time unit
+    ("theo khu vực", "by region") is ignored.
+    """
+    for match in _GRAIN.finditer(question or ""):
+        word = (match[1] or match[2]).lower()
+        for grain, words in _GRAIN_WORDS.items():
+            if word in words:
+                return grain  # type: ignore[return-value]
+    return None
+
+
 class PeriodShift(BaseModel):
     """A follow-up's periods as the previous query's periods moved by ``offset`` ``unit``s (0 keeps them)."""
 
@@ -239,12 +306,16 @@ def resolve_time(state: "AgentState", deps: "AgentDeps") -> dict:
     extraction = state["extraction"]
     fiscal_start_month = deps.compiled.pack.business_profile.fiscal_year_start_month
     previous = state.get("previous_spec")
-    if not extraction.periods:
+    descriptors = list(extraction.periods)
+    if not descriptors:
         if extraction.previous_periods is not None and previous is not None:
             return {"periods": shift_periods(previous.periods, extraction.previous_periods, fiscal_start_month)}
-        return {"periods": []}
+        # The extraction model can miss a period the question spells out; asking back for it would be wrong.
+        descriptors = explicit_periods(state.get("question", ""))
+        if not descriptors:
+            return {"periods": []}
     try:
-        periods = resolve_periods(extraction.periods, deps.today, fiscal_start_month)
+        periods = resolve_periods(descriptors, deps.today, fiscal_start_month)
     except TimeResolutionError as error:
         return {"rejection": f"the period cannot be resolved: {error}"}
     return {"periods": periods}

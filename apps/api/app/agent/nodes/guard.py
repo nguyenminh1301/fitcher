@@ -174,6 +174,33 @@ def _check_stars(tree: exp.Expression, scopes: list[Scope]) -> None:
                 raise _Rejected("SELECT * is not allowed on a dataset; name the columns")
 
 
+class _Unrunnable(Exception):
+    """SQL that passes the policy but that ClickHouse would refuse; the generator is asked to rewrite it."""
+
+
+def _check_shadowing_aliases(scopes: list[Scope], allowlist: Allowlist) -> None:
+    """An alias that reuses a column's name over another expression breaks the query in ClickHouse.
+
+    ClickHouse resolves an alias in WHERE and GROUP BY too, so ``toStartOfMonth(day) AS day`` turns
+    ``WHERE day >= …`` into a condition on the month and fails aggregation with code 215.
+    """
+    for scope in scopes:
+        select = scope.expression
+        if not isinstance(select, exp.Select):
+            continue
+        columns = set().union(*(allowlist.tables.get(source.name, frozenset())
+                                for source in scope.sources.values() if isinstance(source, exp.Table)))
+        for projection in select.expressions:
+            if not isinstance(projection, exp.Alias) or projection.alias not in columns:
+                continue
+            inner = projection.this
+            if isinstance(inner, exp.Column) and inner.name == projection.alias:
+                continue
+            raise _Unrunnable(f"the alias {projection.alias} reuses the name of a column of the table for another "
+                              f"expression, which ClickHouse also applies in WHERE and GROUP BY; give it a new name "
+                              f"such as {projection.alias}_{'period' if inner.find(exp.Func) else 'value'}")
+
+
 def _check_clauses(tree: exp.Expression) -> None:
     for node in tree.walk():
         if node.args.get("settings"):
@@ -215,8 +242,11 @@ def guard_sql(sql: str, allowlist: Allowlist, max_rows: int) -> GuardResult:
             raise _Rejected("the query reads no approved dataset")
         _check_stars(tree, scopes)
         _check_columns(scopes, allowlist)
+        _check_shadowing_aliases(scopes, allowlist)
     except _Rejected as rejection:
         return _policy(str(rejection))
+    except _Unrunnable as problem:
+        return GuardResult(error=AgentError("sql", NODE, str(problem)))
     except sqlglot.errors.OptimizeError as error:  # for example two sources with the same alias
         return GuardResult(error=AgentError("sql", NODE, f"SQL cannot be resolved: {' '.join(str(error).split())[:300]}"))
     return GuardResult(sql=_limited(sql, tree, max_rows))

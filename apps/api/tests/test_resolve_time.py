@@ -5,6 +5,8 @@ from datetime import UTC, date, datetime
 import pytest
 
 from app.agent.nodes.resolve_time import (
+    explicit_periods,
+    explicit_time_grain,
     PeriodDescriptor,
     PeriodShift,
     TimeResolutionError,
@@ -182,3 +184,31 @@ def test_shift_labels_a_plain_range_by_its_dates():
 
 def test_a_zero_shift_keeps_the_periods_and_relabels_them():
     assert shifted([("2024-01-01", "2024-04-01")], unit="year", offset=0) == [("Q1 2024", "2024-01-01", "2024-04-01")]
+
+
+@pytest.mark.parametrize(("question", "expected"), [
+    ("Số đơn hàng theo tháng năm 2026", [{"kind": "year", "year": 2026}]),
+    ("Doanh thu quý 1 năm 2025 so với quý 1 năm 2024", [{"kind": "quarter", "quarter": 1, "year": 2025},
+                                                        {"kind": "quarter", "quarter": 1, "year": 2024}]),
+    ("Top products in Q3 2024", [{"kind": "quarter", "quarter": 3, "year": 2024}]),
+    ("Revenue in March 2024", [{"kind": "month", "month": 3, "year": 2024}]),
+    ("Doanh thu tháng 3/2025", [{"kind": "month", "month": 3, "year": 2025}]),
+    ("Sales in 2025 and in 2025", [{"kind": "year", "year": 2025}]),
+    ("Sales last quarter", []),
+    ("Top 2026 products by amount", []),
+])
+def test_explicit_periods_are_read_from_the_question(question, expected):
+    assert [d.model_dump(exclude_defaults=True) for d in explicit_periods(question)] == expected
+
+
+@pytest.mark.parametrize(("question", "grain"), [
+    ("Tổng số tiền theo tháng năm 2026", "month"),
+    ("Doanh thu từng quý năm 2025", "quarter"),
+    ("Revenue by week in March 2024", "week"),
+    ("Monthly sales in 2025", "month"),
+    ("Doanh thu theo khu vực năm 2026", None),
+    ("Sales by region in 2025", None),
+    ("Tổng số tiền năm 2026", None),
+])
+def test_explicit_time_grain_is_read_from_the_question(question, grain):
+    assert explicit_time_grain(question) == grain

@@ -82,7 +82,7 @@ export function RecordTable<T>({ rows, columns, rowKey, title, label, empty }: {
     <section className="box" aria-label={label}>
       {title ? <div className="box-head"><h2 className="box-title">{title}</h2></div> : null}
       {rows.length ? (
-        <div style={{ overflowX: "auto" }}>
+        <div className="card-table">
           <table className="tbl tbl-cards">
             <thead>
               <tr>{columns.map((column) => <th key={column.key} scope="col" className={column.numeric ? "num" : undefined}>{column.label}</th>)}</tr>

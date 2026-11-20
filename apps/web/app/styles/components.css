@@ -102,13 +102,15 @@ textarea.fc-input { height: auto; min-height: 80px; padding: var(--base-size-8) 
 .fc-tab[aria-selected="true"]::after { content: ""; position: absolute; left: 0; right: 0; bottom: -9px; height: 2px; border-radius: var(--borderRadius-medium); background: var(--fgColor-default); }
 
 /* Segmented control (Primer SegmentedControl) */
-.fc-seg { display: inline-flex; padding: 0; border-radius: var(--borderRadius-medium); background: var(--bgColor-neutral-muted); height: var(--control-medium-size); }
-.fc-seg-btn { display: inline-flex; align-items: center; justify-content: center; gap: var(--base-size-4); min-width: 32px; height: 100%; padding: 0 var(--base-size-12); border: 1px solid transparent; border-radius: var(--borderRadius-medium); background: transparent; color: var(--fgColor-default); font-size: 14px; cursor: pointer; white-space: nowrap; }
+/* Wraps onto a second line when its options are wider than the space (long Vietnamese labels on a phone) instead of
+   running past the edge of its box. */
+.fc-seg { display: inline-flex; flex-wrap: wrap; max-width: 100%; padding: 0; border-radius: var(--borderRadius-medium); background: var(--bgColor-neutral-muted); min-height: var(--control-medium-size); }
+.fc-seg-btn { display: inline-flex; align-items: center; justify-content: center; gap: var(--base-size-4); min-width: 32px; height: var(--control-medium-size); padding: 0 var(--base-size-12); border: 1px solid transparent; border-radius: var(--borderRadius-medium); background: transparent; color: var(--fgColor-default); font-size: 14px; cursor: pointer; white-space: nowrap; }
 .fc-seg-btn:hover:not([aria-disabled="true"]):not([aria-checked="true"]) { background: var(--control-transparent-bgColor-hover); }
 .fc-seg-btn[aria-checked="true"] { background: var(--bgColor-default); border-color: var(--borderColor-emphasis); font-weight: 600; }
 .fc-seg-btn[aria-disabled="true"] { color: var(--fgColor-disabled); cursor: not-allowed; }
-.fc-seg-sm { height: var(--control-small-size); }
-.fc-seg-sm .fc-seg-btn { padding: 0 var(--base-size-8); font-size: 12px; }
+.fc-seg-sm { min-height: var(--control-small-size); }
+.fc-seg-sm .fc-seg-btn { height: var(--control-small-size); padding: 0 var(--base-size-8); font-size: 12px; }
 .fc-seg-icon .fc-seg-btn { padding: 0; width: 32px; }
 .fc-seg-sm.fc-seg-icon .fc-seg-btn { width: 28px; }
 
@@ -312,7 +314,7 @@ textarea.fc-input { height: auto; min-height: 80px; padding: var(--base-size-8) 
 .fc-menu-sep { height: 1px; background: var(--borderColor-muted); margin: var(--base-size-4) calc(var(--base-size-8) * -1); }
 
 /* Chat app shell */
-.fc-app { position: relative; display: flex; height: 100%; min-height: 600px; background: var(--bgColor-default); container-type: inline-size; container-name: app; overflow: hidden; }
+.fc-app { position: relative; display: flex; height: 100%; min-height: 0; background: var(--bgColor-default); container-type: inline-size; container-name: app; overflow: hidden; }
 /* A page in document flow (setup, sign-in): it grows with its content and the window scrolls it. */
 .fc-side { position: relative; width: var(--sidebar-width); flex: none; display: flex; flex-direction: column; background: var(--bgColor-muted); border-right: 1px solid var(--borderColor-muted); }
 .fc-side-resize { position: absolute; top: 0; right: -4px; bottom: 0; width: 8px; cursor: col-resize; z-index: 5; touch-action: none; }

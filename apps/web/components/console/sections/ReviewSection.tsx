@@ -71,8 +71,10 @@ export function ReviewSection() {
           {files.length ? files.map((file) => (
             <section key={file} className="box" aria-label={file}>
               <div className="box-head"><h2 className="box-title file-title"><Icon name="fileText" /><span className="fc-mono">{file}</span></h2></div>
-              <div style={{ overflowX: "auto" }}>
-                <table className="tbl tbl-cards">
+              <div className="card-table">
+                <table className="tbl tbl-cards tbl-review">
+                  {/* Fixed column widths, so the tables of the files stacked on this page line up. */}
+                  <colgroup><col /><col className="col-kind" /><col className="col-origin" /><col className="col-confidence" /><col className="col-status" /></colgroup>
                   <thead><tr><th>{t("ui.name")}</th><th>{t("reviewPage.kind")}</th><th>{t("ui.origin")}</th><th>{t("ui.confidence")}</th><th>{t("ui.status")}</th></tr></thead>
                   <tbody>
                     {shown.filter((item) => item.file === file).map((item) => (
@@ -97,7 +99,7 @@ export function ReviewSection() {
           <section className="box" aria-labelledby="proposals-title">
             <div className="box-head"><h2 id="proposals-title" className="box-title">{t("ui.proposals")}</h2></div>
             {proposals.length ? (
-              <div style={{ overflowX: "auto" }}>
+              <div className="card-table">
                 <table className="tbl tbl-cards">
                   <thead><tr><th>{t("ui.question")}</th><th>{t("ui.origin")}</th><th>{t("ui.status")}</th></tr></thead>
                   <tbody>
