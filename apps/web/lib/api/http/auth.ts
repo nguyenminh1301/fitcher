@@ -25,10 +25,15 @@ async function json<T>(response: Response): Promise<T> {
 }
 
 export function createHttpAuth(fetcher: typeof fetch = (...args) => fetch(...args)): FitcherApi["auth"] {
-  // The signed-in user is read once per page load and shared by every caller.
+  // The signed-in user is read once per page load and shared by every caller. A signed-out answer is not kept:
+  // after signing in, the app moves to the chat without loading the page again, and must see the new session.
   let current: Promise<Identity | null> | null = null;
   const load = () =>
-    (current ??= fetcher("/api/session", { cache: "no-store" }).then((response) => (response.status === 401 ? null : json<Identity>(response))).catch((error) => {
+    (current ??= fetcher("/api/session", { cache: "no-store" }).then((response) => {
+      if (response.status !== 401) return json<Identity>(response);
+      current = null;
+      return null;
+    }).catch((error) => {
       current = null;
       throw error;
     }));

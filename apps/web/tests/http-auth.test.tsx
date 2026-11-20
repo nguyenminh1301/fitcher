@@ -59,4 +59,16 @@ describe("http auth", () => {
     expect(refused).toBeInstanceOf(AccessRefused);
     expect((refused as AccessRefused).reason).toBe(reason);
   });
+
+  it("asks again after a signed-out answer, so signing in without a page load opens the app", async () => {
+    let signedIn = false;
+    const fetch = fetcher({ "/api/session": () => (signedIn ? Response.json(IDENTITY) : Response.json({ error: "signed_out" }, { status: 401 })) });
+    const auth = createHttpAuth(fetch);
+
+    expect(await auth.current()).toBeNull();
+    signedIn = true;
+    expect(await auth.current()).toEqual(IDENTITY);
+    expect(await auth.current()).toEqual(IDENTITY);
+    expect(fetch).toHaveBeenCalledTimes(2);
+  });
 });
