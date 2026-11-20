@@ -67,6 +67,16 @@
           },
           "title": "Models",
           "type": "array"
+        },
+        "cost_unknown": {
+          "default": false,
+          "title": "Cost Unknown",
+          "type": "boolean"
+        },
+        "answer_to": {
+          "default": "",
+          "title": "Answer To",
+          "type": "string"
         }
       },
       "required": [

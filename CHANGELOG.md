@@ -32,6 +32,7 @@
 
 ### Fixed
 
+- The Runs page filters stopped runs, shows a run that answered a question asked back with that question ("Answer to: …"), says a cost is unknown, or at least the priced part, when a model call had no price instead of $0.0000, and the trace names an OpenAI-compatible model once instead of with a doubled `openai/` prefix.
 - Answers head a metric column, a KPI and a chart series with the metric's display name instead of its internal id (the id stays in the tooltip), bold the figures of a summary the model did not mark, and cut a long category label with an ellipsis inside the chart instead of clipping it at the edge.
 - An answer's warnings (a period outside or partly outside the data, a table without dates, a single period for a comparison, a cut result) are written in the language of the question, and each metric column of a result carries the metric's display name from the pack as its `label`, with the period of a compared column.
 - The standing "This address is open to other machines" banner no longer says fitcher has no owner password once a password is set: `/me` reports `exposed` only while names other than loopback are listed in `FITCHER_ALLOWED_HOSTS` and no owner password is set.

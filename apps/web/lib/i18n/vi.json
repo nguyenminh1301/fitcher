@@ -1117,6 +1117,10 @@
     "kind_other": "Mục"
   },
   "runsPage": {
+    "costUnknown": "Không rõ",
+    "costAtLeast": "Ít nhất {cost}",
+    "answerTo": "Trả lời cho:",
+    "answerToLabel": "Trả lời cho",
     "filters": "Bộ lọc",
     "empty": "Chưa có lượt chạy.",
     "steps": "Các bước",

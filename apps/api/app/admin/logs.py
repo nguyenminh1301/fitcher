@@ -62,15 +62,30 @@ def _short(value: object) -> str:
 
 RUN_SELECT = """
 SELECT r.trace_id, r.ts, r.user_id, a.role, r.question, r.intent, r.status, r.latency_ms, c.cost, r.error,
-    c.input_tokens, c.output_tokens, c.models, r.pack
+    c.input_tokens, c.output_tokens, c.models, r.pack, c.unpriced > 0, if(p.status = 'clarified', p.question, '')
 FROM agent_logs.runs AS r FINAL
 LEFT JOIN (SELECT trace_id, any(role) AS role FROM agent_logs.audit GROUP BY trace_id) AS a ON a.trace_id = r.trace_id
 LEFT JOIN (
     SELECT trace_id, sum(cost_usd) AS cost, sum(prompt_tokens) AS input_tokens, sum(completion_tokens) AS output_tokens,
+        -- Calls the gateway had no price for: the run's cost is then unknown, not the sum of the priced ones.
+        countIf(cost_usd IS NULL AND status IN ('success', 'ok')) AS unpriced,
         -- The answering models in the order they first answered.
         arrayDistinct(arrayMap(call -> call.2, arraySort(groupArrayIf((ts, model), status IN ('success', 'ok'))))) AS models
     FROM agent_logs.llm_calls GROUP BY trace_id
 ) AS c ON c.trace_id = r.trace_id
+-- The run of the conversation's previous turn (its latest revision): a run that answers a question asked back names it.
+LEFT JOIN (
+    SELECT turns.trace_id AS trace_id, any(previous.latest_trace) AS asked_trace
+    FROM (SELECT DISTINCT trace_id, user_id, conversation_id, turn FROM agent_logs.chat_messages WHERE trace_id != '') AS turns
+    INNER JOIN (
+        SELECT user_id, conversation_id, turn + 1 AS next_turn, argMax(trace_id, (revision, ts)) AS latest_trace
+        FROM agent_logs.chat_messages WHERE trace_id != '' GROUP BY user_id, conversation_id, turn
+    ) AS previous
+        ON previous.user_id = turns.user_id AND previous.conversation_id = turns.conversation_id
+        AND previous.next_turn = turns.turn
+    GROUP BY turns.trace_id
+) AS q ON q.trace_id = r.trace_id
+LEFT JOIN (SELECT trace_id, question, status FROM agent_logs.runs FINAL) AS p ON p.trace_id = q.asked_trace
 WHERE (r.pack = {pack:String} OR {every_pack:Bool})"""
 
 
@@ -86,13 +101,14 @@ class AdminLogs:
     @staticmethod
     def _run(row: Sequence) -> RunRow:
         (trace_id, ts, user_id, role, question, intent, status, latency_ms, cost, error, input_tokens, output_tokens, models,
-         pack) = row
+         pack, unpriced, answer_to) = row
         return RunRow(
             pack=pack or "",
             trace_id=trace_id, ts=_aware(ts), user_id=user_id, role=role or "", question=question, intent=intent,
             status=status, latency_ms=int(latency_ms or 0), cost_usd=round(float(cost or 0.0), 6), error=error or "",
             input_tokens=int(input_tokens or 0), output_tokens=int(output_tokens or 0),
             models=list(dict.fromkeys(model_name(model) for model in (models or []) if model)),
+            cost_unknown=bool(unpriced), answer_to=answer_to or "",
         )
 
     def runs(
@@ -141,7 +157,8 @@ class AdminLogs:
             items.append((_aware(ts), TraceItem(
                 name=f"LLM {node}", kind="llm", status="ok" if status in ("ok", "success") else "err",
                 ms=int(latency_ms or 0),
-                meta=[alias or provider, model, f"{int(tokens or 0)} tokens", "no price" if cost is None else f"${float(cost):.6f}"],
+                meta=[alias or provider, model_name(model or ""), f"{int(tokens or 0)} tokens",
+                      "price unknown" if cost is None else f"${float(cost):.6f}"],
                 error=_short(error) or None,
             )))
         for ts, attempt, sql, rows_read, error in self.query(

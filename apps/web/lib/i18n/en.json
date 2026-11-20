@@ -1117,6 +1117,10 @@
     "kind_other": "Item"
   },
   "runsPage": {
+    "costUnknown": "Unknown",
+    "costAtLeast": "At least {cost}",
+    "answerTo": "Answer to:",
+    "answerToLabel": "Answer to",
     "filters": "Filters",
     "empty": "No runs yet.",
     "steps": "Steps",
