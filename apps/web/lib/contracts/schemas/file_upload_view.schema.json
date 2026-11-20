@@ -66,6 +66,18 @@
       },
       "title": "Sample",
       "type": "array"
+    },
+    "encoding": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Encoding"
     }
   },
   "required": [

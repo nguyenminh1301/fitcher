@@ -1,6 +1,9 @@
 """Uploaded CSV, XLSX and Parquet files become ``raw`` tables with column types the user confirmed (DECISIONS §4)."""
 
+from decimal import Decimal
 from io import BytesIO
+from pathlib import Path
+import unicodedata
 import zipfile
 
 from openpyxl import Workbook
@@ -64,13 +67,77 @@ def test_the_type_comes_from_the_content_not_the_name(data, name, kind):
 
 
 @pytest.mark.parametrize(("data", "status"), [
-    (b"", 422), (b"%PDF-1.7 x", 415), (b"\x00\x01\x02binary", 415), (b"\xff\xfe bad utf8 \xc3(", 422),
+    (b"", 422), (b"%PDF-1.7 x", 415), (b"\x00\x01\x02binary", 415), (b'[{"a": 1}]', 415),
+    (b'  {"rows": [1, 2', 415),
     (workbook([["a"]], macro=True), 415), (b"PK\x03\x04 not a zip", 415),
 ])
 def test_content_that_is_not_a_supported_table_is_rejected(data, status):
     with pytest.raises(DocumentRejected) as raised:
         files.detect_format(data, "x")
     assert raised.value.status == status
+
+
+_TONES = {"\u0300", "\u0301", "\u0303", "\u0309", "\u0323"}
+
+
+def cp1258(text: str) -> bytes:
+    """Encode Vietnamese text as Windows-1258 does: a precomposed vowel where the code page has one, plus a tone mark."""
+    out = []
+    for char in text:
+        try:
+            out.append(char.encode("cp1258"))
+        except UnicodeEncodeError:
+            parts = unicodedata.normalize("NFD", char)
+            base = unicodedata.normalize("NFC", parts[0] + "".join(m for m in parts[1:] if m not in _TONES))
+            out.append((base + "".join(m for m in parts[1:] if m in _TONES)).encode("cp1258"))
+    return b"".join(out)
+
+
+@pytest.mark.parametrize(("data", "encoding"), [
+    (CSV, "utf-8"), (b"\xef\xbb\xbf" + CSV, "utf-8"), ("a,b\n1,2\n".encode("utf-16"), "utf-16"),
+    (cp1258("Tên,Số\nHà Nội,1\n"), "cp1258"), (b"id,name\n1,caf\xe9\n", "cp1258"),
+])
+def test_a_csv_encoding_is_detected_from_its_first_bytes(data, encoding):
+    assert files.csv_encoding(data) == encoding
+
+
+@pytest.mark.parametrize(("encoded", "encoding"), [
+    ("Mã đơn,Số tiền,Ngày\nA1,10.5,2024-01-02\n".encode("utf-16"), "utf-16"),
+    ("Mã đơn,Số tiền,Ngày\nA1,10.5,2024-01-02\n".encode("utf-16-le").join([b"\xff\xfe", b""]), "utf-16"),
+    (cp1258("Mã đơn,Số tiền,Ngày\nA1,10.5,2024-01-02\n"), "cp1258"),
+])
+def test_a_utf16_or_windows_csv_is_stored_as_utf8_and_read_like_any_other(parts, encoded, encoding):
+    store, clickhouse, service = parts
+
+    upload = service.upload("export.csv", BytesIO(encoded), uploaded_by=None)
+
+    assert (upload.format, upload.encoding) == ("csv", encoding)
+    assert upload.sample[0] == ["A1", "10.5", "2024-01-02"]
+    assert clickhouse.parameters["sample"].startswith("Mã đơn,Số tiền,Ngày\n")
+    stored = Path(store.get_file(upload.id).stored_path).read_bytes()
+    assert stored.decode("utf-8") == "Mã đơn,Số tiền,Ngày\nA1,10.5,2024-01-02\n"
+
+
+def test_a_csv_with_a_header_only_is_refused_with_a_reason_and_nothing_is_kept(parts, tmp_path):
+    _, _, service = parts
+
+    with pytest.raises(DocumentRejected, match="no data rows") as raised:
+        service.upload("header_only.csv", BytesIO(b"a,b,c\n"), uploaded_by=None)
+
+    assert raised.value.status == 422
+    assert not any((tmp_path / "uploads").iterdir())
+
+
+def test_a_sample_clickhouse_cannot_infer_types_from_is_a_422_not_an_outage(parts):
+    _, clickhouse, service = parts
+
+    def refuse(sql, parameters=None, settings=None):
+        raise RuntimeError("Code: 636. DB::Exception: The table structure cannot be extracted. (CANNOT_EXTRACT_TABLE_STRUCTURE)")
+
+    clickhouse.query = refuse
+    with pytest.raises(DocumentRejected, match="column types") as raised:
+        service.upload("odd.csv", BytesIO(CSV), uploaded_by=None)
+    assert raised.value.status == 422
 
 
 def test_a_macro_enabled_workbook_is_rejected_by_the_document_readers_rule():
@@ -132,12 +199,14 @@ def test_header_names_are_trimmed_filled_in_and_made_unique():
 
 
 @pytest.mark.parametrize("type_name", ["String", "Nullable(Int64)", "Float64", "Date", "DateTime64(6)",
-                                       "DateTime64(6, 'UTC')", "Decimal(18, 4)", "Nullable(Bool)", "UInt8"])
+                                       "DateTime64(6, 'UTC')", "Decimal(18, 4)", "Nullable(Bool)", "UInt8",
+                                       "Decimal(76, 2)", "Array(Nullable(String))", "Array(Int64)"])
 def test_allowed_column_types_pass(type_name):
     files.check_columns([FileColumn("a", type_name)])
 
 
-@pytest.mark.parametrize("type_name", ["String) ENGINE = Memory --", "Array(String)", "Nullable(Nullable(String))", "",
+@pytest.mark.parametrize("type_name", ["String) ENGINE = Memory --", "Nullable(Array(String))", "Array(Array(String))",
+                                       "Nullable(Nullable(String))", "Decimal(100, 2)", "",
                                        "Int64; DROP TABLE x", "Enum8('a'=1)"])
 def test_a_column_type_outside_the_allowed_set_is_refused_before_it_reaches_ddl(type_name):
     with pytest.raises(ValueError, match="type"):
@@ -165,6 +234,64 @@ def test_a_workbook_becomes_csv_rows_with_the_first_non_empty_row_as_header():
 
     assert header == ["id", "when", "note"]
     assert list(rows) == [["1", "2024-01-02", "a,b"], ["2", "", ""]]
+
+
+def nested_parquet() -> bytes:
+    buffer = BytesIO()
+    pq.write_table(pa.table({
+        "tags": pa.array([["a", "b"], None], pa.list_(pa.string())),
+        "point": pa.array([{"x": 1, "label": "á"}, None], pa.struct([("x", pa.int32()), ("label", pa.string())])),
+        "grid": pa.array([[[1], [2, 3]], []], pa.list_(pa.list_(pa.int64()))),
+        "amount": pa.array([Decimal("1.2345"), None], pa.decimal128(38, 4)),
+        "huge": pa.array([Decimal("1" * 48 + ".25"), None], pa.decimal256(50, 2)),
+    }), buffer)
+    return buffer.getvalue()
+
+
+def test_parquet_lists_structs_and_wide_decimals_map_to_types_clickhouse_loads():
+    assert files.parquet_columns(nested_parquet()) == [
+        FileColumn("tags", "Array(Nullable(String))"), FileColumn("point", "Nullable(String)"),
+        FileColumn("grid", "Nullable(String)"), FileColumn("amount", "Nullable(Decimal(38, 4))"),
+        FileColumn("huge", "Nullable(Decimal(76, 2))")]
+    files.check_columns(files.parquet_columns(nested_parquet()))
+
+
+def test_a_parquet_file_with_nested_columns_is_sent_with_them_as_json_text(parts):
+    _, clickhouse, service = parts
+    upload = service.upload("nested.parquet", BytesIO(nested_parquet()), uploaded_by=None)
+
+    service.load(upload.id, None, [FileColumn(c.name, c.type) for c in upload.columns])
+
+    sent = pq.read_table(BytesIO(clickhouse.inserted[0][3]))
+    assert sent.column("point").to_pylist() == ['{"x": 1, "label": "á"}', None]
+    assert sent.column("grid").to_pylist() == ["[[1], [2, 3]]", "[]"]
+    assert sent.column("tags").to_pylist() == [["a", "b"], None], "a list of scalars is sent as it is"
+
+
+@pytest.mark.parametrize(("error", "named"), [
+    ("Code: 53. Requested type of column point doesn't match parquet schema: parquet type is Tuple", "point"),
+    ("Cannot parse input: expected ',' before: 'x'. Row 1: Column 1, name: amount, type: Decimal(38, 4), parsed text: 'x'",
+     "amount"),
+    ("Cannot parse input: expected ',' before: 'x'", None),
+])
+def test_a_failed_load_names_the_column_clickhouse_refused(error, named):
+    columns = [FileColumn("point", "String"), FileColumn("amount", "Decimal(38, 4)")]
+
+    found = files.failing_column(RuntimeError(error), columns)
+
+    assert (found.name if found else None) == named
+
+
+def test_a_failed_load_says_which_column_and_type_failed(parts):
+    _, clickhouse, service = parts
+    upload = service.upload("a.csv", BytesIO(CSV), uploaded_by=None)
+    clickhouse.fail_on = "raw_insert"
+    clickhouse.error = RuntimeError(f"Row 1: Column 0, name: {upload.columns[0].name}, type: Int64, parsed text: 'x'")
+
+    with pytest.raises(files.LoadFailed) as raised:
+        service.load(upload.id, None, confirmed(upload))
+
+    assert f"column {upload.columns[0].name!r} as {upload.columns[0].type}" in str(raised.value)
 
 
 def test_a_parquet_schema_maps_to_clickhouse_types():

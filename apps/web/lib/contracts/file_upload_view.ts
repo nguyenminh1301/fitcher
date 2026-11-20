@@ -8,6 +8,7 @@ export type Name = string;
 export type Type = string;
 export type Columns = FileColumn[];
 export type Sample = (string | null)[][];
+export type Encoding = string | null;
 
 export interface FileUploadView {
   id: Id;
@@ -16,6 +17,7 @@ export interface FileUploadView {
   size_bytes: SizeBytes;
   columns: Columns;
   sample: Sample;
+  encoding?: Encoding;
 }
 export interface FileColumn {
   name: Name;

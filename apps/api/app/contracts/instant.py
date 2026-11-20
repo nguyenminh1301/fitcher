@@ -3,6 +3,7 @@
 from typing import Literal
 
 from app.contracts.query_spec import ContractModel
+from app.contracts.sources import FailureReason
 
 
 class InstantEstimateRequest(ContractModel):
@@ -45,6 +46,9 @@ class InstantResult(ContractModel):
     dropped: list[str] = []
     # Wide views that read a live table: ClickHouse joins the live rows itself, so copying the tables is faster.
     slow: list[str] = []
+    # Columns ("mart.column") whose values ClickHouse could not read, such as a number too large for its type; the
+    # pack was drafted without them.
+    unreadable_columns: list[str] = []
     suggested_questions: list[str] = []
 
 
@@ -56,6 +60,10 @@ class InstantJobView(ContractModel):
     steps: list[InstantStep]
     failed_step: str | None = None
     error: str | None = None
+    # Set when ClickHouse refused the failed step: the reason the interface words instead of ClickHouse's text.
+    error_reason: FailureReason | None = None
+    # Whether the source had a pack before this build; a failed build leaves that pack answering.
+    had_pack: bool = False
     result: InstantResult | None = None
     started_at: str
     finished_at: str | None = None

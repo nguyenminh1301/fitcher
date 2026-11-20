@@ -12,6 +12,7 @@ read with openpyxl in read-only mode, first sheet only, and sent as CSV; formula
 """
 
 import csv
+import json
 from datetime import UTC, date, datetime, time
 import hashlib
 from itertools import islice
@@ -29,7 +30,7 @@ from app.sources.attach import Source, Table, loading_table, publish_copy, quote
 from app.sources.store import (
     DuplicateSource, NewSource, SourceStore, StoredFile, StoredSource, TableChange,
 )
-from app.sources.inspect import CatalogColumn, TableInfo
+from app.sources.inspect import CatalogColumn, TableInfo, classify_error
 
 logger = logging.getLogger(__name__)
 
@@ -41,11 +42,13 @@ INFERENCE_ROWS = 1000
 INFERENCE_SCAN_ROWS = 20_000
 MAX_TABLE_NAME = 40
 DELIMITERS = (",", ";", "\t", "|")
+UTF16_BOMS = (b"\xff\xfe", b"\xfe\xff")
+LEGACY_ENCODINGS = ("cp1258", "cp1252")
 # A column type is interpolated into DDL, so only these shapes pass.
-_TYPE = re.compile(
-    r"^(?:Nullable\()?(?:U?Int(?:8|16|32|64)|Float(?:32|64)|Bool|String|Date|Date32|DateTime|DateTime64\(\d(?:, '[A-Za-z_/+-]+')?\)"
-    r"|Decimal\(\d{1,2}, \d{1,2}\))\)?$"
-)
+_SCALAR = (r"(?:U?Int(?:8|16|32|64)|Float(?:32|64)|Bool|String|Date|Date32|DateTime|DateTime64\(\d(?:, '[A-Za-z_/+-]+')?\)"
+           r"|Decimal\(\d{1,2}, \d{1,2}\))")
+# A Parquet list of scalars loads as an array; ClickHouse has no nullable array, so it is never wrapped.
+_TYPE = re.compile(rf"^(?:(?:Nullable\()?{_SCALAR}\)?|Array\((?:Nullable\()?{_SCALAR}\)?\))$")
 
 
 class FileTooLarge(ValueError):
@@ -75,9 +78,9 @@ class FileColumn:
 
 class Upload:
     def __init__(self, id: str, file_name: str, format: str, size_bytes: int, columns: list[FileColumn],
-                 sample: list[list[str | None]]):
+                 sample: list[list[str | None]], encoding: str | None = None):
         self.id, self.file_name, self.format, self.size_bytes = id, file_name, format, size_bytes
-        self.columns, self.sample = columns, sample
+        self.columns, self.sample, self.encoding = columns, sample, encoding
 
 
 # Type from the content
@@ -112,11 +115,57 @@ def detect_format(data: bytes | BinaryIO, file_name: str) -> str:
         if _office_type(source) != XLSX:
             raise DocumentRejected("only XLSX workbooks are accepted among Office files", 415)
         return "xlsx"
+    if head.startswith(UTF16_BOMS):
+        return "csv"
     if head.startswith(b"%PDF-") or b"\x00" in head[:8192]:
         raise DocumentRejected("the file is not a CSV, XLSX or Parquet file", 415)
-    if not _decodes(head):
-        raise DocumentRejected("a CSV file must be UTF-8 text")
+    if _looks_like_json(head):
+        raise DocumentRejected("the file is JSON; save it as CSV, XLSX or Parquet and upload that", 415)
     return "csv"
+
+
+def _looks_like_json(head: bytes) -> bool:
+    text = head.decode("utf-8-sig", errors="ignore").lstrip()
+    if not text or text[0] not in "[{":
+        return False
+    try:
+        json.loads(text)
+        return True
+    except ValueError:
+        # Only the start of a large file was read: an object or a list of objects or values is still JSON.
+        return bool(re.match(r'^(?:\{\s*"|\[\s*[\[{"\d-])', text))
+
+
+def csv_encoding(head: bytes) -> str:
+    """The encoding a CSV file is read in: UTF-16 by its byte-order mark, UTF-8, else a Windows code page.
+
+    Vietnamese Windows exports are often Windows-1258 and Western European ones Windows-1252; Latin-1 decodes any
+    byte, so it is the last resort.
+    """
+    if head.startswith(UTF16_BOMS):
+        return "utf-16"
+    if _decodes(head):
+        return "utf-8"
+    for encoding in LEGACY_ENCODINGS:
+        try:
+            head.decode(encoding)
+            return encoding
+        except UnicodeDecodeError:
+            continue
+    return "latin-1"
+
+
+def transcode_to_utf8(path: Path, encoding: str) -> None:
+    """Rewrite a CSV file in UTF-8, composed (NFC), so ClickHouse and the reload read it like any other."""
+    target = path.with_name(path.name + ".utf8")
+    try:
+        with path.open(encoding=encoding, newline="") as source, target.open("w", encoding="utf-8", newline="") as out:
+            for line in source:
+                out.write(unicodedata.normalize("NFC", line))
+    except UnicodeDecodeError:
+        target.unlink(missing_ok=True)
+        raise DocumentRejected(f"the file is not valid {encoding} text; save it as CSV UTF-8 and upload it again") from None
+    target.replace(path)
 
 
 # Names and columns
@@ -215,25 +264,78 @@ _ARROW = {
 }
 
 
-def _arrow_type(field) -> str:
+def _nested(kind) -> bool:
+    """A struct, a map or a list of anything but scalars: loaded as JSON text, since ClickHouse reads it as a tuple."""
     import pyarrow as pa
 
-    kind = field.type
+    if pa.types.is_struct(kind) or pa.types.is_map(kind) or pa.types.is_union(kind):
+        return True
+    if pa.types.is_list(kind) or pa.types.is_large_list(kind) or pa.types.is_fixed_size_list(kind):
+        return _nested(kind.value_type) or _is_list(kind.value_type)
+    return False
+
+
+def _is_list(kind) -> bool:
+    import pyarrow as pa
+
+    return pa.types.is_list(kind) or pa.types.is_large_list(kind) or pa.types.is_fixed_size_list(kind)
+
+
+def _scalar_type(kind) -> str:
+    import pyarrow as pa
+
     if pa.types.is_integer(kind):
         return f"{'Int' if pa.types.is_signed_integer(kind) else 'UInt'}{kind.bit_width}"
     if pa.types.is_timestamp(kind):
         zone = f", '{kind.tz}'" if kind.tz and re.fullmatch(r"[A-Za-z_/+-]+", kind.tz) else ""
         return f"DateTime64(6{zone})"
     if pa.types.is_decimal(kind) and kind.precision <= 76:
-        return f"Decimal({min(kind.precision, 38)}, {min(kind.scale, 38)})"
+        # Up to 38 digits fit a 128-bit decimal; a wider one needs ClickHouse's widest, Decimal(76, s).
+        return f"Decimal({kind.precision if kind.precision <= 38 else 76}, {kind.scale})"
     return _ARROW.get(str(kind), "String")
+
+
+def _arrow_type(field) -> str:
+    """The ClickHouse type of a Parquet column, with the Nullable wrapper it is loaded with."""
+    kind = field.type
+    if _nested(kind):
+        return "Nullable(String)"
+    if _is_list(kind):
+        return f"Array(Nullable({_scalar_type(kind.value_type)}))"
+    return f"Nullable({_scalar_type(kind)})"
 
 
 def parquet_columns(data: bytes | BinaryIO) -> list[FileColumn]:
     import pyarrow.parquet as pq
 
     schema = pq.read_schema(BytesIO(data) if isinstance(data, bytes) else data)
-    return [FileColumn(field.name, f"Nullable({_arrow_type(field)})") for field in schema]
+    return [FileColumn(field.name, _arrow_type(field)) for field in schema]
+
+
+def _parquet_batches(path: Path) -> Iterator[bytes] | None:
+    """The file rewritten with each nested column as JSON text, in row groups; None when nothing is nested."""
+    import pyarrow as pa
+    import pyarrow.parquet as pq
+
+    source = pq.ParquetFile(path)
+    nested = [field.name for field in source.schema_arrow if _nested(field.type)]
+    if not nested:
+        return None
+
+    def as_json(column) -> pa.Array:
+        return pa.array([None if value is None else json.dumps(value, default=str, ensure_ascii=False)
+                         for value in column.to_pylist()], pa.string())
+
+    def batches() -> Iterator[bytes]:
+        for group in range(source.num_row_groups):
+            table = source.read_row_group(group)
+            for name in nested:
+                table = table.set_column(table.schema.get_field_index(name), name, as_json(table.column(name)))
+            buffer = BytesIO()
+            pq.write_table(table, buffer)
+            yield buffer.getvalue()
+
+    return batches()
 
 
 def _csv_text(header: list[str], rows: list[list[str]]) -> str:
@@ -266,6 +368,20 @@ def _read_csv_head(path: Path) -> tuple[str, str]:
     return delimiter, _csv_text(header, [row + [""] * (len(header) - len(row)) for row in reader[1:]])
 
 
+_COLUMN_IN_ERROR = (re.compile(r"\bname: (.+?), type: "), re.compile(r"\bcolumn [`'\"]?([^`'\"\s:,]+)", re.IGNORECASE))
+
+
+def failing_column(error: BaseException, columns: list[FileColumn]) -> FileColumn | None:
+    """The confirmed column that ClickHouse's error names, if it names one; nothing else of the text is kept."""
+    by_name = {column.name: column for column in columns}
+    text = str(error)
+    for pattern in _COLUMN_IN_ERROR:
+        for match in pattern.finditer(text):
+            if match.group(1) in by_name:
+                return by_name[match.group(1)]
+    return None
+
+
 class FileService:
     def __init__(self, store: SourceStore, client, directory: Path, max_bytes: int):
         self._store = store
@@ -284,6 +400,10 @@ class FileService:
             size, digest = self._write(body, path)
             with path.open("rb") as handle:
                 kind = detect_format(handle, file_name)
+                handle.seek(0)
+                encoding = csv_encoding(handle.read(HEAD_BYTES)) if kind == "csv" else None
+            if encoding not in (None, "utf-8"):
+                transcode_to_utf8(path, encoding)
             columns, sample = self._infer(kind, path)
         except BaseException:
             shutil.rmtree(folder, ignore_errors=True)
@@ -292,7 +412,7 @@ class FileService:
             id=file_id, source_id=None, file_name=file_name, format=kind, size_bytes=size, sha256=digest,
             columns=tuple((c.name, c.type) for c in columns), stored_path=str(path), uploaded_by=uploaded_by,
             created_at=datetime.now(UTC).isoformat()))
-        return Upload(file_id, file_name, kind, size, columns, sample)
+        return Upload(file_id, file_name, kind, size, columns, sample, encoding)
 
     def _write(self, body: BinaryIO, path: Path) -> tuple[int, str]:
         digest, size = hashlib.sha256(), 0
@@ -322,12 +442,19 @@ class FileService:
             sample_text = _csv_text(header, kept)
         else:
             _, sample_text = _read_csv_head(path)
+        if len(list(csv.reader(StringIO(sample_text)))) < 2:
+            raise DocumentRejected("the file has a header row but no data rows")
         # The sample is rewritten with commas whatever the file's delimiter, so it is described as comma separated;
         # the load reads the file itself with its own delimiter.
-        result = self._client.query(
-            "DESCRIBE TABLE format(CSVWithNames, {sample:String})", parameters={"sample": sample_text},
-            settings={"format_csv_delimiter": ",", "schema_inference_make_columns_nullable": 1,
-                      "input_format_csv_use_best_effort_in_schema_inference": 1})
+        try:
+            result = self._client.query(
+                "DESCRIBE TABLE format(CSVWithNames, {sample:String})", parameters={"sample": sample_text},
+                settings={"format_csv_delimiter": ",", "schema_inference_make_columns_nullable": 1,
+                          "input_format_csv_use_best_effort_in_schema_inference": 1})
+        except Exception as error:  # noqa: BLE001 - only ClickHouse's refusal of the content is the user's to fix
+            if classify_error(error) == "empty_or_unreadable":
+                raise DocumentRejected("ClickHouse cannot read column types from the first rows of the file") from None
+            raise
         columns = [FileColumn(row[0], row[1]) for row in result.result_rows]
         parsed = list(csv.reader(StringIO(sample_text)))[1:][:SAMPLE_ROWS]
         return columns, parsed
@@ -384,9 +511,13 @@ class FileService:
             self._client.command(f"CREATE TABLE {loading} ({structure}) ENGINE = MergeTree ORDER BY tuple()")
             self._insert(loading, stored)
             rows = int(self._client.command(f"SELECT count() FROM {loading}"))
-        except Exception:
+        except Exception as error:
             self._client.command(f"DROP TABLE IF EXISTS {loading}")
             logger.warning("loading the uploaded file %s failed", stored.id)
+            column = failing_column(error, columns)
+            if column is not None:
+                raise LoadFailed(f"ClickHouse could not load the column {column.name!r} as {column.type}; "
+                                 "choose another type for it") from None
             raise LoadFailed("ClickHouse could not load the file with these column types") from None
         publish_copy(self._client, source, table)
         return rows
@@ -394,6 +525,11 @@ class FileService:
     def _insert(self, loading: str, stored: StoredFile) -> None:
         path = Path(stored.stored_path)
         if stored.format == "parquet":
+            rewritten = _parquet_batches(path)
+            if rewritten is not None:
+                for block in rewritten:
+                    self._client.raw_insert(loading, insert_block=block, fmt="Parquet")
+                return
             with path.open("rb") as handle:
                 self._client.raw_insert(loading, insert_block=handle.read() if path.stat().st_size < CHUNK_BYTES else _chunks(handle),
                                         fmt="Parquet")

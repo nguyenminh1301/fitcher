@@ -149,13 +149,18 @@ class SqlServer:
         connection = self._open(params)
         try:
             cursor = connection.cursor()
+            # The rows come from the heap or the clustered index alone, and apart from the allocation units: a
+            # partition has one unit per kind of data (in-row, large object, row overflow), and joining them would
+            # count its rows once per unit.
             objects = self._query(cursor, (
-                "SELECT o.name, o.type, SUM(CASE WHEN p.index_id IN (0, 1) THEN p.rows END) AS row_count, "
-                f"SUM(a.total_pages) * {PAGE_BYTES} AS size_bytes FROM sys.objects AS o "
+                "SELECT o.name, o.type, "
+                "(SELECT SUM(p.rows) FROM sys.partitions AS p WHERE p.object_id = o.object_id AND p.index_id IN (0, 1)) "
+                "AS row_count, "
+                "(SELECT SUM(a.total_pages) FROM sys.partitions AS p "
+                "INNER JOIN sys.allocation_units AS a ON a.container_id = p.partition_id "
+                f"WHERE p.object_id = o.object_id) * {PAGE_BYTES} AS size_bytes FROM sys.objects AS o "
                 "INNER JOIN sys.schemas AS s ON s.schema_id = o.schema_id "
-                "LEFT JOIN sys.partitions AS p ON p.object_id = o.object_id "
-                "LEFT JOIN sys.allocation_units AS a ON a.container_id = p.partition_id "
-                "WHERE s.name = %s AND o.type IN ('U', 'V') GROUP BY o.name, o.type ORDER BY o.name"), (schema,))
+                "WHERE s.name = %s AND o.type IN ('U', 'V') ORDER BY o.name"), (schema,))
             columns = self._query(cursor, (
                 "SELECT TABLE_NAME, COLUMN_NAME, DATA_TYPE, IS_NULLABLE, ORDINAL_POSITION, CHARACTER_MAXIMUM_LENGTH, "
                 "NUMERIC_PRECISION, NUMERIC_SCALE, DATETIME_PRECISION FROM INFORMATION_SCHEMA.COLUMNS "

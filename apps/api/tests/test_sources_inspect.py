@@ -129,6 +129,14 @@ def test_a_mysql_check_finds_the_database_in_the_catalog_or_reports_it_missing()
     ("ERROR 1049 : Unknown database 'nope'", "database_not_found"),
     ("pqxx::insufficient_privilege, e.what() = ERROR:  permission denied for table secret_t", "permission"),
     ("SELECT command denied to user 'u'@'%' for table 'orders'", "permission"),
+    ("Code: 36. DB::Exception: PostgreSQL table name cannot contain single quote or backslash characters, passed a'b. "
+     "(BAD_ARGUMENTS)", "unsupported_name"),
+    ("Code: 1001, type: pqxx::syntax_error, e.what() = ERROR:  syntax error at or near \"\", \"\"", "unsupported_name"),
+    ("Code: 36. DB::Exception: Cannot parse PostgreSQL value '123456789012345678901234.5678' as Decimal(38, 19): "
+     "Decimal value is too big. (BAD_ARGUMENTS)", "value_out_of_range"),
+    ("Code: 636. DB::Exception: The table structure cannot be extracted from a CSV format file. "
+     "(CANNOT_EXTRACT_TABLE_STRUCTURE)", "empty_or_unreadable"),
+    ("Code: 92. DB::Exception: Empty data is not allowed. (EMPTY_DATA_PASSED)", "empty_or_unreadable"),
     ("something nobody expected", "unknown"),
 ])
 def test_a_driver_failure_becomes_one_fixed_reason(text, reason):
@@ -147,6 +155,6 @@ def test_a_failed_check_raises_only_the_reason_never_the_driver_text():
     assert raised.value.__cause__ is None and raised.value.__suppress_context__
 
 
-def test_the_reasons_are_the_fixed_set_of_the_plan_plus_unknown():
+def test_the_reasons_are_the_fixed_set_of_the_plan_plus_clickhouse_refusals_and_unknown():
     assert set(REASONS) == {"unreachable", "refused", "authentication", "tls", "database_not_found", "permission",
-                            "unknown"}
+                            "unsupported_name", "value_out_of_range", "empty_or_unreadable", "unknown"}

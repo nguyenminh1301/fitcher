@@ -172,6 +172,28 @@ def test_a_failed_sync_records_its_reason_and_the_last_result_is_listed_first(st
     assert syncs[1].results == [{"table": "orders", "rows": 3}]
 
 
+def test_a_sync_that_read_some_tables_only_is_stored_as_partial(store):
+    store.create(new())
+    sync = store.start_sync("shop", "manual", NOW)
+    results = [{"table": "orders", "rows": 3}, {"table": "big", "rows": None, "error": "value_out_of_range"}]
+
+    store.finish_sync(sync.id, "partial", results=results, error="value_out_of_range", finished_at=NOW)
+
+    stored = store.sync(sync.id)
+    assert (stored.status, stored.error, stored.results) == ("partial", "value_out_of_range", results)
+    assert store.start_sync("shop", "manual", NOW).status == "running", "a partial sync no longer counts as running"
+
+
+def test_a_postgres_table_with_a_quote_in_its_name_cannot_be_chosen_live(store):
+    store.create(new())
+    store.save_catalog("shop", [TableInfo("it's", "table", 10, 8192)])
+
+    assert store.tables("shop")[0].proposed_mode == "copy" and store.tables("shop")[0].reason == "unsupported_name"
+    with pytest.raises(ValueError, match="quote or a backslash"):
+        store.set_tables("shop", [TableChange("it's", selected=True, mode="live")])
+    store.set_tables("shop", [TableChange("it's", selected=True, mode="copy")])
+
+
 def test_a_sync_whose_heartbeat_stopped_is_marked_interrupted_but_a_live_one_is_not(store):
     store.create(new())
     stale = store.start_sync("shop", "schedule", NOW)

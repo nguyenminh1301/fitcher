@@ -12,12 +12,29 @@ export type Total = number | null;
 export type Steps = InstantStep[];
 export type FailedStep = string | null;
 export type Error = string | null;
+export type ErrorReason =
+  | (
+      | "unreachable"
+      | "refused"
+      | "authentication"
+      | "tls"
+      | "database_not_found"
+      | "permission"
+      | "unsupported_name"
+      | "value_out_of_range"
+      | "empty_or_unreadable"
+      | "unknown"
+      | "interrupted"
+    )
+  | null;
+export type HadPack = boolean;
 export type Pack = string;
 export type Datasets = number;
 export type Relationships = number;
 export type Skipped = string[];
 export type Dropped = string[];
 export type Slow = string[];
+export type UnreadableColumns = string[];
 export type SuggestedQuestions = string[];
 export type StartedAt = string;
 export type FinishedAt = string | null;
@@ -33,6 +50,8 @@ export interface InstantJobView {
   steps: Steps;
   failed_step?: FailedStep;
   error?: Error;
+  error_reason?: ErrorReason;
+  had_pack?: HadPack;
   result?: InstantResult | null;
   started_at: StartedAt;
   finished_at?: FinishedAt;
@@ -51,5 +70,6 @@ export interface InstantResult {
   skipped?: Skipped;
   dropped?: Dropped;
   slow?: Slow;
+  unreadable_columns?: UnreadableColumns;
   suggested_questions?: SuggestedQuestions;
 }

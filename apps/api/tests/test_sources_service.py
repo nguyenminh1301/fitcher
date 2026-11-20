@@ -278,6 +278,69 @@ def test_a_sync_attaches_the_live_database_for_live_tables(parts):
     assert sync.results == [{"table": "order_items", "mode": "live", "rows": 7, "full": None}]
 
 
+def test_one_table_that_cannot_be_copied_leaves_the_others_synced_and_names_its_reason(parts):
+    store, clickhouse, service = parts
+    service.create("shop", connection())
+    store.set_tables("shop", [TableChange("orders", selected=True, mode="copy", interval_seconds=3600),
+                              TableChange("order_items", selected=True, mode="copy", interval_seconds=3600)])
+    clickhouse.fail_on = r"CREATE TABLE `raw`\.`shop__order_items__loading`"
+    clickhouse.error = RuntimeError("Code: 36. DB::Exception: Cannot parse PostgreSQL value '1e30' as Decimal(38, 19): "
+                                    "Decimal value is too big. (BAD_ARGUMENTS)")
+
+    sync = service.sync("shop", "manual")
+
+    assert (sync.status, sync.error) == ("partial", "value_out_of_range")
+    assert {result["table"]: result.get("error") for result in sync.results} == {
+        "order_items": "value_out_of_range", "orders": None}
+    assert clickhouse.raw["shop__orders"] == 5 and "shop__order_items" not in clickhouse.raw
+    tables = {table.name: table for table in store.tables("shop")}
+    assert tables["orders"].last_rows == 5 and tables["order_items"].last_rows is None
+    assert tables["order_items"].next_run_at == (NOW + timedelta(hours=1)).isoformat()
+
+
+def test_one_live_table_that_cannot_be_read_leaves_the_other_live_tables_counted(parts):
+    store, clickhouse, service = parts
+    service.create("shop", connection())
+    store.set_tables("shop", [TableChange("orders", selected=True, mode="live"),
+                              TableChange("order_items", selected=True, mode="live")])
+    clickhouse.fail_on = r"SELECT count\(\) FROM `src_shop`\.`orders`"
+    clickhouse.error = RuntimeError("Code: 36. DB::Exception: PostgreSQL table name cannot contain single quote or "
+                                    "backslash characters, passed o'rders. (BAD_ARGUMENTS)")
+
+    sync = service.sync("shop", "manual")
+
+    assert (sync.status, sync.error) == ("partial", "unsupported_name")
+    assert sync.results == [
+        {"table": "order_items", "mode": "live", "rows": 7, "full": None},
+        {"table": "orders", "mode": "live", "rows": None, "full": None, "error": "unsupported_name"}]
+
+
+def test_a_sync_whose_every_table_fails_is_failed_with_the_first_reason(parts):
+    store, clickhouse, service = parts
+    service.create("shop", connection())
+    select_for_copy(store)
+    clickhouse.fail_on = r"CREATE TABLE `raw`"
+    clickhouse.error = RuntimeError("Code: 92. DB::Exception: Empty data is not allowed. (EMPTY_DATA_PASSED)")
+
+    sync = service.sync("shop", "manual")
+
+    assert (sync.status, sync.error) == ("failed", "empty_or_unreadable")
+    assert sync.results == [{"table": "orders", "mode": "copy", "rows": None, "full": None,
+                             "error": "empty_or_unreadable"}]
+
+
+def test_a_source_that_cannot_be_reached_still_fails_the_whole_live_sync(parts):
+    store, clickhouse, service = parts
+    service.create("shop", connection())
+    store.set_tables("shop", [TableChange("orders", selected=True, mode="live")])
+    clickhouse.fail_on = r"CREATE DATABASE"
+    clickhouse.error = RuntimeError("connection to server failed: Connection refused")
+
+    sync = service.sync("shop", "manual")
+
+    assert (sync.status, sync.error, sync.results) == ("failed", "refused", [])
+
+
 def test_a_sync_with_no_selected_table_is_refused(parts):
     _, _, service = parts
     service.create("shop", connection())

@@ -28,6 +28,7 @@ class FakeClickHouse:
         self.raw: dict[str, int] = {}
         self.source_rows = {"orders": 5, "order_items": 7}
         self.cursor = "41"
+        self.wide_numerics: list[str] = []
 
     def command(self, sql, parameters=None, settings=None):
         self.sql.append(sql)
@@ -72,6 +73,8 @@ class FakeClickHouse:
             rows = [(parameters["name"],)] if parameters["name"] in self.collections else []
         elif "system.tables" in sql:
             rows = [(name, definition) for name, definition in self.mart_definitions]
+        elif "numeric_precision IS NULL" in sql:
+            rows = [(name,) for name in self.wide_numerics]
         else:
             rows = next((rows for fragment, rows in self.catalog.items() if fragment in sql), [])
         return type("Result", (), {"result_rows": rows})()

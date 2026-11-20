@@ -162,6 +162,18 @@ def test_the_catalog_lists_tables_with_estimates_sizes_keys_columns_and_flags():
     assert all("dbo" in str(params) for _, params in connection.executed if params)
 
 
+def test_the_row_estimate_counts_the_heap_or_clustered_index_once_whatever_the_allocation_units():
+    connection = FakeConnection({"sys.partitions": [], "INFORMATION_SCHEMA.COLUMNS": [], "is_primary_key": [],
+                                 "sys.foreign_keys": []})
+
+    SqlServer(lambda **_: connection).tables(schema="dbo", **PARAMS)
+
+    catalog = next(sql for sql, _ in connection.executed if "sys.objects" in sql)
+    rows = catalog[catalog.index("(SELECT SUM(p.rows)"):catalog.index("AS row_count")]
+    assert "p.index_id IN (0, 1)" in rows and "allocation_units" not in rows
+    assert "GROUP BY" not in catalog, "one row per object, so nothing is summed across the joined units"
+
+
 @pytest.mark.parametrize(("column", "expected"), [
     (("int", "NO", None, 10, 0, None), "Int32"),
     (("int", "YES", None, 10, 0, None), "Nullable(Int32)"),

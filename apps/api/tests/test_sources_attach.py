@@ -9,10 +9,17 @@ from app.sources.attach import Column, Source, Table
 class FakeClient:
     """Records SQL; ``results`` maps a substring of a statement to what ``command`` answers for it."""
 
-    def __init__(self, results=None, fail_on=None):
+    def __init__(self, results=None, fail_on=None, wide=(), described=()):
         self.sql: list[str] = []
         self.results = results or {}
         self.fail_on = fail_on
+        self.wide, self.described = list(wide), list(described)
+        self.queries: list[str] = []
+
+    def query(self, sql):
+        self.queries.append(sql)
+        rows = [(name,) for name in self.wide] if "numeric_precision IS NULL" in sql else self.described
+        return type("Result", (), {"result_rows": rows})()
 
     def command(self, sql):
         self.sql.append(sql)
@@ -143,8 +150,10 @@ def test_dropping_a_source_removes_its_database_and_its_copies():
         "DROP DATABASE IF EXISTS `src_shop`",
         "DROP TABLE IF EXISTS `raw`.`shop__orders`",
         "DROP TABLE IF EXISTS `raw`.`shop__orders__loading`",
+        "DROP TABLE IF EXISTS `raw`.`shop__orders__reading`",
         "DROP TABLE IF EXISTS `raw`.`shop__items`",
         "DROP TABLE IF EXISTS `raw`.`shop__items__loading`",
+        "DROP TABLE IF EXISTS `raw`.`shop__items__reading`",
     ]
 
 
@@ -180,3 +189,38 @@ def test_a_mysql_source_names_only_its_database():
     assert attach.live_statements(shop) == [
         "CREATE DATABASE IF NOT EXISTS `src_shop` ENGINE = MySQL(shop, database = 'erp')",
     ]
+
+
+def test_a_postgres_numeric_without_precision_is_copied_as_the_widest_decimal_through_a_reading_table():
+    client = FakeClient({"SELECT count()": 3}, wide=["amount"],
+                        described=[("id", "Int32"), ("amount", "Nullable(Decimal(38, 19))")])
+    shop = Source(name="shop", kind="postgres", tables=(ORDERS,), database="erp", schema="sales")
+
+    assert attach.stage_copy(client, shop, ORDERS) == 3
+
+    assert "AND table_name = 'orders' AND data_type = 'numeric' AND numeric_precision IS NULL" in client.queries[0]
+    assert "schema = 'information_schema'" in client.queries[0] and "table_schema = 'sales'" in client.queries[0]
+    assert client.sql[1] == (
+        "CREATE OR REPLACE TABLE `raw`.`shop__orders__reading` (`id` Int32, `amount` Nullable(Decimal(76, 38))) "
+        "ENGINE = PostgreSQL(shop, database = 'erp', schema = 'sales', table = 'orders')")
+    assert client.sql[2].endswith("AS SELECT * FROM `raw`.`shop__orders__reading`")
+    assert client.sql[-1] == "DROP TABLE IF EXISTS `raw`.`shop__orders__reading`"
+
+
+def test_a_failed_wide_copy_still_drops_its_reading_table():
+    client = FakeClient(fail_on="CREATE TABLE `raw`.`shop__orders__loading`", wide=["amount"],
+                        described=[("amount", "Nullable(Decimal(38, 19))")])
+
+    with pytest.raises(RuntimeError):
+        attach.stage_copy(client, source(ORDERS), ORDERS)
+
+    assert client.sql[-2:] == ["DROP TABLE IF EXISTS `raw`.`shop__orders__loading`",
+                               "DROP TABLE IF EXISTS `raw`.`shop__orders__reading`"]
+
+
+def test_a_mysql_copy_never_looks_for_wide_numerics():
+    client = FakeClient({"SELECT count()": 1})
+
+    attach.stage_copy(client, source(ORDERS, kind="mysql"), ORDERS)
+
+    assert client.queries == []

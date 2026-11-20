@@ -108,6 +108,7 @@
           "enum": [
             "running",
             "succeeded",
+            "partial",
             "failed",
             "cancelled"
           ],
@@ -158,6 +159,9 @@
                 "tls",
                 "database_not_found",
                 "permission",
+                "unsupported_name",
+                "value_out_of_range",
+                "empty_or_unreadable",
                 "unknown",
                 "interrupted"
               ],

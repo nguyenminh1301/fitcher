@@ -113,7 +113,7 @@ def packs_dir(tmp_path: Path) -> Path:
     return tmp_path / "packs"
 
 
-def _pipeline(packs_dir, drafter=None, compile_fails=False, model_missing=None, client=None):
+def _pipeline(packs_dir, drafter=None, compile_fails=False, model_missing=None, client=None, compile_error=None):
     compiled, activated = [], []
 
     def compile_pack(pack_dir: Path, progress=None):
@@ -121,6 +121,8 @@ def _pipeline(packs_dir, drafter=None, compile_fails=False, model_missing=None, 
         if progress is not None:
             progress("screen", 0, 1200)
             progress("index", 500, 1200)
+        if compile_error is not None:
+            raise compile_error
         if compile_fails:
             raise RuntimeError("index generation failed")
         return {"generation": 2}
@@ -177,6 +179,28 @@ def test_a_failed_step_leaves_the_previous_pack_live_and_names_the_step(packs_di
     assert "index generation failed" in job.error
     assert (packs_dir / "shop" / "datasets.yaml").read_text(encoding="utf-8") == "previous\n"
     assert activated == []
+
+
+def test_a_step_clickhouse_refused_reports_a_reason_and_never_its_text_with_the_data(packs_dir, caplog):
+    refusal = RuntimeError("Code: 36. DB::Exception: Cannot parse PostgreSQL value '123456789012345678901234.5678' "
+                           "as Decimal(38, 19): Decimal value is too big. (BAD_ARGUMENTS)")
+    pipeline, _, _ = _pipeline(packs_dir, compile_error=refusal)
+
+    job = pipeline.run(pipeline.new_job("shop", ["widgets", "sales"], started_by="owner"))
+
+    assert (job.status, job.failed_step, job.error_reason) == ("failed", "compile", "value_out_of_range")
+    assert "1234567890" not in job.error and "Decimal(38, 19)" not in job.error
+    assert job.had_pack is False
+    assert "123456789012345678901234.5678" in caplog.text, "the full text stays in the log"
+
+
+def test_a_build_knows_whether_a_previous_pack_keeps_answering(packs_dir):
+    (packs_dir / "shop").mkdir()
+    pipeline, _, _ = _pipeline(packs_dir, compile_fails=True)
+
+    job = pipeline.run(pipeline.new_job("shop", ["widgets", "sales"], started_by="owner"))
+
+    assert job.had_pack is True and job.error_reason is None, "an error that is not ClickHouse's keeps its text"
 
 
 def test_without_a_model_the_job_stops_before_the_draft_and_says_what_is_missing(packs_dir):

@@ -58,6 +58,36 @@
           "default": null,
           "title": "Error"
         },
+        "error_reason": {
+          "anyOf": [
+            {
+              "enum": [
+                "unreachable",
+                "refused",
+                "authentication",
+                "tls",
+                "database_not_found",
+                "permission",
+                "unsupported_name",
+                "value_out_of_range",
+                "empty_or_unreadable",
+                "unknown",
+                "interrupted"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Error Reason"
+        },
+        "had_pack": {
+          "default": false,
+          "title": "Had Pack",
+          "type": "boolean"
+        },
         "result": {
           "anyOf": [
             {
@@ -136,6 +166,14 @@
             "type": "string"
           },
           "title": "Slow",
+          "type": "array"
+        },
+        "unreadable_columns": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Unreadable Columns",
           "type": "array"
         },
         "suggested_questions": {

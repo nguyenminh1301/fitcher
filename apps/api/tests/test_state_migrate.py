@@ -188,3 +188,23 @@ def test_a_new_instance_runs_the_classifier_through_a_provider(tmp_path):
     db = StateDb(tmp_path / "app.db")
     migrate.apply_pending(db)
     assert Settings(db).get("screening", "classifier_engine") == "provider"
+
+
+def test_syncs_stored_before_partial_syncs_keep_their_rows_and_the_one_running_rule(tmp_path):
+    db = _state_before(tmp_path, 14)
+    with db.write() as conn:
+        conn.execute("INSERT INTO sources (id, kind, created_at, updated_at) VALUES ('shop', 'file', 'x', 'x')")
+        conn.execute("INSERT INTO source_syncs (source_id, started_by, status, started_at, heartbeat_at, results, error) "
+                     "VALUES ('shop', 'manual', 'failed', 'a', 'a', '[]', 'unknown')")
+
+    migrate.apply_pending(db)
+
+    with db.write() as conn:
+        assert conn.execute("SELECT id, status, error FROM source_syncs").fetchall() == [(1, "failed", "unknown")]
+        conn.execute("INSERT INTO source_syncs (source_id, started_by, status, started_at, heartbeat_at) "
+                     "VALUES ('shop', 'manual', 'partial', 'b', 'b')")
+        conn.execute("INSERT INTO source_syncs (source_id, started_by, status, started_at, heartbeat_at) "
+                     "VALUES ('shop', 'manual', 'running', 'c', 'c')")
+    with pytest.raises(Exception, match="UNIQUE"), db.write() as conn:
+        conn.execute("INSERT INTO source_syncs (source_id, started_by, status, started_at, heartbeat_at) "
+                     "VALUES ('shop', 'manual', 'running', 'd', 'd')")
