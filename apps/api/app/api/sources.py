@@ -139,12 +139,15 @@ def _sync_view(sync: SyncRecord) -> SyncView:
 def _source_view(source: StoredSource, store: SourceStore) -> SourceView:
     tables = store.tables(source.id)
     syncs = store.syncs(source.id, limit=1)
+    return _view(source, (len(tables), sum(1 for table in tables if table.selected)), syncs[0] if syncs else None)
+
+
+def _view(source: StoredSource, counts: tuple[int, int], last_sync: SyncRecord | None) -> SourceView:
     return SourceView(
         id=source.id, kind=source.kind, host=source.host, port=source.port, database=source.database,
         schema_name=source.schema, user=source.username, tls_mode=source.tls_mode, has_ca=source.has_ca,
-        created_at=datetime.fromisoformat(source.created_at), table_count=len(tables),
-        selected_count=sum(1 for table in tables if table.selected),
-        last_sync=_sync_view(syncs[0]) if syncs else None,
+        created_at=datetime.fromisoformat(source.created_at), table_count=counts[0], selected_count=counts[1],
+        last_sync=_sync_view(last_sync) if last_sync else None,
     )
 
 
@@ -216,10 +219,12 @@ def get_pack_status():
 
 @router.get("")
 def list_sources(_: Admin, store: Store, status_of: Annotated[Callable, Depends(get_pack_status)]) -> list[SourceView]:
+    # The table counts and the latest syncs of every source are read in two queries, not two per source.
+    counts, latest = store.table_counts(), store.latest_syncs()
     views = []
     for source in store.list():
         state, datasets, error = status_of(source.id)
-        views.append(_source_view(source, store).model_copy(update={
+        views.append(_view(source, counts.get(source.id, (0, 0)), latest.get(source.id)).model_copy(update={
             "pack": SourcePack(name=source.id, status=state, datasets=datasets, error=error),
         }))
     return views

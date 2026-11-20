@@ -396,6 +396,19 @@ class SourceStore:
         with self._db.write() as conn:
             conn.execute("UPDATE source_syncs SET query_id = ? WHERE id = ?", (query_id, sync_id))
 
+    def table_counts(self) -> dict[str, tuple[int, int]]:
+        """``{source: (tables, selected tables)}`` of every source, in one query."""
+        rows = self._db.connection().execute(
+            "SELECT source_id, count(*), coalesce(sum(selected), 0) FROM source_tables GROUP BY source_id").fetchall()
+        return {row[0]: (int(row[1]), int(row[2])) for row in rows}
+
+    def latest_syncs(self) -> dict[str, SyncRecord]:
+        """Each source's latest sync, in one query."""
+        rows = self._db.connection().execute(
+            f"SELECT {_SYNC_COLUMNS} FROM source_syncs "
+            "WHERE id IN (SELECT max(id) FROM source_syncs GROUP BY source_id)").fetchall()
+        return {sync.source_id: sync for sync in map(_sync, rows)}
+
     def syncs(self, source_id: str, limit: int = 20) -> list[SyncRecord]:
         rows = self._db.connection().execute(
             f"SELECT {_SYNC_COLUMNS} FROM source_syncs WHERE source_id = ? ORDER BY id DESC LIMIT ?",
