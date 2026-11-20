@@ -567,7 +567,7 @@
     "reason_database_not_found": "Không tìm thấy cơ sở dữ liệu hoặc người dùng này không được mở.",
     "reason_permission": "Người dùng không được đọc danh mục hoặc một bảng.",
     "reason_unknown": "Kết nối thất bại vì một lý do khác.",
-    "reason_unsupported_name": "ClickHouse không đọc trực tiếp được bảng này vì tên có dấu nháy hoặc dấu gạch chéo ngược. Hãy chọn Sao chép hoặc đổi tên bảng.",
+    "reason_unsupported_name": "ClickHouse không đọc được bảng này vì tên bảng hoặc tên một cột có dấu nháy hoặc dấu gạch chéo ngược. Hãy chọn Sao chép, hoặc đổi tên bảng hay cột đó.",
     "reason_value_out_of_range": "Một giá trị của bảng không vừa kiểu cột mà ClickHouse dùng để đọc.",
     "reason_empty_or_unreadable": "Bảng hoặc tệp không có dòng nào, hoặc ClickHouse không đọc được định dạng của nó.",
     "reason_interrupted": "Lần đồng bộ bị gián đoạn khi fitcher dừng.",

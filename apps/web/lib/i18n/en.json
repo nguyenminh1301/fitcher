@@ -567,7 +567,7 @@
     "reason_database_not_found": "The database was not found or this user may not open it.",
     "reason_permission": "The user may not read the catalog or a table.",
     "reason_unknown": "The connection failed for another reason.",
-    "reason_unsupported_name": "ClickHouse cannot read this table live because its name has a quote or a backslash. Choose Copy or rename the table.",
+    "reason_unsupported_name": "ClickHouse cannot read this table because its name or a column name has a quote or a backslash. Choose Copy, or rename the table or column.",
     "reason_value_out_of_range": "A value of the table does not fit the column type ClickHouse reads it as.",
     "reason_empty_or_unreadable": "The table or file has no rows, or ClickHouse cannot read its format.",
     "reason_interrupted": "The sync was interrupted when fitcher stopped.",

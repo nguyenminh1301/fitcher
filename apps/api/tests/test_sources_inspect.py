@@ -131,6 +131,7 @@ def test_a_mysql_check_finds_the_database_in_the_catalog_or_reports_it_missing()
     ("SELECT command denied to user 'u'@'%' for table 'orders'", "permission"),
     ("Code: 36. DB::Exception: PostgreSQL table name cannot contain single quote or backslash characters, passed a'b. "
      "(BAD_ARGUMENTS)", "unsupported_name"),
+    ("Code: 1001, type: pqxx::syntax_error, e.what() = ERROR:  syntax error at or near \"\", \"\"", "unsupported_name"),
     ("Code: 36. DB::Exception: Cannot parse PostgreSQL value '123456789012345678901234.5678' as Decimal(38, 19): "
      "Decimal value is too big. (BAD_ARGUMENTS)", "value_out_of_range"),
     ("Code: 636. DB::Exception: The table structure cannot be extracted from a CSV format file. "

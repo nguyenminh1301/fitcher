@@ -42,7 +42,8 @@ _PATTERNS = (
         r"could not translate host name|Name or service not known|Unknown server host|ERROR 2005|timeout expired|"
         r"Timeout exceeded|No route to host|Network is unreachable|ERROR 2013|ERROR 2006|timed out", re.IGNORECASE)),
     # ClickHouse's own refusals while it reads a table (code 36 BAD_ARGUMENTS carries both of the first two).
-    ("unsupported_name", re.compile(r"table name cannot contain", re.IGNORECASE)),
+    # ClickHouse quotes a PostgreSQL column named with a double quote wrongly, and PostgreSQL answers a syntax error.
+    ("unsupported_name", re.compile(r"table name cannot contain|pqxx::syntax_error", re.IGNORECASE)),
     ("value_out_of_range", re.compile(
         r"Decimal value is too big|Cannot parse \w+ value|ARGUMENT_OUT_OF_BOUND|DECIMAL_OVERFLOW|value is out of range",
         re.IGNORECASE)),
