@@ -145,6 +145,8 @@ export function OverviewSection() {
     data.dislikes ? { key: "dislikes", icon: "thumbsDown", text: t("overview.dislikes", { n: data.dislikes }), path: "/console/feedback" } : null,
     ...(data.sources ?? []).filter((source) => source.last_sync?.status === "failed").map((source) => (
       { key: `failed-${source.id}`, dot: "var(--fgColor-danger)", text: t("overview.syncFailed", { name: source.id }), path: "/console/sources" })),
+    ...(data.sources ?? []).filter((source) => source.last_sync?.status === "partial").map((source) => (
+      { key: `partial-${source.id}`, dot: "var(--fgColor-attention)", text: t("overview.syncPartial", { name: source.id }), path: "/console/sources" })),
     ...data.drifted.map((id) => ({ key: `drift-${id}`, dot: "var(--fgColor-attention)", text: t("overview.drifted", { name: id }), path: "/console/sources" })),
   ].filter(Boolean) as { key: string; icon?: string; dot?: string; text: string; path: string }[] : [];
 
@@ -286,7 +288,7 @@ export function OverviewSection() {
                       {t(`sources.kind_${source.kind}`)} · {t("overview.tables", { n: source.selected_count })}
                     </span>
                   </span>
-                  {status ? <span className={`fc-label fc-label-${status === "succeeded" ? "success" : status === "failed" ? "danger" : "accent"}`}>{t(`sources.status_${status}`)}</span> : null}
+                  {status ? <span className={`fc-label fc-label-${status === "succeeded" ? "success" : status === "failed" ? "danger" : status === "partial" ? "attention" : "accent"}`}>{t(`sources.status_${status}`)}</span> : null}
                 </div>
               );
             }) : (

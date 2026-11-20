@@ -414,6 +414,33 @@ describe("setup data and start steps", () => {
     expect(setup.complete).toHaveBeenCalled();
   });
 
+  it("names the table a sync could not read with its reason and builds the pack from the others", async () => {
+    const quoted = { ...TABLE, name: "it's", mode: "live" as const, proposed_mode: "live" as const, reason: "small" };
+    const sources = fakeSources({
+      test: vi.fn(async () => ({ tables: [TABLE, quoted] })),
+      create: vi.fn(async () => ({ ...CREATED, table_count: 2, tables: [TABLE, quoted] })),
+      changeTables: vi.fn(async () => [{ ...TABLE, selected: true }, { ...quoted, selected: true }]),
+      syncs: vi.fn(async () => [{ id: 1, status: "partial", error: "unsupported_name", results: [
+        { table: "it's", mode: "live", rows: null, error: "unsupported_name" }, { table: "orders", mode: "copy", rows: 1200 }] }]),
+    });
+    wrap(<SetupScreen sources={sources} models={fakeModels()} setup={fakeSetup(DATA_PENDING)} {...exits()} />);
+
+    await connectDatabase();
+    await userEvent.click(await screen.findByRole("button", { name: "Choose tables" }));
+    expect(((await screen.findByRole("checkbox", { name: "it's" })) as HTMLInputElement).checked).toBe(true);
+    await userEvent.click(screen.getByRole("button", { name: "Use 2 tables" }));
+
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).toContain("1 table could not be read:");
+    expect(alert.textContent).toContain("it's: ClickHouse cannot read this table");
+    const progress = screen.getByRole("list", { name: /chosen tables/i });
+    expect(within(progress).getByText("Could not be read")).toBeTruthy();
+    expect(within(progress).getByText("Copied · 1,200 rows")).toBeTruthy();
+    await waitFor(() => expect(sources.instantEstimate).toHaveBeenCalledWith({ source_id: "erp", tables: ["orders"] }));
+    await userEvent.click(await screen.findByRole("button", { name: "Build the pack" }));
+    expect(sources.instantStart).toHaveBeenCalledWith({ source_id: "erp", tables: ["orders"], confirm_billable: true });
+  });
+
   it("shows the build as five lines and offers a retry when it fails", async () => {
     const failed = JOB("failed", { marts: "done", profile: "done", files: "done", draft: "failed" });
     const sources = fakeSources({ instantStart: vi.fn(async () => ({ job: failed })) });

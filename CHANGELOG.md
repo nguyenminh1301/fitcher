@@ -32,6 +32,7 @@
 
 ### Fixed
 
+- The Sources page shows a sync started from it as syncing until the list has the sync's own outcome, so a retry that succeeded no longer leaves "Failed" on screen; a partly synced source, the Overview and the setup's build step name each table that could not be read with its reason instead of "The connection failed for another reason", and the setup builds the pack from the tables that were read.
 - A pack build that ClickHouse refused shows a plain, translated reason (a value too large for its type, a table name it cannot read, an unreachable source) instead of ClickHouse's own message with data values and internal types, which stays in the api log; the setup says questions asked before still work only when the source already had a pack.
 - A SQL Server table's row estimate equals its row count: it was multiplied by the number of allocation units (in-row, large object, row overflow) of each partition, so a table with text columns showed three times its rows.
 - Uploading a CSV that is not UTF-8 works: a UTF-16 file (Excel's Unicode Text) is recognised by its byte-order mark and a Windows-1258, Windows-1252 or Latin-1 file is read in that encoding, and both are stored as UTF-8 with the encoding reported in the upload. A CSV with a header but no rows, a JSON file, or a sample ClickHouse cannot read types from is refused with 422 or 415 and a reason instead of 503 "ClickHouse or the app state is unavailable".

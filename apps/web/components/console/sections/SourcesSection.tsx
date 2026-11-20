@@ -24,7 +24,37 @@ import type { SourceDrift, SourcePatch, SourceView, TableDrift } from "@/lib/con
 import { useI18n } from "@/lib/i18n/react";
 
 const POLL_MS = 3000;
-const TONE: Record<string, string> = { succeeded: "fc-label-success", failed: "fc-label-danger", running: "fc-label-accent", cancelled: "" };
+const TONE: Record<string, string> = {
+  succeeded: "fc-label-success", partial: "fc-label-attention", failed: "fc-label-danger", running: "fc-label-accent", cancelled: "",
+};
+
+/** The tables a finished sync could not read, each with its reason, from the sync's own per-table results. */
+export function failedTables(source: SourceView): { table: string; error: string }[] {
+  return (source.last_sync?.results ?? []).flatMap((result) =>
+    typeof result.error === "string" && typeof result.table === "string" ? [{ table: result.table, error: result.error }] : []);
+}
+
+/** What went wrong in a source's last sync: each table that failed, or the reason the whole sync failed. */
+export function SyncProblem({ source }: { source: SourceView }) {
+  const { t } = useI18n();
+  const sync = source.last_sync;
+  if (!sync || (sync.status !== "failed" && sync.status !== "partial")) return null;
+  const tables = failedTables(source);
+  if (!tables.length) {
+    return sync.error ? <div className="fc-field-error"><Icon name="alert" />{t(`sources.reason_${sync.error}`)}</div> : null;
+  }
+  return (
+    <div className="fc-field-error src-problem">
+      <Icon name="alert" />
+      <div>
+        <div>{t("sourcesPage.tablesFailed", { n: tables.length })}</div>
+        <ul className="src-problem-list">
+          {tables.map((item) => <li key={item.table}><span className="fc-mono">{item.table}</span>: {t(`sources.reason_${item.error}`)}</li>)}
+        </ul>
+      </div>
+    </div>
+  );
+}
 
 function EditDialog({ sources, source, onClose, onSaved }: { sources: FitcherApi["sources"]; source: SourceView; onClose: () => void; onSaved: () => void }) {
   const { t } = useI18n();
@@ -109,11 +139,12 @@ function LastSync({ source }: { source: SourceView }) {
   const sync = source.last_sync;
   if (!sync) return <span className="fc-muted">{t("sources.never")}</span>;
   if (sync.status === "running") return <span>{t("sourcesPage.syncRunning")}</span>;
+  const synced = sync.status === "succeeded" || sync.status === "partial";
   const rows = sync.results.reduce((total, result) => total + (typeof result.rows === "number" ? result.rows : 0), 0);
   return (
     <span>
       {formatDate(sync.finished_at ?? sync.started_at, { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
-      {sync.status === "succeeded" ? ` · ${t("sources.rowsLoaded", { rows: formatNumber(rows) })}` : null}
+      {synced ? ` · ${t("sources.rowsLoaded", { rows: formatNumber(rows) })}` : null}
     </span>
   );
 }
@@ -135,7 +166,7 @@ function Answers({ source, onBuild, onAsk }: { source: SourceView; onBuild: () =
   if (state === "building") {
     return <span className="fc-label"><span className="fc-spin fc-spinning" aria-hidden="true" />{t("sourcesPage.answer_building")}</span>;
   }
-  const ready = source.last_sync?.status === "succeeded" && source.selected_count > 0;
+  const ready = (source.last_sync?.status === "succeeded" || source.last_sync?.status === "partial") && source.selected_count > 0;
   return (
     <span className="src-answers">
       {state === "failed" ? <span className="fc-label fc-label-danger" title={source.pack?.error ?? undefined}>{t("sourcesPage.answer_failed")}</span>
@@ -161,6 +192,9 @@ export function SourcesSection() {
   const [dialog, setDialog] = useState<{ kind: "tables" | "edit" | "delete"; source: SourceView } | null>(null);
   const [adding, setAdding] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  // Syncs started from this page, by source, until the list shows them finished: a sync that ends before the
+  // list is read again would otherwise leave the previous outcome on screen.
+  const [started, setStarted] = useState<Record<string, number>>({});
 
   // Columns that changed since a source's pack was built (DECISIONS §11 step 0).
   const syncIds = (data ?? []).map((source) => `${source.id}:${source.last_sync?.id ?? ""}`).join(",");
@@ -174,7 +208,18 @@ export function SourcesSection() {
   }, [sources, syncIds]);
 
   // A running sync or pack build is read again until it ends, so its outcome shows without reloading the page.
-  const running = (data ?? []).some((source) => source.last_sync?.status === "running" || source.pack?.status === "building");
+  const running = Object.keys(started).length > 0
+    || (data ?? []).some((source) => source.last_sync?.status === "running" || source.pack?.status === "building");
+  useEffect(() => {
+    if (!data) return;
+    setStarted((current) => {
+      const left = Object.fromEntries(Object.entries(current).filter(([id, syncId]) => {
+        const sync = data.find((source) => source.id === id)?.last_sync;
+        return !sync || sync.id < syncId || sync.status === "running";
+      }));
+      return Object.keys(left).length === Object.keys(current).length ? current : left;
+    });
+  }, [data]);
   useEffect(() => {
     if (!running) return;
     const timer = setInterval(() => void reload(), POLL_MS);
@@ -209,7 +254,12 @@ export function SourcesSection() {
   const add = <button type="button" className="fc-btn fc-btn-primary" onClick={() => setAdding(true)}><Icon name="plus" />{t("sources.add")}</button>;
 
   // Without an active pack the other pages have nothing to read: say so here, where the pack is built.
-  const buildable = loaded && !pack ? (data ?? []).find((source) => source.last_sync?.status === "succeeded" && source.selected_count > 0) : undefined;
+  const buildable = loaded && !pack ? (data ?? []).find((source) =>
+    (source.last_sync?.status === "succeeded" || source.last_sync?.status === "partial") && source.selected_count > 0) : undefined;
+  const startSync = (source: SourceView) => void act(source, async () => {
+    const sync = await sources.sync(source.id);
+    setStarted((current) => ({ ...current, [source.id]: sync.id }));
+  });
 
   return (
     <ListPage section="sources" loading={!data} failed={failed} actions={data?.length ? add : undefined}>
@@ -255,8 +305,7 @@ export function SourcesSection() {
               </thead>
               <tbody>
                 {data.map((source) => {
-                  const status = source.last_sync?.status;
-                  const syncError = source.last_sync?.error ? t(`sources.reason_${source.last_sync.error}`) : null;
+                  const status = source.id in started ? "running" : source.last_sync?.status;
                   const rowError = errors[source.id] || null;
                   return (
                     <tr key={source.id} aria-label={source.id}>
@@ -269,7 +318,7 @@ export function SourcesSection() {
                                 onClick={() => setDialog({ kind: "edit", source })}>{source.id}</button>
                             )}
                             <div className="fc-muted src-kind">{t(`sources.kind_${source.kind}`)}</div>
-                            {status === "failed" && syncError ? <div className="fc-field-error"><Icon name="alert" />{syncError}</div> : null}
+                            {status === "running" ? null : <SyncProblem source={source} />}
                             {rowError ? <div className="fc-field-error" role="alert"><Icon name="alert" />{rowError}</div> : null}
                           </div>
                         </div>
@@ -280,7 +329,7 @@ export function SourcesSection() {
                             onClick={() => setDialog({ kind: "tables", source })}>{t("sourcesPage.tableCount", { used: source.selected_count, total: source.table_count })}</button>
                         )}
                       </td>
-                      <td data-label={t("sourcesPage.lastSync")}><LastSync source={source} /></td>
+                      <td data-label={t("sourcesPage.lastSync")}>{source.id in started ? <span>{t("sourcesPage.syncRunning")}</span> : <LastSync source={source} />}</td>
                       <td data-label={t("ui.status")}>
                         {status ? (
                           <span className={`fc-label ${TONE[status] ?? ""}`}>
@@ -296,9 +345,9 @@ export function SourcesSection() {
                           <button type="button" className="fc-btn fc-btn-sm" aria-label={t("sources.cancelOf", { name: source.id })}
                             onClick={() => void act(source, () => sources.cancel(source.id))}>{t("sources.cancel")}</button>
                         ) : (
-                          <button type="button" className={status === "failed" ? "fc-btn fc-btn-sm" : "fc-btn fc-btn-ghost fc-btn-sm"} aria-label={t("sources.syncOf", { name: source.id })}
-                            disabled={source.selected_count === 0} onClick={() => void act(source, () => sources.sync(source.id))}>
-                            <Icon name="refresh" />{status === "failed" ? t("sourcesPage.retry") : t("sourcesPage.sync")}
+                          <button type="button" className={status === "failed" || status === "partial" ? "fc-btn fc-btn-sm" : "fc-btn fc-btn-ghost fc-btn-sm"} aria-label={t("sources.syncOf", { name: source.id })}
+                            disabled={source.selected_count === 0} onClick={() => startSync(source)}>
+                            <Icon name="refresh" />{status === "failed" || status === "partial" ? t("sourcesPage.retry") : t("sourcesPage.sync")}
                           </button>
                         )}
                         <button type="button" className="fc-btn fc-btn-ghost fc-btn-icon fc-btn-sm" aria-label={t("sourcesPage.optionsOf", { name: source.id })} aria-haspopup="menu"

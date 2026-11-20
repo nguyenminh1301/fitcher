@@ -488,6 +488,8 @@ a.stat:hover { background: var(--bgColor-muted); }
 
 /* Whether a source can answer questions, and the composer's choice of data source for a new conversation. */
 .src-answers { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.src-problem { align-items: flex-start; }
+.src-problem-list { margin: 2px 0 0; padding-left: 16px; }
 .src-answers-error { flex-basis: 100%; max-width: 360px; font-size: 12px; line-height: 16px; white-space: normal; }
 .fc-composer-pick { position: relative; cursor: pointer; }
 .fc-composer-pick select { appearance: none; background: transparent; border: 0; color: inherit; font: inherit; padding: 0 2px; cursor: pointer; }
