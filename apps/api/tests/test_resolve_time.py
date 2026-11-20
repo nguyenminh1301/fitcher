@@ -6,6 +6,7 @@ import pytest
 
 from app.agent.nodes.resolve_time import (
     explicit_periods,
+    explicit_time_grain,
     PeriodDescriptor,
     PeriodShift,
     TimeResolutionError,
@@ -198,3 +199,16 @@ def test_a_zero_shift_keeps_the_periods_and_relabels_them():
 ])
 def test_explicit_periods_are_read_from_the_question(question, expected):
     assert [d.model_dump(exclude_defaults=True) for d in explicit_periods(question)] == expected
+
+
+@pytest.mark.parametrize(("question", "grain"), [
+    ("Tổng số tiền theo tháng năm 2026", "month"),
+    ("Doanh thu từng quý năm 2025", "quarter"),
+    ("Revenue by week in March 2024", "week"),
+    ("Monthly sales in 2025", "month"),
+    ("Doanh thu theo khu vực năm 2026", None),
+    ("Sales by region in 2025", None),
+    ("Tổng số tiền năm 2026", None),
+])
+def test_explicit_time_grain_is_read_from_the_question(question, grain):
+    assert explicit_time_grain(question) == grain

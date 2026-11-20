@@ -37,6 +37,7 @@
 ### Fixed
 
 - A question that names its period outright, such as "năm 2026", "Q1 2025" or "March 2024", is answered for that period instead of being asked back when the extraction model misses it.
+- A question that asks for a time grain outright, such as "theo tháng", "by quarter" or "monthly", is grouped by that grain when the extraction model misses it, instead of being answered with one total.
 - The SQL guard sends back a query whose alias reuses a column's name for another expression, such as `toStartOfMonth(day) AS day`, with the name to use instead, so the retry no longer fails in ClickHouse with code 215.
 - Accessibility: switches are named by their label, the sidebar's icon-only items keep a name when it is collapsed, the Overview's done marks use the success colours instead of white on green, screen-reader-only text is hidden the standard way, the Sources table turns into cards by the width it gets so a 768 px tablet no longer scrolls sideways, and row links, back links, switches and the setup's step bars have a 44 by 24 px or larger touch target below 768 px.
 - The Runs page filters stopped runs, shows a run that answered a question asked back with that question ("Answer to: …"), says a cost is unknown, or at least the priced part, when a model call had no price instead of $0.0000, and the trace names an OpenAI-compatible model once instead of with a doubled `openai/` prefix.

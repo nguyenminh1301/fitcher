@@ -246,6 +246,31 @@ def explicit_periods(question: str) -> list[PeriodDescriptor]:
     return unique
 
 
+_GRAIN_WORDS = {
+    "day": ("ngày", "ngay", "day", "daily"), "week": ("tuần", "tuan", "week", "weekly"),
+    "month": ("tháng", "thang", "month", "monthly"), "quarter": ("quý", "quy", "quarter", "quarterly"),
+    "year": ("năm", "nam", "year", "yearly", "annually"),
+}
+_GRAIN = re.compile(
+    r"\b(?:(?:theo|từng|tung|mỗi|moi|hàng|hang|by|per|each)\s+(\w+)|(daily|weekly|monthly|quarterly|yearly|annually))\b",
+    re.IGNORECASE,
+)
+
+
+def explicit_time_grain(question: str) -> Unit | None:
+    """The time grain a question asks for outright ("theo tháng", "by quarter", "monthly"), or None.
+
+    Used only when the extraction returned no grain. A word right after "theo"/"by" that is not a time unit
+    ("theo khu vực", "by region") is ignored.
+    """
+    for match in _GRAIN.finditer(question or ""):
+        word = (match[1] or match[2]).lower()
+        for grain, words in _GRAIN_WORDS.items():
+            if word in words:
+                return grain  # type: ignore[return-value]
+    return None
+
+
 class PeriodShift(BaseModel):
     """A follow-up's periods as the previous query's periods moved by ``offset`` ``unit``s (0 keeps them)."""
 
