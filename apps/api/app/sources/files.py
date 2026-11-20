@@ -8,7 +8,7 @@ and the original stays there so the table can be reloaded.
 ClickHouse infers the column types of a CSV from a sample, and the Parquet schema comes from the file; the page
 shows them for confirmation before anything is loaded. The load streams the file through the client into a
 loading table and swaps it in, so it works with an external ClickHouse that cannot see the api's disk. XLSX is
-read with openpyxl in read-only mode, first sheet only, and sent as CSV; formulas are not evaluated.
+read with python-calamine, first sheet only, and sent as CSV; formulas are not evaluated.
 """
 
 import csv
@@ -210,7 +210,19 @@ def check_columns(columns: list[FileColumn]) -> None:
 # Readers
 
 
+# Below this size a whole number read as a float is written without its ".0", as Excel shows it; a larger one keeps
+# Python's float text (``1e+20``), as before.
+_WHOLE_LIMIT = 1e15
+
+
 def _cell(value) -> str:
+    # Text and numbers come first: they are most cells of a sheet, and this runs once per cell.
+    kind = type(value)
+    if kind is str:
+        return value
+    if kind is float:
+        # The workbook reader returns every number as a float; a whole one is written as an integer.
+        return str(int(value)) if value.is_integer() and abs(value) < _WHOLE_LIMIT else str(value)
     if value is None:
         return ""
     if isinstance(value, datetime):
@@ -227,15 +239,21 @@ def workbook_rows(data: bytes | BinaryIO, max_rows: int | None = None) -> tuple[
     """The header and the rows of the first sheet with data, as text; formulas show their cached values.
 
     ``max_rows`` stops each sheet after that many rows, empty ones included, so a sample never reads a whole sheet.
+    The workbook is read with python-calamine (a Rust reader); the ZIP's declared size was checked before.
     """
-    from openpyxl import load_workbook
+    from python_calamine import CalamineWorkbook
 
     try:
-        book = load_workbook(BytesIO(data) if isinstance(data, bytes) else data, read_only=True, data_only=True)
-    except Exception as error:  # noqa: BLE001 - openpyxl raises many types for a corrupt workbook
+        book = CalamineWorkbook.from_filelike(BytesIO(data) if isinstance(data, bytes) else data)
+        names = list(book.sheet_names)
+    except Exception as error:  # noqa: BLE001 - the reader raises its own types for a corrupt workbook
         raise DocumentRejected(f"the workbook cannot be read: {type(error).__name__}") from None
-    for sheet in book.worksheets:
-        rows = islice(sheet.iter_rows(values_only=True), max_rows)
+    for name in names:
+        try:
+            sheet = book.get_sheet_by_name(name)
+        except Exception as error:  # noqa: BLE001
+            raise DocumentRejected(f"the workbook cannot be read: {type(error).__name__}") from None
+        rows = islice(sheet.iter_rows(), max_rows)
         header = None
         for row in rows:
             if any(cell not in (None, "") for cell in row):
@@ -244,17 +262,13 @@ def workbook_rows(data: bytes | BinaryIO, max_rows: int | None = None) -> tuple[
         if header is None:
             continue
 
-        def body(rows=rows, width=len(header), book=book) -> Iterator[list[str]]:
-            try:
-                for row in rows:
-                    cells = [_cell(cell) for cell in row][:width]
-                    if any(cells):
-                        yield cells + [""] * (width - len(cells))
-            finally:
-                book.close()
+        def body(rows=rows, width=len(header)) -> Iterator[list[str]]:
+            for row in rows:
+                cells = [_cell(cell) for cell in row][:width]
+                if any(cells):
+                    yield cells + [""] * (width - len(cells))
 
         return header, body()
-    book.close()
     raise DocumentRejected("the workbook has no sheet with data")
 
 
@@ -574,15 +588,15 @@ def _chunks(handle: BinaryIO, strip_bom: bool = False) -> Iterator[bytes]:
 
 
 def _csv_chunks(header: list[str], rows: Iterator[list[str]]) -> Iterator[bytes]:
+    """The header and the rows as CSV, in blocks of 5 000 rows written at once."""
     buffer = StringIO()
     writer = csv.writer(buffer)
     writer.writerow(header)
-    count = 0
-    for row in rows:
-        writer.writerow(row)
-        count += 1
-        if count % 5000 == 0:
-            yield buffer.getvalue().encode("utf-8")
-            buffer.seek(0)
-            buffer.truncate()
-    yield buffer.getvalue().encode("utf-8")
+    rows = iter(rows)
+    while batch := list(islice(rows, 5000)):
+        writer.writerows(batch)
+        yield buffer.getvalue().encode("utf-8")
+        buffer.seek(0)
+        buffer.truncate()
+    if buffer.tell():
+        yield buffer.getvalue().encode("utf-8")

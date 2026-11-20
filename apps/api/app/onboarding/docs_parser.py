@@ -183,38 +183,43 @@ def _markdown(text: str) -> list[Section]:
 
 
 def _cell(value: object) -> str:
+    if isinstance(value, float) and value.is_integer() and abs(value) < 1e15:
+        # The workbook reader returns every number as a float; a whole one reads as an integer.
+        value = int(value)
     return "" if value is None else " ".join(str(value).split())
 
 
 def _xlsx(data: bytes) -> list[Section]:
-    from openpyxl import load_workbook
+    from python_calamine import CalamineWorkbook
 
     try:
-        workbook = load_workbook(BytesIO(data), read_only=True, data_only=True)
-    except Exception as error:  # noqa: BLE001 - openpyxl raises many types for a corrupt workbook
+        workbook = CalamineWorkbook.from_filelike(BytesIO(data))
+        names = list(workbook.sheet_names)
+    except Exception as error:  # noqa: BLE001 - the reader raises its own types for a corrupt workbook
         raise DocumentRejected(f"the workbook cannot be read: {type(error).__name__}") from None
     sections: list[Section] = []
     total = 0
-    try:
-        for sheet in workbook.worksheets:
-            header: str | None = None
-            lines: list[str] = []
-            for row in sheet.iter_rows(values_only=True):
-                cells = [_cell(value) for value in row]
-                if not any(cells):
-                    continue
-                total += 1
-                if total > MAX_SHEET_ROWS:
-                    raise DocumentRejected(f"the workbook has more than {MAX_SHEET_ROWS} rows")
-                line = " | ".join(cells).rstrip(" |")
-                if header is None:
-                    header = line
-                else:
-                    lines.append(line)
-            if header is not None:
-                sections.append(Section([sheet.title], "\n".join(lines) or header, header=header))
-    finally:
-        workbook.close()
+    for name in names:
+        try:
+            rows = workbook.get_sheet_by_name(name).iter_rows()
+        except Exception as error:  # noqa: BLE001
+            raise DocumentRejected(f"the workbook cannot be read: {type(error).__name__}") from None
+        header: str | None = None
+        lines: list[str] = []
+        for row in rows:
+            cells = [_cell(value) for value in row]
+            if not any(cells):
+                continue
+            total += 1
+            if total > MAX_SHEET_ROWS:
+                raise DocumentRejected(f"the workbook has more than {MAX_SHEET_ROWS} rows")
+            line = " | ".join(cells).rstrip(" |")
+            if header is None:
+                header = line
+            else:
+                lines.append(line)
+        if header is not None:
+            sections.append(Section([name], "\n".join(lines) or header, header=header))
     return sections
 
 
