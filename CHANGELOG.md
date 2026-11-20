@@ -21,6 +21,7 @@
 
 ### Changed
 
+- Charts load ECharts' core with only the bar, line, pie and scatter charts, the components and the two renderers they use, so the chart chunk the chat downloads shrinks from 1.14 MB to 0.62 MB.
 - `GET /sources` reads every source's table counts and latest sync in two queries instead of two per source.
 - XLSX uploads and documents are read with python-calamine, a Rust-backed reader, instead of openpyxl: converting a 50 000-row sheet to CSV takes about 0.32 s instead of 2.2 s, with the same cell text. openpyxl is now only a test dependency.
 - Adding a model provider starts on OpenRouter, which has free models, instead of OpenAI, and lists OpenRouter and Ollama first; the chat's empty state no longer repeats the read-only SQL sentence of the composer hint; the setup's Live and Copy pills have their own colours, and the table chooser's "New rows only" choice shows its whole text.
