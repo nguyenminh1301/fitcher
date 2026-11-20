@@ -162,7 +162,7 @@ export function ChatLayout({ children, onConsole }: { children: ReactNode; onCon
     const menuOpen = menu?.label === label;
     return (
       <li key={conversation.id} className="fc-conv" data-open={menuOpen ? "true" : undefined}>
-        <button type="button" className="fc-navitem" aria-current={activeId === conversation.id ? "true" : undefined} title={conversation.title} onClick={() => open(conversation.id)}>
+        <button type="button" className="fc-navitem" aria-label={conversation.title} aria-current={activeId === conversation.id ? "true" : undefined} title={conversation.title} onClick={() => open(conversation.id)}>
           <span className="fc-navitem-text">{conversation.title}</span>
         </button>
         <button type="button" className="fc-conv-more" aria-label={label} aria-haspopup="menu" aria-expanded={menuOpen} onClick={(event) => conversationMenu(event.currentTarget, conversation)}>
@@ -174,7 +174,7 @@ export function ChatLayout({ children, onConsole }: { children: ReactNode; onCon
 
   const head = (key: keyof typeof sections, label: string, extra?: ReactNode) => (
     <div className="fc-sec">
-      <button type="button" className="fc-sec-toggle" aria-expanded={sections[key]} onClick={() => setSections({ ...sections, [key]: !sections[key] })}>
+      <button type="button" className="fc-sec-toggle" aria-label={label} aria-expanded={sections[key]} onClick={() => setSections({ ...sections, [key]: !sections[key] })}>
         {label}
         <Icon name={sections[key] ? "chevronDown" : "chevronRight"} />
       </button>
@@ -205,10 +205,11 @@ export function ChatLayout({ children, onConsole }: { children: ReactNode; onCon
           <Button variant="ghost" iconOnly icon="x" label={t("ui.closeHistory")} className="fc-drawer-only" onClick={() => setDrawer(false)} />
         </div>
         <div className="fc-side-actions">
-          <button type="button" className="fc-navitem" onClick={() => open(null)}>
+          {/* Named by aria-label as well: a collapsed sidebar shows the icon alone. */}
+          <button type="button" className="fc-navitem" aria-label={t("ui.newChat")} title={t("ui.newChat")} onClick={() => open(null)}>
             <Icon name="squarePen" /><span className="fc-navitem-text">{t("ui.newChat")}</span>
           </button>
-          <button type="button" className="fc-navitem" aria-haspopup="dialog" onClick={() => setSearch(true)}>
+          <button type="button" className="fc-navitem" aria-label={t("ui.search")} title={t("ui.search")} aria-haspopup="dialog" onClick={() => setSearch(true)}>
             <Icon name="search" /><span className="fc-navitem-text">{t("ui.search")}</span><kbd className="fc-kbd fc-desk-only">Ctrl K</kbd>
           </button>
         </div>
@@ -232,6 +233,7 @@ export function ChatLayout({ children, onConsole }: { children: ReactNode; onCon
                         <button
                           type="button"
                           className="fc-navitem"
+                          aria-label={group.name}
                           aria-expanded={isOpen}
                           onClick={() => {
                             const next = new Set(closedGroups);

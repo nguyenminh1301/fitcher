@@ -295,7 +295,7 @@ export function SourcesSection() {
       {data?.length ? (
         <section className="box" aria-labelledby="sources-title">
           <div className="box-head"><h2 id="sources-title" className="box-title">{t("sourcesPage.listTitle")}</h2></div>
-          <div style={{ overflowX: "auto" }}>
+          <div className="src-table">
             <table className="tbl tbl-cards">
               <thead>
                 <tr>

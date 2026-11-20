@@ -120,7 +120,7 @@
 .gs-item { display: flex; flex-direction: column; gap: 10px; padding: 12px; border-radius: 10px; background: var(--bgColor-muted); min-height: 116px; }
 .gs-item[data-state="next"] { background: var(--bgColor-default); border: 1.5px solid var(--fgColor-default); padding: 10.5px; }
 .gs-mark { width: 22px; height: 22px; border-radius: 9999px; display: flex; align-items: center; justify-content: center; border: 1.5px solid var(--borderColor-emphasis); color: var(--fgColor-muted); font-size: 11px; font-weight: 600; }
-.gs-mark[data-state="done"] { background: var(--fgColor-success); border-color: var(--fgColor-success); color: #fff; }
+.gs-mark[data-state="done"] { background: var(--bgColor-success-muted); border-color: transparent; color: var(--fgColor-success); }
 .gs-mark .fc-icon { width: 12px; height: 12px; stroke-width: 3; }
 .prog-bar { width: 120px; height: 6px; border-radius: 3px; background: var(--bgColor-neutral-muted); overflow: hidden; }
 .prog-bar > span { display: block; height: 100%; background: var(--fgColor-default); }
@@ -273,6 +273,18 @@
   .tbl-cards td::before { content: attr(data-label); color: var(--fgColor-muted); font-size: 12px; text-align: left; }
   .tbl-cards td:first-child { display: block; text-align: left; font-weight: 600; padding-bottom: 6px; }
   .tbl-cards td:first-child::before { content: none; }
+}
+/* The Sources table has seven columns: it turns into cards by the width it gets, not the window's, so a tablet
+   with the console sidebar open never scrolls sideways. */
+.src-table { container-type: inline-size; overflow-x: auto; }
+@container (max-width: 880px) {
+  .src-table .tbl-cards thead { display: none; }
+  .src-table .tbl-cards, .src-table .tbl-cards tbody, .src-table .tbl-cards tr, .src-table .tbl-cards td { display: block; width: 100%; }
+  .src-table .tbl-cards tr { border-bottom: 1px solid var(--borderColor-default); padding: 12px 16px; }
+  .src-table .tbl-cards td { border: 0; padding: 2px 0; display: flex; justify-content: space-between; gap: 12px; text-align: right; }
+  .src-table .tbl-cards td::before { content: attr(data-label); color: var(--fgColor-muted); font-size: 12px; text-align: left; }
+  .src-table .tbl-cards td:first-child { display: block; text-align: left; font-weight: 600; padding-bottom: 6px; }
+  .src-table .tbl-cards td:first-child::before { content: none; }
 }
 .cs-navclose { display: none; }
 @media (max-width: 760px) {
@@ -501,3 +513,13 @@ a.stat:hover { background: var(--bgColor-muted); }
 button.fc-composer-pack.src-switch:hover { background: var(--control-transparent-bgColor-hover); }
 .cs-navtop > .src-switch { flex: 1; min-width: 0; }
 .fc-menu-hint { margin-left: auto; padding-left: 8px; font-size: 12px; color: var(--fgColor-muted); white-space: nowrap; }
+
+/* Touch targets below 768 px are at least 44 px tall (design: 40-44 px; WCAG 2.5.8): the links of table and card
+   rows and the setup's step bars grow their hit area without changing how they look. */
+@media (max-width: 767px) {
+  .tbl .src-link, .tbl .fc-link, .tbl .link-button, .back { display: inline-flex; align-items: center; min-height: 44px; min-width: 44px; }
+  .fc-switch-track { width: 44px; height: 24px; }
+  .fc-switch-track::after { top: 2px; width: 20px; height: 20px; }
+  .fc-switch-track[aria-checked="true"]::after { left: 22px; }
+  .ob-step { height: 44px; margin: -20px 0; padding: 20px 0; }
+}
