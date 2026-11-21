@@ -7,11 +7,12 @@ const chat = vi.hoisted(() => ({
   ask: vi.fn(async () => "c1"),
   pack: { name: "erp" } as { name: string } | null,
   loaded: true,
+  providers: [{ id: "p" }] as { id: string }[],
 }));
 
 vi.mock("@/lib/chat/ChatContext", () => ({
   useChat: () => ({
-    api: { chat: { suggestions: async () => [] } }, identity: null, pack: chat.pack, ask: chat.ask, busy: null, loaded: chat.loaded,
+    api: { chat: { suggestions: async () => [] }, models: { providers: async () => chat.providers } }, identity: null, pack: chat.pack, ask: chat.ask, busy: null, loaded: chat.loaded,
   }),
 }));
 
@@ -47,6 +48,27 @@ describe("a question picked in the setup", () => {
     await new Promise((resolve) => setTimeout(resolve, 20));
     expect(chat.ask).not.toHaveBeenCalled();
     expect(takeQuestion()).toBe("Orders per month?");
+    chat.pack = { name: "erp" };
+  });
+});
+
+describe("a new chat without a pack", () => {
+  it("points to connecting a model first when there is none", async () => {
+    chat.pack = null;
+    chat.providers = [];
+    const { findByRole } = render(<I18nProvider initial="en"><EmptyChat /></I18nProvider>);
+
+    expect(await findByRole("heading", { name: "Connect a model to start" })).toBeTruthy();
+    expect((await findByRole("link", { name: "Open Models" })).getAttribute("href")).toBe("/console/models");
+    chat.pack = { name: "erp" };
+    chat.providers = [{ id: "p" }];
+  });
+
+  it("points to the data once a model is connected", async () => {
+    chat.pack = null;
+    const { findByRole } = render(<I18nProvider initial="en"><EmptyChat /></I18nProvider>);
+
+    expect(await findByRole("heading", { name: "Connect your data to start" })).toBeTruthy();
     chat.pack = { name: "erp" };
   });
 });

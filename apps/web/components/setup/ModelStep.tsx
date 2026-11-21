@@ -152,7 +152,8 @@ export function ModelStep({ models, meta, onNext, onSkip, disabled = false }: {
     <>
       <StepHead icon={<Icon name="cpu" size="xl" />} title={t("onboarding.modelTitle")}>{t("onboarding.modelSub")}</StepHead>
       <ProviderPicker presetId={presetId} onPreset={choose} apiKey={apiKey} onApiKey={setApiKey} address={address} onAddress={setAddress}
-        name={providerName} onName={setProviderName} error={error} disabled={busy || disabled} />
+        // The first run asks for a name only where one is needed; any provider can be renamed on the Models page.
+        name={providerName} onName={preset.group === "other" ? setProviderName : undefined} error={error} disabled={busy || disabled} />
       <div className="ob-foot">
         <button type="button" className="fc-btn fc-btn-primary fc-btn-xl fc-btn-block" aria-busy={busy || undefined}
           disabled={busy || disabled || presetIncomplete(preset, apiKey, address, providerName)} onClick={() => void check()}>

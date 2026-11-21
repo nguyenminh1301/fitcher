@@ -94,6 +94,16 @@ describe("overview", () => {
     expect(within(screen.getByRole("navigation", { name: "Console" })).getByRole("link", { name: /Quality/ }).textContent).toContain("1");
   });
 
+  it("counts items approved without a person and questions that failed in the last day", async () => {
+    vi.spyOn(api.review, "items").mockResolvedValue([{ id: "i1", status: "approved", reviewed: false }, { id: "i2", status: "approved" }] as never);
+    vi.spyOn(api.runs, "list").mockResolvedValue([run("a", "failed", 2), run("b", "error", 5), run("c", "failed", 30)]);
+    show();
+
+    const attention = await screen.findByRole("region", { name: "Needs a look" });
+    await waitFor(() => expect(within(attention).getAllByRole("link").map((link) => link.textContent))
+      .toEqual(["1 item to review", "2 questions failed in the last 24 hours"]));
+  });
+
   it("says there is nothing to look at", async () => {
     show();
     expect(await screen.findByText("Nothing needs a look.")).toBeTruthy();

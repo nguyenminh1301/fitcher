@@ -107,7 +107,8 @@ export function OverviewSection() {
       setData({
         runs, costs, providers, sources, owner,
         report: [...reports].sort((a, b) => b.ts.localeCompare(a.ts))[0] ?? null,
-        drafts: items.filter((item) => item.status === "draft").length,
+        // A draft, or an item an instant pack approved without a person (shown as Unreviewed on Review).
+        drafts: items.filter((item) => item.status === "draft" || item.reviewed === false).length,
         dislikes: feedback.filter((row) => row.rating === "dislike" && !row.proposal).length,
         drifted: drifted.filter((id): id is string => Boolean(id)),
       });
@@ -119,6 +120,9 @@ export function OverviewSection() {
   const runs = useMemo(() => (data?.runs ?? []).filter((run) => Date.parse(run.ts) >= start), [data, start]);
   const costs = useMemo(() => (data?.costs ?? []).filter((row) => Date.parse(`${row.day}T23:59:59Z`) >= start), [data, start]);
   const answered = runs.filter((run) => run.status === "succeeded").length;
+  // Questions of the last 24 hours that failed: the model did not answer, or the SQL kept failing.
+  const unanswered = (data?.runs ?? []).filter((run) => Date.parse(run.ts) >= now - 86_400_000
+    && (run.status === "failed" || run.status === "error")).length;
   const cost = costs.reduce((sum, row) => sum + row.cost_usd, 0);
   const exec = data?.report?.layers.execution;
   const execRate = exec && exec.passed + exec.failed ? exec.passed / (exec.passed + exec.failed) : null;
@@ -143,6 +147,7 @@ export function OverviewSection() {
   const attention = data ? [
     data.drafts ? { key: "drafts", icon: "clipboardCheck", text: t("overview.drafts", { n: data.drafts }), path: "/console/review" } : null,
     data.dislikes ? { key: "dislikes", icon: "thumbsDown", text: t("overview.dislikes", { n: data.dislikes }), path: "/console/feedback" } : null,
+    unanswered ? { key: "unanswered", icon: "alert", text: t("overview.unanswered", { n: unanswered }), path: "/console/runs" } : null,
     ...(data.sources ?? []).filter((source) => source.last_sync?.status === "failed").map((source) => (
       { key: `failed-${source.id}`, dot: "var(--fgColor-danger)", text: t("overview.syncFailed", { name: source.id }), path: "/console/sources" })),
     ...(data.sources ?? []).filter((source) => source.last_sync?.status === "partial").map((source) => (

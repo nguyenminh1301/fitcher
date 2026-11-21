@@ -17,6 +17,7 @@ import type { EvalReport } from "@/lib/contracts";
 import { useChat } from "@/lib/chat/ChatContext";
 import { useLoad } from "@/lib/console/useLoad";
 import { cx } from "@/lib/cx";
+import { useAiCostLabel } from "@/lib/console/useAiCostLabel";
 import { useI18n } from "@/lib/i18n/react";
 
 // The layers an eval report scores, in pipeline order, and their labels.
@@ -159,6 +160,7 @@ function History({ reports }: { reports: EvalReport[] }) {
 
 export function EvaluationSection() {
   const { t } = useI18n();
+  const cost = useAiCostLabel();
   const { api } = useChat();
   const { toast } = useConsole();
   const { data, failed, reload } = useReports();
@@ -188,7 +190,7 @@ export function EvaluationSection() {
     <ListPage section="evaluation" loading={!data} failed={failed} skeleton="page"
       actions={
         <div className="toolbar">
-          <span className="fc-paid" id="eval-paid">{t("ui.paidAi")}</span>
+          <span className={cost.paid ? "fc-paid" : "fc-paid fc-paid-free"} id="eval-paid">{cost.text}</span>
           <button type="button" className="fc-btn fc-btn-primary" disabled={running} aria-busy={running || undefined}
             aria-describedby="eval-paid" onClick={() => setConfirming(true)}>
             {running ? <span className="fc-spin fc-spinning" aria-hidden="true" /> : <Icon name="play" />}
