@@ -203,6 +203,19 @@
         "lang": {
           "title": "Lang",
           "type": "string"
+        },
+        "about": {
+          "default": "",
+          "title": "About",
+          "type": "string"
+        },
+        "chosen": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Chosen",
+          "type": "array"
         }
       },
       "required": [
@@ -210,7 +223,9 @@
         "event",
         "question",
         "options",
-        "lang"
+        "lang",
+        "about",
+        "chosen"
       ],
       "title": "ClarifyEvent",
       "type": "object"

@@ -45,16 +45,22 @@ class FakeAgent:
     # Other AgentDeps fields of every run, such as the screener and screen mode.
     overrides: dict = field(default_factory=dict)
     llms: list = field(default_factory=list)
+    # The LLM replies of each later run in turn, after the first run's ``llm_replies``.
+    later_replies: list = field(default_factory=list)
+    clarified: list = field(default_factory=list)
 
-    def start(self, *, role, user_id, today, history=()):
+    def start(self, *, role, user_id, today, history=(), clarified=None):
         self.started.append((role, user_id, today))
         self.histories.append(history)
-        agent_deps = deps(self.llm_replies, self.runner)
+        self.clarified.append(clarified)
+        replies = self.later_replies.pop(0) if len(self.started) > 1 and self.later_replies else self.llm_replies
+        agent_deps = deps(replies, self.runner)
         self.llms.append(agent_deps.llm)
+        overrides = {**self.overrides, **({"choices": clarified[1]} if clarified else {})}
         return GraphRun(replace(
             agent_deps, compiled=self.compiled or agent_deps.compiled, role=role, user_id=user_id, history=history,
-            **self.overrides,
-        ))
+            **overrides,
+        ), question=clarified[0] if clarified else None)
 
 
 def pack_with_refunds_clerk():
@@ -450,6 +456,37 @@ def test_a_follow_up_reads_the_previous_turn():
     assert (previous.turn, previous.question, previous.answer) == (1, QUESTION, "Widget 0 led.")
     assert previous.query_spec is not None and previous.result is not None
     assert [row["turn"] for row in client.tables["chat_messages"]] == [1, 1, 2, 2]
+
+
+def test_a_picked_option_answers_the_clarified_question_with_that_choice():
+    first_run = [routing_reply(), extraction_reply(metric_terms=[], rank_term=None)]
+    # The second run reads the clarified question again; the router is not asked.
+    second_run = [extraction_reply(metric_terms=[], rank_term=None), GOOD_SQL, "Widget 0 led."]
+    agent, client = FakeAgent(first_run, later_replies=[second_run]), FakeConversationClient()
+    store = ConversationStore(client)
+    first = ask_with(agent, store, {})[0]
+    clarify = parse(first.text)[-2]
+    assert (clarify["about"], clarify["chosen"]) == (QUESTION, [])
+
+    [second] = ask_with(agent, store, {
+        "question": "Widget revenue", "conversation_id": first.headers["x-conversation-id"],
+        "clarify_option": "metric:widget_revenue",
+    })
+
+    assert agent.clarified[1] == (QUESTION, ("metric:widget_revenue",))
+    assert kinds(parse(second.text))[-2:] == ["summary", "done"]
+    asked = [row["content"] for row in client.tables["chat_messages"] if row["role"] == "user"]
+    assert asked == [QUESTION, "Widget revenue"]
+
+
+def test_an_option_the_last_turn_did_not_offer_is_read_as_typed():
+    agent, store = answer(), ConversationStore(FakeConversationClient())
+    first = ask_with(agent, store, {})[0]
+
+    ask_with(agent, store, {"question": "This year", "conversation_id": first.headers["x-conversation-id"],
+                            "clarify_option": "period:this_year"})
+
+    assert agent.clarified[1] is None
 
 
 def test_an_unreachable_store_is_503():

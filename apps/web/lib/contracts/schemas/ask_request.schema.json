@@ -69,6 +69,19 @@
       ],
       "default": null,
       "title": "Retry Of Turn"
+    },
+    "clarify_option": {
+      "anyOf": [
+        {
+          "pattern": "^(period|metric|column):[A-Za-z0-9_.-]{1,200}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Clarify Option"
     }
   },
   "required": [

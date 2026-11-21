@@ -159,7 +159,7 @@ def test_a_follow_up_without_a_previous_query_has_no_period():
 
     update = resolve_time({"extraction": extraction, "previous_spec": None}, deps([]))
 
-    assert update == {"periods": []}
+    assert update == {"periods": [], "all_time": False}
 
 
 def test_what_about_last_year_reuses_the_previous_question():
@@ -188,6 +188,32 @@ def test_a_year_the_question_spells_out_is_used_when_the_extraction_misses_it():
     update = resolve_time({"question": "Số đơn hàng theo tháng năm 2026", "extraction": extraction, "previous_spec": None}, deps([]))
 
     assert [(p.start.isoformat(), p.end.isoformat()) for p in update["periods"]] == [("2026-01-01", "2027-01-01")]
+
+
+def test_a_picked_period_option_is_applied_without_reading_its_label():
+    extraction = extract({"question": "Revenue"}, deps([extraction_reply(periods=[])]))["extraction"]
+    state = {"question": "Revenue", "extraction": extraction, "previous_spec": None, "choices": ["period:last_year"]}
+
+    update = resolve_time(state, deps([]))
+
+    assert [(p.start.isoformat(), p.end.isoformat()) for p in update["periods"]] == [("2025-01-01", "2026-01-01")]
+
+
+def test_picking_all_data_needs_no_period():
+    extraction = extract({"question": "Revenue"}, deps([extraction_reply(periods=[])]))["extraction"]
+    state = {"question": "Revenue", "extraction": extraction, "previous_spec": None, "choices": ["period:all"]}
+
+    assert resolve_time(state, deps([])) == {"periods": [], "all_time": True}
+
+
+@pytest.mark.parametrize("question", [
+    "How many orders are there in total?", "Overall revenue by region", "Tổng cộng có bao nhiêu đơn hàng?",
+    "Doanh thu từ trước đến nay", "Doanh thu toàn bộ các khu vực",
+])
+def test_a_question_about_all_the_data_needs_no_period(question):
+    extraction = extract({"question": question}, deps([extraction_reply(periods=[])]))["extraction"]
+
+    assert resolve_time({"question": question, "extraction": extraction, "previous_spec": None}, deps([]))["all_time"] is True
 
 
 def test_a_grain_the_question_spells_out_is_kept_when_the_extraction_misses_it():

@@ -122,6 +122,9 @@ def _outcome(state: AgentState) -> tuple[str, str, str]:
         return "clarified", intent, ""
     if state.get("denial"):
         return "denied", intent, state["denial"].message
+    if intent == "out_of_scope" and state.get("reply") is not None:
+        # Declined, not answered: it returned no result and must not count as one.
+        return "declined", intent, ""
     if state.get("result") is not None or state.get("reply") is not None:
         return "succeeded", intent, ""
     errors = state.get("errors", [])
@@ -145,13 +148,16 @@ def run_question(question: str, deps: AgentDeps) -> AgentState:
         initial: AgentState = {
             "question": question,
             "trace_id": run.trace_id,
+            "choices": list(deps.choices),
+            "asked": deps.asked,
+            "all_time": False,
             "attempts": [],
             "errors": [],
             "warnings": [],
         }
         if deps.logs is None:
             return _invoke(initial, deps)
-        log = RunLog(deps.logs, run, user_id=deps.user_id, pack=deps.compiled.pack.name, question=question)
+        log = RunLog(deps.logs, run, user_id=deps.user_id, pack=deps.compiled.pack.name, question=deps.asked or question)
         deps = replace(deps, runner=LoggingRunner(deps.runner, deps.logs))
         try:
             state = _invoke(initial, deps)
