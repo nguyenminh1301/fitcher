@@ -12,7 +12,6 @@ from app.packs.models import READER_ROLE
 
 ROOT = Path(__file__).resolve().parents[3]
 PACKS = ROOT / "packs"
-CONSOLE_ROLES = {"pack_reviewer", "admin"}
 SAMPLE_FILES = sorted(PACKS.glob("*/sample_data/*.json"))
 
 
@@ -43,7 +42,7 @@ def test_sample_data_names_only_the_packs_roles(pack_dir):
     scenarios = json.loads((pack_dir / "sample_data" / "scenarios.json").read_text(encoding="utf-8"))
 
     assert set(console["pack_roles"]) == roles
-    assert {role for identity in console["identities"] for role in identity["roles"]} <= roles | CONSOLE_ROLES
+    assert "identities" not in console
     assert {role for scenario in scenarios["scenarios"] for role in scenario["allowed_roles"]} <= roles
 
 

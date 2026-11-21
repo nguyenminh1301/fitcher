@@ -6,17 +6,6 @@
   "pack_roles": [
     "reader"
   ],
-  "identities": [
-    {
-      "user_id": "owner",
-      "display_name": "Owner",
-      "roles": [
-        "reader",
-        "pack_reviewer",
-        "admin"
-      ]
-    }
-  ],
   "conversations": [],
   "datasets": [],
   "review_items": [],

@@ -17,7 +17,7 @@ const SCENARIO: Scenario = {
 const IDENTITY: Identity = { user_id: "ana", display_name: "Ana", roles: ["analyst"] };
 
 function api(stepMs = 0, overrides: Partial<{ pack: FitcherApi["auth"]["pack"]; chat: FitcherApi["chat"] }> = {}): FitcherApi {
-  const data: SampleData = { console: { ...EMPTY_CONSOLE, identities: [IDENTITY] }, scenarios: { suggestions: [], scenarios: [SCENARIO] }, status: "ok" };
+  const data: SampleData = { console: { ...EMPTY_CONSOLE,}, scenarios: { suggestions: [], scenarios: [SCENARIO] }, status: "ok" };
   const load = async () => data;
   const identity = async () => IDENTITY;
   return {

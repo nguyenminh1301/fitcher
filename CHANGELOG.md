@@ -119,6 +119,7 @@
 
 ### Removed
 
+- The demo identities of the sample-data mode and the account menu's "Sign in as" list: the sample instance has one owner, like a real one, who holds every role of the pack. The sample packs' `console.json` no longer lists identities.
 - The console roles `pack_reviewer` and `admin` and the `X-Active-Role` header. fitcher has one owner, who held both roles anyway; every console endpoint now answers the owner, `/me` lists only the pack roles, and a request runs as the first role of the pack's `policies.yaml`. A request that still sends `X-Active-Role` is answered as before, without it.
 - `GET /admin/conversations` and `GET /admin/conversations/{id}`, which read any user's conversations for an administrator: no page used them, and fitcher has one owner, who reads their own conversations in the chat.
 - The animated walkthrough for creating an OpenRouter key is gone from the setup's provider card; the "Get a key" link and the note on OpenRouter's free models stay.

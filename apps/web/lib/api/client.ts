@@ -63,9 +63,8 @@ export type { ConversationPatch } from "@/lib/contracts";
 
 export interface FitcherApi {
   auth: {
-    identities(): Promise<Identity[]>;
+    /** The owner, or null when the owner password asks this browser to sign in first. */
     current(): Promise<Identity | null>;
-    switchTo(userId: string): Promise<Identity>;
     /** The active pack, or null while no pack is active (a new instance before its first pack is built). */
     pack(): Promise<{ name: string; display_name: string; roles: string[] } | null>;
     /** Make a ready source's pack the current one: the console reads it and a new conversation starts on it. */

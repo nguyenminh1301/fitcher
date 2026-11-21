@@ -18,7 +18,6 @@
     "badge": "Sample data",
     "tooltip": "This part runs on sample data until its service is connected.",
     "unmatched": "I can only answer this demo's sample questions until the chat is connected to your data. Try one of the suggested questions.",
-    "identity": "Sign in as (sample data)",
     "continue": "Continue with the sample data"
   },
   "common": {

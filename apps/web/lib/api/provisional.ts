@@ -18,7 +18,7 @@ import type {
 import type { ConversationThread } from "./conversations";
 import type { AskEvent } from "./events";
 
-/** Who a request acts as: the owner of this personal app; demo identities on sample data. */
+/** Who a request acts as: the owner of this personal app. */
 export interface Identity {
   user_id: string;
   display_name: string;
@@ -61,7 +61,6 @@ export interface ScenarioFile {
 export interface ConsoleFile {
   pack: { name: string; display_name: string };
   pack_roles: string[];
-  identities: Identity[];
   conversations: ConversationThread[];
   datasets: DatasetView[];
   review_items: ReviewItem[];

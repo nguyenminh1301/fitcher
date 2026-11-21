@@ -17,14 +17,13 @@ function fetcher(replies: Record<string, (init?: RequestInit) => Response>) {
 afterEach(cleanup);
 
 describe("http auth", () => {
-  it("reads the signed-in user once per page and offers no other identity", async () => {
+  it("reads the owner once per page", async () => {
     const fetch = fetcher({ "/api/session": () => Response.json(IDENTITY) });
     const auth = createHttpAuth(fetch);
 
     expect(await auth.current()).toEqual(IDENTITY);
-    expect(await auth.identities()).toEqual([IDENTITY]);
+    expect(await auth.current()).toEqual(IDENTITY);
     expect(fetch).toHaveBeenCalledTimes(1);
-    await expect(auth.switchTo("dev.other")).rejects.toThrow("sign out");
   });
 
   it("reads the pack from the web server", async () => {

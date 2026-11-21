@@ -11,7 +11,6 @@ import { I18nProvider } from "@/lib/i18n/react";
 const CONSOLE = {
   pack: { name: "shop", display_name: "Shop" },
   pack_roles: ["analyst", "marketing"],
-  identities: [{ user_id: "u1", display_name: "Ana", roles: ["analyst", "admin"] }],
   conversations: [],
   datasets: [{ id: "orders", description: "Orders.", grain: "one row per order", time_column: "day", readable_roles: ["analyst"], columns: [] }],
   review_items: [],

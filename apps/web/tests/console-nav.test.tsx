@@ -12,16 +12,10 @@ import { ThemeProvider } from "@/lib/theme";
 const CONSOLE: Partial<ConsoleFile> = {
   pack: { name: "shop", display_name: "Shop" },
   pack_roles: ["analyst"],
-  identities: [
-    { user_id: "ana", display_name: "Ana Analyst", roles: ["analyst"] },
-    { user_id: "rev", display_name: "Rae Reviewer", roles: ["pack_reviewer", "analyst"] },
-    { user_id: "adm", display_name: "Ada Admin", roles: ["admin", "analyst"] },
-  ],
   conversations: [],
 };
 
 function renderConsole(user: string, section: string, api = createMockApi()) {
-  window.localStorage.setItem("fitcher.demo.identity", user);
   const navigate = vi.fn();
   const onChat = vi.fn();
   render(

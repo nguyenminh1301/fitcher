@@ -2,14 +2,13 @@
 
 // The owner's menu, shared by the chat and the console: who this is ("Owner", on this computer or signed in),
 // the theme and language, the chat, the console and the Security page, and signing out once an owner password
-// is set. While sign-in runs on sample data it also offers the pack's demo identities.
+// is set.
 
 import { useCallback, useEffect, useState, type MouseEvent } from "react";
 
 import { Icon } from "@/components/brand/Icon";
 import { Segmented } from "@/components/ui/controls";
 import { Menu, type MenuItem } from "@/components/ui/overlay";
-import { isSample } from "@/lib/api/sources";
 import { useChat } from "@/lib/chat/ChatContext";
 import { useI18n } from "@/lib/i18n/react";
 import { useTheme, type Theme } from "@/lib/theme";
@@ -21,7 +20,7 @@ export function initials(name: string): string {
 export function AccountMenu({ onConsole, onChat, onSecurity }: { onConsole?: () => void; onChat?: () => void; onSecurity?: () => void }) {
   const { t, locale, setLocale } = useI18n();
   const { theme, setTheme } = useTheme();
-  const { api, identity, identities, sources, switchIdentity } = useChat();
+  const { api } = useChat();
   const [anchor, setAnchor] = useState<HTMLElement | null>(null);
   // Signing out is offered only once the owner has set a password; without one there is no session.
   const [password, setPassword] = useState(false);
@@ -30,20 +29,12 @@ export function AccountMenu({ onConsole, onChat, onSecurity }: { onConsole?: () 
     void api.owner.status().then((status) => setPassword(status.password_set && status.signed_in)).catch(() => setPassword(false));
   }, [api]);
   useEffect(refresh, [refresh]);
-  const sample = isSample("auth", sources) && Boolean(identity);
-  // The demo's identities keep their names; the owner is "Owner".
-  const name = sample && identity ? identity.display_name : t("owner.name");
+  const name = t("owner.name");
   const where = password ? t("owner.signedIn") : t("owner.thisComputer");
 
   const items: MenuItem[] = [
     { icon: "globe", label: t("ui.language"), sub: (["vi", "en"] as const).map((code) => ({ label: t(`language.${code}`), checked: locale === code, onSelect: () => setLocale(code) })) },
   ];
-  if (sample && identity && identities.length > 1) {
-    items.push({ separator: true }, { node: <div className="nav-group">{t("sample.identity")}</div> });
-    for (const option of identities) {
-      items.push({ icon: "user", label: option.display_name, checked: option.user_id === identity.user_id, onSelect: () => void switchIdentity(option.user_id) });
-    }
-  }
   items.push({ separator: true });
   if (onChat) items.push({ icon: "message", label: t("console.chat"), onSelect: onChat });
   if (onConsole) items.push({ icon: "home", label: t("ui.console"), onSelect: onConsole });

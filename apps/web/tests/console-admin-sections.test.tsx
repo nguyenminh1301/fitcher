@@ -21,10 +21,6 @@ configure({ asyncUtilTimeout: 4000 });
 const CONSOLE: Partial<ConsoleFile> = {
   pack: { name: "shop", display_name: "Shop" },
   pack_roles: ["analyst", "viewer"],
-  identities: [
-    { user_id: "adm", display_name: "Ada Admin", roles: ["admin", "analyst"] },
-    { user_id: "rev", display_name: "Rae Reviewer", roles: ["pack_reviewer", "analyst"] },
-  ],
   conversations: [],
   eval_reports: [
     {
@@ -68,7 +64,6 @@ let api: MockApi;
 let navigate: Mock<(path: string, options?: { replace: boolean }) => void>;
 
 function show(section: string, page: ReactNode, user = "adm") {
-  window.localStorage.setItem("fitcher.demo.identity", user);
   render(
     <ThemeProvider>
       <I18nProvider initial="en">

@@ -39,13 +39,6 @@ export function createHttpAuth(fetcher: typeof fetch = (...args) => fetch(...arg
     }));
   return {
     current: load,
-    identities: async () => {
-      const identity = await load();
-      return identity ? [identity] : [];
-    },
-    switchTo: async () => {
-      throw new Error("A session has one identity; sign out to use another account.");
-    },
     // 503 means no pack is active yet; 401 means the owner password asks for a session first, which the
     // session check sends to the sign-in page.
     pack: async () => {
