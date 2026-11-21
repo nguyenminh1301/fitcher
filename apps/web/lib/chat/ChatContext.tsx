@@ -27,7 +27,6 @@ export type ChatState = {
   identity: Identity | null;
   /** The api's reason when it refused this browser outright (see AccessRefused), else null. */
   refused: string | null;
-  identities: Identity[];
   pack: { name: string; display_name: string; roles: string[] } | null;
   conversations: Conversation[];
   groups: ConversationGroup[];
@@ -36,7 +35,6 @@ export type ChatState = {
   now: () => Date;
   navigate: (conversationId: string | null) => void;
   refresh: () => Promise<void>;
-  switchIdentity: (userId: string) => Promise<void>;
   /** Open conversations by id, with their turns as streamed so far. */
   threads: Record<string, ConversationThread>;
   /** The conversation whose answer is streaming, if any. */
@@ -68,7 +66,6 @@ type ProviderProps = {
 export function ChatProvider({ api, navigate, activeId, sources = currentSources, now = () => new Date(), onSignedOut, children }: ProviderProps) {
   const [identity, setIdentity] = useState<Identity | null>(null);
   const [refused, setRefused] = useState<string | null>(null);
-  const [identities, setIdentities] = useState<Identity[]>([]);
   const [pack, setPack] = useState<ChatState["pack"]>(null);
   // The api keeps the current pack, so the chat, the console and other tabs agree on the source.
   const chosenPack = pack?.name ?? null;
@@ -96,20 +93,19 @@ export function ChatProvider({ api, navigate, activeId, sources = currentSources
     (async () => {
       let answers;
       try {
-        answers = await Promise.all([api.auth.current(), api.auth.identities(), api.auth.pack()]);
+        answers = await Promise.all([api.auth.current(), api.auth.pack()]);
       } catch (error) {
         if (!cancelled && error instanceof AccessRefused) setRefused(error.reason);
         if (error instanceof AccessRefused) return;
         throw error;
       }
-      const [current, all, packInfo] = answers;
+      const [current, packInfo] = answers;
       if (cancelled) return;
       if (current === null && !isSample("auth", sources)) {
         onSignedOut?.();
         return;
       }
       setIdentity(current);
-      setIdentities(all);
       setPack(packInfo);
       await refresh();
     })();
@@ -247,23 +243,12 @@ export function ChatProvider({ api, navigate, activeId, sources = currentSources
     if (!conversationId || conversationId === busyRef.current) controller.current?.abort();
   }, [api]);
 
-  const switchIdentity = useCallback(
-    async (userId: string) => {
-      setIdentity(await api.auth.switchTo(userId));
-      threadsRef.current = {};
-      setThreads({});
-      navigate(null);
-      await refresh();
-    },
-    [api, navigate, refresh],
-  );
-
   const value = useMemo<ChatState>(
     () => ({
-      api, sources, identity, refused, identities, pack, conversations, groups, loaded, activeId, now, navigate, refresh, switchIdentity,
+      api, sources, identity, refused, pack, conversations, groups, loaded, activeId, now, navigate, refresh,
       threads, busy, loadThread, ask, stop, chosenPack, choosePack,
     }),
-    [api, sources, identity, refused, identities, pack, conversations, groups, loaded, activeId, now, navigate, refresh, switchIdentity, threads, busy, loadThread, ask, stop, chosenPack, choosePack],
+    [api, sources, identity, refused, pack, conversations, groups, loaded, activeId, now, navigate, refresh, threads, busy, loadThread, ask, stop, chosenPack, choosePack],
   );
   return <ChatContext.Provider value={value}>{children}</ChatContext.Provider>;
 }

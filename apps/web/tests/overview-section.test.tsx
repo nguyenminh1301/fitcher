@@ -11,7 +11,6 @@ import { ThemeProvider } from "@/lib/theme";
 
 const CONSOLE: Partial<ConsoleFile> = {
   pack: { name: "shop", display_name: "Shop" },
-  identities: [{ user_id: "owner", display_name: "Owner", roles: ["admin", "pack_reviewer"] }],
   conversations: [],
 };
 

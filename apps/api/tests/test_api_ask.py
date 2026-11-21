@@ -8,7 +8,6 @@ import time
 import uuid
 
 from agent_fixtures import GOOD_SQL, compiled_fixture, deps, extraction_reply, good_output, routing_reply
-from session_fixtures import SessionHeaders
 from fakes import FakeClassifier, FakeConversationClient, FakeRunner
 from fastapi.testclient import TestClient
 import pytest
@@ -114,7 +113,7 @@ def kinds(events: list[dict]) -> list[str]:
 
 
 def post(client, question=QUESTION, headers=None, **body):
-    return client.post("/ask", json={"question": question, **body}, headers={**SessionHeaders(), **(headers or {})})
+    return client.post("/ask", json={"question": question, **body}, headers={**{}, **(headers or {})})
 
 
 def test_a_data_question_streams_status_sql_result_chart_summary_and_done(ask_client):
@@ -172,13 +171,16 @@ def test_a_repaired_query_streams_each_sql_attempt_before_the_result():
 
 
 def test_a_role_without_permission_receives_a_deny_event():
+    # The owner runs as the first role of policies.yaml; here that role may read refunds only.
     compiled = pack_with_refunds_clerk()
+    policies = compiled.pack.policies
+    first_clerk = policies.model_copy(update={"roles": list(reversed(policies.roles))})
+    compiled = compiled.model_copy(update={"pack": compiled.pack.model_copy(update={"policies": first_clerk})})
     agent = FakeAgent([routing_reply(), extraction_reply()], compiled=compiled)
     serve(agent, compiled)
-    clerk = SessionHeaders(["refunds_clerk"])
     try:
         with TestClient(app) as client:
-            response = client.post("/ask", json={"question": QUESTION}, headers=clerk)
+            response = client.post("/ask", json={"question": QUESTION})
     finally:
         app.dependency_overrides.clear()
 
@@ -373,7 +375,7 @@ def test_too_many_questions_are_refused_before_the_graph_starts(ask_client):
 
 @pytest.mark.parametrize("body", [{"question": ""}, {"question": QUESTION, "timezone": "Mars/Base"}, {"question": QUESTION, "extra": 1}])
 def test_an_invalid_request_is_unprocessable(ask_client, body):
-    response = ask_client.post("/ask", json=body, headers=SessionHeaders())
+    response = ask_client.post("/ask", json=body, headers={})
 
     assert response.status_code == 422
     assert ask_client.agent.started == []

@@ -6,7 +6,6 @@ import type { ConsoleFile, ScenarioFile } from "../provisional";
 export const EMPTY_CONSOLE: ConsoleFile = {
   pack: { name: "", display_name: "" },
   pack_roles: [],
-  identities: [],
   conversations: [],
   datasets: [],
   review_items: [],

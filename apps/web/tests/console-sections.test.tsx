@@ -24,10 +24,6 @@ const TEST_RESULT: Result = {
 const CONSOLE: Partial<ConsoleFile> = {
   pack: { name: "shop", display_name: "Shop" },
   pack_roles: ["analyst", "viewer"],
-  identities: [
-    { user_id: "rev", display_name: "Rae Reviewer", roles: ["pack_reviewer", "analyst"] },
-    { user_id: "adm", display_name: "Ada Admin", roles: ["admin", "analyst"] },
-  ],
   conversations: [],
   review_items: [
     { id: "m1", file: "metrics.yaml", name: "metric_one", kind: "item", status: "draft", confidence: 0.82, body: "Units returned over units sold.", formula: "sum(a) / sum(b)", evidence: { source: "Handbook.pdf, page 2", quote: "Measured in units." }, test_result: TEST_RESULT },
@@ -57,7 +53,6 @@ let api: MockApi;
 let navigate: Mock<(path: string, options?: { replace: boolean }) => void>;
 
 function show(section: string, page: ReactNode, user = "rev") {
-  window.localStorage.setItem("fitcher.demo.identity", user);
   render(
     <ThemeProvider>
       <I18nProvider initial="en">

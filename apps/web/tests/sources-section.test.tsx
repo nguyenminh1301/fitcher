@@ -19,7 +19,6 @@ configure({ asyncUtilTimeout: 4000 });
 const CONSOLE: Partial<ConsoleFile> = {
   pack: { name: "shop", display_name: "Shop" },
   pack_roles: ["analyst"],
-  identities: [{ user_id: "adm", display_name: "Ada Admin", roles: ["admin", "analyst"] }],
   conversations: [],
 };
 
@@ -85,7 +84,6 @@ let navigate = vi.fn();
 let choose: Mock<FitcherApi["auth"]["choosePack"]>;
 
 function show(sources: FitcherApi["sources"], page: React.ReactNode = <SourcesSection />) {
-  window.localStorage.setItem("fitcher.demo.identity", "adm");
   const base = createMockApi();
   choose = vi.fn(async (name: string) => ({ name, display_name: name, roles: ["analyst"] }));
   const api = { ...base, sources, auth: { ...base.auth, choosePack: choose } };

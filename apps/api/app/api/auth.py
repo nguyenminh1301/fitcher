@@ -1,13 +1,12 @@
 """The principal of every request, plus ``/me`` and ``/pack``.
 
 fitcher is a personal app (DECISIONS §9): ``current_principal`` is always the owner, and the address checks of
-``app/auth/origin.py`` decide who reaches the api. ``current_role`` answers 403 when the ``X-Active-Role``
-header names a pack role the owner does not hold.
+``app/auth/origin.py`` decide who reaches the api. A request runs as the owner's first pack role.
 """
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Header, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 
 from app.api import runtime
@@ -18,7 +17,7 @@ from app.api.runtime import (
 from app.auth import origin
 from app.auth import owner as owner_password
 from app.auth.principal import Principal, owner
-from app.auth.roles import RoleError, active_role, known_roles
+from app.auth.roles import RoleError, active_role, held_pack_roles
 from app.packs.compiler import CompiledPack
 
 router = APIRouter()
@@ -43,10 +42,9 @@ def current_principal(owner_roles: Annotated[list[str], Depends(_owner_pack_role
 def current_role(
     principal: Annotated[Principal, Depends(current_principal)],
     compiled: Annotated[CompiledPack, Depends(get_compiled)],
-    x_active_role: Annotated[str | None, Header()] = None,
 ) -> str:
     try:
-        return active_role(principal.roles, pack_roles(compiled), x_active_role)
+        return active_role(principal.roles, pack_roles(compiled))
     except RoleError as error:
         raise HTTPException(status.HTTP_403_FORBIDDEN, detail=str(error)) from None
 
@@ -71,20 +69,16 @@ class PackInfo(BaseModel):
 def me(
     principal: Annotated[Principal, Depends(current_principal)],
     identity: Annotated[PackIdentity | None, Depends(get_pack_identity_or_none)],
-    x_active_role: Annotated[str | None, Header()] = None,
 ) -> Me:
-    """The user a request acts as; ``active_role`` is null for a user who holds console roles only, as on a new
-    instance where no pack is active yet."""
+    """The owner; ``active_role`` is null on a new instance where no pack is active yet."""
     roles = identity.roles if identity is not None else []
     try:
-        role = active_role(principal.roles, roles, x_active_role)
-    except RoleError as error:
-        if x_active_role is not None:
-            raise HTTPException(status.HTTP_403_FORBIDDEN, detail=str(error)) from None
+        role: str | None = active_role(principal.roles, roles)
+    except RoleError:
         role = None
     return Me(
         user_id=principal.user_id, display_name=principal.display_name,
-        roles=known_roles(principal.roles, roles), active_role=role, exposed=origin.exposed() and not _password_set(),
+        roles=held_pack_roles(principal.roles, roles), active_role=role, exposed=origin.exposed() and not _password_set(),
     )
 
 

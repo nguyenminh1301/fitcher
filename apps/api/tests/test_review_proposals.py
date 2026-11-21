@@ -7,7 +7,6 @@ from fastapi.testclient import TestClient
 import pytest
 
 from agent_fixtures import compiled_fixture
-from session_fixtures import SessionHeaders
 from test_review_service import NOW, Warehouse, pack_dir, registry  # noqa: F401 - fixtures
 
 from app.api import runtime
@@ -19,8 +18,8 @@ from app.main import app
 from app.onboarding.pack_yaml import ItemNotFound, PackFiles
 from app.onboarding.review import ReviewRefused, ReviewService
 
-REVIEWER = SessionHeaders(['pack_reviewer'])
-ADMIN = SessionHeaders(['admin'])
+REVIEWER = {}
+ADMIN = {}
 TS = datetime(2026, 11, 5, tzinfo=UTC)
 
 

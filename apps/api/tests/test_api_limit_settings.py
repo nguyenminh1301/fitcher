@@ -2,12 +2,11 @@
 
 from fastapi.testclient import TestClient
 
-from session_fixtures import SessionHeaders
 
 from app.main import app
 
-ADMIN = SessionHeaders(["admin"])
-VIEWER = SessionHeaders(["reader"])
+ADMIN = {}
+VIEWER = {}
 
 
 def test_the_question_limit_is_changed_within_its_range():

@@ -66,7 +66,7 @@ After a PostgreSQL source restarts, ClickHouse's `PostgreSQL` engine fails the f
 
 ### Connecting a source in the interface
 
-An `admin` connects a PostgreSQL, MySQL/MariaDB or SQL Server database, or uploads a CSV, XLSX or Parquet file, on the Sources page of the console or in the Data step of the setup, with no manifest and no `.env` change ([DECISIONS §4 and §15](../docs/DECISIONS.md#data-sources)):
+The owner connects a PostgreSQL, MySQL/MariaDB or SQL Server database, or uploads a CSV, XLSX or Parquet file, on the Sources page of the console or in the Data step of the setup, with no manifest and no `.env` change ([DECISIONS §4 and §15](../docs/DECISIONS.md#data-sources)):
 
 1. Create the read-only user below on the source system.
 2. Open Sources, choose Add source, enter the name, host, port, database, schema (PostgreSQL), user and password, and choose a TLS mode (a CA certificate verifies a server with its own authority). A database on the Docker host is reached as `host.docker.internal`; on Linux the `docker run` command adds `--add-host=host.docker.internal:host-gateway`.

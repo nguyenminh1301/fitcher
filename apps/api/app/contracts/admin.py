@@ -84,26 +84,3 @@ class CostRow(ContractModel):
     # Tokens sent to (prompt) and written by (completion) the calls, as the provider reported them.
     input_tokens: int = 0
     output_tokens: int = 0
-
-
-class AdminConversation(ContractModel):
-    conversation_id: str
-    user_id: str
-    title: str
-    # Deleted by its owner: hidden from them, still readable here; conversations have no expiry.
-    deleted: bool
-    updated_at: datetime
-
-
-class AdminMessage(ContractModel):
-    ts: datetime
-    role: str
-    content: str
-    trace_id: str
-    turn: int
-    revision: int
-
-
-class AdminConversationThread(ContractModel):
-    conversation: AdminConversation
-    messages: list[AdminMessage]

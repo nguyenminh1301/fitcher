@@ -8,23 +8,23 @@ The design makes one promise visible everywhere: every number comes from a query
 
 | | Chat app | Workspace console |
 |---|---|---|
-| Who | every role | `pack_reviewer`, `admin` |
-| Layout | history sidebar and a centred 768px conversation column (`ChatLayout`) | top bar with the pack, grouped navigation and pages in a panel up to 1160px (`ConsoleLayout`) |
+| Who | the owner | the owner |
+| Layout | history sidebar and a centred 768px conversation column (`ChatLayout`) | sidebar with the source, six areas and pages in a panel up to 1160px; an area with several pages shows them as tabs (`ConsoleLayout`, `AreaTabs`) |
 | Density | 16/24 message text, 12px box corners | 14/20 text, 6px box corners, 28px toolbar buttons |
 | Below 768px | the sidebar becomes a drawer | the navigation becomes a drawer, panes stack, tables become cards |
 
-`SignInScreen` comes first in team mode: an e-mail and password form, a "Continue with company account" action when an OpenID Connect provider is set up, the active pack and a short trust statement. Individual mode has no sign-in and opens the app at once.
+fitcher has one owner and no accounts. The sign-in page asks only for the optional owner password, once it is set; without one the app opens at once on this computer.
 
 ## Chat app
 
 ### Sidebar and conversations
 
 - Order: New chat, Search, then Pinned, Groups, Recent (Today, Past week, Past month), and the account menu at the bottom.
-- Each conversation has a menu: Pin, Rename, Move to group, Remove from group, Delete (with a confirmation dialog; it hides the conversation from the user, and an admin can still read it). Groups can be created, renamed and deleted; deleting a group returns its conversations to Recent.
+- Each conversation has a menu: Pin, Rename, Move to group, Remove from group, Delete (with a confirmation dialog). Groups can be created, renamed and deleted; deleting a group returns its conversations to Recent.
 - Search opens `SearchDialog` (also Ctrl K): filters as the user types, arrow keys and Enter open a result; full screen on phones.
 - The sidebar can be resized from 220 to 440px (drag, arrow keys on the handle, double-click resets) and collapsed on desktop.
 - The top bar shows the conversation title and its group; it opens the same menu. The active pack is a small label inside the composer.
-- The account menu holds the language and theme switches, the console entry for console roles, and sign out.
+- The account menu holds the language and theme switches, the console and Security entries, and sign out once an owner password is set.
 
 ### Empty state
 
@@ -54,17 +54,14 @@ The user's own `MessageBubble` offers copy and edit; editing replaces that quest
 
 ## Workspace console
 
-| Group | Section | Role | Content |
-|---|---|---|---|
-| Knowledge | Review | `pack_reviewer` | Pack items by file with draft/approved filters; `ReviewItem` detail with evidence (flagged when it cites a deleted document), `ConfidenceMeter`, inline edit, approve, delete and Test run for metrics; a Proposals tab for examples proposed from feedback, approved only after masked values are replaced and the SQL is test-run |
-| Knowledge | Documents | `pack_reviewer` | `UploadDropzone` (PDF, DOCX, MD, TXT, XLSX, 20 MB), `DocumentRow` with role chips, status (processing, indexed, failed with error), delete with confirmation, and "Draft pack items" marked as using paid AI; duplicate and compiling states |
-| Knowledge | Datasets | `pack_reviewer` | Read-only datasets of the compiled pack: columns, types, roles, readable roles |
-| Knowledge | Feedback | `pack_reviewer` | Likes and dislikes with question, note and trace; "Propose example" sends one run to Proposals |
-| Quality | Evaluation | `pack_reviewer`, `admin` | Per-layer rates, the 80% threshold, required categories, failed cases; `admin` can run the eval set (paid AI, confirmation) |
-| Observe | Runs and trace | `admin` | Paginated runs filtered by user, dates and status; `TraceTimeline` with step durations, LLM calls (alias, tokens, estimated cost), SQL attempts with errors and the access decision; any user's conversations, including deleted ones, marked as such |
-| Observe | Audit | `admin` | Allow and deny decisions with role, blocked tables and time |
-| Observe | Costs | `admin` | Estimated LLM cost by day, alias and model in the chat's chart card style |
-| Administration | Users | `admin` | Users with their pack roles and status; change roles, disable and enable; a role overview |
+| Area | Pages (tabs) | Content |
+|---|---|---|
+| Overview | Overview | Get started steps, figures for 24 hours, 7 or 30 days, recent runs, what needs a look (items to review, disliked answers, failed questions, failed or drifted syncs) and the sources |
+| Sources | Sources, Datasets | Connected databases and files with their tables, mode, last sync and pack; read-only datasets of the compiled pack: columns, types, roles |
+| Documents | Documents | `UploadDropzone` (PDF, DOCX, MD, TXT, XLSX, 20 MB), status (processing, indexed, failed with error), delete with confirmation, and "Draft pack items" labelled with what it costs; off until the owner turns documents on |
+| Quality | Review, Feedback, Evaluation | Pack items by file with draft/approved filters, evidence, `ConfidenceMeter` (left out when every item shares one value), inline edit, approve, delete and Test run, and a Proposals tab; likes and dislikes with "Propose example"; per-layer eval rates, the 80% threshold for reference, required categories, failed cases and starting a run |
+| Activity | Runs, Query log, Costs | Paginated runs filtered by dates and status; `TraceTimeline` with step durations, model calls, SQL attempts and the access decision, and why a run asked back or failed; access decisions and the screening verdict of every question; estimated model cost by day, task and model |
+| Settings | Models, Security | Providers, keys and each task's chain of models, the embedding and the prompt-injection filter; the owner password and how many questions are answered at once |
 
 Lists open into detail pages with a back button, a header of actions and two panes (stacked below 900px). Each section and detail page shows a page skeleton while it loads.
 

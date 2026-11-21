@@ -2,14 +2,13 @@
 
 from fastapi.testclient import TestClient
 import pytest
-from session_fixtures import SessionHeaders
 
 from app.api import instant as instant_api
 from app.main import app
 from app.onboarding.instant import InstantJob, InstantRefused
 
-ADMIN = SessionHeaders(["admin"], user_id="owner")
-VIEWER = SessionHeaders()
+ADMIN = {}
+VIEWER = {}
 
 
 class FakePipeline:

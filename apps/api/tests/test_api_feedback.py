@@ -4,7 +4,6 @@ from fastapi.testclient import TestClient
 import pytest
 
 from agent_fixtures import compiled_fixture
-from session_fixtures import SessionHeaders
 from fakes import FakeConversationClient
 
 from app.api import runtime
@@ -14,8 +13,8 @@ from app.main import app
 TRACE = "a" * 32
 
 
-def headers(user: str = "owner") -> SessionHeaders:
-    return SessionHeaders(user_id=user)
+def headers(user: str = "owner") -> dict[str, str]:
+    return {}
 
 
 @pytest.fixture

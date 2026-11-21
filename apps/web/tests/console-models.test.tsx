@@ -15,7 +15,6 @@ configure({ asyncUtilTimeout: 4000 });
 const CONSOLE: Partial<ConsoleFile> = {
   pack: { name: "shop", display_name: "Shop" },
   pack_roles: ["analyst"],
-  identities: [{ user_id: "adm", display_name: "Ada Admin", roles: ["admin", "analyst"] }],
   conversations: [],
 };
 
@@ -49,7 +48,6 @@ const CLASSIFIER: ClassifierStatus = { enabled: false, model_present: false, ver
 let api: MockApi;
 
 function show() {
-  window.localStorage.setItem("fitcher.demo.identity", "adm");
   render(
     <ThemeProvider>
       <I18nProvider initial="en">

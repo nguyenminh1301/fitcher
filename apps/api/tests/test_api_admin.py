@@ -7,15 +7,14 @@ from fastapi.testclient import TestClient
 import pytest
 
 from agent_fixtures import compiled_fixture
-from session_fixtures import SessionHeaders
 
 from app.admin.logs import PAGE_SIZE, AdminLogs
 from app.api import runtime
 from app.main import app
 
 TS = datetime(2026, 11, 5, 9, 0, tzinfo=UTC)
-ADMIN = SessionHeaders(['admin'])
-REVIEWER = SessionHeaders(['pack_reviewer'])
+ADMIN = {}
+REVIEWER = {}
 RUN = ("t1", TS, "dev.analyst", "reader", "Revenue by widget", "data_query", "succeeded", 1200, 0.0042, "", 1500, 220,
        ["openai/nvidia/model:free", "gpt-x", ""], "minimal", False, "")
 
@@ -160,21 +159,6 @@ def test_costs_are_grouped_with_their_provider(client):
          "cost_usd": 0.0, "input_tokens": 0, "output_tokens": 0},
     ]
     assert script.calls[0][1] == {"start": date(2026, 11, 1), "end": date(2026, 11, 6)}
-
-
-def test_an_admin_reads_a_conversation_its_owner_deleted(client):
-    reader, _ = logs([
-        (r"FROM agent_logs\.conversations FINAL WHERE conversation_id", [("c1", "dev.analyst", "Revenue", 1, TS)]),
-        (r"FROM agent_logs\.conversations FINAL", [("c1", "dev.analyst", "Revenue", 1, TS)]),
-        (r"FROM agent_logs\.chat_messages", [(TS, "user", "Revenue by widget", "t1", 1, 0)]),
-    ])
-    use(reader)
-
-    listed = client.get("/admin/conversations", headers=ADMIN, params={"user": "dev.analyst"}).json()
-    thread = client.get("/admin/conversations/c1", headers=ADMIN).json()
-
-    assert listed[0]["deleted"] is True
-    assert thread["conversation"]["deleted"] is True and thread["messages"][0]["content"] == "Revenue by widget"
 
 
 def test_an_unreachable_log_store_is_503(client):

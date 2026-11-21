@@ -1,7 +1,6 @@
 """The console's Evaluation section: eval reports and starting an eval run (DECISIONS §15).
 
-Reports are read by a ``pack_reviewer`` or an ``admin``; only an ``admin``
-starts a run, which is billable, runs in the background inside the api and
+The owner reads the reports and starts a run, which is billable, runs in the background inside the api and
 answers 409 while another run of the pack has not finished, or when the pack has
 no evaluation set to run (a pack built from a source starts without one).
 """
@@ -11,10 +10,8 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
 
-from app.api.auth import current_principal
-from app.api.console import ADMIN, PACK_REVIEWER, require_admin
+from app.api.console import Owner
 from app.api.runtime import get_compiled_or_none, get_eval_reports, get_eval_runs, unavailable
-from app.auth.principal import Principal
 from app.contracts.evaluation import EvalReportView, EvalRunStarted
 from app.eval.cases import EvalSetError, load_eval_set
 from app.eval.console import EvalReports, EvalRuns, RunInProgress
@@ -24,18 +21,11 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/admin")
 
 
-def require_reviewer_or_admin(principal: Annotated[Principal, Depends(current_principal)]) -> Principal:
-    if not {PACK_REVIEWER, ADMIN} & set(principal.roles):
-        raise HTTPException(status.HTTP_403_FORBIDDEN, detail="the Evaluation section needs pack_reviewer or admin")
-    return principal
-
-
-Reader = Annotated[Principal, Depends(require_reviewer_or_admin)]
 Reports = Annotated[EvalReports, Depends(get_eval_reports)]
 
 
 @router.get("/eval-reports")
-def list_reports(_: Reader, reports: Reports) -> list[EvalReportView]:
+def list_reports(_: Owner, reports: Reports) -> list[EvalReportView]:
     try:
         return reports.list()
     except Exception as error:  # noqa: BLE001 - ClickHouse unreachable or a stored report that no longer parses
@@ -44,7 +34,7 @@ def list_reports(_: Reader, reports: Reports) -> list[EvalReportView]:
 
 
 @router.get("/eval-reports/{report_id}")
-def read_report(report_id: str, _: Reader, reports: Reports) -> EvalReportView:
+def read_report(report_id: str, _: Owner, reports: Reports) -> EvalReportView:
     try:
         report = reports.get(report_id)
     except Exception as error:  # noqa: BLE001 - as above
@@ -57,7 +47,7 @@ def read_report(report_id: str, _: Reader, reports: Reports) -> EvalReportView:
 
 @router.post("/eval-runs", status_code=status.HTTP_202_ACCEPTED)
 def start_run(
-    _: Annotated[Principal, Depends(require_admin)], reports: Reports,
+    _: Owner, reports: Reports,
     runs: Annotated[EvalRuns, Depends(get_eval_runs)], compiled: Annotated[CompiledPack | None, Depends(get_compiled_or_none)],
 ) -> EvalRunStarted:
     # The run itself goes to the background, so a pack it cannot run is refused here rather than failing unseen.

@@ -5,7 +5,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.api.auth import current_principal
-from app.api.console import require_admin
+from app.api.console import Owner
 from app.api.runtime import get_state_db
 from app.auth.principal import Principal
 from app.contracts.setup import SetupStatus, SetupStep
@@ -13,7 +13,6 @@ from app.state import setup
 from app.state.db import StateDb
 
 router = APIRouter(prefix="/setup")
-Admin = Annotated[Principal, Depends(require_admin)]
 
 
 State = Annotated[StateDb, Depends(get_state_db)]
@@ -32,7 +31,7 @@ def get_status(_: Annotated[Principal, Depends(current_principal)], db: State) -
 
 
 @router.post("/steps/{step_id}/skip")
-def skip_step(step_id: str, _: Admin, db: State) -> SetupStatus:
+def skip_step(step_id: str, _: Owner, db: State) -> SetupStatus:
     try:
         setup.skip(db, step_id)
     except setup.UnknownStep as error:
@@ -41,7 +40,7 @@ def skip_step(step_id: str, _: Admin, db: State) -> SetupStatus:
 
 
 @router.post("/complete")
-def complete_setup(_: Admin, db: State) -> SetupStatus:
+def complete_setup(_: Owner, db: State) -> SetupStatus:
     try:
         setup.complete(db)
     except setup.SetupError as error:

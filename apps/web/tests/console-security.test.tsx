@@ -10,7 +10,7 @@ import type { OwnerStatus } from "@/lib/contracts";
 import { I18nProvider } from "@/lib/i18n/react";
 import { ThemeProvider } from "@/lib/theme";
 
-const CONSOLE: Partial<ConsoleFile> = { pack: { name: "shop", display_name: "Shop" }, identities: [], conversations: [] };
+const CONSOLE: Partial<ConsoleFile> = { pack: { name: "shop", display_name: "Shop" },conversations: [] };
 
 let api: MockApi;
 

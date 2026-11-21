@@ -1,6 +1,6 @@
 """The console's Documents page: upload, list, retag and delete company documents (DECISIONS §5, §15).
 
-Only a ``pack_reviewer`` reaches these endpoints. An upload is a multipart
+The owner reaches these endpoints. An upload is a multipart
 form with ``file`` and one ``allowed_roles`` field per role; the body is read
 at most one byte past the size cap. Uploads, retags and deletes answer 409
 while the pack compiles, and an upload whose content is already registered
@@ -20,7 +20,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Response, UploadFile, status
 
 from app.api.auth import current_principal
-from app.api.console import require_admin, require_reviewer
+from app.api.console import Owner
 from app.api.runtime import (
     get_document_service, get_document_service_or_none, get_drafter, get_pack_dir, get_state_db, unavailable,
 )
@@ -52,7 +52,6 @@ def require_documents_on(db: State) -> None:
 
 router = APIRouter(prefix="/documents", dependencies=[Depends(require_documents_on)])
 settings_router = APIRouter(prefix="/settings/documents")
-Reviewer = Annotated[Principal, Depends(require_reviewer)]
 Service = Annotated[DocumentService, Depends(get_document_service)]
 
 
@@ -77,7 +76,7 @@ def refusal(error: Exception) -> HTTPException:
 
 
 @router.get("")
-def list_documents(_: Reviewer, service: Service) -> DocumentList:
+def list_documents(_: Owner, service: Service) -> DocumentList:
     try:
         records = service.list()
     except Exception as error:  # noqa: BLE001 - the registry is unreachable
@@ -87,7 +86,7 @@ def list_documents(_: Reviewer, service: Service) -> DocumentList:
 
 @router.post("", status_code=status.HTTP_201_CREATED)
 def upload_document(
-    reviewer: Reviewer,
+    reviewer: Owner,
     service: Service,
     file: Annotated[UploadFile, File()],
     allowed_roles: Annotated[list[str] | None, Form()] = None,
@@ -100,7 +99,7 @@ def upload_document(
 
 
 @router.patch("/{document_id}")
-def change_roles(document_id: str, body: DocumentRolesChange, _: Reviewer, service: Service) -> DocumentView:
+def change_roles(document_id: str, body: DocumentRolesChange, _: Owner, service: Service) -> DocumentView:
     try:
         return view(service.set_roles(document_id, body.allowed_roles))
     except Exception as error:  # noqa: BLE001 - each failure maps to its status in refusal
@@ -110,7 +109,7 @@ def change_roles(document_id: str, body: DocumentRolesChange, _: Reviewer, servi
 @router.post("/{document_id}/draft")
 def draft_from_document(
     document_id: str,
-    _: Reviewer,
+    _: Owner,
     service: Service,
     drafter: Annotated[Drafter, Depends(get_drafter)],
     pack_dir: Annotated[Path, Depends(get_pack_dir)],
@@ -138,7 +137,7 @@ def draft_from_document(
 
 
 @router.delete("/{document_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_document(document_id: str, _: Reviewer, service: Service) -> Response:
+def delete_document(document_id: str, _: Owner, service: Service) -> Response:
     try:
         service.delete(document_id)
     except Exception as error:  # noqa: BLE001 - each failure maps to its status in refusal
@@ -169,7 +168,7 @@ def get_document_settings(
 
 @settings_router.put("")
 def put_document_settings(
-    change: DocumentSettingsChange, _: Annotated[Principal, Depends(require_admin)], db: State, service: OptionalService,
+    change: DocumentSettingsChange, _: Owner, db: State, service: OptionalService,
 ) -> DocumentSettings:
     """Turn documents on or off; off with documents kept needs ``confirm``."""
     kept = _kept_documents(service)

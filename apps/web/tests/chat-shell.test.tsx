@@ -19,10 +19,6 @@ function thread(id: string, title: string, updated: string, extra: Partial<Conve
 const CONSOLE: Partial<ConsoleFile> = {
   pack: { name: "shop", display_name: "Shop" },
   pack_roles: ["analyst", "marketing"],
-  identities: [
-    { user_id: "ana", display_name: "Ana Analyst", roles: ["analyst"] },
-    { user_id: "rev", display_name: "Rae Reviewer", roles: ["pack_reviewer", "analyst"] },
-  ],
   conversations: [
     thread("today", "Sales today", "2026-11-03T09:00:00Z"),
     thread("week", "Sales this week", "2026-10-30T09:00:00Z"),
@@ -120,18 +116,6 @@ describe("account menu", () => {
     return screen.findByRole("menu");
   }
 
-  it("offers the demo identities while sign-in is on sample data, and switching reloads the history", async () => {
-    const { api } = renderShell();
-    await screen.findByText("Sales today");
-    await api.conversations.save(thread("ana-only", "Only for Ana", "2026-11-03T10:00:00Z"));
-
-    const menu = await openAccount();
-    await act(async () => fireEvent.click(within(menu).getByRole("menuitem", { name: /Rae Reviewer/ })));
-
-    await waitFor(() => expect(screen.queryByText("Only for Ana")).toBeNull());
-    expect(screen.getByText("Sales today")).toBeTruthy();
-  });
-
   it("opens as wide as the sidebar's account button", async () => {
     renderShell();
     await screen.findByText("Sales today");
@@ -143,13 +127,14 @@ describe("account menu", () => {
     expect(menu.style.width).toBe("232px");
   });
 
-  it("hides the identity picker once sign-in is wired", async () => {
-    renderShell({ sources: { auth: "http" } });
+  it("names the owner and offers no other identity, also on sample data", async () => {
+    renderShell();
     await screen.findByText("Sales today");
 
     const menu = await openAccount();
 
-    expect(within(menu).queryByRole("menuitem", { name: /Rae Reviewer/ })).toBeNull();
+    expect(within(menu).getByText("Owner")).toBeTruthy();
+    expect(within(menu).queryByRole("menuitem", { name: /Reviewer|Analyst/ })).toBeNull();
   });
 
   it("offers the console and the Security page to the owner, with the theme in the menu header", async () => {

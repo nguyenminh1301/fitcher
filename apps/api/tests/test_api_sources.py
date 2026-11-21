@@ -6,7 +6,6 @@ import time
 from fastapi.testclient import TestClient
 import pytest
 
-from session_fixtures import SessionHeaders
 from io import BytesIO
 
 from sources_fixtures import FakeSqlServer, UploadClickHouse
@@ -18,8 +17,8 @@ from app.sources.files import FileService
 from app.sources.service import SourceService
 from app.sources.store import SourceStore
 
-ADMIN = SessionHeaders(["admin"], user_id="owner")
-VIEWER = SessionHeaders()
+ADMIN = {}
+VIEWER = {}
 PASSWORD = "reader-pass-4711-xyz"
 BODY = {"kind": "postgres", "host": "db.internal", "port": 5432, "database": "erp", "schema_name": "public",
         "user": "reader", "password": PASSWORD, "tls_mode": "prefer"}

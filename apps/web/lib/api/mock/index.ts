@@ -2,8 +2,6 @@
 // (approvals, role changes, uploads) live in memory for the page's lifetime, and demo conversations in
 // browser storage, so each feature behaves as it will once its api exists.
 
-import { readStored, writeStored } from "@/lib/storage";
-
 import type { FitcherApi } from "../client";
 import type { DocumentView, EvalRunStarted, ReviewItem } from "@/lib/contracts";
 
@@ -11,8 +9,6 @@ import type { Identity, SampleDocument } from "../provisional";
 import { createMockChat } from "./chat";
 import { createMockConversations } from "./conversations";
 import { sampleLoader, type SampleStatus } from "./load";
-
-const IDENTITY_KEY = "fitcher.demo.identity";
 
 export type MockApi = FitcherApi & { sampleStatus(): Promise<SampleStatus> };
 
@@ -25,7 +21,7 @@ function delay<T>(value: T, ms = 150): Promise<T> {
   return new Promise((resolve) => setTimeout(() => resolve(value), ms));
 }
 
-/** ``identity`` replaces the demo identities with the signed-in user once sign-in is real. */
+/** ``identity`` replaces the sample owner with the signed-in one once sign-in is real. */
 export function createMockApi(options: { latencyMs?: number; identity?: () => Promise<Identity | null> } = {}): MockApi {
   const load = sampleLoader();
   const wait = <T>(value: T) => delay(value, options.latencyMs ?? 0);
@@ -35,9 +31,9 @@ export function createMockApi(options: { latencyMs?: number; identity?: () => Pr
   async function identity(): Promise<Identity | null> {
     if (options.identity) return options.identity();
     if (current) return current;
+    // The sample instance has one owner, who holds every role of the pack like the real one.
     const { console } = await load();
-    const stored = readStored(IDENTITY_KEY);
-    current = console.identities.find((item) => item.user_id === stored) ?? console.identities[0] ?? null;
+    current = { user_id: "owner", display_name: "Owner", roles: console.pack_roles };
     return current;
   }
 
@@ -50,15 +46,7 @@ export function createMockApi(options: { latencyMs?: number; identity?: () => Pr
   return {
     sampleStatus: async () => (await load()).status,
     auth: {
-      identities: async () => wait((await load()).console.identities),
       current: async () => wait(await identity()),
-      switchTo: async (userId) => {
-        const next = (await load()).console.identities.find((item) => item.user_id === userId);
-        if (!next) throw new Error(`no demo identity ${userId}`);
-        current = next;
-        writeStored(IDENTITY_KEY, userId);
-        return next;
-      },
       pack: async () => {
         const { console } = await load();
         return { ...console.pack, roles: console.pack_roles };

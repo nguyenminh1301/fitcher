@@ -4,7 +4,6 @@ from agent_fixtures import compiled_fixture
 from fastapi.testclient import TestClient
 import pytest
 
-from session_fixtures import SessionHeaders
 
 from app.api import runtime
 from app.main import app
@@ -19,21 +18,15 @@ def client():
     app.dependency_overrides.clear()
 
 
-def test_me_is_the_owner_with_every_pack_role_and_console_role(client):
+def test_me_is_the_owner_with_every_pack_role(client):
     response = client.get("/me")
 
     assert response.status_code == 200
     pack_roles = [role.id for role in compiled_fixture().pack.policies.roles]
     assert response.json() == {
-        "user_id": "owner", "display_name": "Owner", "roles": [*pack_roles, "pack_reviewer", "admin"],
+        "user_id": "owner", "display_name": "Owner", "roles": pack_roles,
         "active_role": pack_roles[0], "exposed": False,
     }
-
-
-def test_an_active_role_header_the_user_does_not_hold_is_forbidden(client):
-    response = client.get("/me", headers={**SessionHeaders(), "X-Active-Role": "auditor"})
-
-    assert response.status_code == 403
 
 
 def test_pack_names_the_active_pack_and_its_roles_without_a_token(client):
@@ -58,7 +51,7 @@ def test_a_pack_under_onboarding_is_named_from_its_pack_files(client, monkeypatc
 
     assert client.get("/pack").json() == {"name": "minimal", "display_name": "Minimal widget shop", "roles": ["reader"]}
     me = client.get("/me").json()
-    assert me["roles"] == ["reader", "pack_reviewer", "admin"] and me["active_role"] == "reader"
+    assert me["roles"] == ["reader"] and me["active_role"] == "reader"
 
 
 def test_an_uncompiled_pack_makes_the_endpoints_unavailable(client, monkeypatch, tmp_path):
@@ -73,12 +66,12 @@ def test_an_uncompiled_pack_makes_the_endpoints_unavailable(client, monkeypatch,
 
     assert response.status_code == 503
     assert "compile the pack first" in response.json()["detail"]
-    assert client.get("/me", headers=SessionHeaders()).status_code == 503
+    assert client.get("/me", headers={}).status_code == 503
     runtime.reload_pack()
 
 
 def test_suggestions_are_the_first_approved_example_questions_of_the_active_pack(client):
-    response = client.get("/pack/suggestions", headers=SessionHeaders())
+    response = client.get("/pack/suggestions", headers={})
 
     examples = [example for example in compiled_fixture().pack.examples.examples][:3]
     assert response.status_code == 200
@@ -94,7 +87,7 @@ def test_a_new_instance_without_any_pack_still_knows_the_owner(client, monkeypat
     response = client.get("/me")
 
     assert response.status_code == 200
-    assert response.json()["active_role"] is None and response.json()["roles"] == ["pack_reviewer", "admin"]
+    assert response.json()["active_role"] is None and response.json()["roles"] == []
     runtime.reload_pack()
 
 

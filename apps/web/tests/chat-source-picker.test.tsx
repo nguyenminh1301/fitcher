@@ -11,7 +11,6 @@ import { I18nProvider } from "@/lib/i18n/react";
 const CONSOLE: Partial<ConsoleFile> = {
   pack: { name: "shop", display_name: "Shop" },
   pack_roles: ["analyst"],
-  identities: [{ user_id: "ana", display_name: "Ana Analyst", roles: ["analyst", "admin"] }],
   conversations: [],
 };
 

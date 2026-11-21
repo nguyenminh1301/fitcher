@@ -15,7 +15,7 @@ from typing import Protocol
 import clickhouse_connect
 
 from app.contracts.admin import (
-    AdminConversation, AdminConversationThread, AdminMessage, AuditRow, CostRow, RunRow, RunTrace, ScreeningRow,
+    AuditRow, CostRow, RunRow, RunTrace, ScreeningRow,
     TraceItem,
 )
 from app.llm.tiers import provider_of
@@ -248,38 +248,4 @@ class AdminLogs:
             {"days": days},
         )
         return {(provider, model_name(model)): int(median) for provider, model, median in rows}
-
-    @staticmethod
-    def _conversation(row: Sequence) -> AdminConversation:
-        conversation_id, user_id, title, deleted, updated_at = row
-        return AdminConversation(conversation_id=conversation_id, user_id=user_id, title=title, deleted=bool(deleted),
-                                 updated_at=_aware(updated_at))
-
-    def conversations(self, *, user: str | None = None) -> list[AdminConversation]:
-        sql = "SELECT conversation_id, user_id, title, deleted, updated_at FROM agent_logs.conversations FINAL"
-        parameters: dict = {"limit": 200}
-        if user:
-            sql += " WHERE user_id = {user:String}"
-            parameters["user"] = user
-        sql += " ORDER BY updated_at DESC LIMIT {limit:UInt32}"
-        return [self._conversation(row) for row in self.query(sql, parameters)]
-
-    def conversation(self, conversation_id: str) -> AdminConversationThread | None:
-        rows = self.query(
-            "SELECT conversation_id, user_id, title, deleted, updated_at FROM agent_logs.conversations FINAL "
-            "WHERE conversation_id = {id:String} LIMIT 1",
-            {"id": conversation_id},
-        )
-        if not rows:
-            return None
-        messages = [
-            AdminMessage(ts=_aware(ts), role=role, content=content, trace_id=trace_id, turn=int(turn),
-                         revision=int(revision))
-            for ts, role, content, trace_id, turn, revision in self.query(
-                "SELECT ts, role, content, trace_id, turn, revision FROM agent_logs.chat_messages "
-                "WHERE conversation_id = {id:String} ORDER BY turn, revision, ts",
-                {"id": conversation_id},
-            )
-        ]
-        return AdminConversationThread(conversation=self._conversation(rows[0]), messages=messages)
 
