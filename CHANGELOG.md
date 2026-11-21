@@ -36,6 +36,8 @@
 
 ### Fixed
 
+- Automatic model chains leave out models whose name gives fewer than 7 billion parameters, such as `liquid/lfm-3-1.7b:free`, which the free chain had put second for every task although such a model misreads questions; they stay selectable by hand.
+- A model that keeps failing rests longer each time: every failure in a row doubles its rest from the base time (a minute after a timeout) up to 30 minutes, and an answer ends the run. A free model that timed out used to rest a minute only, so a question asked after that minute waited its whole 30-second timeout again before the next model answered.
 - Picking an option of a clarifying question no longer asks the same question again: the chat sends the option's id with its label (`clarify_option` on `POST /ask`), and the api answers the question that was clarified with every option picked for it applied as it is, without a model reading the label. A period question also offers "All data", and a question that says it covers all the data ("in total", "overall", "tổng cộng", "từ trước đến nay") is answered over every row instead of asking for a period.
 - An off-topic question is recorded as a declined run ("Off topic" on the Runs page) instead of a successful one, so the Overview's answered rate counts only answers.
 - On a touch screen wider than 768 px, such as a phone held sideways, table links, back links, switches and setup step bars keep their 44 px touch targets, and a segmented control whose labels are too long for a phone, such as the Vietnamese model choice, wraps onto a second line instead of running past its box.
