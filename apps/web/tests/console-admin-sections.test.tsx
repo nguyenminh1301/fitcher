@@ -91,9 +91,9 @@ describe("evaluation", () => {
   it("shows the latest report's per-layer rates against the 80% threshold", async () => {
     show("evaluation", <EvaluationSection />);
 
-    expect(await screen.findByRole("img", { name: /Execution match 85% · Threshold 80%/ })).toBeTruthy();
+    expect(await screen.findByRole("img", { name: /Correct results 85% · Threshold 80%/ })).toBeTruthy();
     expect(screen.getByRole("img", { name: /Retrieval recall 100%/ })).toBeTruthy();
-    expect(screen.getByText("Execution match · threshold 80%")).toBeTruthy();
+    expect(screen.getByText("Correct results · threshold 80%")).toBeTruthy();
     expect(screen.getAllByText("Meets threshold").length).toBeGreaterThan(0);
     const intent = screen.getByText("Intent routing").closest(".ev-layer") as HTMLElement;
     expect(within(intent).getByText("Not scored yet")).toBeTruthy();
@@ -139,7 +139,7 @@ describe("evaluation without an eval set", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Run evaluation" }));
     await act(async () => fireEvent.click(within(screen.getByRole("dialog", { name: "Run the evaluation?" })).getByRole("button", { name: "Run evaluation" })));
 
-    expect((await screen.findByRole("alert")).textContent).toContain("This pack has no evaluation questions yet");
+    expect((await screen.findByRole("alert")).textContent).toContain("This source has no evaluation questions yet");
   });
 });
 

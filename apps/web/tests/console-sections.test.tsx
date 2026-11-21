@@ -245,10 +245,10 @@ describe("documents", () => {
     show("documents", <DocumentsSection />);
     const row = (await screen.findByText("Handbook.pdf")).closest("tr") as HTMLElement;
 
-    const button = within(row).getByRole("button", { name: "Draft pack items" });
+    const button = within(row).getByRole("button", { name: "Draft knowledge items" });
     expect(document.getElementById(button.getAttribute("aria-describedby") ?? "")?.textContent).toBe("Uses paid AI");
     fireEvent.click(button);
-    const dialog = screen.getByRole("dialog", { name: "Draft pack items from Handbook.pdf?" });
+    const dialog = screen.getByRole("dialog", { name: "Draft knowledge items from Handbook.pdf?" });
     expect(within(dialog).getByText(/The provider bills each call/)).toBeTruthy();
     expect(draft).not.toHaveBeenCalled();
     await act(async () => fireEvent.click(within(dialog).getByRole("button", { name: "Draft items" })));
