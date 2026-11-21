@@ -33,6 +33,9 @@ function NoPack() {
   );
 }
 
+// The api sends up to three example questions per language; the chat shows three.
+const SHOWN_SUGGESTIONS = 3;
+
 /** A new conversation: the question title, the composer and the pack's suggested questions. */
 export function EmptyChat() {
   const { t, locale } = useI18n();
@@ -44,6 +47,9 @@ export function EmptyChat() {
   useEffect(() => {
     void api.chat.suggestions().then(setSuggestions);
   }, [api, packName]);
+  // Questions in the interface's language come first; the others keep their order and their language tag.
+  const ordered = [...suggestions.filter((item) => item.lang === locale), ...suggestions.filter((item) => item.lang !== locale)]
+    .slice(0, SHOWN_SUGGESTIONS);
 
   // A question picked in the setup is asked as soon as the pack is known.
   useEffect(() => {
@@ -60,11 +66,11 @@ export function EmptyChat() {
         <h1>{firstName ? t("ui.heroTitle", { name: firstName }) : t("ui.heroTitleAnonymous")}</h1>
         <p className="fc-hero-sub">{t("ui.heroSub", { pack: pack?.display_name ?? "" })}</p>
         <Composer large running={!!busy} onSend={(text) => void ask(text)} meta={pack ? <PackPicker fallback={pack.name} /> : null} />
-        {suggestions.length ? (
+        {ordered.length ? (
           <div>
             <h2 className="fc-navgroup" style={{ margin: 0, padding: "0 var(--base-size-12) var(--base-size-4)" }}>{t("ui.suggested")}</h2>
             <ul className="fc-suggest">
-              {suggestions.map((suggestion) => (
+              {ordered.map((suggestion) => (
                 <li key={suggestion.text}>
                   <button type="button" className="fc-suggest-row" lang={suggestion.lang} onClick={() => void ask(suggestion.text)}>
                     <Icon name="message" />

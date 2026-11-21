@@ -119,5 +119,12 @@ def suggestions(
     principal: Annotated[Principal, Depends(current_principal)],
     compiled: Annotated[CompiledPack, Depends(get_compiled)],
 ) -> list[dict[str, str]]:
-    """The first approved example questions of the compiled pack, offered in an empty chat (DECISIONS §11 step 0)."""
-    return [{"text": example.question, "lang": example.language} for example in compiled.pack.examples.examples[:SUGGESTIONS]]
+    """The first approved example questions of the compiled pack in each language, offered in an empty chat
+    (DECISIONS §11 step 0); the chat shows the ones in its interface's language first."""
+    taken: dict[str, int] = {}
+    chosen = []
+    for example in compiled.pack.examples.examples:
+        if taken.get(example.language, 0) < SUGGESTIONS:
+            taken[example.language] = taken.get(example.language, 0) + 1
+            chosen.append({"text": example.question, "lang": example.language})
+    return chosen
