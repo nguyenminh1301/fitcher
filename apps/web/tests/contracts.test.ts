@@ -27,7 +27,7 @@ describe("generated contract types", () => {
       "provider_create.schema.json", "provider_key_create.schema.json", "provider_models.schema.json", "provider_test_request.schema.json",
       "provider_test_result.schema.json", "provider_update.schema.json", "provider_view.schema.json",
       "query_spec.schema.json", "result.schema.json", "review_item.schema.json", "review_item_patch.schema.json",
-      "run_row.schema.json", "run_trace.schema.json", "setup_status.schema.json",
+      "run_row.schema.json", "run_trace.schema.json", "screening_row.schema.json", "setup_status.schema.json",
       "source_connection.schema.json", "source_create.schema.json", "source_detail.schema.json",
       "source_drift.schema.json", "source_patch.schema.json", "source_view.schema.json", "sync_view.schema.json",
       "tables_change.schema.json",

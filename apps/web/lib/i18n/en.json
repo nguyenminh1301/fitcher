@@ -1144,6 +1144,19 @@
     "noSpend": "No spend in this period: every call used a free model or a free tier."
   },
   "auditPage": {
+    "decisions": "Data access",
+    "screening": "Question screening",
+    "screeningEmpty": "No question screened yet.",
+    "verdict": "Verdict",
+    "verdict_allow": "Passed",
+    "verdict_flag": "Flagged",
+    "verdict_block": "Stopped",
+    "verdict_unavailable": "Not checked",
+    "mode": "Action",
+    "mode_log": "Recorded only",
+    "mode_enforce": "Stops the question",
+    "rules": "Rules matched",
+    "score": "Classifier score",
     "dataset": "Dataset",
     "none": "None",
     "empty": "No decision yet."

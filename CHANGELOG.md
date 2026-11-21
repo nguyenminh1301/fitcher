@@ -4,6 +4,7 @@
 
 ### Added
 
+- The Query log page lists the input-screening verdict of every question below the access decisions: whether it passed, was flagged, stopped or could not be checked, whether a flag only records it or stops the question, the rules it matched and the classifier's score. The api already served them (`GET /admin/screening`) but no page read them.
 - The install guide shows how to reach fitcher from other machines: list the public name, set the owner password on this computer first, then start an nginx, Caddy or Cloudflare Tunnel proxy that sends the public name as `Host`, with the settings for uploads and streamed answers.
 - One source switcher in the chat's question box and at the top of the console sidebar: a menu of the sources that can answer, with their kind and dataset count, the current one checked and a way to the Sources page. Choosing a source makes its pack the current one on the api (`PUT /pack`), so the console's pages and a new conversation use the same source.
 - The Runs page lists every source's runs together, with a Source column and filter (`GET /admin/runs?all=true`), and a run of any source opens its trace; the Overview and Costs pages count every source's runs.

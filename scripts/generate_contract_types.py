@@ -13,7 +13,7 @@ import sys
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "apps" / "api"))
 
-from app.contracts.admin import AuditRow, CostRow, RunRow, RunTrace  # noqa: E402 - needs apps/api on the path
+from app.contracts.admin import AuditRow, CostRow, RunRow, RunTrace, ScreeningRow  # noqa: E402 - needs apps/api on the path
 from app.contracts.admin_feedback import FeedbackRow, ProposalResult  # noqa: E402
 from app.contracts.chart_spec import ChartSpec  # noqa: E402
 from app.contracts.conversations import (  # noqa: E402
@@ -85,6 +85,7 @@ CONTRACTS = {
     "run_row": (RunRow, "serialization"),
     "run_trace": (RunTrace, "serialization"),
     "audit_row": (AuditRow, "serialization"),
+    "screening_row": (ScreeningRow, "serialization"),
     "cost_row": (CostRow, "serialization"),
     "feedback_row": (FeedbackRow, "serialization"),
     "proposal_result": (ProposalResult, "serialization"),

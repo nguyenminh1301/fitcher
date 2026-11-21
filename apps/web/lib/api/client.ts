@@ -10,6 +10,8 @@ import type {
   DocumentView,
   DraftResult,
   AuditRow,
+  ScreeningRow,
+  LimitSettings,
   CostRow,
   EvalReport,
   EvalRunStarted,
@@ -130,7 +132,8 @@ export interface FitcherApi {
     list(query?: { from?: string; to?: string; page?: number; all?: boolean }): Promise<RunRow[]>;
     trace(traceId: string): Promise<{ run: RunRow; items: TraceItem[] } | null>;
   };
-  audit: { list(): Promise<AuditRow[]> };
+  /** Access decisions, and the input-screening verdicts of the questions (DECISIONS §9, §15). */
+  audit: { list(): Promise<AuditRow[]>; screening(): Promise<ScreeningRow[]> };
   costs: { list(): Promise<CostRow[]> };
   /** Model providers, the tier mapping, the embedding and the optional screening classifier (admin only). */
   models: {

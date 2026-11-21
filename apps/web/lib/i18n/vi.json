@@ -1144,6 +1144,19 @@
     "noSpend": "Không có chi phí trong khoảng này: mọi lần gọi đều dùng model miễn phí hoặc gói miễn phí."
   },
   "auditPage": {
+    "decisions": "Truy cập dữ liệu",
+    "screening": "Sàng lọc câu hỏi",
+    "screeningEmpty": "Chưa có câu hỏi nào được sàng lọc.",
+    "verdict": "Kết quả",
+    "verdict_allow": "Cho qua",
+    "verdict_flag": "Đánh dấu",
+    "verdict_block": "Đã chặn",
+    "verdict_unavailable": "Không kiểm tra được",
+    "mode": "Xử lý",
+    "mode_log": "Chỉ ghi lại",
+    "mode_enforce": "Dừng câu hỏi",
+    "rules": "Quy tắc khớp",
+    "score": "Điểm bộ phân loại",
     "dataset": "Bộ dữ liệu",
     "none": "Không có",
     "empty": "Chưa có quyết định nào."

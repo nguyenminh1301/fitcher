@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from "vitest";
 
 import { ConsoleLayout } from "@/components/console/ConsoleLayout";
+import { AuditSection } from "@/components/console/sections/AuditSection";
 import { DatasetsSection } from "@/components/console/sections/DatasetsSection";
 import { DocumentsSection } from "@/components/console/sections/DocumentsSection";
 import { FeedbackSection } from "@/components/console/sections/FeedbackSection";
@@ -306,5 +307,21 @@ describe("feedback", () => {
 
     await waitFor(() => expect(screen.getAllByText("Proposed").length).toBeGreaterThan(0));
     expect((await api.feedbackReview.list()).find((row) => row.trace_id === "t1")?.proposal).toBe("proposed");
+  });
+});
+
+describe("query log", () => {
+  it("lists the access decisions, then the screening verdict of each question", async () => {
+    vi.spyOn(api.audit, "list").mockResolvedValue([]);
+    vi.spyOn(api.audit, "screening").mockResolvedValue([
+      { ts: "2026-11-21T10:00:00Z", trace_id: "t1", user_id: "owner", source: "question", verdict: "flag", mode: "log", score: 0.91, rule_hits: ["ignore_instructions"] },
+    ]);
+    show("audit", <AuditSection />);
+
+    const screening = await screen.findByRole("region", { name: "Question screening" });
+    expect(within(screening).getByText("Flagged")).toBeTruthy();
+    expect(within(screening).getByText("Recorded only")).toBeTruthy();
+    expect(within(screening).getByText("ignore_instructions")).toBeTruthy();
+    expect(screen.getByText("No decision yet.")).toBeTruthy();
   });
 });

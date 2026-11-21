@@ -143,7 +143,7 @@ export function createMockApi(options: { latencyMs?: number; identity?: () => Pr
         return wait(run ? { run, items: console.traces[traceId] ?? [] } : null);
       },
     },
-    audit: { list: async () => wait((await load()).console.audit) },
+    audit: { list: async () => wait((await load()).console.audit), screening: async () => wait([]) },
     costs: { list: async () => wait((await load()).console.costs) },
     // The Models page has no sample data: providers, keys and tiers live in the instance's app state.
     models: Object.fromEntries([

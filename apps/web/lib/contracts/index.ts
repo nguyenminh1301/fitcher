@@ -37,6 +37,8 @@ export type { DraftResult } from "./draft_result";
 export type { RunRow } from "./run_row";
 export type { RunTrace, TraceItem } from "./run_trace";
 export type { AuditRow } from "./audit_row";
+export type { ScreeningRow } from "./screening_row";
+export type { LimitSettings } from "./limit_settings";
 export type { CostRow } from "./cost_row";
 export type { FeedbackRow } from "./feedback_row";
 export type { ProposalResult } from "./proposal_result";
