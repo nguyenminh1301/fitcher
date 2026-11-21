@@ -482,6 +482,7 @@ class Gateway:
                         raise LLMError(f"model {route.model} replied with JSON that does not match {schema_name}",
                                        tuple(attempts))
                     break
+                self._keys.answered(route)
                 return route.model, content
         raise LLMError(_attempts_text(tier, attempts), tuple(attempts))
 

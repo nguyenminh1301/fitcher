@@ -8,7 +8,10 @@ a benchmark comes after every model with one. The quick tiers (``fast`` and
 answering, because they run on every question and must answer in seconds; they
 keep the benchmark order, because the smallest models (lite, nano, 7B) miss
 what the question says, such as its period, and send the user back a
-clarification instead of an answer.
+clarification instead of an answer. A model whose name gives fewer than
+``MIN_PARAMETERS_B`` billion parameters ("lfm-3-1.7b", "llama-3.2-3b") is left
+out of every automatic chain: such a model misreads questions and writes
+wrong SQL, and it stays selectable by hand.
 
 Every chain starts with the best model and then takes the best model of each
 other provider, so one provider's outage or daily limit leaves an answer; it
@@ -24,6 +27,7 @@ tiers are read. A tier with no eligible model keeps its chain.
 from collections.abc import Callable, Iterable, Mapping
 from datetime import datetime, timedelta, UTC
 import logging
+import re
 
 from app.llm import defaults
 from app.llm.catalog import CatalogModel, ModelListError, with_latency
@@ -41,6 +45,9 @@ QUICK_TIERS = frozenset({"fast", "sql-small"})
 # openai/gpt-oss-120b answered, and replied with JSON that did not match a pack draft's schema.
 MISREADS = frozenset({"qwen/qwen3.8-27b"})
 AUTO_MODES = frozenset({"auto_free", "auto_best"})
+MIN_PARAMETERS_B = 7.0
+# A parameter count in a model name: "1.7b", "-3b-", "_8B"; "e4b" (an effective size) is not one.
+_PARAMETERS = re.compile(r"(?:^|[-/_.:])(\d+(?:\.\d+)?)b(?=$|[-/_.:])", re.IGNORECASE)
 
 _log = logging.getLogger(__name__)
 
@@ -61,6 +68,12 @@ def _published(mode: str):
     return key
 
 
+def too_small(model_id: str) -> bool:
+    """Whether the model's name says it has fewer than ``MIN_PARAMETERS_B`` billion parameters."""
+    sizes = [float(size) for size in _PARAMETERS.findall(model_id)]
+    return bool(sizes) and max(sizes) < MIN_PARAMETERS_B
+
+
 def eligible(models: Iterable[CatalogModel], mode: str, tier: str) -> list[CatalogModel]:
     """The tier's candidates in the mode's order."""
     chosen = [
@@ -69,6 +82,7 @@ def eligible(models: Iterable[CatalogModel], mode: str, tier: str) -> list[Catal
         and (mode != "auto_free" or model.free != "none")
         and (model.structured_output is True if tier in STRUCTURED_TIERS else model.structured_output is not False)
         and not (tier in QUICK_TIERS and defaults.slow_model(model.id))
+        and not too_small(model.id)
     ]
     return sorted(chosen, key=_rank(mode))
 

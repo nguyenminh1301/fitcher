@@ -131,3 +131,15 @@ def test_a_model_measured_to_misread_questions_goes_after_the_others_whatever_it
     chosen = auto.choose(catalog, "auto_free")
 
     assert chain(chosen["fast"]) == [("gemini", "gemini-3.5-flash"), ("groq", "openai/gpt-oss-120b"), ("groq", "qwen/qwen3.8-27b")]
+
+
+def test_a_model_under_seven_billion_parameters_serves_no_automatic_chain():
+    catalog = [
+        model("gemini", "gemini-3.8-flash", benchmark=31),
+        model("openrouter", "liquid/lfm-3-1.7b:free", benchmark=6, latency=200),
+        model("openrouter", "google/gemma-4-31b-it:free", benchmark=4),
+    ]
+
+    for tier, tier_chain in auto.choose(catalog, "auto_free").items():
+        assert "liquid/lfm-3-1.7b:free" not in [link.model for link in tier_chain], tier
+    assert auto.too_small("meta-llama/llama-3.2-3b-instruct") and not auto.too_small("gemma-3n-e4b-it")
