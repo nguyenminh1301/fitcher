@@ -85,6 +85,51 @@ def test_a_missing_period_is_needed_after_the_measure():
     assert build_spec(state, deps([])) == {"need": Need(kind="period")}
 
 
+def test_a_question_about_all_the_data_needs_no_period():
+    parsed = Extraction.model_validate(extraction_reply(periods=[]))
+    state = {"question": "q", "extraction": parsed, "periods": [], "retrieval": Retrieval(), "time_grain": None, "all_time": True}
+
+    update = build_spec(state, deps([]))
+
+    assert "need" not in update and update["spec"].periods == []
+
+
+# build_spec applies the options the user already picked
+
+def test_a_picked_measure_settles_a_vague_ranking_word():
+    retrieval = Retrieval(metric_terms={"best": [hit("metrics", "widget_revenue", 0.7), hit("metrics", "refunded_value", 0.4)]})
+    state = {**state_for(extraction_reply(rank_term="best"), retrieval), "choices": ["metric:widget_revenue"]}
+
+    update = build_spec(state, deps([]))
+
+    assert update["spec"].rank_by == "widget_revenue"
+
+
+def test_a_picked_measure_answers_a_question_that_names_none():
+    retrieval = Retrieval(question_metrics=[hit("metrics", "refunded_value", 0.6)])
+    state = {**state_for(extraction_reply(metric_terms=[], rank_term=None), retrieval), "choices": ["metric:widget_revenue"]}
+
+    update = build_spec(state, deps([]))
+
+    assert update["spec"].metric_ids == ["widget_revenue"]
+
+
+def test_a_picked_column_settles_an_ambiguous_term():
+    compiled = pack_with_two_columns_for_one_term()
+    state = {**state_for(extraction_reply(dimension_terms=["item"])), "choices": ["column:widget_sales.sale_ref"]}
+
+    update = build_spec(state, replace(deps([]), compiled=compiled))
+
+    assert update["spec"].dimensions == ["sale_ref"]
+
+
+def test_a_pick_that_is_not_a_candidate_still_asks():
+    retrieval = Retrieval(metric_terms={"amount": [hit("metrics", "refunded_value", 0.8), hit("metrics", "widget_revenue", 0.78)]})
+    state = {**state_for(extraction_reply(metric_terms=["amount"], rank_term=None), retrieval), "choices": ["metric:unknown", "period:this_year"]}
+
+    assert "need" in build_spec(state, deps([]))
+
+
 # clarification: the question and its options
 
 def readable(metric_id: str) -> bool:
@@ -109,7 +154,7 @@ def test_a_missing_period_offers_relative_periods_in_vietnamese():
     assert asked.question == "Bạn muốn xem khoảng thời gian nào?"
     assert [option.id for option in asked.options] == [
         "period:this_month", "period:last_month", "period:this_quarter", "period:last_quarter", "period:this_year",
-        "period:last_year",
+        "period:last_year", "period:all",
     ]
     assert asked.options[3].label == "Quý trước"
 
@@ -195,3 +240,12 @@ def test_a_run_that_asked_back_records_what_it_asked_for():
     assert _outcome({**asked, "need": Need(kind="period")}) == ("clarified", "data_query", "asked for a period")
     metric = Need(kind="metric", term="best", candidates=["widget_revenue"])
     assert _outcome({**asked, "need": metric})[2] == 'asked for a measure for "best"'
+
+
+# the run's status
+
+def test_an_out_of_scope_reply_is_declined_not_answered():
+    from app.agent.graph import _outcome
+
+    assert _outcome({"intent": "out_of_scope", "reply": "I answer questions about the shop's data."})[0] == "declined"
+    assert _outcome({"intent": "metadata_qa", "reply": "Revenue is the sum of sales."})[0] == "succeeded"

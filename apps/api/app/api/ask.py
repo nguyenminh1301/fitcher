@@ -23,7 +23,7 @@ next node and kills the ClickHouse query it may be running.
 
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
-from collections.abc import AsyncIterator, Mapping
+from collections.abc import AsyncIterator, Mapping, Sequence
 import logging
 import math
 import threading
@@ -53,7 +53,7 @@ from app.contracts.events import (
     AskRequest, BlockedEvent, ChartSpecEvent, ClarifyEvent, DenyEvent, DoneEvent, ErrorEvent, EventModel, ResultEvent,
     SqlEvent, StatusEvent, SummaryEvent,
 )
-from app.conversation.store import ConversationNotFound, ConversationStore, OpenTurn, TurnNotFound
+from app.conversation.store import ConversationNotFound, ConversationStore, OpenTurn, Turn, TurnNotFound, shown_events
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -125,7 +125,10 @@ class AnswerEvents:
             return [SummaryEvent(**trace, text=state["reply"], lang=_language(state)), DoneEvent(**trace)]
         if state.get("clarification"):
             asked = state["clarification"]
-            return [ClarifyEvent(**trace, question=asked.question, options=asked.options, lang=asked.lang), DoneEvent(**trace)]
+            return [ClarifyEvent(
+                **trace, question=asked.question, options=asked.options, lang=asked.lang,
+                about=state["question"], chosen=list(state.get("choices", [])),
+            ), DoneEvent(**trace)]
         if state.get("model_error"):
             # The model did not answer: the client says so in its own language and offers to try again.
             return [ErrorEvent(**trace, kind="model", message="The model did not answer.", error=state["model_error"])]
@@ -148,6 +151,17 @@ class AnswerEvents:
 
     def internal(self) -> list[EventModel]:
         return [ErrorEvent(trace_id=self.trace_id or uuid4().hex, kind="internal", message=INTERNAL_ERROR)]
+
+
+def picked_option(history: Sequence[Turn], option: str) -> tuple[str, tuple[str, ...]] | None:
+    """The clarified question and every option picked for it when ``option`` answers the last turn's clarifying
+    question; None when the last turn asked nothing or offered no such option, and the question is read as typed."""
+    if not history or not history[-1].events:
+        return None
+    for event in shown_events(history[-1]):
+        if isinstance(event, ClarifyEvent) and any(choice.id == option for choice in event.options):
+            return event.about or history[-1].question, (*event.chosen, option)
+    return None
 
 
 def frame(event: EventModel) -> str:
@@ -389,7 +403,8 @@ def ask(
         logger.exception("cannot open a conversation turn")
         raise unavailable("the conversation store is unavailable") from None
     try:
-        run = agent.start(role=role, user_id=principal.user_id, today=today, history=turn.history)
+        clarified = picked_option(turn.history, request.clarify_option) if request.clarify_option else None
+        run = agent.start(role=role, user_id=principal.user_id, today=today, history=turn.history, clarified=clarified)
     except Exception:  # noqa: BLE001 - the role's ClickHouse client could not be created
         logger.exception("cannot prepare a run as role %s", role)
         raise unavailable("the agent cannot reach its data store") from None

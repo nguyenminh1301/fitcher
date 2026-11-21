@@ -18,7 +18,8 @@ import { langOf } from "@/lib/text";
 const TITLE_LENGTH = 80;
 const FOLLOW_MS = 2000;
 
-export type AskOptions = { conversationId?: string; editOf?: number; retryOf?: number };
+/** ``clarifyOption`` is the id of the clarifying option the question picks, which the api applies as it is. */
+export type AskOptions = { conversationId?: string; editOf?: number; retryOf?: number; clarifyOption?: string };
 
 export type ChatState = {
   api: FitcherApi;
@@ -197,6 +198,7 @@ export function ChatProvider({ api, navigate, activeId, sources = currentSources
         timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
         edit_of_turn: options.editOf ?? null,
         retry_of_turn: options.retryOf ?? null,
+        clarify_option: options.clarifyOption ?? null,
       };
       const named = (apiId: string) => {
         if (apiId === id) return;

@@ -200,12 +200,12 @@ describe("answer", () => {
     expect(onRetry).toHaveBeenCalled();
   });
 
-  it("sends a clarifying option as a follow-up question", () => {
-    const { onFollowUp } = show([{ event: "clarify", question: "Which measure?", options: [{ id: "a", label: "Net sales" }, { id: "b", label: "Orders" }], lang: "en", trace_id: T }, { event: "done", trace_id: T }]);
+  it("sends a clarifying option as a follow-up question with its id", () => {
+    const { onFollowUp } = show([{ event: "clarify", question: "Which measure?", options: [{ id: "metric:first_measure", label: "Net sales" }, { id: "metric:second_measure", label: "Orders" }], about: "Sales?", chosen: [], lang: "en", trace_id: T }, { event: "done", trace_id: T }]);
 
     fireEvent.click(screen.getByRole("button", { name: "Net sales" }));
 
-    expect(onFollowUp).toHaveBeenCalledWith("Net sales");
+    expect(onFollowUp).toHaveBeenCalledWith("Net sales", "metric:first_measure");
   });
 
   it("says the run was stopped", () => {

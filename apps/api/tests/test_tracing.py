@@ -61,13 +61,13 @@ def test_lost_records_mark_the_log_incomplete():
     assert (final.log_complete, final.lost_records) == (False, 2)
 
 
-def test_an_out_of_scope_run_records_its_intent_and_success():
+def test_an_out_of_scope_run_records_its_intent_as_declined():
     agent = logged([routing_reply("out_of_scope"), "I answer data questions."])
 
     run_question("Write me a poem", agent)
 
     final = agent.logs.runs()[-1]
-    assert (final.status, final.intent, final.error) == ("succeeded", "out_of_scope", "")
+    assert (final.status, final.intent, final.error) == ("declined", "out_of_scope", "")
 
 
 def test_rejected_and_failed_runs_record_their_status():

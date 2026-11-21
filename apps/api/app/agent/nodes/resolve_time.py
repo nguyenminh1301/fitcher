@@ -20,6 +20,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from app.agent.nodes.clarify import chosen
 from app.contracts.query_spec import Period
 
 if TYPE_CHECKING:
@@ -271,6 +272,29 @@ def explicit_time_grain(question: str) -> Unit | None:
     return None
 
 
+# The period options of a clarifying question (``clarify.PERIODS``) as descriptors; "all" is handled apart.
+CHOSEN_PERIODS: dict[str, PeriodDescriptor] = {
+    "this_month": PeriodDescriptor(kind="relative", unit="month", offset=0),
+    "last_month": PeriodDescriptor(kind="relative", unit="month", offset=-1),
+    "this_quarter": PeriodDescriptor(kind="relative", unit="quarter", offset=0),
+    "last_quarter": PeriodDescriptor(kind="relative", unit="quarter", offset=-1),
+    "this_year": PeriodDescriptor(kind="relative", unit="year", offset=0),
+    "last_year": PeriodDescriptor(kind="relative", unit="year", offset=-1),
+}
+
+# Words that say a question covers all of the data, in English and Vietnamese.
+_ALL_TIME = re.compile(
+    r"\b(?:all[- ]time|of all time|overall|ever|in total|so far|to date)\b"
+    r"|toàn bộ|tất cả thời gian|từ trước (?:đến|tới) nay|từ trước giờ|tổng cộng|tính đến nay",
+    re.IGNORECASE,
+)
+
+
+def says_all_time(question: str) -> bool:
+    """The question asks about all of the data ("in total", "overall", "tổng cộng"), so it needs no period."""
+    return bool(_ALL_TIME.search(question or ""))
+
+
 class PeriodShift(BaseModel):
     """A follow-up's periods as the previous query's periods moved by ``offset`` ``unit``s (0 keeps them)."""
 
@@ -308,12 +332,19 @@ def resolve_time(state: "AgentState", deps: "AgentDeps") -> dict:
     previous = state.get("previous_spec")
     descriptors = list(extraction.periods)
     if not descriptors:
+        # A period option the user picked is applied as it is, without a model reading its label.
+        picked = chosen(state.get("choices"), "period")
+        if picked and picked[-1] == "all":
+            return {"periods": [], "all_time": True}
+        if picked and picked[-1] in CHOSEN_PERIODS:
+            descriptors = [CHOSEN_PERIODS[picked[-1]]]
+    if not descriptors:
         if extraction.previous_periods is not None and previous is not None:
             return {"periods": shift_periods(previous.periods, extraction.previous_periods, fiscal_start_month)}
         # The extraction model can miss a period the question spells out; asking back for it would be wrong.
         descriptors = explicit_periods(state.get("question", ""))
         if not descriptors:
-            return {"periods": []}
+            return {"periods": [], "all_time": says_all_time(state.get("question", ""))}
     try:
         periods = resolve_periods(descriptors, deps.today, fiscal_start_month)
     except TimeResolutionError as error:

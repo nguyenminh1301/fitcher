@@ -200,9 +200,10 @@ Nodes in order:
 6. **retrieve**: hybrid search over the search collections (§5). Candidates for the question's own terms (metrics, dimensions, filter values) are searched across all of the pack's roles, so a term resolves to what it means and the gate can deny it rather than replace it with the nearest item the role may read; the context given to SQL generation (examples, dataset hits) is filtered by the asking role.
 7. **build_spec** -> `QuerySpec`, with a coverage check (dataset min/max dates versus the requested periods).
    A dataset may have no time column (a product catalog or a contact list has no dates). Its QuerySpec has no periods: the question is answered over all rows without asking for a period, and a period or time grain the question names is dropped with a warning.
+   A question that names no period is answered over all rows when it says it covers all the data ("in total", "overall", "tổng cộng", "từ trước đến nay"); otherwise a dataset with a time column needs a period and the gate asks for one.
    When an approved example readable by the asking role asks the same question (compared case-, diacritic- and punctuation-insensitively) and carries a reviewed spec, that spec's metrics, dataset, dimensions, filters, top N and ranking replace the term resolution; periods and time grain still come from the question, and the gate checks the result as usual. A reviewed spec names only pack items and pack values, never a value taken from a user's run.
 8. **gate**:
-   - ambiguous -> **clarify** (ask the user with options, or apply the pack's default convention if one exists)
+   - ambiguous -> **clarify** (ask the user with options, or apply the pack's default convention if one exists). A period question also offers "All data". Picking an option sends its id with the answer; the api answers the clarified question again with every option picked for it applied as it is, never through a model reading the label, so the same question is never asked twice.
    - no permission or no dataset -> **deny** + audit record
    - sufficient -> continue
 9. **generate_sql**: tier `sql-small` when the deterministic complexity rule scores the QuerySpec as simple (one metric, at most one dimension, one period, no comparison, no top N, one dataset), otherwise `sql-gen`. Input: QuerySpec + permitted schema + declared join paths + few-shot.

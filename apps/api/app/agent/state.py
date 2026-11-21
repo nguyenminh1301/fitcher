@@ -77,6 +77,10 @@ class AgentDeps:
     screen_mode: ScreenMode = "log"
     # Company documents are on (DECISIONS §15); off, metadata_qa answers without searching kb_docs.
     documents_enabled: bool = True
+    # The clarifying options picked for ``question``, oldest first; the question is then the one that was clarified.
+    choices: tuple[str, ...] = ()
+    # What the user sent for this turn when it differs from ``question`` (the label of a picked option).
+    asked: str = ""
 
 
 class Attempt(BaseModel):
@@ -99,6 +103,12 @@ BlockedReason = Literal["screened", "unavailable", "gateway"]
 class AgentState(TypedDict, total=False):
     question: str
     trace_id: str
+    # What the user sent when it differs from ``question``: the label of a clarifying option they picked.
+    asked: str
+    # The clarifying options the user picked for this question, as their ids ("period:this_year"), oldest first.
+    choices: list[str]
+    # The question covers all of the data: it said so, or the user picked "All data" for its period.
+    all_time: bool
     # The screen node's verdict on the question, and why the run was stopped, if it was.
     screening: Verdict | None
     blocked: BlockedReason | None

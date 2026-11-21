@@ -435,6 +435,7 @@
     "files_one": "{n} file",
     "documentsOffText_one": "{n} document stays stored but is no longer searched.",
     "clarified": "Asked back",
+    "declined": "Off topic",
     "blocked": "Blocked",
     "cancelled": "Stopped",
     "modelTitle": "The model did not answer",

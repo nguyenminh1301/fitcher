@@ -19,7 +19,7 @@ import { useLoad } from "@/lib/console/useLoad";
 import { useI18n } from "@/lib/i18n/react";
 import { langOf } from "@/lib/text";
 
-const STATUSES = ["all", "running", "succeeded", "clarified", "cancelled", "failed", "error", "denied", "rejected", "blocked"];
+const STATUSES = ["all", "running", "succeeded", "clarified", "declined", "cancelled", "failed", "error", "denied", "rejected", "blocked"];
 /** How often a page with a running run reads it again. */
 export const REFRESH_MS = 2000;
 
