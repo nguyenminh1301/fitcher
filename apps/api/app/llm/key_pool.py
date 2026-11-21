@@ -7,7 +7,10 @@ the provider rate-limited rests for its ``Retry-After`` time, or
 (401 or 403) is not tried again by this process; a replaced key is a new key
 with a new id, so it is tried. A model that timed out, was unavailable, is
 missing or needs credit the account lacks rests on its own (``rest_model``)
-with that key, while the key keeps serving the provider's other models. The
+with that key, while the key keeps serving the provider's other models. Each
+failure in a row doubles that rest, up to ``MAX_MODEL_REST_SECONDS``, and an
+answer from the model ends the run of failures (``answered``), so a model that
+keeps timing out stops costing every question its whole timeout. The
 state is per process and is lost on restart,
 which costs at most one more refused call per key.
 """
@@ -24,6 +27,8 @@ COOLDOWN_SECONDS = 60.0
 # The longest rest a provider's Retry-After can impose; a larger value is a daily limit and the
 # chain's next model answers meanwhile.
 MAX_COOLDOWN_SECONDS = 3600.0
+# The longest rest of one model after failures in a row.
+MAX_MODEL_REST_SECONDS = 1800.0
 
 
 class KeyPool:
@@ -34,6 +39,8 @@ class KeyPool:
         self._resting: dict[tuple[str, str], float] = {}
         self._refused: set[tuple[str, str]] = set()
         self._models_resting: dict[tuple[str, str, str], float] = {}
+        # How many times in a row each model failed with its key.
+        self._model_failures: dict[tuple[str, str, str], int] = {}
 
     def _usable(self, route: "Route", now: float) -> bool:
         if self._models_resting.get((route.provider, route.key_id or "", route.model), 0.0) > now:
@@ -65,9 +72,18 @@ class KeyPool:
             self._resting[(route.provider, route.key_id)] = self._clock() + wait
 
     def rest_model(self, route: "Route", seconds: float) -> None:
-        """This model failed with this key: skip it for ``seconds``."""
+        """This model failed with this key: skip it for ``seconds``, doubled for each earlier failure in a row."""
+        model = (route.provider, route.key_id or "", route.model)
         with self._lock:
-            self._models_resting[(route.provider, route.key_id or "", route.model)] = self._clock() + seconds
+            failures = self._model_failures.get(model, 0)
+            self._model_failures[model] = failures + 1
+            wait = min(seconds * 2 ** min(failures, 16), max(seconds, MAX_MODEL_REST_SECONDS))
+            self._models_resting[model] = self._clock() + wait
+
+    def answered(self, route: "Route") -> None:
+        """This model answered with this key: its next failure rests it for the base time again."""
+        with self._lock:
+            self._model_failures.pop((route.provider, route.key_id or "", route.model), None)
 
     def refuse(self, route: "Route") -> None:
         """The provider refused this key: do not use it again."""

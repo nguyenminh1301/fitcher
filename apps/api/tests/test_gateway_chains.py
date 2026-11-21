@@ -278,6 +278,30 @@ def test_a_single_model_gets_one_more_call_after_a_brief_outage_but_not_after_a_
     assert len(slow.calls) == 1
 
 
+def test_each_failure_in_a_row_doubles_a_models_rest_up_to_half_an_hour():
+    clock = Clock()
+    pool = KeyPool(clock)
+    rests = []
+    for _ in range(7):
+        pool.rest_model(GEMINI, 60)
+        rests.append(pool._models_resting[("gemini", "g", "openai/gemini-2.5-flash")] - clock.now)
+
+    assert rests == [60, 120, 240, 480, 960, 1800, 1800]
+
+
+def test_an_answer_ends_the_run_of_failures():
+    clock = Clock()
+    pool = KeyPool(clock)
+    pool.rest_model(GEMINI, 60)
+    pool.rest_model(GEMINI, 60)
+    clock.now += 1000
+    assert gateway([[GEMINI]], Sdk(lambda call: reply("back")), pool).text("fast", PROMPT) == "back"
+
+    pool.rest_model(GEMINI, 60)
+
+    assert pool._models_resting[("gemini", "g", "openai/gemini-2.5-flash")] - clock.now == 60
+
+
 def test_models_that_all_rest_are_still_asked_rather_than_failing_unasked():
     pool = KeyPool(Clock())
     pool.rest_model(GEMINI, 60)
