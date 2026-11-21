@@ -119,6 +119,7 @@
 
 ### Removed
 
+- `GET /admin/conversations` and `GET /admin/conversations/{id}`, which read any user's conversations for an administrator: no page used them, and fitcher has one owner, who reads their own conversations in the chat.
 - The animated walkthrough for creating an OpenRouter key is gone from the setup's provider card; the "Get a key" link and the note on OpenRouter's free models stay.
 
 ## 0.0.3 - 2026-11-18

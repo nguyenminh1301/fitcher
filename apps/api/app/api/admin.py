@@ -1,8 +1,7 @@
-"""The console's Runs and trace, Audit and Costs sections, and admin reads of conversations (DECISIONS §15).
+"""The console's Runs and trace, Query log and Costs pages (DECISIONS §15).
 
-Every endpoint is read-only and answers only an ``admin``. Dates are ISO days;
-``to`` is exclusive. An admin reads any user's conversations, including the
-ones their owner deleted, which are marked ``deleted``.
+Every endpoint is read-only and answers the owner. Dates are ISO days;
+``to`` is exclusive.
 """
 
 from datetime import date, timedelta
@@ -76,16 +75,3 @@ def list_costs(
     end = end or date.today() + timedelta(days=1)
     start = start or end - timedelta(days=COST_DAYS)
     return _read(lambda: logs.costs(start=start, end=end, pack=pack))
-
-
-@router.get("/conversations")
-def list_conversations(_: Admin, logs: Logs, user: str | None = None) -> list[AdminConversation]:
-    return _read(lambda: logs.conversations(user=user))
-
-
-@router.get("/conversations/{conversation_id}")
-def read_conversation(conversation_id: str, _: Admin, logs: Logs) -> AdminConversationThread:
-    thread = _read(lambda: logs.conversation(conversation_id))
-    if thread is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="conversation not found")
-    return thread

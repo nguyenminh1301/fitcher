@@ -162,21 +162,6 @@ def test_costs_are_grouped_with_their_provider(client):
     assert script.calls[0][1] == {"start": date(2026, 11, 1), "end": date(2026, 11, 6)}
 
 
-def test_an_admin_reads_a_conversation_its_owner_deleted(client):
-    reader, _ = logs([
-        (r"FROM agent_logs\.conversations FINAL WHERE conversation_id", [("c1", "dev.analyst", "Revenue", 1, TS)]),
-        (r"FROM agent_logs\.conversations FINAL", [("c1", "dev.analyst", "Revenue", 1, TS)]),
-        (r"FROM agent_logs\.chat_messages", [(TS, "user", "Revenue by widget", "t1", 1, 0)]),
-    ])
-    use(reader)
-
-    listed = client.get("/admin/conversations", headers=ADMIN, params={"user": "dev.analyst"}).json()
-    thread = client.get("/admin/conversations/c1", headers=ADMIN).json()
-
-    assert listed[0]["deleted"] is True
-    assert thread["conversation"]["deleted"] is True and thread["messages"][0]["content"] == "Revenue by widget"
-
-
 def test_an_unreachable_log_store_is_503(client):
     def broken(sql, parameters):
         raise RuntimeError("connection refused")
