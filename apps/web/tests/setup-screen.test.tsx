@@ -77,7 +77,7 @@ describe("setup screen", () => {
 
     expect(await screen.findByRole("heading", { name: "2 things left before you can ask" })).toBeTruthy();
     expect(screen.getByRole("button", { name: /No data yet/ })).toBeTruthy();
-    expect(screen.getByText("No pack yet")).toBeTruthy();
+    expect(screen.getByText("Not ready to answer yet")).toBeTruthy();
     expect(screen.queryByText("No model yet")).toBeNull();
     await userEvent.click(screen.getByRole("button", { name: "Done" }));
     await waitFor(() => expect(ways.onOpenChat).toHaveBeenCalled());
@@ -414,13 +414,13 @@ describe("setup data and start steps", () => {
       tables: [{ name: "orders", selected: true, mode: "copy", interval_seconds: 86_400, cursor_column: null }],
     });
     expect(sources.sync).toHaveBeenCalledWith("erp");
-    expect(await screen.findByRole("heading", { name: "Build the pack from 1 table" })).toBeTruthy();
+    expect(await screen.findByRole("heading", { name: "Get 1 table ready to answer" })).toBeTruthy();
     expect(await screen.findByText(/one call of about 12,000 tokens/)).toBeTruthy();
     expect(screen.getByText("Copied · 1,200 rows")).toBeTruthy();
-    await userEvent.click(screen.getByRole("button", { name: "Build the pack" }));
+    await userEvent.click(screen.getByRole("button", { name: "Get ready to answer" }));
 
     expect(sources.instantStart).toHaveBeenCalledWith({ source_id: "erp", tables: ["orders"], confirm_billable: true });
-    expect(await screen.findByRole("heading", { name: "The pack is ready" })).toBeTruthy();
+    expect(await screen.findByRole("heading", { name: "Ready to answer" })).toBeTruthy();
     await userEvent.click(screen.getByRole("button", { name: "Orders per month?" }));
     await waitFor(() => expect(ways.onOpenChat).toHaveBeenCalledWith("Orders per month?"));
     expect(setup.complete).toHaveBeenCalled();
@@ -449,7 +449,7 @@ describe("setup data and start steps", () => {
     expect(within(progress).getByText("Could not be read")).toBeTruthy();
     expect(within(progress).getByText("Copied · 1,200 rows")).toBeTruthy();
     await waitFor(() => expect(sources.instantEstimate).toHaveBeenCalledWith({ source_id: "erp", tables: ["orders"] }));
-    await userEvent.click(await screen.findByRole("button", { name: "Build the pack" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Get ready to answer" }));
     expect(sources.instantStart).toHaveBeenCalledWith({ source_id: "erp", tables: ["orders"], confirm_billable: true });
   });
 
@@ -461,9 +461,9 @@ describe("setup data and start steps", () => {
     await connectDatabase();
     await userEvent.click(await screen.findByRole("button", { name: "Choose tables" }));
     await userEvent.click(await screen.findByRole("button", { name: "Use 1 table" }));
-    await userEvent.click(await screen.findByRole("button", { name: "Build the pack" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Get ready to answer" }));
 
-    const progress = await screen.findByRole("list", { name: "Pack build progress" });
+    const progress = await screen.findByRole("list", { name: "Progress" });
     expect(within(progress).getAllByRole("listitem")).toHaveLength(5);
     expect(screen.getByRole("alert").textContent).toContain("Write descriptions and metrics failed: the model answered nonsense.");
     await userEvent.click(screen.getByRole("button", { name: "Try again" }));
@@ -480,7 +480,7 @@ describe("setup data and start steps", () => {
       await connectDatabase();
       await userEvent.click(await screen.findByRole("button", { name: "Choose tables" }));
       await userEvent.click(await screen.findByRole("button", { name: "Use 1 table" }));
-      await userEvent.click(await screen.findByRole("button", { name: "Build the pack" }));
+      await userEvent.click(await screen.findByRole("button", { name: "Get ready to answer" }));
 
       const alert = (await screen.findByRole("alert")).textContent ?? "";
       expect(alert).toContain("A value of the table does not fit the column type ClickHouse reads it as.");
@@ -498,9 +498,9 @@ describe("setup data and start steps", () => {
     await connectDatabase();
     await userEvent.click(await screen.findByRole("button", { name: "Choose tables" }));
     await userEvent.click(await screen.findByRole("button", { name: "Use 1 table" }));
-    await userEvent.click(await screen.findByRole("button", { name: "Build the pack" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Get ready to answer" }));
 
-    const progress = await screen.findByRole("list", { name: "Pack build progress" });
+    const progress = await screen.findByRole("list", { name: "Progress" });
     expect(within(progress).getByText("1,500 of 6,000 items indexed")).toBeTruthy();
     const bar = within(progress).getByRole("progressbar") as HTMLProgressElement;
     expect(bar.max).toBe(6000);
@@ -516,8 +516,8 @@ describe("setup data and start steps", () => {
     await userEvent.click(await screen.findByRole("button", { name: "Choose tables" }));
     await userEvent.click(await screen.findByRole("button", { name: "Use 1 table" }));
 
-    expect(await screen.findByText(/A model is needed before the pack can be built: no provider yet/)).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Build the pack" }).hasAttribute("disabled")).toBe(true);
+    expect(await screen.findByText(/A model is needed before the source can be made ready: no provider yet/)).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Get ready to answer" }).hasAttribute("disabled")).toBe(true);
   });
 
   it("goes back to the answered Model step and returns without changing its answer", async () => {

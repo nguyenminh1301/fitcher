@@ -8,11 +8,12 @@ const chat = vi.hoisted(() => ({
   pack: { name: "erp" } as { name: string } | null,
   loaded: true,
   providers: [{ id: "p" }] as { id: string }[],
+  suggestions: [] as { text: string; lang: string }[],
 }));
 
 vi.mock("@/lib/chat/ChatContext", () => ({
   useChat: () => ({
-    api: { chat: { suggestions: async () => [] }, models: { providers: async () => chat.providers } }, identity: null, pack: chat.pack, ask: chat.ask, busy: null, loaded: chat.loaded,
+    api: { chat: { suggestions: async () => chat.suggestions }, models: { providers: async () => chat.providers } }, identity: null, pack: chat.pack, ask: chat.ask, busy: null, loaded: chat.loaded,
   }),
 }));
 
@@ -70,5 +71,16 @@ describe("a new chat without a pack", () => {
 
     expect(await findByRole("heading", { name: "Connect your data to start" })).toBeTruthy();
     chat.pack = { name: "erp" };
+  });
+});
+
+describe("suggested questions", () => {
+  it("lists the questions in the interface's language first", async () => {
+    chat.suggestions = [{ text: "How many orders in total?", lang: "en" }, { text: "Tổng số đơn hàng là bao nhiêu?", lang: "vi" }];
+    const { findAllByRole } = render(<I18nProvider initial="vi"><EmptyChat /></I18nProvider>);
+
+    const rows = await findAllByRole("button", { name: /đơn hàng|orders/ });
+    expect(rows.map((row) => row.textContent)).toEqual(["Tổng số đơn hàng là bao nhiêu?", "How many orders in total?EN"]);
+    chat.suggestions = [];
   });
 });

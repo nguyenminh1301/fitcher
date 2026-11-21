@@ -195,10 +195,10 @@ describe("Sources page", () => {
     ] }));
     show(sources);
 
-    const banner = (await screen.findByText("The pack shop no longer matches source shop.")).closest(".fc-banner") as HTMLElement;
+    const banner = (await screen.findByText("Source shop changed since it was made ready.")).closest(".fc-banner") as HTMLElement;
     expect(banner.textContent).toContain("orders: added note_text, removed coupon");
     expect(banner.textContent).toContain("returns: no longer in the source");
-    fireEvent.click(within(banner).getByRole("button", { name: "Rebuild the pack of shop" }));
+    fireEvent.click(within(banner).getByRole("button", { name: "Get shop ready again" }));
     expect(navigate).toHaveBeenCalledWith("/console/sources/shop/pack");
   });
 
@@ -307,14 +307,14 @@ describe("Source flows", () => {
     fireEvent.click(await screen.findByRole("button", { name: /Use 2 tables/ }));
 
     // The saved choice comes back from the api; here it keeps one chosen table.
-    expect(await screen.findByRole("heading", { name: "Build the pack from 1 table" })).toBeTruthy();
+    expect(await screen.findByRole("heading", { name: "Get 1 table ready to answer" })).toBeTruthy();
   });
 
   it("rebuilds a source's pack from the tables in use", async () => {
     const sources = fakeSources();
     show(sources, <BuildPackPage id="shop" />);
 
-    expect(await screen.findByRole("heading", { name: "Build the pack from 1 table" })).toBeTruthy();
+    expect(await screen.findByRole("heading", { name: "Get 1 table ready to answer" })).toBeTruthy();
     await waitFor(() => expect(sources.instantEstimate).toHaveBeenCalledWith({ source_id: "shop", tables: ["items"] }));
   });
 });

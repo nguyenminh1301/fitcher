@@ -70,12 +70,17 @@ def test_an_uncompiled_pack_makes_the_endpoints_unavailable(client, monkeypatch,
     runtime.reload_pack()
 
 
-def test_suggestions_are_the_first_approved_example_questions_of_the_active_pack(client):
+def test_suggestions_are_the_first_three_approved_example_questions_of_each_language(client):
     response = client.get("/pack/suggestions", headers={})
 
-    examples = [example for example in compiled_fixture().pack.examples.examples][:3]
+    examples = compiled_fixture().pack.examples.examples
+    expected = [
+        {"text": example.question, "lang": example.language} for example in examples
+        if [other.language for other in examples[: examples.index(example) + 1]].count(example.language) <= 3
+    ]
     assert response.status_code == 200
-    assert response.json() == [{"text": example.question, "lang": example.language} for example in examples]
+    assert response.json() == expected
+    assert {item["lang"] for item in expected} == {example.language for example in examples}
 
 
 def test_a_new_instance_without_any_pack_still_knows_the_owner(client, monkeypatch):
@@ -132,3 +137,20 @@ def test_a_pack_that_was_never_compiled_cannot_be_chosen(client, monkeypatch):
     assert client.put("/pack", json={"name": "nothing_here"}).status_code == 503
     assert client.put("/pack", json={"name": "../etc"}).status_code == 422
     assert chosen == []
+
+
+def test_suggestions_keep_three_questions_of_each_language():
+    from app.api.auth import suggestions
+    from app.auth.principal import owner
+
+    compiled = compiled_fixture()
+    first = compiled.pack.examples.examples[0]
+    examples = [first.model_copy(update={"id": f"q{index}", "question": f"Question {index}?", "language": lang})
+                for index, lang in enumerate(["en", "en", "en", "en", "vi", "vi"])]
+    pack = compiled.pack.model_copy(update={"examples": compiled.pack.examples.model_copy(update={"examples": examples})})
+
+    listed = suggestions(owner([]), compiled.model_copy(update={"pack": pack}))
+
+    assert [(item["text"], item["lang"]) for item in listed] == [
+        ("Question 0?", "en"), ("Question 1?", "en"), ("Question 2?", "en"), ("Question 4?", "vi"), ("Question 5?", "vi"),
+    ]

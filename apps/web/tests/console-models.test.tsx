@@ -124,7 +124,7 @@ describe("models", () => {
     const fast = await screen.findByRole("listitem", { name: "Quick" });
     expect(within(fast).getByText("gpt-5.4-mini")).toBeTruthy();
     expect(within(fast).getByText("Not evaluated")).toBeTruthy();
-    expect(screen.getByText("Passed the pack evaluation")).toBeTruthy();
+    expect(screen.getByText("Passed the source's evaluation")).toBeTruthy();
 
     const change = within(fast).getByRole("button", { name: "Change the models of Quick" });
     await waitFor(() => expect((change as HTMLButtonElement).disabled).toBe(false));
