@@ -501,6 +501,7 @@
     "embeddingSaved": "The embedding model was changed. Recompile the pack.",
     "classifier": "Prompt-injection filter",
     "classifierOn": "On: every question is also scored by the classifier, and a question stops when the classifier cannot run.",
+    "classifierOffNote": "Off: only the English and Vietnamese rules check questions. Turn it on to also score every question with the classifier; a question then stops when the classifier cannot run.",
     "turnOn": "Turn on",
     "turnOff": "Turn off",
     "cancel": "Cancel",

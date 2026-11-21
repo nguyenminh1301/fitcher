@@ -501,6 +501,7 @@
     "embeddingSaved": "Đã đổi model embedding. Hãy compile lại pack.",
     "classifier": "Bộ lọc prompt injection",
     "classifierOn": "Bật: mọi câu hỏi được chấm thêm bằng bộ phân loại; câu hỏi dừng lại khi bộ phân loại không chạy được.",
+    "classifierOffNote": "Tắt: chỉ bộ quy tắc tiếng Anh và tiếng Việt kiểm tra câu hỏi. Bật lên để chấm thêm mọi câu hỏi bằng bộ phân loại; khi đó câu hỏi sẽ dừng lại nếu bộ phân loại không chạy được.",
     "turnOn": "Bật",
     "turnOff": "Tắt",
     "cancel": "Huỷ",
