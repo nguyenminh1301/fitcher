@@ -317,7 +317,6 @@
     "nav_datasets": "Datasets",
     "nav_feedback": "Feedback",
     "nav_evaluation": "Evaluation",
-    "group_quality": "Quality",
     "desc_datasets": "The tables fitcher may query in the active pack. To change them, build the pack again.",
     "desc_feedback": "Likes and dislikes from the chat. Turn a disliked answer into a proposal to review.",
     "desc_evaluation": "The pack is turned on only when Execution match reaches the threshold.",
@@ -987,10 +986,12 @@
     "activePack": "Active pack",
     "noPack": "No pack yet",
     "chat": "Chat",
-    "group_data": "Data",
-    "group_quality": "Quality",
-    "group_activity": "Activity",
-    "group_settings": "Settings"
+    "area_overview": "Overview",
+    "area_sources": "Sources",
+    "area_documents": "Documents",
+    "area_quality": "Quality",
+    "area_activity": "Activity",
+    "area_settings": "Settings"
   },
   "sourcesPage": {
     "notApplicable": "Does not apply",

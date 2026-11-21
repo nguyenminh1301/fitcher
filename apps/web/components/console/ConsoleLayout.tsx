@@ -5,7 +5,7 @@
 // panel. Review and Feedback show how many items wait. Below 760px the sidebar becomes a drawer opened from a
 // small header. fitcher is a personal app, so every page is listed.
 
-import { createContext, Fragment, useCallback, useContext, useEffect, useState, type MouseEvent, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useState, type MouseEvent, type ReactNode } from "react";
 
 import { Icon } from "@/components/brand/Icon";
 import { Logo } from "@/components/brand/Logo";
@@ -13,7 +13,7 @@ import { AccountMenu } from "@/components/chat/AccountMenu";
 import { SourceSwitcher } from "@/components/chat/SourceSwitcher";
 import { Toast } from "@/components/ui/feedback";
 import { useChat } from "@/lib/chat/ChatContext";
-import { GROUPS, SECTIONS } from "@/lib/console/sections";
+import { areaOf, AREAS, sectionPath } from "@/lib/console/sections";
 import { useI18n } from "@/lib/i18n/react";
 
 type Navigate = (path: string, options?: { replace: boolean }) => void;
@@ -41,14 +41,14 @@ export function ConsoleLayout({ section, navigate, onChat, children }: Props) {
   const [generation, setGeneration] = useState(0);
   const [drawer, setDrawer] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
-  // How many items wait in Review (drafts) and Feedback (dislikes); a count of 0 shows no badge.
+  // How many items wait in Quality: Review's drafts and unreviewed items, and Feedback's dislikes; 0 shows no badge.
   const [waiting, setWaiting] = useState<Record<string, number>>({});
   useEffect(() => {
     let live = true;
     void Promise.all([
-      api.review.items().then((items) => items.filter((item) => item.status === "draft").length).catch(() => 0),
+      api.review.items().then((items) => items.filter((item) => item.status === "draft" || item.reviewed === false).length).catch(() => 0),
       api.feedbackReview.list().then((rows) => rows.filter((row) => row.rating === "dislike" && !row.proposal).length).catch(() => 0),
-    ]).then(([review, feedback]) => { if (live) setWaiting({ review, feedback }); });
+    ]).then(([review, feedback]) => { if (live) setWaiting({ quality: review + feedback }); });
     return () => { live = false; };
   }, [api, section, generation]);
 
@@ -66,15 +66,17 @@ export function ConsoleLayout({ section, navigate, onChat, children }: Props) {
     go();
   }
 
+  const current = areaOf(section).key;
   const link = (key: string) => {
-    const item = SECTIONS.find((entry) => entry.key === key);
-    if (!item) return null;
+    const area = AREAS.find((entry) => entry.key === key);
+    if (!area) return null;
+    const path = sectionPath(area.pages[0]);
     const count = waiting[key] ?? 0;
     return (
       <li key={key}>
-        <a href={item.path} className="nav-item" aria-current={key === section ? "page" : undefined} onClick={(event) => follow(event, () => navigate(item.path))}>
-          <Icon name={item.icon} />
-          <span className="nav-text">{t(`ui.nav_${key}`)}</span>
+        <a href={path} className="nav-item" aria-current={key === current ? "page" : undefined} onClick={(event) => follow(event, () => navigate(path))}>
+          <Icon name={area.icon} />
+          <span className="nav-text">{t(`console.area_${key}`)}</span>
           {count ? <span className="fc-count">{count}<span className="fc-sr"> {t("console.waiting")}</span></span> : null}
         </a>
       </li>
@@ -100,13 +102,7 @@ export function ConsoleLayout({ section, navigate, onChat, children }: Props) {
               </button>
             </span>
           </div>
-          <ul className="nav-list">{link("overview")}</ul>
-          {GROUPS.map((group) => (
-            <Fragment key={group}>
-              <p className="nav-group">{t(`console.group_${group}`)}</p>
-              <ul className="nav-list">{SECTIONS.filter((item) => item.group === group).map((item) => link(item.key))}</ul>
-            </Fragment>
-          ))}
+          <ul className="nav-list">{AREAS.map((area) => link(area.key))}</ul>
           <div className="cs-navspace" />
           <a href="/" className="nav-item" onClick={(event) => follow(event, onChat)}>
             <Icon name="message" />

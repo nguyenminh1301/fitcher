@@ -317,7 +317,6 @@
     "nav_datasets": "Bộ dữ liệu",
     "nav_feedback": "Phản hồi",
     "nav_evaluation": "Đánh giá",
-    "group_quality": "Chất lượng",
     "desc_datasets": "Các bảng fitcher được phép truy vấn trong gói đang dùng. Muốn sửa thì dựng lại gói.",
     "desc_feedback": "Lượt thích và chê từ trò chuyện. Biến một câu trả lời bị chê thành đề xuất để duyệt.",
     "desc_evaluation": "Gói chỉ được bật khi Khớp kết quả đạt ngưỡng.",
@@ -987,10 +986,12 @@
     "activePack": "Gói đang dùng",
     "noPack": "Chưa có gói",
     "chat": "Trò chuyện",
-    "group_data": "Dữ liệu",
-    "group_quality": "Chất lượng",
-    "group_activity": "Hoạt động",
-    "group_settings": "Cài đặt"
+    "area_overview": "Tổng quan",
+    "area_sources": "Nguồn dữ liệu",
+    "area_documents": "Tài liệu",
+    "area_quality": "Chất lượng",
+    "area_activity": "Hoạt động",
+    "area_settings": "Cài đặt"
   },
   "sourcesPage": {
     "notApplicable": "Không áp dụng",

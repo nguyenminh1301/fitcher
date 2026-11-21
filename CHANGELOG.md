@@ -21,6 +21,7 @@
 
 ### Changed
 
+- The console's sidebar has six areas instead of twelve pages under four headings: Overview, Sources, Documents, Quality, Activity and Settings. A page that belongs with another one is a tab of its area (Datasets beside Sources; Review, Feedback and Evaluation under Quality; Runs, Query log and Costs under Activity; Models and Security under Settings), and every page keeps its own address. The Quality badge counts Review's drafts and unreviewed items with Feedback's disliked answers.
 - Charts load ECharts' core with only the bar, line, pie and scatter charts, the components and the two renderers they use, so the chart chunk the chat downloads shrinks from 1.14 MB to 0.62 MB.
 - `GET /sources` reads every source's table counts and latest sync in two queries instead of two per source.
 - XLSX uploads and documents are read with python-calamine, a Rust-backed reader, instead of openpyxl: converting a 50 000-row sheet to CSV takes about 0.32 s instead of 2.2 s, with the same cell text. openpyxl is now only a test dependency.
