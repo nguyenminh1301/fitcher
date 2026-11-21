@@ -36,6 +36,7 @@
 
 ### Fixed
 
+- Automatic model chains leave out models whose name gives fewer than 7 billion parameters, such as `liquid/lfm-3-1.7b:free`, which the free chain had put second for every task although such a model misreads questions; they stay selectable by hand.
 - A model that keeps failing rests longer each time: every failure in a row doubles its rest from the base time (a minute after a timeout) up to 30 minutes, and an answer ends the run. A free model that timed out used to rest a minute only, so a question asked after that minute waited its whole 30-second timeout again before the next model answered.
 - On a touch screen wider than 768 px, such as a phone held sideways, table links, back links, switches and setup step bars keep their 44 px touch targets, and a segmented control whose labels are too long for a phone, such as the Vietnamese model choice, wraps onto a second line instead of running past its box.
 - Console pages read cleanly on a tablet and in a narrow panel: the Overview's Get started bar lines up with its card and its steps wrap into rows; the Datasets, Runs, Query log and Review tables turn into cards below 640 px of panel width instead of breaking text one word per line or cutting columns off; the Review tables of the pack's files line up column for column; and Costs says there was no spend instead of drawing an empty chart, and no longer breaks a model id inside its name.
