@@ -60,6 +60,10 @@ class _Tie(Exception):
         self.candidates = candidates
 
 
+# Words after which a question names what to group by, folded: "by region", "theo khu vực", "mỗi cửa hàng".
+_GROUPING_WORDS = frozenset({"by", "per", "across", "each", "theo", "moi", "tung"})
+
+
 def _forms(term: str) -> set[str]:
     folded = fold(term)
     forms = {folded}
@@ -135,6 +139,27 @@ class _Catalog:
             if fold(entry.id) in self.conventions:
                 return self.conventions[fold(entry.id)]
         return None
+
+    def named_columns(self, question: str, dataset: Dataset) -> list[str]:
+        """Columns the question groups by outright ("by region", "theo khu vực", "mỗi cửa hàng"): the longest run
+        of up to four words after a grouping word that names exactly one dimension column of ``dataset``. The time
+        column is left to the time grain, and a measure ("by sale amount") is never grouped by."""
+        words = fold(question).split()
+        roles = {column.name: column.role for column in dataset.columns}
+        found: list[str] = []
+        for index, word in enumerate(words):
+            if word not in _GROUPING_WORDS:
+                continue
+            for length in range(min(4, len(words) - index - 1), 0, -1):
+                columns = [
+                    column for column in self.exact_columns(" ".join(words[index + 1:index + 1 + length]), dataset)
+                    if roles.get(column) == "dimension"
+                ]
+                if len(columns) == 1:
+                    if columns[0] != dataset.time_column and columns[0] not in found:
+                        found.append(columns[0])
+                    break
+        return found
 
     def exact_columns(self, term: str, dataset: Dataset) -> list[str]:
         names = {column.name for column in dataset.columns}
@@ -414,6 +439,9 @@ def make_spec(state: AgentState, compiled: CompiledPack, example: Hit | None = N
     _require_period(state, dataset)
 
     dimensions = [_resolve_column(term, dataset, catalog, retrieval) for term in extraction.dimension_terms]
+    if not dimensions:
+        # The extraction model can miss a grouping the question spells out; a column it names exactly is used.
+        dimensions = catalog.named_columns(state.get("question", ""), dataset)
     if state.get("time_grain") and dataset.time_column is not None and dataset.time_column not in dimensions:
         dimensions.append(dataset.time_column)
     filters = []

@@ -531,3 +531,20 @@ def test_result_is_capped_at_5000_rows():
     result = to_result(output, compiled_fixture().pack, "widget_sales")
 
     assert (len(result.rows), result.row_count, result.truncated) == (5000, 5001, True)
+
+
+@pytest.mark.parametrize(("question", "dimensions"), [
+    ("Revenue by product in Q1 2025", ["widget_name"]),
+    ("Doanh thu theo widget name quý 1 năm 2025", ["widget_name"]),
+    ("Revenue per sale ref in Q1 2025", ["sale_ref"]),
+    ("Revenue by month in 2025", []),
+    ("Revenue by colour in Q1 2025", []),
+    ("Revenue by sale amount in Q1 2025", []),
+])
+def test_a_grouping_the_question_names_is_used_when_the_extraction_misses_it(question, dimensions):
+    reply = extraction_reply(metric_terms=["revenue"], dimension_terms=[], top_n=None, rank_term=None, compare=False)
+    state = state_for(reply, question=question)
+
+    update = build_spec(state, deps([]))
+
+    assert update["spec"].dimensions == dimensions

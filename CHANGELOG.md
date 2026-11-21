@@ -42,6 +42,7 @@
 
 ### Fixed
 
+- A question that groups by a column in its own words ("by region", "theo khu vực", "mỗi cửa hàng") is grouped by it when the extraction model misses the grouping: "Tổng doanh thu năm 2025 theo khu vực" answered one total instead of one row per region. Only words that name exactly one dimension column are used.
 - The first run keeps its place: the setup's step bars show the current step's name, the Model step asks for a provider name only for a custom endpoint, what is still missing at the end goes back to its own setup step instead of the console, and Done opens the chat. A chat without a pack says that a model is missing when none is connected, instead of asking for data first.
 - A run that asked a question back records what it asked for (a period, a measure or a column, with the term), and a run's trace shows that reason, or the error a failed run ended with, in its summary.
 - Review leaves out the Confidence column when every item has the same confidence, as all the items of an instant pack do (50%), since such a column tells nothing apart.
