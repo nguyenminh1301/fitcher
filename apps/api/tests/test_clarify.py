@@ -186,3 +186,12 @@ def test_a_question_without_a_period_asks_for_one():
     state = run_question("Top widgets?", deps([routing_reply(), extraction_reply(periods=[], compare=False)]))
 
     assert [option.id for option in state["clarification"].options][:2] == ["period:this_month", "period:last_month"]
+
+
+# the run's status
+
+def test_an_out_of_scope_reply_is_declined_not_answered():
+    from app.agent.graph import _outcome
+
+    assert _outcome({"intent": "out_of_scope", "reply": "I answer questions about the shop's data."})[0] == "declined"
+    assert _outcome({"intent": "metadata_qa", "reply": "Revenue is the sum of sales."})[0] == "succeeded"

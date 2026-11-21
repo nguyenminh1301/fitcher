@@ -122,6 +122,9 @@ def _outcome(state: AgentState) -> tuple[str, str, str]:
         return "clarified", intent, ""
     if state.get("denial"):
         return "denied", intent, state["denial"].message
+    if intent == "out_of_scope" and state.get("reply") is not None:
+        # Declined, not answered: it returned no result and must not count as one.
+        return "declined", intent, ""
     if state.get("result") is not None or state.get("reply") is not None:
         return "succeeded", intent, ""
     errors = state.get("errors", [])
