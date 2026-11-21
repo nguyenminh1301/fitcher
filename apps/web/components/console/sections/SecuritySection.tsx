@@ -125,8 +125,57 @@ export function SecuritySection() {
             </section>
           ) : null}
           <p className="fc-field-help forgot-line"><Icon name="info" />{t("owner.forgottenConsole")}</p>
+          <QuestionLimit />
         </>
       ) : null}
     </ListPage>
+  );
+}
+
+/** How many questions the instance answers at once (app/api/limits.py); more wait their turn in order. */
+function QuestionLimit() {
+  const { t } = useI18n();
+  const { api } = useChat();
+  const { data } = useLoad(useCallback(() => api.owner.limits(), [api]));
+  const [value, setValue] = useState<string | null>(null);
+  const [notice, setNotice] = useState<{ ok: boolean; text: string } | null>(null);
+  const [busy, setBusy] = useState(false);
+  if (!data) return null;
+  const shown = value ?? String(data.concurrent_questions);
+  const parsed = Number(shown);
+  const valid = Number.isInteger(parsed) && parsed >= 1 && parsed <= 64;
+  async function save(event: FormEvent) {
+    event.preventDefault();
+    if (!valid) return;
+    setBusy(true);
+    try {
+      const saved = await api.owner.setLimits(parsed);
+      setValue(String(saved.concurrent_questions));
+      setNotice({ ok: true, text: t("limits.saved") });
+    } catch (error) {
+      setNotice({ ok: false, text: errorText(error) });
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <form className="box" aria-labelledby="limits-title" onSubmit={(event) => void save(event)}>
+      <div className="box-head"><h2 id="limits-title" className="box-title">{t("limits.title")}</h2></div>
+      <div className="box-body">
+        <div className="fc-field">
+          <label className="fc-field-label" htmlFor="limits-questions">{t("limits.label")}</label>
+          <input id="limits-questions" className="fc-input" type="number" min={1} max={64} inputMode="numeric" style={{ maxWidth: 120 }}
+            value={shown} disabled={busy} aria-describedby="limits-help" aria-invalid={valid ? undefined : true}
+            onChange={(event) => { setValue(event.target.value); setNotice(null); }} />
+          <span className="fc-field-help" id="limits-help">{t("limits.help")}</span>
+        </div>
+        <div><button type="submit" className="fc-btn" disabled={busy || !valid || parsed === data.concurrent_questions}>{t("limits.save")}</button></div>
+        {notice ? (
+          <p role={notice.ok ? "status" : "alert"} className={notice.ok ? "notice-ok" : "fc-field-error"}>
+            <Icon name={notice.ok ? "check" : "alert"} />{notice.text}
+          </p>
+        ) : null}
+      </div>
+    </form>
   );
 }

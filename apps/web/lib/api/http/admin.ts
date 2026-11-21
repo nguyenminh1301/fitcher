@@ -38,7 +38,10 @@ export function createHttpRuns(fetcher: Fetcher = (...args) => fetch(...args)): 
 }
 
 export function createHttpAudit(fetcher: Fetcher = (...args) => fetch(...args)): FitcherApi["audit"] {
-  return { list: async () => (await call(fetcher, "/api/admin/audit")).json() };
+  return {
+    list: async () => (await call(fetcher, "/api/admin/audit")).json(),
+    screening: async () => (await call(fetcher, "/api/admin/screening")).json(),
+  };
 }
 
 export function createHttpCosts(fetcher: Fetcher = (...args) => fetch(...args)): FitcherApi["costs"] {

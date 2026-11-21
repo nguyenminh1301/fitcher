@@ -282,7 +282,7 @@
     "avgCost": "Chi phí trung bình mỗi lượt",
     "desc_review": "Mục fitcher soạn khi dựng gói hoặc từ tài liệu. Duyệt những mục có bằng chứng.",
     "desc_runs": "Mọi câu hỏi đã hỏi, kèm thời lượng và chi phí ước tính.",
-    "desc_audit": "Mọi quyết định truy cập dữ liệu, mới nhất ở trên.",
+    "desc_audit": "Mọi quyết định truy cập dữ liệu, rồi kết quả sàng lọc từng câu hỏi, mới nhất ở trên.",
     "files": "{n} tệp",
     "sourceFile": "Tệp",
     "openTrace": "Mở vết xử lý",
@@ -318,7 +318,6 @@
     "nav_datasets": "Bộ dữ liệu",
     "nav_feedback": "Phản hồi",
     "nav_evaluation": "Đánh giá",
-    "group_quality": "Chất lượng",
     "desc_datasets": "Các bảng fitcher được phép truy vấn trong gói đang dùng. Muốn sửa thì dựng lại gói.",
     "desc_feedback": "Lượt thích và chê từ trò chuyện. Biến một câu trả lời bị chê thành đề xuất để duyệt.",
     "desc_evaluation": "Chấm điểm gói trên bộ câu hỏi kiểm thử với các model đang chọn. Kết quả chỉ để tham khảo: gói vẫn trả lời dù có đạt ngưỡng hay không.",
@@ -994,10 +993,12 @@
     "activePack": "Gói đang dùng",
     "noPack": "Chưa có gói",
     "chat": "Trò chuyện",
-    "group_data": "Dữ liệu",
-    "group_quality": "Chất lượng",
-    "group_activity": "Hoạt động",
-    "group_settings": "Cài đặt"
+    "area_overview": "Tổng quan",
+    "area_sources": "Nguồn dữ liệu",
+    "area_documents": "Tài liệu",
+    "area_quality": "Chất lượng",
+    "area_activity": "Hoạt động",
+    "area_settings": "Cài đặt"
   },
   "sourcesPage": {
     "notApplicable": "Không áp dụng",
@@ -1149,7 +1150,27 @@
     "byDayLabel_one": "Chi phí ước tính theo ngày, {n} ngày",
     "noSpend": "Không có chi phí trong khoảng này: mọi lần gọi đều dùng model miễn phí hoặc gói miễn phí."
   },
+  "limits": {
+    "title": "Số câu hỏi cùng lúc",
+    "label": "Số câu hỏi được trả lời cùng lúc",
+    "help": "Từ 1 đến 64. Các câu hỏi khác chờ đến lượt theo thứ tự. Máy yếu hoặc model miễn phí có giới hạn số yêu cầu nên để 1 hoặc 2.",
+    "save": "Lưu",
+    "saved": "Đã lưu giới hạn."
+  },
   "auditPage": {
+    "decisions": "Truy cập dữ liệu",
+    "screening": "Sàng lọc câu hỏi",
+    "screeningEmpty": "Chưa có câu hỏi nào được sàng lọc.",
+    "verdict": "Kết quả",
+    "verdict_allow": "Cho qua",
+    "verdict_flag": "Đánh dấu",
+    "verdict_block": "Đã chặn",
+    "verdict_unavailable": "Không kiểm tra được",
+    "mode": "Xử lý",
+    "mode_log": "Chỉ ghi lại",
+    "mode_enforce": "Dừng câu hỏi",
+    "rules": "Quy tắc khớp",
+    "score": "Điểm bộ phân loại",
     "dataset": "Bộ dữ liệu",
     "none": "Không có",
     "empty": "Chưa có quyết định nào."

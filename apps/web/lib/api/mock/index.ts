@@ -143,7 +143,7 @@ export function createMockApi(options: { latencyMs?: number; identity?: () => Pr
         return wait(run ? { run, items: console.traces[traceId] ?? [] } : null);
       },
     },
-    audit: { list: async () => wait((await load()).console.audit) },
+    audit: { list: async () => wait((await load()).console.audit), screening: async () => wait([]) },
     costs: { list: async () => wait((await load()).console.costs) },
     // The Models page has no sample data: providers, keys and tiers live in the instance's app state.
     models: Object.fromEntries([
@@ -158,6 +158,8 @@ export function createMockApi(options: { latencyMs?: number; identity?: () => Pr
     // The demo has no owner password, so it never asks to sign in.
     owner: {
       status: async () => ({ password_set: false, signed_in: false, exposed: false }),
+      limits: async () => ({ concurrent_questions: 2 }),
+      setLimits: () => Promise.reject(new Error("The limits need the api; they have no sample data.")),
       signIn: () => Promise.reject(new Error("The owner password needs the api; it has no sample data.")),
       signOut: async () => undefined,
       setPassword: () => Promise.reject(new Error("The owner password needs the api; it has no sample data.")),

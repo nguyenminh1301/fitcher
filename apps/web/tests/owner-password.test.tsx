@@ -15,6 +15,8 @@ function fakeOwner(status: OwnerStatus, signIn: FitcherApi["owner"]["signIn"] = 
   return {
     status: vi.fn(async () => status), signIn, signOut: vi.fn(async () => undefined),
     setPassword: vi.fn(async () => undefined), removePassword: vi.fn(async () => undefined),
+    limits: vi.fn(async () => ({ concurrent_questions: 2 })),
+    setLimits: vi.fn(async (concurrent_questions: number) => ({ concurrent_questions })),
   };
 }
 

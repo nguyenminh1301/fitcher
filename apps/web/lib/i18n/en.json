@@ -282,7 +282,7 @@
     "avgCost": "Average cost per run",
     "desc_review": "Items fitcher drafted while building the pack or from documents. Approve the ones the evidence supports.",
     "desc_runs": "Every question asked, with its duration and estimated cost.",
-    "desc_audit": "Every data access decision, newest first.",
+    "desc_audit": "Every data access decision, then how each question was screened, newest first.",
     "files": "{n} files",
     "sourceFile": "File",
     "openTrace": "Open trace",
@@ -318,7 +318,6 @@
     "nav_datasets": "Datasets",
     "nav_feedback": "Feedback",
     "nav_evaluation": "Evaluation",
-    "group_quality": "Quality",
     "desc_datasets": "The tables fitcher may query in the active pack. To change them, build the pack again.",
     "desc_feedback": "Likes and dislikes from the chat. Turn a disliked answer into a proposal to review.",
     "desc_evaluation": "Scores the pack on its test questions with the chosen models. The result is for reference: the pack answers whether or not it reaches the threshold.",
@@ -994,10 +993,12 @@
     "activePack": "Active pack",
     "noPack": "No pack yet",
     "chat": "Chat",
-    "group_data": "Data",
-    "group_quality": "Quality",
-    "group_activity": "Activity",
-    "group_settings": "Settings"
+    "area_overview": "Overview",
+    "area_sources": "Sources",
+    "area_documents": "Documents",
+    "area_quality": "Quality",
+    "area_activity": "Activity",
+    "area_settings": "Settings"
   },
   "sourcesPage": {
     "notApplicable": "Does not apply",
@@ -1149,7 +1150,27 @@
     "byDayLabel_one": "Estimated cost by day, {n} day",
     "noSpend": "No spend in this period: every call used a free model or a free tier."
   },
+  "limits": {
+    "title": "Questions at once",
+    "label": "Questions answered at the same time",
+    "help": "From 1 to 64. More questions wait their turn in order. A small machine or a free model's request limit answers better with 1 or 2.",
+    "save": "Save",
+    "saved": "The limit was saved."
+  },
   "auditPage": {
+    "decisions": "Data access",
+    "screening": "Question screening",
+    "screeningEmpty": "No question screened yet.",
+    "verdict": "Verdict",
+    "verdict_allow": "Passed",
+    "verdict_flag": "Flagged",
+    "verdict_block": "Stopped",
+    "verdict_unavailable": "Not checked",
+    "mode": "Action",
+    "mode_log": "Recorded only",
+    "mode_enforce": "Stops the question",
+    "rules": "Rules matched",
+    "score": "Classifier score",
     "dataset": "Dataset",
     "none": "None",
     "empty": "No decision yet."

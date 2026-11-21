@@ -23,6 +23,8 @@ export function createHttpOwner(fetcher: typeof fetch = (...args) => fetch(...ar
   };
   return {
     status: async () => (await call("/api/owner/status", { cache: "no-store" })).json(),
+    limits: async () => (await call("/api/settings/limits", { cache: "no-store" })).json(),
+    setLimits: async (concurrentQuestions) => (await call("/api/settings/limits", json("PUT", { concurrent_questions: concurrentQuestions }))).json(),
     signIn: async (password) => {
       const response = await fetcher("/api/owner/session", json("POST", { password }));
       if (response.status === 401) throw new OwnerSignInError("wrong");
