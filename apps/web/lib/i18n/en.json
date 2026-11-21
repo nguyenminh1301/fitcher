@@ -282,7 +282,7 @@
     "avgCost": "Average cost per run",
     "desc_review": "Items fitcher drafted while building the pack or from documents. Approve the ones the evidence supports.",
     "desc_runs": "Every question asked, with its duration and estimated cost.",
-    "desc_audit": "Every data access decision, newest first.",
+    "desc_audit": "Every data access decision, then how each question was screened, newest first.",
     "files": "{n} files",
     "sourceFile": "File",
     "openTrace": "Open trace",

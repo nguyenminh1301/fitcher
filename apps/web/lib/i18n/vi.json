@@ -282,7 +282,7 @@
     "avgCost": "Chi phí trung bình mỗi lượt",
     "desc_review": "Mục fitcher soạn khi dựng gói hoặc từ tài liệu. Duyệt những mục có bằng chứng.",
     "desc_runs": "Mọi câu hỏi đã hỏi, kèm thời lượng và chi phí ước tính.",
-    "desc_audit": "Mọi quyết định truy cập dữ liệu, mới nhất ở trên.",
+    "desc_audit": "Mọi quyết định truy cập dữ liệu, rồi kết quả sàng lọc từng câu hỏi, mới nhất ở trên.",
     "files": "{n} tệp",
     "sourceFile": "Tệp",
     "openTrace": "Mở vết xử lý",
