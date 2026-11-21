@@ -36,6 +36,7 @@
 
 ### Fixed
 
+- A run that asked a question back records what it asked for (a period, a measure or a column, with the term), and a run's trace shows that reason, or the error a failed run ended with, in its summary.
 - Review leaves out the Confidence column when every item has the same confidence, as all the items of an instant pack do (50%), since such a column tells nothing apart.
 - The Overview's Needs a look counts the items an instant pack approved without a person, which Review shows as Unreviewed, and the questions that failed in the last 24 hours; it said nothing needed a look while a new pack had a dozen unreviewed items.
 - Actions that call the models (running the evaluation, drafting from a document) are labelled "Uses free models" instead of "Uses paid AI" when every task's models are chosen from free models, and the Evaluation page no longer says the pack is turned on only above the threshold: the result is for reference and the pack answers either way.

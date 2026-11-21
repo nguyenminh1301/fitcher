@@ -79,7 +79,7 @@ def test_rejected_and_failed_runs_record_their_status():
     clarified = logged([routing_reply(), extraction_reply(rank_term=None)])
     run_question("Which widgets?", clarified)
     final = clarified.logs.runs()[-1]
-    assert (final.status, final.intent, final.error) == ("clarified", "data_query", "")
+    assert (final.status, final.intent, final.error) == ("clarified", "data_query", "asked for a measure")
 
     failed = logged([routing_reply(), extraction_reply(), "SELECT secret FROM marts.widget_sales"])
     run_question(QUESTION, failed)
