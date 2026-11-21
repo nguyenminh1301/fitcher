@@ -13,7 +13,7 @@ import sys
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "apps" / "api"))
 
-from app.contracts.admin import AuditRow, CostRow, RunRow, RunTrace  # noqa: E402 - needs apps/api on the path
+from app.contracts.admin import AuditRow, CostRow, RunRow, RunTrace, ScreeningRow  # noqa: E402 - needs apps/api on the path
 from app.contracts.admin_feedback import FeedbackRow, ProposalResult  # noqa: E402
 from app.contracts.chart_spec import ChartSpec  # noqa: E402
 from app.contracts.conversations import (  # noqa: E402
@@ -34,6 +34,7 @@ from app.contracts.result import Result  # noqa: E402
 from app.contracts.review import DatasetView, ReviewItem, ReviewItemPatch  # noqa: E402
 from app.contracts.screening import ClassifierChange, ClassifierDownload, ClassifierStatus  # noqa: E402
 from app.contracts.owner import OwnerPasswordChange, OwnerPasswordRemoval, OwnerSignIn, OwnerStatus  # noqa: E402
+from app.contracts.limits import LimitSettings  # noqa: E402
 from app.contracts.setup import SetupStatus  # noqa: E402
 from app.contracts.instant import InstantEstimate, InstantEstimateRequest, InstantJobReply, InstantRequest  # noqa: E402
 from app.contracts.sources import (  # noqa: E402
@@ -85,6 +86,7 @@ CONTRACTS = {
     "run_row": (RunRow, "serialization"),
     "run_trace": (RunTrace, "serialization"),
     "audit_row": (AuditRow, "serialization"),
+    "screening_row": (ScreeningRow, "serialization"),
     "cost_row": (CostRow, "serialization"),
     "feedback_row": (FeedbackRow, "serialization"),
     "proposal_result": (ProposalResult, "serialization"),
@@ -106,6 +108,7 @@ CONTRACTS = {
     "file_upload_view": (FileUploadView, "serialization"),
     "file_load": (FileLoad, "validation"),
     "setup_status": (SetupStatus, "serialization"),
+    "limit_settings": (LimitSettings, "serialization"),
     "owner_status": (OwnerStatus, "serialization"),
     "owner_sign_in": (OwnerSignIn, "validation"),
     "owner_password_change": (OwnerPasswordChange, "validation"),

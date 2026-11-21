@@ -90,7 +90,7 @@ describe("overview", () => {
     const attention = await screen.findByRole("region", { name: "Needs a look" });
     await waitFor(() => expect(within(attention).getAllByRole("link").map((link) => link.textContent)).toEqual(["1 item to review", "Source kho failed to sync"]));
     expect(screen.getByRole("alert").textContent).toContain("open to other machines");
-    expect(within(screen.getByRole("navigation", { name: "Console" })).getByRole("link", { name: /Review/ }).textContent).toContain("1");
+    expect(within(screen.getByRole("navigation", { name: "Console" })).getByRole("link", { name: /Quality/ }).textContent).toContain("1");
   });
 
   it("counts items approved without a person and questions that failed in the last day", async () => {

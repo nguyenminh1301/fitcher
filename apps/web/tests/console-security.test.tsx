@@ -102,3 +102,22 @@ describe("security", () => {
     expect((await screen.findByRole("alert")).textContent).toContain("Set an owner password on this computer");
   });
 });
+
+describe("questions at once", () => {
+  it("reads the limit and saves a new one between 1 and 64", async () => {
+    const setLimits = vi.fn(async (concurrent_questions: number) => ({ concurrent_questions }));
+    Object.assign(api.owner, { limits: vi.fn(async () => ({ concurrent_questions: 2 })), setLimits });
+    show({ password_set: false, signed_in: false, exposed: false });
+    const form = await screen.findByRole("form", { name: "Questions at once" });
+    const input = within(form).getByLabelText("Questions answered at the same time") as HTMLInputElement;
+    expect(input.value).toBe("2");
+
+    fireEvent.change(input, { target: { value: "99" } });
+    expect((within(form).getByRole("button", { name: "Save" }) as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.change(input, { target: { value: "1" } });
+    await act(async () => fireEvent.click(within(form).getByRole("button", { name: "Save" })));
+
+    expect(setLimits).toHaveBeenCalledWith(1);
+    expect(within(form).getByRole("status").textContent).toContain("The limit was saved.");
+  });
+});

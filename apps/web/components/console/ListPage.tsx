@@ -11,11 +11,30 @@ import { Empty } from "@/components/console/kit";
 import { Skeleton } from "@/components/ui/feedback";
 import { SampleDataBadge } from "@/components/ui/SampleDataBadge";
 import { useChat } from "@/lib/chat/ChatContext";
-import { SECTIONS } from "@/lib/console/sections";
+import { useConsole } from "@/components/console/ConsoleLayout";
+import { areaOf, SECTIONS, sectionPath } from "@/lib/console/sections";
 import { cx } from "@/lib/cx";
 import { useI18n } from "@/lib/i18n/react";
 
 export const PAGE_SIZE = 20;
+
+/** The pages of the open page's area as tabs, when the area has more than one (lib/console/sections.ts). */
+export function AreaTabs({ section }: { section: string }) {
+  const { t } = useI18n();
+  const { navigate } = useConsole();
+  const area = areaOf(section);
+  if (area.pages.length < 2) return null;
+  return (
+    <nav className="tabs area-tabs" aria-label={t(`console.area_${area.key}`)}>
+      {area.pages.map((page) => (
+        <a key={page} href={sectionPath(page)} className="tab" aria-current={page === section ? "page" : undefined}
+          onClick={(event) => { event.preventDefault(); navigate(sectionPath(page)); }}>
+          {t(`ui.nav_${page}`)}
+        </a>
+      ))}
+    </nav>
+  );
+}
 
 type ListPageProps = {
   /** The section key, which gives the title, description and the feature behind the Sample data badge. */
@@ -51,6 +70,7 @@ export function ListPage({ section, actions, loading, failed, skeleton = "list",
   else if (loading) body = <div className="box box-pad" aria-busy="true"><Skeleton variant={skeleton} rows={8} /></div>;
   return (
     <div className="cs-page">
+      <AreaTabs section={section} />
       <div className="page-head">
         <div style={{ minWidth: 0 }}>
           <div className="fc-row">

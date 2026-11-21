@@ -5,7 +5,7 @@ import { ConsoleLayout } from "@/components/console/ConsoleLayout";
 import { createMockApi } from "@/lib/api/mock";
 import type { ConsoleFile } from "@/lib/api/provisional";
 import { ChatProvider } from "@/lib/chat/ChatContext";
-import { sectionOf, SECTIONS } from "@/lib/console/sections";
+import { areaOf, AREAS, sectionOf, SECTIONS } from "@/lib/console/sections";
 import { I18nProvider } from "@/lib/i18n/react";
 import { ThemeProvider } from "@/lib/theme";
 
@@ -46,24 +46,23 @@ afterEach(() => {
 });
 
 describe("console sections", () => {
-  it("lists every page for the owner, with the Overview first", () => {
-    expect(SECTIONS.map((section) => section.key)).toEqual([
-      "overview", "sources", "datasets", "documents", "review", "feedback", "evaluation", "runs", "costs", "audit", "models", "security",
-    ]);
+  it("puts every page in one of six areas, with the Overview first", () => {
+    expect(AREAS.map((area) => area.key)).toEqual(["overview", "sources", "documents", "quality", "activity", "settings"]);
+    expect(AREAS.flatMap((area) => area.pages).sort()).toEqual(SECTIONS.map((section) => section.key).sort());
+    expect(areaOf("datasets").key).toBe("sources");
+    expect(areaOf("audit").key).toBe("activity");
     expect(sectionOf("/console")).toBe("overview");
     expect(sectionOf("/console/runs/abc")).toBe("runs");
   });
 });
 
 describe("console layout", () => {
-  it("shows every page grouped as Data, Quality, Activity and Settings, with the open one current", async () => {
-    renderConsole("rev", "documents");
+  it("shows six areas, with the area of the open page current", async () => {
+    renderConsole("rev", "feedback");
 
-    await waitFor(() => expect(links()).toEqual([
-      "Overview", "Sources", "Datasets", "Documents", "Review", "Feedback", "Evaluation", "Runs", "Costs", "Query log", "Models", "Security", "Chat",
-    ]));
-    for (const group of ["Data", "Quality", "Activity", "Settings"]) expect(within(nav()).getByText(group)).toBeTruthy();
-    expect(within(nav()).getByRole("link", { name: "Documents" }).getAttribute("aria-current")).toBe("page");
+    await waitFor(() => expect(links()).toEqual(["Overview", "Sources", "Documents", "Quality", "Activity", "Settings", "Chat"]));
+    expect(within(nav()).getByRole("link", { name: "Quality" }).getAttribute("aria-current")).toBe("page");
+    expect(within(nav()).getByRole("link", { name: "Quality" }).getAttribute("href")).toBe("/console/review");
     expect(screen.getByText("section page")).toBeTruthy();
   });
 
@@ -89,14 +88,14 @@ describe("console layout", () => {
 
   it("opens the navigation as a drawer and closes it after a page is picked", async () => {
     const { navigate } = renderConsole("rev", "review");
-    await waitFor(() => expect(links()).toContain("Datasets"));
+    await waitFor(() => expect(links()).toContain("Activity"));
     const app = document.querySelector(".cs");
 
     fireEvent.click(screen.getByRole("button", { name: "Open the menu" }));
     expect(app?.getAttribute("data-drawer")).toBe("open");
-    fireEvent.click(within(nav()).getByRole("link", { name: "Datasets" }));
+    fireEvent.click(within(nav()).getByRole("link", { name: "Activity" }));
 
-    expect(navigate).toHaveBeenCalledWith("/console/datasets");
+    expect(navigate).toHaveBeenCalledWith("/console/runs");
     expect(app?.getAttribute("data-drawer")).toBe("closed");
   });
 
@@ -104,7 +103,7 @@ describe("console layout", () => {
     const api = createMockApi();
     const status = vi.spyOn(api.owner, "status").mockResolvedValue({ password_set: false, signed_in: false, exposed: false } as never);
     renderConsole("rev", "review", api);
-    await waitFor(() => expect(links()).toContain("Review"));
+    await waitFor(() => expect(links()).toContain("Quality"));
     status.mockResolvedValue({ password_set: true, signed_in: true, exposed: false } as never);
 
     fireEvent.click(await within(nav()).findByRole("button", { name: "Owner menu" }));
@@ -114,7 +113,7 @@ describe("console layout", () => {
 
   it("offers the chat and the Security page from the owner menu, and no sign-out without a password", async () => {
     const { onChat, navigate } = renderConsole("rev", "review");
-    await waitFor(() => expect(links()).toContain("Review"));
+    await waitFor(() => expect(links()).toContain("Quality"));
 
     fireEvent.click(await within(nav()).findByRole("button", { name: "Owner menu" }));
     expect(screen.getByRole("radiogroup", { name: "Theme" })).toBeTruthy();
@@ -125,5 +124,27 @@ describe("console layout", () => {
     fireEvent.click(within(nav()).getByRole("button", { name: "Owner menu" }));
     fireEvent.click(screen.getByRole("menuitem", { name: "Chat" }));
     expect(onChat).toHaveBeenCalled();
+  });
+});
+
+describe("area tabs", () => {
+  it("shows the pages of the open page's area as tabs, the open one current", async () => {
+    const { AreaTabs } = await import("@/components/console/ListPage");
+    const navigate = vi.fn();
+    render(
+      <ThemeProvider>
+        <I18nProvider initial="en">
+          <ChatProvider api={createMockApi()} navigate={vi.fn()} activeId={null} sources={{}}>
+            <ConsoleLayout section="costs" navigate={navigate} onChat={vi.fn()}><AreaTabs section="costs" /></ConsoleLayout>
+          </ChatProvider>
+        </I18nProvider>
+      </ThemeProvider>,
+    );
+
+    const tabs = await screen.findByRole("navigation", { name: "Activity" });
+    expect(within(tabs).getAllByRole("link").map((link) => link.textContent)).toEqual(["Runs", "Query log", "Costs"]);
+    expect(within(tabs).getByRole("link", { name: "Costs" }).getAttribute("aria-current")).toBe("page");
+    fireEvent.click(within(tabs).getByRole("link", { name: "Query log" }));
+    expect(navigate).toHaveBeenCalledWith("/console/audit");
   });
 });

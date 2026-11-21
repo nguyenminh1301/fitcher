@@ -10,6 +10,8 @@ import type {
   DocumentView,
   DraftResult,
   AuditRow,
+  ScreeningRow,
+  LimitSettings,
   CostRow,
   EvalReport,
   EvalRunStarted,
@@ -129,7 +131,8 @@ export interface FitcherApi {
     list(query?: { from?: string; to?: string; page?: number; all?: boolean }): Promise<RunRow[]>;
     trace(traceId: string): Promise<{ run: RunRow; items: TraceItem[] } | null>;
   };
-  audit: { list(): Promise<AuditRow[]> };
+  /** Access decisions, and the input-screening verdicts of the questions (DECISIONS §9, §15). */
+  audit: { list(): Promise<AuditRow[]>; screening(): Promise<ScreeningRow[]> };
   costs: { list(): Promise<CostRow[]> };
   /** Model providers, the tier mapping, the embedding and the optional screening classifier (admin only). */
   models: {
@@ -185,6 +188,9 @@ export interface FitcherApi {
   /** The optional owner password (DECISIONS §9): its status, signing in and out, setting and removing it. */
   owner: {
     status(): Promise<OwnerStatus>;
+    /** How many questions the instance answers at once, and changing it. */
+    limits(): Promise<LimitSettings>;
+    setLimits(concurrentQuestions: number): Promise<LimitSettings>;
     /** Throws an OwnerSignInError when the password is wrong or too many attempts failed. */
     signIn(password: string): Promise<void>;
     signOut(): Promise<void>;
