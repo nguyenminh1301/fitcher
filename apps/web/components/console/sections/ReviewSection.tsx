@@ -50,6 +50,11 @@ export function ReviewSection() {
   const files = [...new Set(shown.map((item) => item.file))];
   // A confidence every item shares (an instant pack gives each one 0.5) says nothing, so its column is left out.
   const rated = new Set(items.map((item) => item.confidence)).size > 1;
+  // A pack file by what it holds ("Metrics"), with its file name beside it for whoever edits the files.
+  const fileName = (file: string) => {
+    const key = `reviewPage.file_${file.replace(/\.ya?ml$/, "")}`;
+    return t(key) !== key ? t(key) : file;
+  };
   const open = (item: ReviewItem) => navigate(`/console/review/${encodeURIComponent(item.id)}`);
   const status = (item: ReviewItem) => item.reviewed === false
     ? <StatusLabel status="unreviewed">{t("ui.unreviewed")}</StatusLabel>
@@ -72,7 +77,8 @@ export function ReviewSection() {
           </div>
           {files.length ? files.map((file) => (
             <section key={file} className="box" aria-label={file}>
-              <div className="box-head"><h2 className="box-title file-title"><Icon name="fileText" /><span className="fc-mono">{file}</span></h2></div>
+              <div className="box-head"><h2 className="box-title file-title"><Icon name="fileText" /><span>{fileName(file)}</span>
+                {fileName(file) !== file ? <span className="fc-mono fc-muted file-path">{file}</span> : null}</h2></div>
               <div className="card-table">
                 <table className="tbl tbl-cards tbl-review">
                   {/* Fixed column widths, so the tables of the files stacked on this page line up. */}

@@ -1107,6 +1107,12 @@
     "draftButton": "Soạn mục"
   },
   "reviewPage": {
+    "file_datasets": "Tập dữ liệu",
+    "file_glossary": "Thuật ngữ",
+    "file_metrics": "Chỉ số",
+    "file_examples": "Câu hỏi mẫu",
+    "file_relationships": "Phép nối bảng",
+    "file_business_profile": "Hồ sơ doanh nghiệp",
     "filter": "Lọc theo trạng thái",
     "kind": "Loại",
     "waiting": "Chờ duyệt",
@@ -1157,6 +1163,7 @@
     "saved": "Đã lưu giới hạn."
   },
   "auditPage": {
+    "allowedAttempt": "Đã kiểm tra và chạy, lần thử SQL {n}",
     "decisions": "Truy cập dữ liệu",
     "screening": "Sàng lọc câu hỏi",
     "screeningEmpty": "Chưa có câu hỏi nào được sàng lọc.",

@@ -24,6 +24,11 @@ export function AuditSection() {
       screening: [...screening].sort((a, b) => b.ts.localeCompare(a.ts)),
     };
   }, [api]));
+  // An allowed query's logged reason ("gate and guard: SQL attempt 2 allowed") read as a sentence.
+  const reasonText = (reason: string) => {
+    const attempt = /SQL attempt (\d+) allowed/.exec(reason);
+    return attempt ? t("auditPage.allowedAttempt", { n: Number(attempt[1]) }) : reason;
+  };
   const when = (ts: string) => formatDate(ts, { dateStyle: "medium", timeStyle: "medium" });
   return (
     <ListPage section="audit" loading={!data} failed={failed} skeleton="table">
@@ -41,7 +46,7 @@ export function AuditSection() {
           { key: "blocked_tables", label: t("ui.blockedTables"), render: (row) => (row.blocked_tables.length
             ? <span className="fc-mono">{row.blocked_tables.join(", ")}</span>
             : <span className="fc-muted">{t("auditPage.none")}</span>) },
-          { key: "reason", label: t("ui.reason"), render: (row) => <span className="fc-muted">{row.reason}</span> },
+          { key: "reason", label: t("ui.reason"), render: (row) => <span className="fc-muted">{reasonText(row.reason)}</span> },
         ]}
       />
       <RecordTable

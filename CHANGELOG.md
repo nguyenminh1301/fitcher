@@ -23,6 +23,7 @@
 
 ### Changed
 
+- Review names each group of items by what it holds (Datasets, Terms, Metrics, Example questions) with the pack file name beside it, instead of the file name alone, and the Query log reads an allowed query's reason as "Checked and run, SQL attempt 2" instead of the logged "gate and guard: SQL attempt 2 allowed".
 - The console's sidebar has six areas instead of twelve pages under four headings: Overview, Sources, Documents, Quality, Activity and Settings. A page that belongs with another one is a tab of its area (Datasets beside Sources; Review, Feedback and Evaluation under Quality; Runs, Query log and Costs under Activity; Models and Security under Settings), and every page keeps its own address. The Quality badge counts Review's drafts and unreviewed items with Feedback's disliked answers.
 - Charts load ECharts' core with only the bar, line, pie and scatter charts, the components and the two renderers they use, so the chart chunk the chat downloads shrinks from 1.14 MB to 0.62 MB.
 - `GET /sources` reads every source's table counts and latest sync in two queries instead of two per source.
