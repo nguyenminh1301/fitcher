@@ -151,4 +151,6 @@ Branch from `develop` and open a pull request back to it. [CONTRIBUTING.md](CONT
 
 ## Data and licences
 
+fitcher is released under the [MIT License](LICENSE). The licence covers this repository's code and documentation, not the datasets or models it works with.
+
 Datasets are never committed; downloads stay in the Git-ignored `data/` folder. FreeEcommerceTwin14M is licensed CC BY-NC 4.0 for non-commercial use. Iowa Liquor Sales 2025 is published by the Iowa Department of Revenue under CC BY 4.0.

@@ -4,6 +4,7 @@
 
 ### Added
 
+- fitcher is released under the MIT License (`LICENSE`); the api and web manifests name it. Datasets and downloaded models keep their own licences.
 - The Security page sets how many questions the instance answers at once (1 to 64; more wait their turn in order), which the api kept as a setting (`GET` and `PUT /settings/limits`) with no way to change it in the app.
 - The Query log page lists the input-screening verdict of every question below the access decisions: whether it passed, was flagged, stopped or could not be checked, whether a flag only records it or stops the question, the rules it matched and the classifier's score. The api already served them (`GET /admin/screening`) but no page read them.
 - The install guide shows how to reach fitcher from other machines: list the public name, set the owner password on this computer first, then start an nginx, Caddy or Cloudflare Tunnel proxy that sends the public name as `Host`, with the settings for uploads and streamed answers.

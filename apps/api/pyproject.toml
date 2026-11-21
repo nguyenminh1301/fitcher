@@ -2,6 +2,7 @@
 name = "fitcher-api"
 version = "0.0.3"
 description = "Domain-neutral natural-language data analysis API"
+license = "MIT"
 requires-python = ">=3.13,<3.14"
 dependencies = [
     # Hashes the owner password with Argon2id (app/auth/owner.py).
