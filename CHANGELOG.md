@@ -36,6 +36,7 @@
 
 ### Fixed
 
+- Actions that call the models (running the evaluation, drafting from a document) are labelled "Uses free models" instead of "Uses paid AI" when every task's models are chosen from free models, and the Evaluation page no longer says the pack is turned on only above the threshold: the result is for reference and the pack answers either way.
 - The Models page describes the prompt-injection filter by its switch: while the filter is off it says that only the English and Vietnamese rules check questions, instead of always showing the text of the filter turned on.
 - On a touch screen wider than 768 px, such as a phone held sideways, table links, back links, switches and setup step bars keep their 44 px touch targets, and a segmented control whose labels are too long for a phone, such as the Vietnamese model choice, wraps onto a second line instead of running past its box.
 - Console pages read cleanly on a tablet and in a narrow panel: the Overview's Get started bar lines up with its card and its steps wrap into rows; the Datasets, Runs, Query log and Review tables turn into cards below 640 px of panel width instead of breaking text one word per line or cutting columns off; the Review tables of the pack's files line up column for column; and Costs says there was no spend instead of drawing an empty chart, and no longer breaks a model id inside its name.

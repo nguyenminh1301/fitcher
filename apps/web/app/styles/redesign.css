@@ -443,6 +443,7 @@ a.stat:hover { background: var(--bgColor-muted); }
 .drop[aria-disabled="true"] { opacity: .6; }
 .doc-name { font-weight: 500; overflow-wrap: anywhere; }
 .row-actions .fc-paid { margin-left: 6px; }
+.fc-paid-free { border-color: var(--borderColor-default); color: var(--fgColor-muted); }
 .file-title { display: flex; align-items: center; gap: 8px; }
 .src-link.plain { font-family: var(--font-sans); font-weight: 500; }
 
