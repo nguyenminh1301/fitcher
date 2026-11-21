@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 1.0.0 - 2026-11-21
+
 ### Added
 
 - fitcher is released under the MIT License (`LICENSE`); the api and web manifests name it. Datasets and downloaded models keep their own licences.
