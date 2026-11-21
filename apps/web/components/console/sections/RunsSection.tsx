@@ -163,6 +163,8 @@ export function RunDetail({ traceId }: { traceId: string }) {
                   <dt>{t("ui.duration")}</dt><dd>{duration(runDuration(run, now))}</dd>
                   <dt>{t("ui.cost")}</dt><dd>{cost(run)}</dd>
                   {run.answer_to ? <><dt>{t("runsPage.answerToLabel")}</dt><dd lang={langOf(run.answer_to)}>{run.answer_to}</dd></> : null}
+                  {/* Why the run got no answer: what it asked back for, or the error it ended with. */}
+                  {run.error ? <><dt>{t("ui.reason")}</dt><dd lang="en">{run.error}</dd></> : null}
                   {pack ? <><dt>{t("runsPage.pack")}</dt><dd>{pack.display_name || pack.name}</dd></> : null}
                   <dt>{t("runsPage.trace")}</dt><dd className="fc-mono trace-id">{run.trace_id}</dd>
                 </dl>

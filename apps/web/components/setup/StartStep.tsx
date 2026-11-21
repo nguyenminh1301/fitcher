@@ -294,15 +294,18 @@ export function StartStep({ sources, chosen, meta, onAsk, onConsole, onModel, po
 }
 
 /** What is still missing before a first question, each with the console page that adds it. */
-export function LeftScreen({ missing, meta, onConsole }: { missing: ("model" | "data" | "pack")[]; meta: ReactNode; onConsole: (path?: string) => void }) {
+/** What is still missing goes back to its own setup step; Done opens the chat, which says what is left. */
+export function LeftScreen({ missing, meta, onStep, onDone }: {
+  missing: ("model" | "data" | "pack")[]; meta: ReactNode; onStep: (step: "models" | "data") => void; onDone: () => void;
+}) {
   const { t } = useI18n();
-  const PATH = { model: "/console/models", data: "/console/sources", pack: "/console/sources" };
+  const STEP = { model: "models", data: "data", pack: "data" } as const;
   if (!missing.length) {
     return (
       <>
         <StepHead icon={<Icon name="check" size="xl" />} tone="success" title={t("onboarding.allSet")} />
         <div className="ob-foot">
-          <button type="button" className="fc-btn fc-btn-primary fc-btn-xl fc-btn-block" onClick={() => onConsole()}>{t("onboarding.done")}</button>
+          <button type="button" className="fc-btn fc-btn-primary fc-btn-xl fc-btn-block" onClick={onDone}>{t("onboarding.done")}</button>
           <p className="ob-meta">{t("onboarding.backup")}</p>
           {meta}
         </div>
@@ -317,16 +320,16 @@ export function LeftScreen({ missing, meta, onConsole }: { missing: ("model" | "
       </StepHead>
       <div className="box">
         {missing.map((item) => (
-          <a key={item} className="row-link" href={PATH[item]} onClick={(event) => { event.preventDefault(); onConsole(PATH[item]); }}>
+          <button key={item} type="button" className="row-link" onClick={() => onStep(STEP[item])}>
             <span className="dot" style={{ background: "var(--fgColor-attention)" }} />
             <span style={{ flex: 1 }}>{t(`onboarding.missing_${item}`)}</span>
             <span className="fc-muted">{t(`onboarding.open_${item}`)}</span>
             <Icon name="chevronRight" />
-          </a>
+          </button>
         ))}
       </div>
       <div className="ob-foot">
-        <button type="button" className="fc-btn fc-btn-primary fc-btn-xl fc-btn-block" onClick={() => onConsole()}>{t("onboarding.done")}</button>
+        <button type="button" className="fc-btn fc-btn-primary fc-btn-xl fc-btn-block" onClick={onDone}>{t("onboarding.done")}</button>
         <p className="ob-meta">{t("onboarding.backup")}</p>
         {meta}
       </div>

@@ -14,10 +14,12 @@ export type ShellStep = { id: string; state: "done" | "current" | "todo"; onOpen
 
 export function SetupShell({ steps, wide = false, children }: { steps: ShellStep[]; wide?: boolean; children: ReactNode }) {
   const { t } = useI18n();
+  const at = steps.findIndex((step) => step.state === "current");
   return (
     <div className="fc-app ob">
       <header className="ob-top">
         <Logo height={20} />
+        <div className="ob-progress">
         <ol className="ob-steps" aria-label={t("onboarding.progress")}>
           {steps.map((step, index) => {
             const name = t("onboarding.stepLabel", { n: index + 1, name: t(`onboarding.step_${step.id}`) });
@@ -33,6 +35,13 @@ export function SetupShell({ steps, wide = false, children }: { steps: ShellStep
             );
           })}
         </ol>
+        {/* The bars alone do not say which step this is; its name is shown under them. */}
+        {at >= 0 ? (
+          <span className="ob-progress-name" aria-hidden="true">
+            {t("onboarding.stepOf", { n: at + 1, total: steps.length })} · {t(`onboarding.step_${steps[at].id}`)}
+          </span>
+        ) : null}
+        </div>
         <div className="ob-top-end"><Preferences languageOnly /></div>
       </header>
       <main className="ob-panel">

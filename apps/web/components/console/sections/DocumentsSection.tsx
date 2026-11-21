@@ -16,6 +16,7 @@ import { Dialog } from "@/components/ui/overlay";
 import type { DocumentSettings, DocumentView as Document } from "@/lib/contracts";
 import { useChat } from "@/lib/chat/ChatContext";
 import { useLoad } from "@/lib/console/useLoad";
+import { useAiCostLabel } from "@/lib/console/useAiCostLabel";
 import { useI18n } from "@/lib/i18n/react";
 
 // A processing document is checked again this often until it is indexed or fails.
@@ -81,6 +82,7 @@ function DocumentsSwitch({ settings, onChange }: { settings: DocumentSettings; o
 
 function DocumentList({ actions }: { actions: ReactNode }) {
   const { t, formatNumber } = useI18n();
+  const cost = useAiCostLabel();
   const { api } = useChat();
   const { toast } = useConsole();
   const { data, failed, reload } = useLoad(useCallback(() => api.documents.list(), [api]));
@@ -157,7 +159,7 @@ function DocumentList({ actions }: { actions: ReactNode }) {
                     <td className="row-actions">
                       <button type="button" className="fc-btn fc-btn-sm" disabled={document.status !== "indexed" || compiling}
                         aria-describedby="paid-note" onClick={() => setDrafting(document)}>{t("ui.draftItems")}</button>
-                      <span className="fc-paid" aria-hidden="true">{t("ui.paidAi")}</span>
+                      <span className={cost.paid ? "fc-paid" : "fc-paid fc-paid-free"} aria-hidden="true">{cost.text}</span>
                       <button type="button" className="fc-btn fc-btn-ghost fc-btn-icon fc-btn-sm" aria-label={`${t("ui.del")} ${document.name}`}
                         onClick={() => setDeleting(document)}><Icon name="trash" /></button>
                     </td>
@@ -165,7 +167,7 @@ function DocumentList({ actions }: { actions: ReactNode }) {
                 ))}
               </tbody>
             </table>
-            <span id="paid-note" className="fc-sr">{t("ui.paidAi")}</span>
+            <span id="paid-note" className="fc-sr">{cost.text}</span>
           </div>
         ) : <Empty icon="fileText" title={t("documentsPage.empty")} />}
       </section>

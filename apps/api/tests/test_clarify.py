@@ -233,6 +233,15 @@ def test_a_question_without_a_period_asks_for_one():
     assert [option.id for option in state["clarification"].options][:2] == ["period:this_month", "period:last_month"]
 
 
+def test_a_run_that_asked_back_records_what_it_asked_for():
+    from app.agent.graph import _outcome
+
+    asked = {"intent": "data_query", "clarification": object()}
+    assert _outcome({**asked, "need": Need(kind="period")}) == ("clarified", "data_query", "asked for a period")
+    metric = Need(kind="metric", term="best", candidates=["widget_revenue"])
+    assert _outcome({**asked, "need": metric})[2] == 'asked for a measure for "best"'
+
+
 # the run's status
 
 def test_an_out_of_scope_reply_is_declined_not_answered():

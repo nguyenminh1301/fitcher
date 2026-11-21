@@ -48,6 +48,8 @@ export function ReviewSection() {
   const proposals = (data ?? []).filter((item) => item.kind === "proposal" && item.status === "draft");
   const shown = items.filter((item) => filter === "all" || item.status === filter);
   const files = [...new Set(shown.map((item) => item.file))];
+  // A confidence every item shares (an instant pack gives each one 0.5) says nothing, so its column is left out.
+  const rated = new Set(items.map((item) => item.confidence)).size > 1;
   const open = (item: ReviewItem) => navigate(`/console/review/${encodeURIComponent(item.id)}`);
   const status = (item: ReviewItem) => item.reviewed === false
     ? <StatusLabel status="unreviewed">{t("ui.unreviewed")}</StatusLabel>
@@ -74,8 +76,8 @@ export function ReviewSection() {
               <div className="card-table">
                 <table className="tbl tbl-cards tbl-review">
                   {/* Fixed column widths, so the tables of the files stacked on this page line up. */}
-                  <colgroup><col /><col className="col-kind" /><col className="col-origin" /><col className="col-confidence" /><col className="col-status" /></colgroup>
-                  <thead><tr><th>{t("ui.name")}</th><th>{t("reviewPage.kind")}</th><th>{t("ui.origin")}</th><th>{t("ui.confidence")}</th><th>{t("ui.status")}</th></tr></thead>
+                  <colgroup><col /><col className="col-kind" /><col className="col-origin" />{rated ? <col className="col-confidence" /> : null}<col className="col-status" /></colgroup>
+                  <thead><tr><th>{t("ui.name")}</th><th>{t("reviewPage.kind")}</th><th>{t("ui.origin")}</th>{rated ? <th>{t("ui.confidence")}</th> : null}<th>{t("ui.status")}</th></tr></thead>
                   <tbody>
                     {shown.filter((item) => item.file === file).map((item) => (
                       <tr key={item.id} aria-label={item.name}>
@@ -83,7 +85,7 @@ export function ReviewSection() {
                           <div className="fc-muted row-sub" lang={langOf(item.body)}>{item.body}</div></td>
                         <td data-label={t("reviewPage.kind")}><StatusLabel tone={null}>{t(KIND_KEY(item))}</StatusLabel></td>
                         <td data-label={t("ui.origin")}><span className="fc-muted">{item.evidence?.source ?? "—"}</span></td>
-                        <td data-label={t("ui.confidence")}><Meter value={item.confidence} /></td>
+                        {rated ? <td data-label={t("ui.confidence")}><Meter value={item.confidence} /></td> : null}
                         <td data-label={t("ui.status")}>{status(item)}</td>
                       </tr>
                     ))}

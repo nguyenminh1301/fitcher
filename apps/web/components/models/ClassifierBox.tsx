@@ -134,7 +134,8 @@ export function ClassifierBox({ models, status, providers, onChanged }: {
             onChange={(on) => void apply(on)} />
         </div>
         {where ? <div className="fc-banner fc-banner-success" role="status"><Icon name="shieldCheck" /><div>{where}</div></div> : null}
-        <p className="fc-muted" style={{ margin: 0 }}>{t("models.classifierOn")}</p>
+        {/* What the switch does in its current position: the "on" text read as a status while the filter was off. */}
+        <p className="fc-muted" style={{ margin: 0 }}>{t(status.enabled ? "models.classifierOn" : "models.classifierOffNote")}</p>
         <div className="fc-field">
           <span className="fc-field-label">{t("classifier.whereLabel")}</span>
           <div style={{ alignSelf: "flex-start" }}>
