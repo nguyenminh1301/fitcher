@@ -8,7 +8,6 @@ pack role and every console role. ``user_id`` is what conversations and
 
 from dataclasses import dataclass
 
-from app.auth.roles import CONSOLE_ROLES
 
 @dataclass(frozen=True)
 class Principal:
@@ -22,4 +21,4 @@ OWNER_ID = "owner"
 
 
 def owner(pack_roles: list[str]) -> Principal:
-    return Principal(user_id=OWNER_ID, subject=OWNER_ID, display_name="Owner", roles=(*pack_roles, *CONSOLE_ROLES))
+    return Principal(user_id=OWNER_ID, subject=OWNER_ID, display_name="Owner", roles=tuple(pack_roles))

@@ -10,17 +10,15 @@ from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
-from app.api.console import require_admin
+from app.api.console import Owner
 from app.api.runtime import get_admin_logs, unavailable
-from app.auth.principal import Principal
 from app.contracts.admin import (
-    AdminConversation, AdminConversationThread, AuditRow, CostRow, RunRow, RunTrace, ScreeningRow,
+    AuditRow, CostRow, RunRow, RunTrace, ScreeningRow,
 )
 from app.admin.logs import AdminLogs
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/admin")
-Admin = Annotated[Principal, Depends(require_admin)]
 Logs = Annotated[AdminLogs, Depends(get_admin_logs)]
 COST_DAYS = 30
 
@@ -35,7 +33,7 @@ def _read(call):
 
 @router.get("/runs")
 def list_runs(
-    _: Admin, logs: Logs, user: str | None = None, status_filter: Annotated[str | None, Query(alias="status")] = None,
+    _: Owner, logs: Logs, user: str | None = None, status_filter: Annotated[str | None, Query(alias="status")] = None,
     start: Annotated[date | None, Query(alias="from")] = None, end: Annotated[date | None, Query(alias="to")] = None,
     page: Annotated[int, Query(ge=1)] = 1, every_pack: Annotated[bool, Query(alias="all")] = False,
 ) -> list[RunRow]:
@@ -44,7 +42,7 @@ def list_runs(
 
 
 @router.get("/runs/{trace_id}")
-def read_trace(trace_id: str, _: Admin, logs: Logs) -> RunTrace:
+def read_trace(trace_id: str, _: Owner, logs: Logs) -> RunTrace:
     trace = _read(lambda: logs.trace(trace_id))
     if trace is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="run not found")
@@ -53,14 +51,14 @@ def read_trace(trace_id: str, _: Admin, logs: Logs) -> RunTrace:
 
 @router.get("/audit")
 def list_audit(
-    _: Admin, logs: Logs, decision: Literal["ALLOW", "DENY"] | None = None, page: Annotated[int, Query(ge=1)] = 1,
+    _: Owner, logs: Logs, decision: Literal["ALLOW", "DENY"] | None = None, page: Annotated[int, Query(ge=1)] = 1,
 ) -> list[AuditRow]:
     return _read(lambda: logs.audit(decision=decision, page=page))
 
 
 @router.get("/screening")
 def list_screening(
-    _: Admin, logs: Logs, verdict: str | None = None, source: str | None = None,
+    _: Owner, logs: Logs, verdict: str | None = None, source: str | None = None,
     page: Annotated[int, Query(ge=1)] = 1,
 ) -> list[ScreeningRow]:
     return _read(lambda: logs.screening(verdict=verdict, source=source, page=page))
@@ -68,7 +66,7 @@ def list_screening(
 
 @router.get("/costs")
 def list_costs(
-    _: Admin, logs: Logs, start: Annotated[date | None, Query(alias="from")] = None,
+    _: Owner, logs: Logs, start: Annotated[date | None, Query(alias="from")] = None,
     end: Annotated[date | None, Query(alias="to")] = None, pack: str | None = None,
 ) -> list[CostRow]:
     """Every model call's cost, or with ``pack`` only the calls of that pack's questions."""

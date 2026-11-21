@@ -30,12 +30,12 @@ def client(monkeypatch):
     app.dependency_overrides.clear()
 
 
-def test_every_request_acts_as_the_owner_with_every_role(client):
+def test_every_request_acts_as_the_owner_with_every_pack_role(client):
     response = client.get("/me")
 
     assert response.status_code == 200
     assert response.json() == {
-        "user_id": "owner", "display_name": "Owner", "roles": [*PACK_ROLES, "pack_reviewer", "admin"],
+        "user_id": "owner", "display_name": "Owner", "roles": PACK_ROLES,
         "active_role": PACK_ROLES[0], "exposed": False,
     }
 

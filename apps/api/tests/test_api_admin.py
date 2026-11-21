@@ -7,15 +7,14 @@ from fastapi.testclient import TestClient
 import pytest
 
 from agent_fixtures import compiled_fixture
-from session_fixtures import SessionHeaders
 
 from app.admin.logs import PAGE_SIZE, AdminLogs
 from app.api import runtime
 from app.main import app
 
 TS = datetime(2026, 11, 5, 9, 0, tzinfo=UTC)
-ADMIN = SessionHeaders(['admin'])
-REVIEWER = SessionHeaders(['pack_reviewer'])
+ADMIN = {}
+REVIEWER = {}
 RUN = ("t1", TS, "dev.analyst", "reader", "Revenue by widget", "data_query", "succeeded", 1200, 0.0042, "", 1500, 220,
        ["openai/nvidia/model:free", "gpt-x", ""], "minimal", False, "")
 

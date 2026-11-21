@@ -1,6 +1,6 @@
 """Model providers and the tier mapping (DECISIONS §2, §9, §15): the setup's Models step and the Models page.
 
-Every endpoint needs the ``admin`` role, which the owner holds. A key goes into the vault and never comes back: responses carry only
+Every endpoint answers the owner. A key goes into the vault and never comes back: responses carry only
 whether it is set and its last four characters, and admin actions record the
 same. Adding the first provider maps every chat tier and the embedding to its
 proposed models; any tier can then be mapped to any model of a configured
@@ -40,7 +40,7 @@ from typing import Annotated, Protocol
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 from pydantic import BaseModel
 
-from app.api.console import require_admin
+from app.api.console import Owner
 from app.api.runtime import (
     get_admin_action_log, get_admin_logs, get_compiled_or_none, get_model_store, get_vault, pack_identity,
 )
@@ -69,7 +69,6 @@ from app.state.secrets import SecretError, SecretVault
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
-Admin = Annotated[Principal, Depends(require_admin)]
 PROBE = Prompt(system='Reply with a JSON object {"ok": true} and nothing else.', user="Reply now.")
 
 
@@ -228,7 +227,7 @@ def _verify(checker: Callable, provider: Provider, api_key: str | None) -> list[
 
 
 @router.get("/providers")
-def list_providers(_: Admin, store: Store, mapping: Mapping) -> list[ProviderView]:
+def list_providers(_: Owner, store: Store, mapping: Mapping) -> list[ProviderView]:
     in_use = mapping.providers_in_use()
     return [_view(provider, in_use) for provider in store.list()]
 
@@ -257,7 +256,7 @@ def _ollama_models(body: ProviderCreate, lister: Callable) -> list[str]:
 
 
 @router.post("/providers", status_code=status.HTTP_201_CREATED)
-def add_provider(body: ProviderCreate, admin: Admin, store: Store, mapping: Mapping, log: Log,
+def add_provider(body: ProviderCreate, admin: Owner, store: Store, mapping: Mapping, log: Log,
                  db: Annotated[StateDb, Depends(get_state_db)],
                  lister: Annotated[Callable, Depends(get_model_lister)], vault: Vault, catalog: CatalogDep,
                  latency: Latency, checker: KeyChecker) -> ProviderView:
@@ -286,7 +285,7 @@ def add_provider(body: ProviderCreate, admin: Admin, store: Store, mapping: Mapp
 
 
 @router.patch("/providers/{provider_id}")
-def change_provider(provider_id: str, body: ProviderUpdate, admin: Admin, store: Store, mapping: Mapping,
+def change_provider(provider_id: str, body: ProviderUpdate, admin: Owner, store: Store, mapping: Mapping,
                     log: Log, vault: Vault, catalog: CatalogDep, latency: Latency, checker: KeyChecker) -> ProviderView:
     before = _found(store, provider_id)
     if body.api_key:
@@ -326,7 +325,7 @@ def _refill(mapping: TierMapping, store: ProviderStore, vault: SecretVault, chec
 
 
 @router.delete("/providers/{provider_id}", status_code=status.HTTP_204_NO_CONTENT)
-def remove_provider(provider_id: str, admin: Admin, store: Store, mapping: Mapping, log: Log, vault: Vault,
+def remove_provider(provider_id: str, admin: Owner, store: Store, mapping: Mapping, log: Log, vault: Vault,
                     catalog: CatalogDep, latency: Latency, checker: KeyChecker) -> Response:
     before = _found(store, provider_id)
     # The provider leaves every chain; a tier it alone served takes the proposed models of a provider that
@@ -340,7 +339,7 @@ def remove_provider(provider_id: str, admin: Admin, store: Store, mapping: Mappi
 
 
 @router.post("/providers/{provider_id}/keys", status_code=status.HTTP_201_CREATED)
-def add_key(provider_id: str, body: ProviderKeyCreate, admin: Admin, store: Store, mapping: Mapping, log: Log,
+def add_key(provider_id: str, body: ProviderKeyCreate, admin: Owner, store: Store, mapping: Mapping, log: Log,
             vault: Vault, catalog: CatalogDep, latency: Latency, checker: KeyChecker) -> ProviderView:
     """Add a key the gateway rotates with the provider's other keys, once the provider accepted it."""
     provider = _found(store, provider_id)
@@ -356,7 +355,7 @@ def add_key(provider_id: str, body: ProviderKeyCreate, admin: Admin, store: Stor
 
 
 @router.delete("/providers/{provider_id}/keys/{key_id}")
-def remove_key(provider_id: str, key_id: str, admin: Admin, store: Store, mapping: Mapping, log: Log,
+def remove_key(provider_id: str, key_id: str, admin: Owner, store: Store, mapping: Mapping, log: Log,
                vault: Vault, catalog: CatalogDep, latency: Latency) -> ProviderView:
     before = _found(store, provider_id)
     try:
@@ -385,7 +384,7 @@ def _key(vault: SecretVault, provider: Provider) -> str | None:
 
 @router.get("/providers/{provider_id}/models")
 def provider_models(
-    provider_id: str, _: Admin, store: Store, vault: Annotated[SecretVault, Depends(get_vault)],
+    provider_id: str, _: Owner, store: Store, vault: Annotated[SecretVault, Depends(get_vault)],
     lister: Annotated[Callable, Depends(get_model_lister)],
 ) -> ProviderModels:
     provider = _found(store, provider_id)
@@ -398,7 +397,7 @@ def provider_models(
 
 @router.get("/models/catalog")
 def model_catalog(
-    provider: str, _: Admin, store: Store, vault: Annotated[SecretVault, Depends(get_vault)],
+    provider: str, _: Owner, store: Store, vault: Annotated[SecretVault, Depends(get_vault)],
     catalog: Annotated[Catalog, Depends(get_catalog)], latency: Annotated[Callable, Depends(get_latency)],
 ) -> ModelCatalog:
     """The provider's models with their kind, price, limits, benchmark and measured median latency."""
@@ -415,7 +414,7 @@ def model_catalog(
 
 @router.post("/providers/{provider_id}/test")
 def test_provider(
-    provider_id: str, body: ProviderTestRequest, _: Admin, store: Store, mapping: Mapping,
+    provider_id: str, body: ProviderTestRequest, _: Owner, store: Store, mapping: Mapping,
     vault: Annotated[SecretVault, Depends(get_vault)], checker: KeyChecker,
     probe: Annotated[Callable, Depends(get_probe)],
 ) -> ProviderTestResult:
@@ -473,7 +472,7 @@ def _tiers(mapping: TierMapping, compiled: tuple[str, int] | None, reports: list
 
 
 @router.get("/models/tiers")
-def model_tiers(_: Admin, mapping: Mapping, compiled: Compiled, store: Store, vault: Vault, catalog: CatalogDep,
+def model_tiers(_: Owner, mapping: Mapping, compiled: Compiled, store: Store, vault: Vault, catalog: CatalogDep,
                 latency: Latency, reports: Annotated[Callable, Depends(get_eval_reports)]) -> ModelTiersView:
     # An automatic mode chooses again once a day, when the tiers are next read.
     _refresh_auto(mapping, store, vault, catalog, latency, force=False)
@@ -481,7 +480,7 @@ def model_tiers(_: Admin, mapping: Mapping, compiled: Compiled, store: Store, va
 
 
 @router.put("/models/mode")
-def change_mode(body: ModeChange, admin: Admin, mapping: Mapping, compiled: Compiled, store: Store, vault: Vault,
+def change_mode(body: ModeChange, admin: Owner, mapping: Mapping, compiled: Compiled, store: Store, vault: Vault,
                 catalog: CatalogDep, latency: Latency, log: Log,
                 reports: Annotated[Callable, Depends(get_eval_reports)]) -> ModelTiersView:
     """Choose the chains automatically (free or best models), or keep them as the owner sets them."""
@@ -493,7 +492,7 @@ def change_mode(body: ModeChange, admin: Admin, mapping: Mapping, compiled: Comp
 
 
 @router.put("/models/embedding")
-def change_embedding(body: EmbeddingChange, admin: Admin, mapping: Mapping, compiled: Compiled, log: Log) -> EmbeddingView:
+def change_embedding(body: EmbeddingChange, admin: Owner, mapping: Mapping, compiled: Compiled, log: Log) -> EmbeddingView:
     if not body.confirm_reindex:
         raise HTTPException(status.HTTP_409_CONFLICT,
                             detail="changing the embedding model needs a full reindex of the pack; confirm it")
@@ -512,7 +511,7 @@ def change_embedding(body: EmbeddingChange, admin: Admin, mapping: Mapping, comp
 
 
 @router.put("/models/tiers/{tier}")
-def map_tier(tier: str, body: TierChange, admin: Admin, mapping: Mapping, log: Log) -> TierView:
+def map_tier(tier: str, body: TierChange, admin: Owner, mapping: Mapping, log: Log) -> TierView:
     if tier == EMBED_TIER:
         raise HTTPException(status.HTTP_400_BAD_REQUEST,
                             detail="the embedding model changes with a full reindex, not as a tier")

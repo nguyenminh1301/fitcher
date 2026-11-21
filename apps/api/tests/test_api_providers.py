@@ -4,7 +4,6 @@ from fastapi.testclient import TestClient
 import logging
 import pytest
 
-from session_fixtures import SessionHeaders
 from state_fixtures import new_state
 
 from app.api import providers as providers_api, runtime, setup as setup_api
@@ -12,8 +11,8 @@ from app.llm.client import LLMError
 from app.llm.provider_models import ModelListError
 from app.main import app
 
-ADMIN = SessionHeaders(['admin'], user_id='dev.admin')
-VIEWER = SessionHeaders()
+ADMIN = {}
+VIEWER = {}
 KEY = "sk-test-endpoint-key-7777"
 
 

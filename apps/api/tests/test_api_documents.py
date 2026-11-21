@@ -6,7 +6,6 @@ from fastapi.testclient import TestClient
 import pytest
 
 from agent_fixtures import compiled_fixture
-from session_fixtures import SessionHeaders
 from document_fixtures import MARKDOWN
 from fakes import FakeEmbeddings, FakeSearch
 from test_documents_service import WordScreener
@@ -18,8 +17,8 @@ from app.state.db import shared_state
 from app.state.settings import Settings
 
 NOW = datetime(2026, 11, 5, 8, 0, tzinfo=UTC)
-REVIEWER = SessionHeaders(['pack_reviewer'])
-VIEWER = SessionHeaders()
+REVIEWER = {}
+VIEWER = {}
 
 
 @pytest.fixture
@@ -158,7 +157,7 @@ def test_draft_needs_an_indexed_document(client, drafting):
 
 # Turning company documents off (DECISIONS §15)
 
-ADMIN = SessionHeaders(["admin"])
+ADMIN = {}
 
 
 def test_documents_are_off_on_a_new_instance(client):

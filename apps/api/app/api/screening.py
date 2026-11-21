@@ -7,8 +7,7 @@ Guard (the default engine) or on this computer from an ONNX model
 (``POST /screening/classifier/download``) or, in the Compose stack, exported
 by the ``guard-model`` job. Once the classifier is on, screening fails closed
 whenever it cannot score. Each change is written to
-``agent_logs.admin_actions``. The endpoints need the ``admin`` role, which the
-owner holds.
+``agent_logs.admin_actions``. The endpoints answer the owner.
 
 ``POST`` and ``DELETE /screening/classifier`` keep turning the classifier on
 and off with the engine already chosen; ``PUT`` also chooses the engine.
@@ -21,7 +20,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
 
-from app.api.console import require_admin
+from app.api.console import Owner
 from app.api.runtime import get_admin_action_log, get_screener, get_vault
 from app.api.setup import get_state_db
 from app.auth.principal import Principal
@@ -39,7 +38,6 @@ from app.state.settings import Settings
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/screening")
-Admin = Annotated[Principal, Depends(require_admin)]
 FETCH_HINT = "download it on the Models page"
 
 
@@ -133,12 +131,12 @@ def _apply(db: StateDb, vault: SecretVault, model_dir: Path, change: ClassifierC
 
 
 @router.get("/classifier")
-def classifier_status(_: Admin, db: State, model_dir: ModelDir, download: Download) -> ClassifierStatus:
+def classifier_status(_: Owner, db: State, model_dir: ModelDir, download: Download) -> ClassifierStatus:
     return _status(db, model_dir, download)
 
 
 @router.put("/classifier")
-def change_classifier(body: ClassifierChange, admin: Admin, db: State, model_dir: ModelDir, download: Download,
+def change_classifier(body: ClassifierChange, admin: Owner, db: State, model_dir: ModelDir, download: Download,
                       log: Log, screener: ScreenerDep, vault: Annotated[SecretVault, Depends(get_vault)]) -> ClassifierStatus:
     before = _status(db, model_dir)
     _apply(db, vault, model_dir, body)
@@ -149,7 +147,7 @@ def change_classifier(body: ClassifierChange, admin: Admin, db: State, model_dir
 
 
 @router.post("/classifier")
-def turn_classifier_on(admin: Admin, db: State, model_dir: ModelDir, download: Download, log: Log,
+def turn_classifier_on(admin: Owner, db: State, model_dir: ModelDir, download: Download, log: Log,
                        screener: ScreenerDep, vault: Annotated[SecretVault, Depends(get_vault)]) -> ClassifierStatus:
     before = _status(db, model_dir)
     engine = before.engine
@@ -164,7 +162,7 @@ def turn_classifier_on(admin: Admin, db: State, model_dir: ModelDir, download: D
 
 
 @router.delete("/classifier")
-def turn_classifier_off(admin: Admin, db: State, model_dir: ModelDir, download: Download, log: Log) -> ClassifierStatus:
+def turn_classifier_off(admin: Owner, db: State, model_dir: ModelDir, download: Download, log: Log) -> ClassifierStatus:
     before = _status(db, model_dir)
     Settings(db).set("screening", "classifier_enabled", False)
     after = _status(db, model_dir, download)
@@ -173,20 +171,20 @@ def turn_classifier_off(admin: Admin, db: State, model_dir: ModelDir, download: 
 
 
 @router.get("/classifier/download")
-def download_progress(_: Admin, download: Download) -> ClassifierDownload:
+def download_progress(_: Owner, download: Download) -> ClassifierDownload:
     return _download_view(download) or ClassifierDownload(state="idle", bytes_done=0,
                                                            bytes_total=download.progress.bytes_total)
 
 
 @router.post("/classifier/download", status_code=status.HTTP_202_ACCEPTED)
-def start_download(_: Admin, download: Download) -> ClassifierDownload:
+def start_download(_: Owner, download: Download) -> ClassifierDownload:
     """Download the pinned model in the background; ``GET`` follows it."""
     download.start()
     return _download_view(download)
 
 
 @router.delete("/classifier/download")
-def cancel_or_remove_download(_: Admin, db: State, model_dir: ModelDir, download: Download) -> ClassifierDownload:
+def cancel_or_remove_download(_: Owner, db: State, model_dir: ModelDir, download: Download) -> ClassifierDownload:
     """Cancel a running download, or remove the downloaded model while the classifier does not use it."""
     if download.running:
         download.cancel()

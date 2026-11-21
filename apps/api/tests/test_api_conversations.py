@@ -4,7 +4,6 @@ import pytest
 from fastapi.testclient import TestClient
 
 from agent_fixtures import compiled_fixture
-from session_fixtures import SessionHeaders
 from fakes import FakeConversationClient
 from pydantic import ValidationError
 from test_api_ask import QUESTION, FakeAgent, answer, ask_with, kinds, parse
@@ -16,8 +15,8 @@ from app.conversation.store import ConversationStore
 from app.main import app
 
 
-def headers(user: str = "owner") -> SessionHeaders:
-    return SessionHeaders(user_id=user)
+def headers(user: str = "owner") -> dict[str, str]:
+    return {}
 
 
 @pytest.fixture

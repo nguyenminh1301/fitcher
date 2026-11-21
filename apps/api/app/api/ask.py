@@ -32,7 +32,7 @@ from uuid import uuid4
 
 from collections.abc import Callable
 
-from fastapi import APIRouter, Depends, Header, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import StreamingResponse
 
 from app.agent.nodes.resolve_time import TimeResolutionError, reference_date
@@ -378,7 +378,6 @@ def ask(
     last_used: Annotated[str, Depends(get_last_used_pack)],
     store: Annotated[ConversationStore, Depends(get_conversation_store)],
     gate: Annotated[QuestionGate, Depends(get_question_gate)],
-    x_active_role: Annotated[str | None, Header()] = None,
 ) -> StreamingResponse:
     try:
         today = reference_date(request.timezone)
@@ -386,7 +385,7 @@ def ask(
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(error)) from None
     pack = _pack_of(request, principal.user_id, store, last_used)
     try:
-        role = active_role(principal.roles, pack_roles(compiled_for(pack)), x_active_role)
+        role = active_role(principal.roles, pack_roles(compiled_for(pack)))
     except RoleError as error:
         raise HTTPException(status.HTTP_403_FORBIDDEN, detail=str(error)) from None
     agent = agent_for(pack)

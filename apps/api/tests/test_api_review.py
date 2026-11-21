@@ -4,7 +4,6 @@ from fastapi.testclient import TestClient
 import pytest
 
 from agent_fixtures import compiled_fixture
-from session_fixtures import SessionHeaders
 from test_review_service import NOW, Warehouse, add_draft_metric, pack_dir, registry  # noqa: F401 - fixtures
 
 from app.api import runtime
@@ -12,8 +11,8 @@ from app.data.clickhouse import QueryLimits
 from app.main import app
 from app.onboarding.review import ReviewService
 
-REVIEWER = SessionHeaders(['pack_reviewer'])
-VIEWER = SessionHeaders()
+REVIEWER = {}
+VIEWER = {}
 
 
 @pytest.fixture

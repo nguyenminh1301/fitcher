@@ -5,7 +5,6 @@ import json
 from fastapi.testclient import TestClient
 import pytest
 
-from session_fixtures import SessionHeaders
 from state_fixtures import new_state
 
 from app.api import runtime, screening as screening_api, setup as setup_api
@@ -13,8 +12,8 @@ from app.main import app
 from app.screening.screen import Screener
 from fakes import FakeClassifier
 
-ADMIN = SessionHeaders(['admin'], user_id='dev.admin')
-VIEWER = SessionHeaders()
+ADMIN = {}
+VIEWER = {}
 
 
 class Actions:

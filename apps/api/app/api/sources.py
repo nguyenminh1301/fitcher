@@ -1,6 +1,6 @@
 """The Sources page and the setup's Data step: connect, test, edit, delete and sync sources (DECISIONS §4, §15).
 
-Only an ``admin`` reaches these endpoints, and in individual mode the owner holds that role. A password is sent
+The owner reaches these endpoints. A password is sent
 once, when a source is connected or its password replaced, and goes straight into the source's ClickHouse named
 collection: no response, log line or admin action carries it, and a failure is answered with one fixed reason
 instead of the driver's text. A source is saved only after its connection was tested.
@@ -15,7 +15,7 @@ from typing import Annotated, Protocol
 
 from fastapi import APIRouter, Depends, File, HTTPException, Response, UploadFile, status
 
-from app.api.console import require_admin
+from app.api.console import Owner
 from app.api.runtime import (
     get_admin_action_log, get_file_service, get_source_service, get_source_store, get_state_db, pack_status, unavailable,
 )
@@ -45,7 +45,6 @@ from app.sources.store import (
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/sources")
-Admin = Annotated[Principal, Depends(require_admin)]
 Store = Annotated[SourceStore, Depends(get_source_store)]
 Service = Annotated[SourceService, Depends(get_source_service)]
 
@@ -190,7 +189,7 @@ def _found(store: SourceStore, source_id: str) -> StoredSource:
 
 
 @router.post("/files", status_code=status.HTTP_201_CREATED)
-def upload_file(admin: Admin, service: Files, file: Annotated[UploadFile, File()]) -> FileUploadView:
+def upload_file(admin: Owner, service: Files, file: Annotated[UploadFile, File()]) -> FileUploadView:
     try:
         upload = service.upload(file.filename or "data", file.file, admin.user_id)
     except Exception as error:  # noqa: BLE001 - each failure maps to its status in _refusal
@@ -202,7 +201,7 @@ def upload_file(admin: Admin, service: Files, file: Annotated[UploadFile, File()
 
 
 @router.post("/files/{file_id}/load", status_code=status.HTTP_201_CREATED)
-def load_file(file_id: str, body: FileLoad, admin: Admin, service: Files, store: Store, log: Log, db: State) -> SourceDetail:
+def load_file(file_id: str, body: FileLoad, admin: Owner, service: Files, store: Store, log: Log, db: State) -> SourceDetail:
     try:
         source = service.load(file_id, body.name, [source_files.FileColumn(c.name, c.type) for c in body.columns])
     except Exception as error:  # noqa: BLE001 - each failure maps to its status in _refusal
@@ -218,7 +217,7 @@ def get_pack_status():
 
 
 @router.get("")
-def list_sources(_: Admin, store: Store, status_of: Annotated[Callable, Depends(get_pack_status)]) -> list[SourceView]:
+def list_sources(_: Owner, store: Store, status_of: Annotated[Callable, Depends(get_pack_status)]) -> list[SourceView]:
     # The table counts and the latest syncs of every source are read in two queries, not two per source.
     counts, latest = store.table_counts(), store.latest_syncs()
     views = []
@@ -231,7 +230,7 @@ def list_sources(_: Admin, store: Store, status_of: Annotated[Callable, Depends(
 
 
 @router.post("/test")
-def test_connection(body: SourceConnection, _: Admin, service: Service) -> ProbeResult:
+def test_connection(body: SourceConnection, _: Owner, service: Service) -> ProbeResult:
     try:
         copy_only = body.kind in COPY_ONLY_KINDS
         return ProbeResult(tables=[_probe_view(table, copy_only, body.kind)
@@ -241,7 +240,7 @@ def test_connection(body: SourceConnection, _: Admin, service: Service) -> Probe
 
 
 @router.post("", status_code=status.HTTP_201_CREATED)
-def create_source(body: SourceCreate, admin: Admin, store: Store, service: Service, log: Log, db: State) -> SourceDetail:
+def create_source(body: SourceCreate, admin: Owner, store: Store, service: Service, log: Log, db: State) -> SourceDetail:
     if not valid_name(body.name):
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT,
                             detail="the name must be lower-case letters, digits and underscores, starting with a letter")
@@ -255,7 +254,7 @@ def create_source(body: SourceCreate, admin: Admin, store: Store, service: Servi
 
 
 @router.patch("/{source_id}")
-def edit_source(source_id: str, body: SourcePatch, admin: Admin, store: Store, service: Service, log: Log) -> SourceDetail:
+def edit_source(source_id: str, body: SourcePatch, admin: Owner, store: Store, service: Service, log: Log) -> SourceDetail:
     before = _found(store, source_id)
     patch = ConnectionPatch(host=body.host, port=body.port, database=body.database, schema=body.schema_name,
                             user=body.user, password=body.password, tls_mode=body.tls_mode,
@@ -270,7 +269,7 @@ def edit_source(source_id: str, body: SourcePatch, admin: Admin, store: Store, s
 
 
 @router.delete("/{source_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_source(source_id: str, admin: Admin, store: Store, service: Service, log: Log,
+def delete_source(source_id: str, admin: Owner, store: Store, service: Service, log: Log,
                   confirm: str | None = None) -> Response:
     before = _found(store, source_id)
     try:
@@ -282,7 +281,7 @@ def delete_source(source_id: str, admin: Admin, store: Store, service: Service, 
 
 
 @router.get("/{source_id}/tables")
-def list_tables(source_id: str, _: Admin, store: Store, service: Service, refresh: bool = False) -> list[TableView]:
+def list_tables(source_id: str, _: Owner, store: Store, service: Service, refresh: bool = False) -> list[TableView]:
     _found(store, source_id)
     try:
         tables = service.refresh(source_id) if refresh else store.tables(source_id)
@@ -292,7 +291,7 @@ def list_tables(source_id: str, _: Admin, store: Store, service: Service, refres
 
 
 @router.get("/{source_id}/drift")
-def drift(source_id: str, _: Admin, store: Store, service: Service, refresh: bool = False) -> SourceDrift:
+def drift(source_id: str, _: Owner, store: Store, service: Service, refresh: bool = False) -> SourceDrift:
     """The columns added, removed and retyped since the source's instant pack was built (DECISIONS §11 step 0)."""
     _found(store, source_id)
     snapshot = read_snapshot(Path(load_settings().packs_dir) / source_id)
@@ -311,7 +310,7 @@ def _change(item: TableChangeInput, sent: set[str]) -> TableChange:
 
 
 @router.put("/{source_id}/tables")
-def change_tables(source_id: str, body: TablesChange, _: Admin, store: Store) -> list[TableView]:
+def change_tables(source_id: str, body: TablesChange, _: Owner, store: Store) -> list[TableView]:
     _found(store, source_id)
     try:
         store.set_tables(source_id, [_change(item, item.model_fields_set) for item in body.tables])
@@ -321,7 +320,7 @@ def change_tables(source_id: str, body: TablesChange, _: Admin, store: Store) ->
 
 
 @router.post("/{source_id}/sync", status_code=status.HTTP_202_ACCEPTED)
-def start_sync(source_id: str, _: Admin, store: Store, service: Service) -> SyncView:
+def start_sync(source_id: str, _: Owner, store: Store, service: Service) -> SyncView:
     _found(store, source_id)
     try:
         return _sync_view(service.start(source_id, "manual"))
@@ -330,7 +329,7 @@ def start_sync(source_id: str, _: Admin, store: Store, service: Service) -> Sync
 
 
 @router.post("/{source_id}/sync/cancel")
-def cancel_sync(source_id: str, _: Admin, store: Store, service: Service) -> SyncView:
+def cancel_sync(source_id: str, _: Owner, store: Store, service: Service) -> SyncView:
     _found(store, source_id)
     running = store.running(source_id)
     try:
@@ -344,6 +343,6 @@ def cancel_sync(source_id: str, _: Admin, store: Store, service: Service) -> Syn
 
 
 @router.get("/{source_id}/syncs")
-def list_syncs(source_id: str, _: Admin, store: Store) -> list[SyncView]:
+def list_syncs(source_id: str, _: Owner, store: Store) -> list[SyncView]:
     _found(store, source_id)
     return [_sync_view(sync) for sync in store.syncs(source_id)]
