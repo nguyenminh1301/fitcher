@@ -979,6 +979,8 @@
     "noSources": "Chưa có nguồn.",
     "sourceCount_one": "{n} nguồn",
     "drafts_one": "{n} mục chờ duyệt",
+    "unanswered": "{n} câu hỏi bị lỗi trong 24 giờ qua",
+    "unanswered_one": "{n} câu hỏi bị lỗi trong 24 giờ qua",
     "tables_one": "{n} bảng"
   },
   "console": {

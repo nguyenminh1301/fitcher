@@ -979,6 +979,8 @@
     "noSources": "No source yet.",
     "sourceCount_one": "{n} source",
     "drafts_one": "{n} item to review",
+    "unanswered": "{n} questions failed in the last 24 hours",
+    "unanswered_one": "{n} question failed in the last 24 hours",
     "tables_one": "{n} table"
   },
   "console": {

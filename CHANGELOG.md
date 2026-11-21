@@ -36,6 +36,7 @@
 
 ### Fixed
 
+- The Overview's Needs a look counts the items an instant pack approved without a person, which Review shows as Unreviewed, and the questions that failed in the last 24 hours; it said nothing needed a look while a new pack had a dozen unreviewed items.
 - Actions that call the models (running the evaluation, drafting from a document) are labelled "Uses free models" instead of "Uses paid AI" when every task's models are chosen from free models, and the Evaluation page no longer says the pack is turned on only above the threshold: the result is for reference and the pack answers either way.
 - The Models page describes the prompt-injection filter by its switch: while the filter is off it says that only the English and Vietnamese rules check questions, instead of always showing the text of the filter turned on.
 - On a touch screen wider than 768 px, such as a phone held sideways, table links, back links, switches and setup step bars keep their 44 px touch targets, and a segmented control whose labels are too long for a phone, such as the Vietnamese model choice, wraps onto a second line instead of running past its box.
