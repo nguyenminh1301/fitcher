@@ -6,6 +6,7 @@ export type Pack = string | null;
 export type Timezone = string | null;
 export type EditOfTurn = number | null;
 export type RetryOfTurn = number | null;
+export type ClarifyOption = string | null;
 
 export interface AskRequest {
   question: Question;
@@ -14,4 +15,5 @@ export interface AskRequest {
   timezone?: Timezone;
   edit_of_turn?: EditOfTurn;
   retry_of_turn?: RetryOfTurn;
+  clarify_option?: ClarifyOption;
 }

@@ -135,8 +135,8 @@ export function NoticeCard({ kind, lang, text, blocked, sql, error, onRetry, onR
   );
 }
 
-/** A clarifying question with its options; picking one sends it as the next question. */
-export function ClarifyOptions({ question, options, lang, onPick }: { question: string; options: { id: string; label: string }[]; lang: string; onPick: (label: string) => void }) {
+/** A clarifying question with its options; picking one sends its label as the next question, with its id. */
+export function ClarifyOptions({ question, options, lang, onPick }: { question: string; options: { id: string; label: string }[]; lang: string; onPick: (label: string, option: string) => void }) {
   const [picked, setPicked] = useState<string | null>(null);
   return (
     <div className="fc-clarify" role="group" aria-label={question} lang={lang}>
@@ -150,7 +150,7 @@ export function ClarifyOptions({ question, options, lang, onPick }: { question: 
             onClick={() => {
               if (picked !== null) return;
               setPicked(option.id);
-              onPick(option.label);
+              onPick(option.label, option.id);
             }}
           >
             {option.label}

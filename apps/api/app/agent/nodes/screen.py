@@ -69,7 +69,8 @@ def blocked_message(reason: BlockedReason, lang: str) -> str:
 
 
 def screen(state: AgentState, deps: AgentDeps) -> dict:
-    question = state["question"]
+    # The user's own words are screened: the label they sent for a picked option, otherwise the question.
+    question = state.get("asked") or state["question"]
     if deps.screener is None:
         verdict = Verdict(verdict="unavailable", score=None, rule_hits=[], model_version=RULES_VERSION)
     else:

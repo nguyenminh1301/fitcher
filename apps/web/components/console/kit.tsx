@@ -15,7 +15,7 @@ export type Tone = "success" | "danger" | "attention" | "accent" | "done" | null
 const TONES: Record<string, Tone> = {
   succeeded: "success", approved: "success", indexed: "success", passed: "success", like: "success",
   failed: "danger", error: "danger", denied: "attention", rejected: "attention", dislike: "attention",
-  unreviewed: "attention", processing: "accent", running: "accent", blocked: "attention", clarified: "done",
+  unreviewed: "attention", processing: "accent", running: "accent", blocked: "attention", clarified: "done", declined: "done",
 };
 
 export function StatusLabel({ status, tone, children }: { status?: string; tone?: Tone; children: ReactNode }) {

@@ -22,7 +22,8 @@ type Props = {
   streaming: boolean;
   onStop: () => void;
   onRetry?: () => void;
-  onFollowUp: (text: string) => void;
+  /** Sends a follow-up question; ``option`` is the id of the clarifying option it picks. */
+  onFollowUp: (text: string, option?: string) => void;
   onFeedback?: (input: FeedbackInput) => void;
 };
 
