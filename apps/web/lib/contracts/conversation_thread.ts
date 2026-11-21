@@ -21,6 +21,8 @@ export type Id1 = string;
 export type Label = string;
 export type Options = ClarifyOption[];
 export type Lang = string;
+export type About = string;
+export type Chosen = string[];
 export type TraceId2 = string;
 export type Event2 = "deny";
 export type Message = string;
@@ -130,6 +132,8 @@ export interface ClarifyEvent {
   question: Question1;
   options: Options;
   lang: Lang;
+  about: About;
+  chosen: Chosen;
 }
 export interface ClarifyOption {
   id: Id1;

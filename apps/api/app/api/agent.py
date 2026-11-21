@@ -56,8 +56,12 @@ class GraphRun:
     query_ids: QueryIds | None = None
     # Returns the stopper and the ClickHouse user whose query it stops.
     stopper: Callable[[], tuple[QueryStopper, str]] | None = None
+    # The clarified question a picked option answers; the run answers it, and logs what the user sent.
+    question: str | None = None
 
     def run(self, question: str, progress: Progress) -> AgentState:
+        if self.question is not None and self.question != question:
+            return run_question(self.question, replace(self.deps, progress=progress, asked=question))
         return run_question(question, replace(self.deps, progress=progress))
 
     def cancel(self) -> None:
@@ -104,7 +108,11 @@ class Agent:
                 self._stopper = QueryStopper(stopper_client())
         return self._stopper, Names(self.compiled.pack.name).user(role)
 
-    def start(self, *, role: str, user_id: str, today: date, history: Sequence[Turn] = ()) -> GraphRun:
+    def start(
+        self, *, role: str, user_id: str, today: date, history: Sequence[Turn] = (),
+        clarified: tuple[str, tuple[str, ...]] | None = None,
+    ) -> GraphRun:
+        """``clarified`` is the question a picked option answers and every option picked for it."""
         query_ids = QueryIds()
         runner = ClickHouseRunner(self._client(role), self._limits, new_query_id=query_ids)
         deps = AgentDeps(
@@ -112,7 +120,9 @@ class Agent:
             compiled=self.compiled, today=today, logs=self._logs, user_id=user_id, role=role, history=tuple(history),
             screener=self._screener, screen_mode=self._screen_mode, documents_enabled=self._documents_enabled(),
         )
-        return GraphRun(deps, query_ids, partial(self._stopper_for, role))
+        if clarified is not None:
+            deps = replace(deps, choices=clarified[1])
+        return GraphRun(deps, query_ids, partial(self._stopper_for, role), question=clarified[0] if clarified else None)
 
     def close(self) -> None:
         self._logs.close()

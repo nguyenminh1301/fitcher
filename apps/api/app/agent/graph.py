@@ -148,13 +148,16 @@ def run_question(question: str, deps: AgentDeps) -> AgentState:
         initial: AgentState = {
             "question": question,
             "trace_id": run.trace_id,
+            "choices": list(deps.choices),
+            "asked": deps.asked,
+            "all_time": False,
             "attempts": [],
             "errors": [],
             "warnings": [],
         }
         if deps.logs is None:
             return _invoke(initial, deps)
-        log = RunLog(deps.logs, run, user_id=deps.user_id, pack=deps.compiled.pack.name, question=question)
+        log = RunLog(deps.logs, run, user_id=deps.user_id, pack=deps.compiled.pack.name, question=deps.asked or question)
         deps = replace(deps, runner=LoggingRunner(deps.runner, deps.logs))
         try:
             state = _invoke(initial, deps)

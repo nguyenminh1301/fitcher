@@ -28,7 +28,7 @@ from datetime import date
 
 from pydantic import ValidationError
 
-from app.agent.nodes.clarify import Need
+from app.agent.nodes.clarify import Need, chosen
 from app.agent.nodes.retrieve import Hit, Retrieval
 from app.agent.nodes.screen import question_language
 from app.agent.state import AgentDeps, AgentState
@@ -73,9 +73,11 @@ def _forms(term: str) -> set[str]:
 class _Catalog:
     """Exact-match lookups over the approved pack."""
 
-    def __init__(self, compiled: CompiledPack):
+    def __init__(self, compiled: CompiledPack, choices: list[str] | None = None):
         pack = compiled.pack
         self.pack = pack
+        # The clarifying options the user picked for this question ("metric:revenue"), applied before asking again.
+        self.choices = choices or []
         self.datasets = {dataset.id: dataset for dataset in pack.datasets.datasets}
         self.metrics = {metric.id: metric for metric in pack.metrics.metrics}
         self.terms = {}
@@ -90,6 +92,16 @@ class _Catalog:
             for name in [term.term, *term.aliases.vi, *term.aliases.en] if fold(name)
         }
         self.value_terms = sorted(((words, term) for (words, _), term in named.items()), key=lambda item: -len(item[0]))
+
+    def pick(self, need: Need) -> str:
+        """The option the user already picked for ``need``; otherwise ask for it."""
+        for value in reversed(chosen(self.choices, need.kind)):
+            # The options offered are the candidates, or every metric the role may read when none is; the gate
+            # still checks that the role may read the one picked.
+            if value in need.candidates or (need.kind == "metric" and value in self.metrics):
+                # A column option is "dataset.column"; the spec names the column alone.
+                return value.split(".", 1)[1] if need.kind == "column" else value
+        raise NeedsChoice(need)
 
     def split_values(self, term: str) -> tuple[str, list[GlossaryTerm]]:
         """The words left after removing value-naming glossary terms, and those terms; ``(term, [])`` if none or nothing is left."""
@@ -169,11 +181,11 @@ def _resolve_metric(term: str, catalog: _Catalog, retrieval: Retrieval, words: s
         convention = catalog.convention_metric(term)
         if convention in exact:
             return convention
-        raise NeedsChoice(Need(kind="metric", term=term, candidates=exact))
+        return catalog.pick(Need(kind="metric", term=term, candidates=exact))
     try:
         found = _best(_metric_from_hits(retrieval.metric_terms.get(term, [])))
     except _Tie as tie:
-        raise NeedsChoice(Need(kind="metric", term=term, candidates=tie.candidates)) from None
+        return catalog.pick(Need(kind="metric", term=term, candidates=tie.candidates))
     if found is None or found not in catalog.metrics:
         raise SpecRejected(f"no metric matches '{term}'")
     return found
@@ -187,7 +199,7 @@ def _resolve_rank_metric(term: str, catalog: _Catalog, retrieval: Retrieval) -> 
     if convention is not None:
         return convention
     candidates = exact or _ranked(_metric_from_hits(retrieval.metric_terms.get(term, [])))
-    raise NeedsChoice(Need(kind="metric", term=term, candidates=candidates))
+    return catalog.pick(Need(kind="metric", term=term, candidates=candidates))
 
 
 def _column_from_hits(hits: Iterable[Hit], dataset: Dataset) -> dict[str, float]:
@@ -214,11 +226,11 @@ def _resolve_column(term: str, dataset: Dataset, catalog: _Catalog, retrieval: R
     if len(exact) == 1:
         return exact[0]
     if len(exact) > 1:
-        raise NeedsChoice(Need(kind="column", term=term, candidates=[f"{dataset.id}.{column}" for column in exact]))
+        return catalog.pick(Need(kind="column", term=term, candidates=[f"{dataset.id}.{column}" for column in exact]))
     try:
         found = _best(_column_from_hits(retrieval.dimension_terms.get(term, []), dataset))
     except _Tie as tie:
-        raise NeedsChoice(Need(kind="column", term=term, candidates=[f"{dataset.id}.{c}" for c in tie.candidates])) from None
+        return catalog.pick(Need(kind="column", term=term, candidates=[f"{dataset.id}.{c}" for c in tie.candidates]))
     if found is None:
         raise SpecRejected(f"no column of {dataset.id} matches '{term}'")
     return found
@@ -260,8 +272,9 @@ def _value_term_filters(terms: list[GlossaryTerm], dataset: Dataset, filtered: s
 
 
 def _require_period(state: AgentState, dataset: Dataset) -> None:
-    """A dataset with a time column needs a period; one without dates is answered over all its rows."""
-    if not state["periods"] and dataset.time_column is not None:
+    """A dataset with a time column needs a period unless the question covers all the data; one without dates
+    is answered over all its rows."""
+    if not state["periods"] and dataset.time_column is not None and not state.get("all_time"):
         raise NeedsChoice(Need(kind="period"))
 
 
@@ -370,11 +383,12 @@ def make_spec(state: AgentState, compiled: CompiledPack, example: Hit | None = N
     extraction = state["extraction"]
     retrieval = state["retrieval"]
     periods = state["periods"]
-    catalog = _Catalog(compiled)
+    catalog = _Catalog(compiled, state.get("choices"))
 
     if not extraction.metric_terms and not extraction.rank_term:
-        raise NeedsChoice(Need(kind="metric", candidates=_ranked(_metric_from_hits(retrieval.question_metrics))))
-    metric_ids = []
+        metric_ids = [catalog.pick(Need(kind="metric", candidates=_ranked(_metric_from_hits(retrieval.question_metrics))))]
+    else:
+        metric_ids = []
     value_terms: list[GlossaryTerm] = []
     for term in extraction.metric_terms:
         words, named = (term, []) if catalog.exact_metrics(term) else catalog.split_values(term)

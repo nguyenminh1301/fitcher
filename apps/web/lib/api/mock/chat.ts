@@ -53,7 +53,7 @@ function plan(scenario: Scenario | null, question: string, identity: Identity | 
     return [...head, { event: "deny", message: scenario.deny_message, role: asked, blocked: scenario.blocked, lang: scenario.lang }, { event: "done" }];
   }
   if (scenario.kind === "clarify" && scenario.clarify) {
-    return [...head.slice(0, 4), { event: "clarify", ...scenario.clarify, lang: scenario.lang }, { event: "done" }];
+    return [...head.slice(0, 4), { event: "clarify", about: "", chosen: [], ...scenario.clarify, lang: scenario.lang }, { event: "done" }];
   }
   const attempts: Untraced[] = [];
   const sqls = scenario.kind === "failed" ? [scenario.sql ?? "", scenario.sql ?? "", scenario.sql ?? "", scenario.sql ?? ""] : [...(scenario.repair ? [scenario.repair.sql] : []), scenario.sql ?? ""];

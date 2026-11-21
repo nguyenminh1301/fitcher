@@ -4,8 +4,10 @@
 by a word no convention defines, uses a term that fits several metrics or
 columns equally, or names no period. ``gate`` turns it into a
 ``Clarification``: a question in the user's language with options that have
-stable ids. Choosing an option sends its label as the next question of the
-conversation, which ``extract`` reads together with this one. Metric options
+stable ids. Choosing an option sends its label and its id as the next
+question of the conversation; the api answers the clarified question again with
+every option chosen so far applied as it is (``choices``), so a choice never
+depends on a model reading the label. Metric options
 are the candidates the asking role may read, at most ``MAX_OPTIONS``, or the
 role's readable metrics when no candidate is readable. The question text is
 English or Vietnamese; other languages get English.
@@ -34,6 +36,7 @@ PERIODS = [
     ("last_quarter", {"en": "Last quarter", "vi": "Quý trước"}),
     ("this_year", {"en": "This year", "vi": "Năm nay"}),
     ("last_year", {"en": "Last year", "vi": "Năm ngoái"}),
+    ("all", {"en": "All data", "vi": "Toàn bộ dữ liệu"}),
 ]
 
 
@@ -53,6 +56,12 @@ class Clarification(BaseModel):
     question: str
     options: list[ClarifyOption]
     lang: str
+
+
+def chosen(choices: list[str] | None, kind: str) -> list[str]:
+    """The values of the options of ``kind`` ("period", "metric" or "column") the user picked, oldest first."""
+    prefix = f"{kind}:"
+    return [choice[len(prefix):] for choice in choices or [] if choice.startswith(prefix)]
 
 
 def _text(key: str, language: str, **values: str) -> str:
