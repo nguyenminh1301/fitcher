@@ -54,7 +54,7 @@ A pack reads only the datasets you approved. Publishing the pack gives its marts
 
 ## Status
 
-fitcher 0.0.3 redraws the whole interface: a three-step setup (model, data, start) with company documents off until they are turned on, a calmer sign-in page, and a console that opens on an Overview of runs, cost and what needs a look, with every page rebuilt on the same layout. 0.0.2 made it a personal app: no accounts or team mode, an optional owner password that is required before the app answers on another host name, packs that read every approved dataset through one read-only database user, a curated list of model providers with an in-app guide to an OpenRouter key and its free models, and a first-run setup that can go back to an answered step. 0.0.1 was the first release of the one-image product: one `docker run`, setup in the browser, data sources and a first pack built in the application, backup and restore, and the security review of [docs/security.md](docs/security.md). The [decisions](docs/DECISIONS.md) and the [master plan](docs/MASTER_PLAN.md) record how it got here.
+fitcher 1.0.0 is the first stable release, under the MIT License: a clarifying question is answered by the option picked, a question about all the data needs no period, a model that keeps failing rests longer, the console has six areas, fitcher has one owner without console roles, and the interface speaks of sources made ready to answer. 0.0.3 redrew the whole interface: a three-step setup (model, data, start) with company documents off until they are turned on, a calmer sign-in page, and a console that opens on an Overview of runs, cost and what needs a look, with every page rebuilt on the same layout. 0.0.2 made it a personal app: no accounts or team mode, an optional owner password that is required before the app answers on another host name, packs that read every approved dataset through one read-only database user, a curated list of model providers with an in-app guide to an OpenRouter key and its free models, and a first-run setup that can go back to an answered step. 0.0.1 was the first release of the one-image product: one `docker run`, setup in the browser, data sources and a first pack built in the application, backup and restore, and the security review of [docs/security.md](docs/security.md). The [decisions](docs/DECISIONS.md) and the [master plan](docs/MASTER_PLAN.md) record how it got here.
 
 ## Quick start
 
@@ -150,5 +150,7 @@ Unit tests replace every AI model and search call with a fake, so they need no k
 Branch from `develop` and open a pull request back to it. [CONTRIBUTING.md](CONTRIBUTING.md) describes the branch and commit message format, and [SECURITY.md](SECURITY.md) explains how to report a vulnerability.
 
 ## Data and licences
+
+fitcher is released under the [MIT License](LICENSE). The licence covers this repository's code and documentation, not the datasets or models it works with.
 
 Datasets are never committed; downloads stay in the Git-ignored `data/` folder. FreeEcommerceTwin14M is licensed CC BY-NC 4.0 for non-commercial use. Iowa Liquor Sales 2025 is published by the Iowa Department of Revenue under CC BY 4.0.
