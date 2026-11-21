@@ -67,21 +67,29 @@ describe("setup screen", () => {
     const steps = await screen.findByRole("list", { name: "Setup progress" });
     expect(within(steps).getAllByRole("listitem").map((item) => item.textContent)).toEqual(["Step 1: Model", "Step 2: Data", "Step 3: Start"]);
     expect(within(steps).getAllByRole("listitem")[0].getAttribute("aria-current")).toBe("step");
-    expect(screen.getByText("Step 1 of 3")).toBeTruthy();
+    expect(screen.getByText("Step 1 of 3 · Model")).toBeTruthy();
   });
 
-  it("lists what is still missing once the steps were left for later, and finishing opens the console", async () => {
+  it("lists what is still missing once the steps were left for later, and finishing opens the chat", async () => {
     const setup = fakeSetup(ANSWERED);
     const ways = exits();
     wrap(<SetupScreen sources={noSources} models={fakeModels()} setup={setup} {...ways} />);
 
     expect(await screen.findByRole("heading", { name: "2 things left before you can ask" })).toBeTruthy();
-    expect(screen.getByRole("link", { name: /No data yet/ }).getAttribute("href")).toBe("/console/sources");
+    expect(screen.getByRole("button", { name: /No data yet/ })).toBeTruthy();
     expect(screen.getByText("No pack yet")).toBeTruthy();
     expect(screen.queryByText("No model yet")).toBeNull();
     await userEvent.click(screen.getByRole("button", { name: "Done" }));
-    await waitFor(() => expect(ways.onOpenConsole).toHaveBeenCalled());
+    await waitFor(() => expect(ways.onOpenChat).toHaveBeenCalled());
     expect(setup.complete).toHaveBeenCalled();
+  });
+
+  it("goes back to the Data step from what is still missing", async () => {
+    wrap(<SetupScreen sources={noSources} models={fakeModels()} setup={fakeSetup(ANSWERED)} {...exits()} />);
+
+    await userEvent.click(await screen.findByRole("button", { name: /No data yet/ }));
+
+    expect(await screen.findByText("Connect your data")).toBeTruthy();
   });
 
   it("opens an answered step again from its bar", async () => {

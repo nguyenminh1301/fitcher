@@ -36,6 +36,7 @@
 
 ### Fixed
 
+- The first run keeps its place: the setup's step bars show the current step's name, the Model step asks for a provider name only for a custom endpoint, what is still missing at the end goes back to its own setup step instead of the console, and Done opens the chat. A chat without a pack says that a model is missing when none is connected, instead of asking for data first.
 - A run that asked a question back records what it asked for (a period, a measure or a column, with the term), and a run's trace shows that reason, or the error a failed run ended with, in its summary.
 - Review leaves out the Confidence column when every item has the same confidence, as all the items of an instant pack do (50%), since such a column tells nothing apart.
 - The Overview's Needs a look counts the items an instant pack approved without a person, which Review shows as Unreviewed, and the questions that failed in the last 24 hours; it said nothing needed a look while a new pack had a dozen unreviewed items.

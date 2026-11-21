@@ -113,24 +113,23 @@ export function SetupScreen({ setup, models, sources, hasPack, onOpenChat, onOpe
     })),
     { id: "start", state: currentId === "start" ? "current" : "todo" },
   ] : [];
-  const meta = (n: number) => <p className="ob-meta">{t("onboarding.stepOf", { n, total: shellSteps.length })}</p>;
   const backTo = previous ? () => setOpen(previous.id) : undefined;
 
   let body = null;
   if (status && currentId === "models") {
-    body = <ModelStep models={models} disabled={busy} meta={meta(1)} onNext={next} onSkip={() => skip("models")} />;
+    body = <ModelStep models={models} disabled={busy} meta={null} onNext={next} onSkip={() => skip("models")} />;
   } else if (status && currentId === "data") {
     body = (
-      <DataStep sources={sources} disabled={busy} meta={meta(2)} onBack={backTo} onSkip={() => skip("data")}
+      <DataStep sources={sources} disabled={busy} meta={null} onBack={backTo} onSkip={() => skip("data")}
         onChosen={(tables) => { setChosen(tables); setOpen("start"); void run(() => setup.status()); }} />
     );
   } else if (status && chosen) {
     body = (
-      <StartStep sources={sources} chosen={chosen} meta={meta(3)} onModel={() => setOpen("models")}
+      <StartStep sources={sources} chosen={chosen} meta={null} onModel={() => setOpen("models")}
         onAsk={(question) => void leave(() => onOpenChat(question))} onConsole={(path) => void leave(() => onOpenConsole(path))} />
     );
   } else if (status && missing) {
-    body = <LeftScreen missing={missing} meta={meta(3)} onConsole={(path) => void leave(() => onOpenConsole(path))} />;
+    body = <LeftScreen missing={missing} meta={null} onStep={setOpen} onDone={() => void leave(() => onOpenChat())} />;
   }
   return (
     <SetupShell steps={shellSteps}>

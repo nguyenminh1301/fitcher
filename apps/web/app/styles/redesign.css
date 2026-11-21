@@ -25,6 +25,8 @@
 /* Onboarding shell (OpenAI Platform onboarding: grey chrome, paper panel, centred single question) */
 .ob { min-height: 100dvh; background: var(--bgColor-inset); display: flex; flex-direction: column; }
 .ob-top { height: 64px; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; padding: 0 24px; }
+.ob-progress { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.ob-progress-name { font-size: 12px; line-height: 16px; color: var(--fgColor-muted); white-space: nowrap; }
 .ob-steps { display: flex; gap: 6px; list-style: none; margin: 0; padding: 0; }
 .ob-steps li { width: 32px; height: 3px; border-radius: 2px; background: var(--borderColor-default); }
 .ob-steps li[data-state="done"], .ob-steps li[data-state="current"] { background: var(--fgColor-default); }
@@ -129,6 +131,8 @@
 .row-link { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--borderColor-muted); text-decoration: none; color: inherit; }
 .row-link:last-child { border-bottom: 0; }
 .row-link:hover { background: var(--bgColor-muted); }
+button.row-link { width: 100%; background: none; border: 0; border-bottom: 1px solid var(--borderColor-muted); font: inherit; text-align: left; cursor: pointer; }
+button.row-link:last-child { border-bottom: 0; }
 
 /* Menu */
 .menu { width: 288px; border-radius: 12px; background: var(--bgColor-default); box-shadow: var(--shadow-floating-small); padding: 6px; display: flex; flex-direction: column; }

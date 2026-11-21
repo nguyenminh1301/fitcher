@@ -9,15 +9,25 @@ import { useI18n } from "@/lib/i18n/react";
 
 import { Composer, PackPicker } from "./Composer";
 
-/** No pack is active yet, so there is nothing to ask about: point to connecting data and building the pack. */
+/** No pack is active yet, so there is nothing to ask about: point to what comes first, a model or the data. */
 function NoPack() {
   const { t } = useI18n();
+  const { api } = useChat();
+  // Unknown until the providers are read; a failed read points to the data, as before.
+  const [model, setModel] = useState<boolean | null>(null);
+  useEffect(() => {
+    void api.models.providers().then((list) => setModel(list.length > 0)).catch(() => setModel(true));
+  }, [api]);
+  if (model === null) return null;
+  const [title, text, action, href, icon] = model
+    ? [t("ui.noPackTitle"), t("ui.noPackText"), t("ui.noPackAction"), "/console/sources", "database"]
+    : [t("ui.noModelTitle"), t("ui.noModelText"), t("ui.noModelAction"), "/console/models", "cpu"];
   return (
     <div className="fc-scroll">
       <div className="fc-hero">
-        <h1>{t("ui.noPackTitle")}</h1>
-        <p className="fc-hero-sub">{t("ui.noPackText")}</p>
-        <div style={{ display: "flex", justifyContent: "center" }}><a className="fc-btn fc-btn-primary" href="/console/sources"><Icon name="database" />{t("ui.noPackAction")}</a></div>
+        <h1>{title}</h1>
+        <p className="fc-hero-sub">{text}</p>
+        <div style={{ display: "flex", justifyContent: "center" }}><a className="fc-btn fc-btn-primary" href={href}><Icon name={icon} />{action}</a></div>
       </div>
     </div>
   );
