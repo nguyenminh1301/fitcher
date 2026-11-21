@@ -1143,6 +1143,13 @@
     "byDayLabel_one": "Chi phí ước tính theo ngày, {n} ngày",
     "noSpend": "Không có chi phí trong khoảng này: mọi lần gọi đều dùng model miễn phí hoặc gói miễn phí."
   },
+  "limits": {
+    "title": "Số câu hỏi cùng lúc",
+    "label": "Số câu hỏi được trả lời cùng lúc",
+    "help": "Từ 1 đến 64. Các câu hỏi khác chờ đến lượt theo thứ tự. Máy yếu hoặc model miễn phí có giới hạn số yêu cầu nên để 1 hoặc 2.",
+    "save": "Lưu",
+    "saved": "Đã lưu giới hạn."
+  },
   "auditPage": {
     "decisions": "Truy cập dữ liệu",
     "screening": "Sàng lọc câu hỏi",

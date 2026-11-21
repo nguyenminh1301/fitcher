@@ -158,6 +158,8 @@ export function createMockApi(options: { latencyMs?: number; identity?: () => Pr
     // The demo has no owner password, so it never asks to sign in.
     owner: {
       status: async () => ({ password_set: false, signed_in: false, exposed: false }),
+      limits: async () => ({ concurrent_questions: 2 }),
+      setLimits: () => Promise.reject(new Error("The limits need the api; they have no sample data.")),
       signIn: () => Promise.reject(new Error("The owner password needs the api; it has no sample data.")),
       signOut: async () => undefined,
       setPassword: () => Promise.reject(new Error("The owner password needs the api; it has no sample data.")),
