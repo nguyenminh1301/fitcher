@@ -85,7 +85,11 @@ class Section:
 
     def __init__(self, key, title, width):
         self.key, self.title, self.width = key, title, width
-        self.boxes, self.arrows, self.notes = {}, [], []
+        self.boxes, self.arrows, self.notes, self.frames = {}, [], [], []
+
+    def frame(self, x, y, w, h, label):
+        """A dashed boundary around boxes, such as the one container."""
+        self.frames.append(dict(x=x, y=y, w=w, h=h, label=label))
 
     def box(self, id_, x, y, w, h, icon, title, sub, color):
         self.boxes[id_] = dict(x=x, y=y, w=w, h=h, icon=icon, title=title, sub=sub, color=color)
@@ -114,7 +118,7 @@ class Section:
 
     @property
     def top(self):
-        return min(b["y"] for b in self.boxes.values())
+        return min([b["y"] for b in self.boxes.values()] + [f["y"] for f in self.frames])
 
     @property
     def height(self):
@@ -137,23 +141,26 @@ def system():
     W, H = 200, 120
     c = grid(5, W, 70)
     r = [60, 250, 440]
-    s.box("search", c[2], r[0], W, H, "search", "Search index", "Finds terms, metrics\nand examples (ClickHouse)", "pink")
-    s.box("pack", c[3], r[0], W, H, "file", "Domain Pack", "A company's terms,\nmetrics and access rules", "yellow")
-    s.box("user", c[0], r[1], W, H, "user", "User", "Asks in English\nor Vietnamese", "yellow")
-    s.box("web", c[1], r[1], W, H, "monitor", "Web app", "Chat and\nworkspace console", "blue")
+    s.frame(c[1] - 25, r[0] - 45, c[3] + W + 25 - (c[1] - 25), r[2] + H + 25 - (r[0] - 45),
+            "One Docker container: s6-overlay runs the web app, the API and ClickHouse; everything is kept in /data")
+    s.box("gateway", c[2], r[0], W, H, "route", "LLM gateway", "Tries each task's models\nin order (in the API)", "orange")
+    s.box("models", c[4], r[0], W, H, "sparkles", "AI providers", "OpenAI, Anthropic, Gemini,\nDeepSeek, Ollama and more", "gray")
+    s.box("user", c[0], r[1], W, H, "user", "You", "In the browser, in\nEnglish or Vietnamese", "yellow")
+    s.box("web", c[1], r[1], W, H, "monitor", "Web app", "Chat and console,\nthe only open port", "blue")
     s.box("api", c[2], r[1], W, H, "server", "API and agent", "Understands the question\nand writes the SQL", "green")
-    s.box("gateway", c[3], r[1], W, H, "route", "LLM gateway", "Sends each task to\nthe right model (in the API)", "orange")
-    s.box("models", c[4], r[1], W, H, "sparkles", "AI models", "OpenAI, Anthropic,\nGemini or a local model", "gray")
-    s.box("dw", c[2], r[2], W, H, "database", "Data warehouse", "Company data and\nrun logs (ClickHouse)", "teal")
-    s.box("sources", c[3], r[2], W, H, "plug", "Company sources", "Databases and files,\ncopied or read live", "gray")
-    s.arrow("user", "web", "asks")
+    s.box("embed", c[3], r[1], W, H, "search", "Local search model", "Multilingual embeddings,\nno key needed", "pink")
+    s.box("state", c[1], r[2], W, H, "lock", "App state", "SQLite: settings, sources\nand encrypted keys", "violet")
+    s.box("ch", c[2], r[2], W, H, "database", "ClickHouse", "Data, search index and\nrun logs (or your own server)", "teal")
+    s.box("sources", c[4], r[2], W, H, "plug", "Your data", "Databases, or CSV,\nExcel and Parquet files", "gray")
+    s.arrow("user", "web", "asks", label_at=(c[0] + W + 22, r[1] + H / 2 - 12))
     s.arrow("web", "api", "streams")
     s.arrow("api", "gateway", "AI tasks")
     s.arrow("gateway", "models")
-    s.arrow("api", "search", "looks up")
-    s.arrow("api", "dw", "runs SQL")
-    s.arrow("sources", "dw", "loads")
-    s.arrow("pack", "search", "indexed")
+    s.arrow("api", "embed", "embeds")
+    s.arrow("api", "ch", "runs SQL, searches")
+    s.arrow("sources", "ch", "read live or copied")
+    mid = r[1] + H + (r[2] - r[1] - H) / 2
+    s.arrow("api", "state", start=(c[2] + 40, r[1] + H), via=[(c[2] + 40, mid), (c[1] + W / 2, mid)], end=(c[1] + W / 2, r[2]))
     return s
 
 
@@ -164,12 +171,12 @@ def flow():
     r = [60, 250, 470]
     s.box("blocked", c[1], r[0], W, H, "stop", "Blocked", "Unsafe input\nstops here", "red")
     s.box("quick", c[2], r[0], W, H, "message", "Quick reply", "Definitions, chart changes\nor off-topic questions", "gray")
-    s.box("clarify", c[4], r[0], W, H, "help", "Clarify or deny", "Ask which one was meant,\nor refuse politely", "red")
+    s.box("clarify", c[4], r[0], W, H, "help", "Clarify or deny", "Offers options to pick,\nor refuses politely", "red")
     s.box("q", c[0], r[1], W, H, "message", "Question", "Typed in the chat\nor on the command line", "yellow")
     s.box("safety", c[1], r[1], W, H, "shield", "Safety check", "Screens for prompt\ninjection first", "green")
     s.box("understand", c[2], r[1], W, H, "bulb", "Understand", "What is measured,\nfor which period", "orange")
-    s.box("terms", c[3], r[1], W, H, "book", "Match terms", "Maps words to the\ncompany's metrics", "pink")
-    s.box("perm", c[4], r[1], W, H, "shieldcheck", "Scope check", "Is the question clear,\nand about the pack's data?", "green")
+    s.box("terms", c[3], r[1], W, H, "book", "Match terms", "Maps words to the\nsource's metrics", "pink")
+    s.box("perm", c[4], r[1], W, H, "shieldcheck", "Scope check", "Is the question clear,\nand about this data?", "green")
     s.box("sql", c[4], r[2], W, H, "code", "Write SQL", "One read-only query", "orange")
     s.box("run", c[3], r[2], W, H, "play", "Check and run", "Validated, then run\nas a read-only user", "teal")
     s.box("chart", c[2], r[2], W, H, "chart", "Pick a chart", "Chosen by rules\nfrom the result shape", "blue")
@@ -195,16 +202,16 @@ def access():
     W, H = 184, 130
     c = grid(6, W, 35)
     r = [60, 260, 460]
-    s.box("rules", c[3], r[0], c[4] + W - c[3], 125, "file", "Approved data", "The pack lists the tables and columns\n"
-                                                                   "you approved for questions", "yellow")
+    s.box("rules", c[3], r[0], c[4] + W - c[3], 125, "file", "Approved data", "Only the tables you chose when\n"
+                                                                   "you made the source ready", "yellow")
     s.box("user", c[0], r[1], W, H, "user", "You", "On this computer,\nor signed in", "yellow")
     s.box("l0", c[1], r[1], W, H, "shield", "Safety screen", "Layer 0: before\nany AI model call", "green")
-    s.box("l1", c[2], r[1], W, H, "search", "Pack search", "Layer 1: context\nfrom the pack only", "pink")
+    s.box("l1", c[2], r[1], W, H, "search", "Knowledge search", "Layer 1: context\nfrom this source only", "pink")
     s.box("l2", c[3], r[1], W, H, "shieldcheck", "Scope check", "Layer 2: refuses other\ndata before any SQL", "green")
-    s.box("l3", c[4], r[1], W, H, "lock", "Read-only user", "Layer 3: the database\nallows only the marts", "teal")
+    s.box("l3", c[4], r[1], W, H, "lock", "Read-only user", "Layer 3: the database\nallows only those tables", "teal")
     s.box("data", c[5], r[1], W, H, "database", "Data", "Only the approved\ntables and columns", "teal")
     s.box("audit", c[3], r[2], c[4] + W - c[3], 125, "eye", "Audit log", "Every query and refusal is recorded\n"
-                                                                "and shown in the console", "violet")
+                                                                "and shown in Activity, Query log", "violet")
     for a, b in [("user", "l0"), ("l0", "l1"), ("l1", "l2"), ("l2", "l3"), ("l3", "data")]:
         s.arrow(a, b)
     rules, audit = s.boxes["rules"], s.boxes["audit"]
@@ -216,28 +223,30 @@ def access():
 
 
 def onboarding():
-    s = Section("onboarding", "4. Bringing in a new company", 1280)
-    W, H = 160, 140
-    c = grid(7, W, 27)
-    r = [60, 270]
-    steps = [
-        ("connect", "plug", "Connect data", "Copy it in\nor read it live", "teal"),
-        ("profile", "pulse", "Profile", "Measure tables,\ndates and values", "gray"),
-        ("docs", "file", "Add documents", "Manuals, policies,\nglossaries", "pink"),
-        ("draft", "pen", "Draft the pack", "AI proposes terms\nand metrics", "orange"),
-        ("review", "users", "Review", "You approve\neach item", "violet"),
-        ("publish", "package", "Publish", "Search index and\nread-only user", "blue"),
-        ("test", "flask", "Test", "Must answer 80%\nof eval questions", "green"),
-    ]
-    for i, (id_, icon, title, sub, color) in enumerate(steps):
-        s.box(id_, c[i], r[0], W, H, icon, title, sub, color)
-    for (a, *_), (b, *_) in zip(steps, steps[1:]):
+    s = Section("onboarding", "4. Bringing in a new data source", 1280)
+    W, H = 200, 120
+    c = grid(5, W, 70)
+    r = [60, 290]
+    s.box("connect", c[0], r[0], W, H, "plug", "Connect data", "A database, or a CSV,\nExcel or Parquet file", "teal")
+    s.box("tables", c[1], r[0], W, H, "layout", "Choose tables", "Each read live or\ncopied on a schedule", "gray")
+    s.box("ready", c[2], r[0], W, H, "package", "Get ready to answer", "One click: profile, draft\nand index (uses AI)", "blue")
+    s.box("ask", c[3], r[0], W, H, "message", "Ask", "Answers at once; drafts\nshow as unreviewed", "green")
+    s.box("eval", c[4], r[0], W, H, "flask", "Check quality", "Test questions shown as\nCorrect results", "yellow")
+    s.box("docs", c[1], r[1], W, H, "file", "Add documents", "Manuals and glossaries,\noff until turned on", "pink")
+    s.box("review", c[2], r[1], W, H, "pen", "Review", "Approve or edit\nknowledge items", "violet")
+    s.box("learn", c[3], r[1], W, H, "refresh", "Learn", "Disliked answers\nbecome examples", "orange")
+    for a, b in [("connect", "tables"), ("tables", "ready"), ("ready", "ask")]:
         s.arrow(a, b)
-    s.box("live", c[6], r[1], W, H, "live", "Live", "Answers the\ncompany's questions", "green")
-    s.box("feedback", c[4], r[1], W, H, "refresh", "Learn", "Disliked answers\nbecome new examples", "yellow")
-    s.arrow("test", "live", "passes")
-    s.arrow("live", "feedback", "feedback")
-    s.arrow("feedback", "review")
+    s.arrow("ask", "eval", "optional", dashed=True)
+    s.arrow("ask", "learn", "dislikes", dashed=True)
+    s.arrow("learn", "review", dashed=True)
+    x_in, x_up = c[2] + W / 2 - 50, c[2] + W / 2 + 50
+    s.arrow("review", "ready", "rebuilds", start=(x_up, r[1]), end=(x_up, r[0] + H), dashed=True,
+            label_at=(x_up + 10, (r[0] + H + r[1]) / 2 + 4))
+    mid = r[0] + H + 40
+    s.arrow("docs", "ready", "indexed", start=(c[1] + W / 2, r[1]), via=[(c[1] + W / 2, mid), (x_in, mid)],
+            end=(x_in, r[0] + H), dashed=True, label_at=(c[1] + W / 2 + 10, mid + 40))
+    s.note(c[0], r[1] + 10, "Dashed steps are optional:\nthe first question needs\nnone of them.", size=14)
     return s
 
 
@@ -246,10 +255,10 @@ def tracing():
     W, H = 300, 130
     c = [0, 490, 980]
     s.box("run", c[0], 60, W, H, "message", "Each question", "Gets one trace id that\nfollows it through every step", "yellow")
-    s.box("store", c[1], 60, W, H, "database", "Run log", "Steps, SQL, AI calls, cost\nand access decisions", "teal")
-    s.box("console", c[2], 60, W, H, "layout", "Workspace console", "Runs, Audit, Costs,\nFeedback and Evaluation", "blue")
+    s.box("store", c[1], 60, W, H, "database", "Run log", "Steps, SQL, AI calls, cost and\naccess decisions, kept 90 days", "teal")
+    s.box("console", c[2], 60, W, H, "layout", "Console", "Activity: Runs, Query log\nand Costs", "blue")
     s.arrow("run", "store", "written as it runs")
-    s.arrow("store", "console", "read by admins and reviewers")
+    s.arrow("store", "console", "read by the owner")
     return s
 
 
@@ -275,6 +284,11 @@ def svg_section(sec):
         out.append(f'<marker id="head{i}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" '
                    f'orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="{col}"/></marker>')
     out.append('</defs>')
+    for f in sec.frames:
+        out.append(f'<rect x="{f["x"]}" y="{f["y"]}" width="{f["w"]}" height="{f["h"]}" rx="18" fill="none" '
+                   f'stroke="#868e96" stroke-width="1.5" stroke-dasharray="8 6"/>')
+        out.append(f'<text x="{f["x"] + 16}" y="{f["y"] + 24}" font-size="14" font-weight="600" fill="{MUTED}">'
+                   f'{escape(f["label"])}</text>')
     heads = {col: f"head{i}" for i, col in enumerate(sorted(colors))}
     for a in sec.arrows:
         pts = " ".join(f"{x:.0f},{y:.0f}" for x, y in a["pts"])
@@ -349,6 +363,10 @@ class Excalidraw:
 
     def add(self, sec, oy):
         ids = {}
+        for f in sec.frames:
+            self._base("rectangle", f["x"], oy + f["y"], f["w"], f["h"], strokeColor="#868e96", strokeWidth=1,
+                       strokeStyle="dashed", roundness={"type": 3})
+            self.text(f["x"] + 16, oy + f["y"] + 10, f["label"], 14, MUTED)
         for key, b in sec.boxes.items():
             fill, stroke = PALETTE[b["color"]]
             group = [f"{sec.key}-{key}"]

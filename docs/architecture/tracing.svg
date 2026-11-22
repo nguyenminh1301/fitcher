@@ -13,13 +13,13 @@
 <rect x="490" y="60" width="300" height="130" rx="14" fill="#e6fcf5" stroke="#0c8599" stroke-width="2"/>
 <svg x="624.0" y="74" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#0c8599" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5"/><path d="M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"/></svg>
 <text x="640.0" y="128" font-size="17" font-weight="700" fill="#1e1e1e" text-anchor="middle">Run log</text>
-<text x="640.0" y="150" font-size="13.5" fill="#5c636a" text-anchor="middle">Steps, SQL, AI calls, cost</text>
-<text x="640.0" y="168" font-size="13.5" fill="#5c636a" text-anchor="middle">and access decisions</text>
+<text x="640.0" y="150" font-size="13.5" fill="#5c636a" text-anchor="middle">Steps, SQL, AI calls, cost and</text>
+<text x="640.0" y="168" font-size="13.5" fill="#5c636a" text-anchor="middle">access decisions, kept 90 days</text>
 <rect x="980" y="60" width="300" height="130" rx="14" fill="#e7f5ff" stroke="#1c7ed6" stroke-width="2"/>
 <svg x="1114.0" y="74" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#1c7ed6" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 9v12"/></svg>
-<text x="1130.0" y="128" font-size="17" font-weight="700" fill="#1e1e1e" text-anchor="middle">Workspace console</text>
-<text x="1130.0" y="150" font-size="13.5" fill="#5c636a" text-anchor="middle">Runs, Audit, Costs,</text>
-<text x="1130.0" y="168" font-size="13.5" fill="#5c636a" text-anchor="middle">Feedback and Evaluation</text>
+<text x="1130.0" y="128" font-size="17" font-weight="700" fill="#1e1e1e" text-anchor="middle">Console</text>
+<text x="1130.0" y="150" font-size="13.5" fill="#5c636a" text-anchor="middle">Activity: Runs, Query log</text>
+<text x="1130.0" y="168" font-size="13.5" fill="#5c636a" text-anchor="middle">and Costs</text>
 <text x="395" y="113" font-size="13" fill="#5c636a" text-anchor="middle">written as it runs</text>
-<text x="885" y="113" font-size="13" fill="#5c636a" text-anchor="middle">read by admins and reviewers</text>
+<text x="885" y="113" font-size="13" fill="#5c636a" text-anchor="middle">read by the owner</text>
 </svg>

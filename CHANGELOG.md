@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### Changed
+
+- The README describes the 1.0.0 product as a user meets it: sources made ready to answer in one click, model chains picked from free or best models, the six console areas, the one-container layout and the `clarify_option` and question-limit API. A new light and dark animation of a question becoming a chart and its SQL replaces the two recordings of the 0.0.x interface.
+- The architecture diagrams (`docs/architecture/*.svg` and `docs/finch-architecture.excalidraw`) draw the 1.0.0 product instead of the six-service stack: one container that runs the web app, the API and ClickHouse with the app state and the local embedding model, a source made ready to answer in one click with review, documents, quality checks and feedback as optional steps, and run logs read on the console's Activity pages.
+
 ### Fixed
 
 - A long category label of a horizontal bar chart, such as "Iced Caramel Latte", is no longer cut off at the chart's left edge: charts measured their labels with the font name "inherit", which ECharts cannot measure, so the room they left was sized for a default font while the labels were drawn in Inter. Charts now measure with the page's font once it has loaded.

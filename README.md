@@ -3,58 +3,29 @@
   <img alt="Fitcher: ask your data in plain language, get SQL, tables and charts back" src="docs/brand/banner/fitcher-banner-light.png" width="100%">
 </picture>
 
-Fitcher answers questions about a company's data. You ask in English or Vietnamese, for example "Top 10 best-selling products in Q1 2024 compared with Q1 2025", and it replies with the SQL it ran, a table, a chart and a short summary.
+Fitcher answers questions about your own data. Connect a database or upload a spreadsheet, ask in English or Vietnamese, for example "Which drink brought in the most money last month?", and it replies with a chart, a table, a short summary and the read-only SQL it ran to get every number.
 
-Everything fitcher knows about a company comes from its Domain Pack: a set of reviewed files describing the company's tables, business terms, metrics and who may see what. Swap the pack and the same app answers questions for a different business.
+It runs on your machine with one Docker command, works with the AI provider you choose (or a model on your own computer), and is open source under the MIT License.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/media/fitcher-ask-dark.gif">
+  <img alt="A question typed into fitcher: which drink brought in the most money last month. fitcher checks the question step by step, answers with a ranked bar chart topped by Iced Caramel Latte at 3,771.04, and shows the read-only SQL behind it" src="docs/media/fitcher-ask-light.gif" width="100%">
+</picture>
 
 ## What you can do with it
 
-![Asking a question in plain language, reading the answer and chart, changing the chart, and exporting the chart as PNG and the data as CSV](docs/media/fitcher-demo.gif)
-
-| Feature | What it means for a user |
+| Feature | What it means for you |
 | --- | --- |
-| Ask about data | Ask for rankings, trends, comparisons between periods and filtered totals. Relative periods such as "last quarter" use the company's fiscal calendar and your time zone. |
-| Hold a conversation | Ask a follow-up and it reuses the previous query. Ask to see the answer as a line chart and it redraws without querying again. Ask what a term means and it answers from the glossary and company documents. |
-| Get asked back | When a question is unclear, fitcher asks which meaning you intended and offers the options. |
-| Read only what you approved | A pack lists the tables and columns you approved. A question about other data is refused before any SQL is written, and the database user the agent runs as can read only the pack's marts. |
-| Stay safe | Every question is screened for prompt injection before it reaches an AI model. For now the screener records its verdict and lets the question through; blocking is switched on once it is accurate enough in both languages. |
-| Check the work | Each answer shows the SQL it ran and the steps it took, and the console opens the full trace of any run. |
-| Add a new company | fitcher profiles the company's tables, reads its documents and drafts a pack. Drafted items answer at once, marked unreviewed until you approve them. |
-| Measure quality | Each pack has a set of test questions with known answers, and the console shows whether at least 80% of them return the right result with the chosen models. |
+| Ask about your data | Ask for rankings, trends, comparisons between periods and filtered totals. Relative periods such as "last quarter" use the source's fiscal calendar and your time zone, and "in total" or "overall" asks about all the data. |
+| Hold a conversation | Ask a follow-up and it reuses the previous query. Ask to see the answer as a line chart and it redraws without querying again. Ask what a term means and it answers from what fitcher knows about the source and its documents. |
+| Get asked back | When a question is unclear, fitcher asks which meaning you intended and offers options to pick, including "All data" when a period is missing. The option you pick is applied as it is, so the same question is never asked twice. |
+| Read only what you chose | Each source answers only from the tables you chose for it. A question about other data is refused before any SQL is written, and every query runs as a database user that can read only those tables. |
+| Bring in a source in one click | Connect PostgreSQL, MySQL, MariaDB or SQL Server, or upload a CSV, Excel or Parquet file, choose the tables and make the source ready to answer. fitcher profiles the tables and drafts what it needs to know; drafted items answer at once and show as unreviewed until you approve them. |
+| Pick your models | Add OpenAI, Anthropic, Gemini, DeepSeek, OpenRouter, Groq, Mistral, Ollama or any OpenAI-compatible endpoint. fitcher picks a chain of models for each task, free models only or the best ones, and moves to the next model when one fails or hits its limit. |
+| Check the work | Each answer shows the SQL it ran and the steps it took, and the console opens the full trace, cost and access decisions of any run. |
+| Stay safe | Every question is screened for prompt injection before it reaches an AI model. By default the screener records its verdict, shown on the Query log, and lets the question through; blocking is switched on once it is accurate enough in both languages. |
 
-The web app has a chat and a workspace console, in English and Vietnamese, light and dark themes, on desktop and phone.
-
-## How it works
-
-![How the pieces fit together](docs/architecture/system.svg)
-
-The user talks to the web app, which streams answers from the API. fitcher is a personal app: there are no accounts, and the API answers only the machine it runs on unless an owner password is set and the browser signs in with it. The API runs the agent: it looks up the company's terms in the search index, sends language tasks to the AI models connected in the app, and runs SQL in ClickHouse as a read-only role. Models are called by task (fast replies, simple SQL, harder SQL), any task can use any model of a connected provider, and the pack's test results are shown next to each model. Search uses a local multilingual embedding model by default, or a provider's embedding model when one is chosen. All of these services run together in one Docker image on one machine.
-
-![How a question is answered](docs/architecture/question-flow.svg)
-
-A question goes through a safety check first. The agent then works out what is being asked, matches the words to the company's metrics, checks that the question is clear and permitted, writes one read-only query, validates and runs it, and picks a chart. If the query fails, the agent fixes it and tries again up to three times; if it still fails, you see the last SQL and the error. Each step shows on screen as it happens, and the numbers in the answer always come from the database, never from the AI model.
-
-The recording below shows one question in the app going through these steps, each lit on the diagram as it runs, with the graph nodes it passed. It then opens the SQL the answer ran, and a follow-up chart change takes the quick-reply path without querying again.
-
-![A question in the app going through the steps of the diagram, then its SQL and a chart change](docs/media/fitcher-question-flow.gif)
-
-![What the agent can read](docs/architecture/access-control.svg)
-
-A pack reads only the datasets you approved. Publishing the pack gives its marts to one read-only database user, which is the user every query runs as, so the database itself stops a query from reading anything else. A question about other data is refused before any SQL is written, and every query and refusal goes to the audit log. The pack's search only keeps the AI's context small and relevant; the database user's grants are what enforce it.
-
-| Component | Technology |
-| --- | --- |
-| Web app | Next.js, ECharts, TanStack Table |
-| API and agent | FastAPI with streamed responses, LangGraph, sqlglot |
-| AI models | OpenAI, Anthropic, Gemini, a local Ollama model or any OpenAI-compatible endpoint, called in process through the LiteLLM SDK; a local multilingual embedding model with fastembed by default, or a provider's embedding model |
-| Data and run logs | ClickHouse |
-| Search index | ClickHouse, combining meaning-based and keyword search |
-| Data modelling | dbt |
-| Domain Packs | YAML checked against JSON Schema |
-
-## Status
-
-fitcher 1.0.0 is the first stable release, under the MIT License: a clarifying question is answered by the option picked, a question about all the data needs no period, a model that keeps failing rests longer, the console has six areas, fitcher has one owner without console roles, and the interface speaks of sources made ready to answer. 0.0.3 redrew the whole interface: a three-step setup (model, data, start) with company documents off until they are turned on, a calmer sign-in page, and a console that opens on an Overview of runs, cost and what needs a look, with every page rebuilt on the same layout. 0.0.2 made it a personal app: no accounts or team mode, an optional owner password that is required before the app answers on another host name, packs that read every approved dataset through one read-only database user, a curated list of model providers with an in-app guide to an OpenRouter key and its free models, and a first-run setup that can go back to an answered step. 0.0.1 was the first release of the one-image product: one `docker run`, setup in the browser, data sources and a first pack built in the application, backup and restore, and the security review of [docs/security.md](docs/security.md). The [decisions](docs/DECISIONS.md) and the [master plan](docs/MASTER_PLAN.md) record how it got here.
+The chat comes with a console of six areas: Overview, Sources, Documents, Quality, Activity and Settings. Both speak English and Vietnamese, follow light and dark themes, and work on desktop and phone.
 
 ## Quick start
 
@@ -64,13 +35,52 @@ You need Docker. Start fitcher with one command:
 docker run -d --name fitcher -p 127.0.0.1:3000:3000 -v fitcher-data:/data ghcr.io/nguyenminh1301/fitcher
 ```
 
-Open [localhost:3000](http://localhost:3000) and follow the setup: connect a model provider and its key, or a model server on this computer reached as `host.docker.internal` (on Linux add `--add-host=host.docker.internal:host-gateway` to the command). Everything is kept in the `fitcher-data` volume.
+Open [localhost:3000](http://localhost:3000) and follow the setup: connect a model provider with its key, or a model server on this computer reached as `host.docker.internal` (on Linux add `--add-host=host.docker.internal:host-gateway` to the command), then connect your data. Everything is kept in the `fitcher-data` volume.
 
-[docs/install.md](docs/install.md) covers the first start and the settings, [docs/operations.md](docs/operations.md) backup, restore, upgrades, limits and the load measurement, and [docs/security.md](docs/security.md) the threat model and hardening checklist. The install guide also covers jobs, local models and measured memory use.
+[docs/install.md](docs/install.md) covers the first start, settings, local models, memory use and reaching fitcher from other machines; [docs/operations.md](docs/operations.md) backup, restore, upgrades and limits; and [docs/security.md](docs/security.md) the threat model and hardening checklist.
 
-A demo of the web app on sample data, with no backend, starts with `docker run -p 127.0.0.1:3000:3000 ghcr.io/nguyenminh1301/fitcher-demo` once the Demo workflow has published it from `main`.
+To look around without a model key, the sample-data demo runs the web app with made-up data and no backend:
 
-To work on fitcher itself with the development datasets, the sample packs and separate services, follow the [development setup](CONTRIBUTING.md#development-setup).
+```bash
+docker run -p 127.0.0.1:3000:3000 ghcr.io/nguyenminh1301/fitcher-demo
+```
+
+## How it works
+
+![How the pieces fit together](docs/architecture/system.svg)
+
+fitcher is one Docker container. The web app is the only open port; behind it the API runs the agent, and an embedded ClickHouse server holds your copied data, the search index and the run logs (or `CLICKHOUSE_URL` points to a ClickHouse server of your own). Settings, sources and the encrypted provider keys live in a small SQLite file next to them in `/data`. The agent sends each language task to the models you connected through an LLM gateway inside the API, which tries each task's models in order. Search uses a local multilingual embedding model by default, so it needs no key.
+
+fitcher is a personal app: there are no accounts, and the API answers only the machine it runs on unless an owner password is set and the browser signs in with it.
+
+![How a question is answered](docs/architecture/question-flow.svg)
+
+A question goes through a safety check first. The agent then works out what is being asked, matches the words to the source's metrics, checks that the question is clear and about this data, writes one read-only query, validates and runs it, and picks a chart. If the query fails, the agent fixes it and tries again up to three times; if it still fails, you see the last SQL and the error. Each step shows on screen as it happens, and the numbers in the answer always come from the database, never from the AI model.
+
+![What the agent can read](docs/architecture/access-control.svg)
+
+Making a source ready gives its chosen tables to one read-only database user, which every query runs as, so the database itself stops a query from reading anything else. A question about other data is refused before any SQL is written, and every query and refusal goes to the audit log on the Query log page. The knowledge search only keeps the AI's context small and relevant; the database user's grants are what enforce it.
+
+| Component | Technology |
+| --- | --- |
+| Web app | Next.js, ECharts, TanStack Table |
+| API and agent | FastAPI with streamed responses, LangGraph, sqlglot |
+| AI models | Any provider you connect, called in process through the LiteLLM SDK; a local multilingual embedding model with fastembed, or a provider's embedding model |
+| Data, search and run logs | ClickHouse, embedded or your own; search combines meaning-based and keyword scoring |
+| App state | SQLite, with provider keys encrypted by the instance's own key |
+| Packaging | One image supervised by s6-overlay |
+
+## Bringing in a new data source
+
+![Bringing in a new data source](docs/architecture/onboarding.svg)
+
+1. Connect a PostgreSQL, MySQL or MariaDB database, or a SQL Server database (copied, never read live), or upload a CSV, Excel or Parquet file, on the Sources page or in the setup's Data step. The [Sources section of the jobs guide](jobs/README.md#connecting-a-source-in-the-interface) gives the read-only database user to create.
+2. Choose the tables, and whether to read each one live or copy it on a schedule. Smaller tables are proposed live, larger ones as copies.
+3. Make the source ready to answer. fitcher profiles the tables, drafts the source's terms, metrics and example questions with an AI model (the setup says it is a paid call when it is), and builds the search index. The first question can be asked straight away.
+
+Everything after that is optional. On the Quality pages you can approve or edit each drafted item, run the source's test questions, and turn disliked or failed answers into new examples. Manuals, policies and glossaries can be added on the Documents page once documents are turned on.
+
+Behind the interface, what fitcher knows about a source is a Domain Pack: a set of YAML files checked against a JSON Schema. [packs/](packs/README.md#onboarding-a-company) describes the files and [jobs/](jobs/README.md) the commands that build them by hand.
 
 ## Using the API
 
@@ -80,28 +90,15 @@ These examples use the [development setup](CONTRIBUTING.md#development-setup), w
 curl -N -H "Content-Type: application/json" -H "Origin: http://127.0.0.1:8000" -d '{"question":"Top 10 best-selling products in Q1 2024 compared with Q1 2025","timezone":"Asia/Ho_Chi_Minh"}' http://127.0.0.1:8000/ask
 ```
 
-The stream reports each step as it starts and finishes, then sends the SQL, the result, the chart and the summary. A question that cannot be answered ends with a clarifying question, a refusal, a blocked notice or an error instead. The response names the conversation it started; send that id with the next question to ask a follow-up. Closing the connection stops the run and its database query.
+The stream reports each step as it starts and finishes, then sends the SQL, the result, the chart and the summary. A question that cannot be answered ends with a clarifying question, a refusal, a blocked notice or an error instead. The response names the conversation it started; send that id with the next question to ask a follow-up, and send a clarifying option's id as `clarify_option` to answer with it. Closing the connection stops the run and its database query.
 
-The owner may ask 10 questions a minute by default. The same API manages conversations (list, search, rename, pin, group and delete), records likes and dislikes, and serves the console's admin pages. The [API docs](http://localhost:8000/docs) of a running stack list every endpoint.
-
-## Bringing in a new company
-
-![Bringing in a new company](docs/architecture/onboarding.svg)
-
-A new company needs its own Domain Pack and nothing else. The Iowa Liquor Sales pack was built this way from a PostgreSQL database.
-
-1. Connect the company's PostgreSQL, MySQL or SQL Server database (SQL Server is copied, never read live), or upload a CSV, Excel or Parquet file, on the console's Sources page or in the setup's Data step: enter the connection, test it, choose the tables and whether to read each live or copy it on a schedule (the [Sources section of the jobs guide](jobs/README.md#connecting-a-source-in-the-interface) gives the read-only user to create). Only ClickHouse holds the credentials. MongoDB and S3 sources are declared in a manifest.
-2. Profile the tables to find their columns, date ranges and common values.
-3. Upload manuals, policies and glossaries on the console's Documents page.
-4. Let the AI draft the pack's terms, metrics and example questions, each with the evidence it used.
-5. Review every draft in the console: edit it, test-run it and approve it.
-6. Publish the pack and run its test questions.
-
-Later, disliked or failed answers become example proposals. A reviewer corrects and approves them, and the next publish uses them. [packs/](packs/README.md#onboarding-a-company) covers the pack files and each step, and [jobs/](jobs/README.md) lists the commands.
+The owner may ask 10 questions a minute by default, and the instance answers 4 at once (1 to 64, set on the Security page or with `PUT /settings/limits`); more wait their turn. The same API manages conversations, sources, models and the console's pages. The [API docs](http://localhost:8000/docs) of a running stack list every endpoint.
 
 ## Quality
 
-Each pack carries test questions with known answers: comparisons between two periods, top N rankings, filters, monthly trends, and questions that should be clarified, refused or declined as off-topic. The evaluation scores each step separately (the type of question, what was extracted, what was found in the search index and whether the result matches) and compares result sets rather than SQL text.
+Each source can carry test questions with known answers: comparisons between two periods, top N rankings, filters, monthly trends, and questions that should be clarified, refused or declined as off-topic. The evaluation scores each step separately (the type of question, what was extracted, what was found in the search index and whether the result matches) and compares result sets rather than SQL text. The Evaluation page shows the share of correct results, and the Models page shows it next to each model; it guides the choice of models and never blocks using one.
+
+Last measured on 2026-11-10 with the development datasets:
 
 | Pack | Industry | Correct results | Report |
 | --- | --- | --- | --- |
@@ -114,7 +111,11 @@ docker compose run --rm -v ./build/eval:/app/build/eval api python -m jobs.eval 
 
 ![Every run is traced](docs/architecture/tracing.svg)
 
-Every run is logged in ClickHouse for 90 days: each step, SQL attempt, model call with its estimated cost, and access decision. [docs/tracing.md](docs/tracing.md) shows how to read one trace.
+Every run is logged in ClickHouse for 90 days: each step, SQL attempt, model call with its estimated cost, and access decision. The Activity area reads them on its Runs, Query log and Costs pages, and [docs/tracing.md](docs/tracing.md) shows how to read one trace.
+
+## Status
+
+fitcher 1.0.0 is the first stable release. [CHANGELOG.md](CHANGELOG.md) lists every change since, and the [decisions](docs/DECISIONS.md) and the [master plan](docs/MASTER_PLAN.md) record how the product got here.
 
 ## Development
 
@@ -133,17 +134,17 @@ npm --prefix apps/web run build
 npm --prefix apps/web run dev
 ```
 
-Unit tests replace every AI model and search call with a fake, so they need no key. Set `ACTIVE_PACK` before starting the web app; in development, `/dev/components` shows the design system. Commit dependency changes together with `apps/api/uv.lock` or `apps/web/package-lock.json`.
+Unit tests replace every AI model and search call with a fake, so they need no key. In development, `/dev/components` shows the design system. Commit dependency changes together with `apps/api/uv.lock` or `apps/web/package-lock.json`. `python scripts/build_architecture_diagram.py` regenerates the diagrams above and their Excalidraw file.
 
 | Folder | Contents |
 | --- | --- |
 | [apps/api](apps/api) | API, agent and its prompts |
-| [apps/web](apps/web) | Chat app and workspace console |
+| [apps/web](apps/web) | Chat app and console |
 | [packs/](packs/README.md) | Domain Packs and their schemas |
-| [dbt/](dbt/README.md) | Models that turn raw tables into the tables the agent reads |
-| [jobs/](jobs/README.md) | Commands for loading data, publishing packs, onboarding and evaluation |
-| [infra/](infra/README.md) | Service configuration |
-| [docs/](docs) | Design notes and evaluation reports |
+| [dbt/](dbt/README.md) | Models that turn the development datasets into the tables the agent reads |
+| [jobs/](jobs/README.md) | Commands for loading data, building packs, onboarding and evaluation |
+| [infra/](infra/README.md) | Image, process supervision and service configuration |
+| [docs/](docs) | Decisions, guides and evaluation reports |
 
 ### Contributing
 
@@ -153,4 +154,4 @@ Branch from `develop` and open a pull request back to it. [CONTRIBUTING.md](CONT
 
 fitcher is released under the [MIT License](LICENSE). The licence covers this repository's code and documentation, not the datasets or models it works with.
 
-Datasets are never committed; downloads stay in the Git-ignored `data/` folder. FreeEcommerceTwin14M is licensed CC BY-NC 4.0 for non-commercial use. Iowa Liquor Sales 2025 is published by the Iowa Department of Revenue under CC BY 4.0.
+Datasets are never committed; downloads stay in the Git-ignored `data/` folder. FreeEcommerceTwin14M is licensed CC BY-NC 4.0 for non-commercial use. Iowa Liquor Sales 2025 is published by the Iowa Department of Revenue under CC BY 4.0. The café data in the animation above is made up.
