@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Fixed
+
+- A model that refuses a JSON-schema response format, such as DeepSeek's own API (`api.deepseek.com`), answers in JSON-object mode with the schema in its instructions instead of being skipped: every question and the provider check used to fall back to the next model with HTTP 400. The api remembers such a model for later calls.
+
 ## 1.0.0 - 2026-11-21
 
 ### Added
