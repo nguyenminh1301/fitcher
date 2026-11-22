@@ -1,0 +1,272 @@
+{
+  "$defs": {
+    "SourcePack": {
+      "additionalProperties": false,
+      "description": "The pack built from a source, which its conversations are answered from.",
+      "properties": {
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "ready",
+            "building",
+            "failed",
+            "none"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "datasets": {
+          "title": "Datasets",
+          "type": "integer"
+        },
+        "error": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Error"
+        }
+      },
+      "required": [
+        "name",
+        "status",
+        "datasets"
+      ],
+      "title": "SourcePack",
+      "type": "object"
+    },
+    "SyncView": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "integer"
+        },
+        "status": {
+          "enum": [
+            "running",
+            "succeeded",
+            "partial",
+            "failed",
+            "cancelled"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "started_by": {
+          "enum": [
+            "manual",
+            "schedule",
+            "setup"
+          ],
+          "title": "Started By",
+          "type": "string"
+        },
+        "started_at": {
+          "format": "date-time",
+          "title": "Started At",
+          "type": "string"
+        },
+        "finished_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Finished At"
+        },
+        "results": {
+          "items": {
+            "additionalProperties": true,
+            "type": "object"
+          },
+          "title": "Results",
+          "type": "array"
+        },
+        "error": {
+          "anyOf": [
+            {
+              "enum": [
+                "unreachable",
+                "refused",
+                "authentication",
+                "tls",
+                "database_not_found",
+                "permission",
+                "unsupported_name",
+                "value_out_of_range",
+                "empty_or_unreadable",
+                "unknown",
+                "interrupted"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Error"
+        }
+      },
+      "required": [
+        "id",
+        "status",
+        "started_by",
+        "started_at",
+        "finished_at",
+        "results",
+        "error"
+      ],
+      "title": "SyncView",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "title": "Id",
+      "type": "string"
+    },
+    "kind": {
+      "enum": [
+        "postgres",
+        "mysql",
+        "sqlserver",
+        "file"
+      ],
+      "title": "Kind",
+      "type": "string"
+    },
+    "host": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Host"
+    },
+    "port": {
+      "anyOf": [
+        {
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Port"
+    },
+    "database": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Database"
+    },
+    "schema_name": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Schema Name"
+    },
+    "user": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "User"
+    },
+    "tls_mode": {
+      "enum": [
+        "prefer",
+        "require",
+        "verify"
+      ],
+      "title": "Tls Mode",
+      "type": "string"
+    },
+    "has_ca": {
+      "title": "Has Ca",
+      "type": "boolean"
+    },
+    "created_at": {
+      "format": "date-time",
+      "title": "Created At",
+      "type": "string"
+    },
+    "table_count": {
+      "title": "Table Count",
+      "type": "integer"
+    },
+    "selected_count": {
+      "title": "Selected Count",
+      "type": "integer"
+    },
+    "last_sync": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/SyncView"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "pack": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/SourcePack"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    }
+  },
+  "required": [
+    "id",
+    "kind",
+    "host",
+    "port",
+    "database",
+    "schema_name",
+    "user",
+    "tls_mode",
+    "has_ca",
+    "created_at",
+    "table_count",
+    "selected_count",
+    "last_sync"
+  ],
+  "title": "SourceView",
+  "type": "object"
+}

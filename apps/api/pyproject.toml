@@ -1,23 +1,40 @@
 [project]
 name = "fitcher-api"
-version = "0.1.0"
+version = "1.0.0"
 description = "Domain-neutral natural-language data analysis API"
+license = "MIT"
 requires-python = ">=3.13,<3.14"
 dependencies = [
+    # Hashes the owner password with Argon2id (app/auth/owner.py).
+    "argon2-cffi==25.1.0",
     "clickhouse-connect==1.11.0",
+    # Encrypts stored secrets with AES-256-GCM (app/state/secrets.py).
+    "cryptography==50.0.2",
     "fastapi==0.162.0",
+    # Local embeddings (app/llm/local_embeddings.py): ONNX models on CPU, downloaded into the data volume.
+    "fastembed==0.9.1",
     "httpx==0.28.1",
+    # Downloads the local embedding model and the optional screening classifier; fastembed requires below 2.0.
+    "huggingface-hub==1.33.0",
     "jsonschema==4.26.0",
     "langgraph==1.2.16",
+    # The model gateway (app/llm/gateway.py) calls every provider through the LiteLLM SDK; no proxy extras.
+    "litellm==1.103.10",
     # The screening classifier (app/screening/classifier.py) runs on CPU with ONNX Runtime.
     "numpy==2.5.4",
     "onnxruntime==1.31.1",
-    "opentelemetry-sdk==1.45.1",
+    "opentelemetry-sdk==1.45.2",
+    # Reads SQL Server (app/sources/sqlserver.py): ClickHouse has no native SQL Server engine and its ODBC bridge is
+    # not shipped in the 26.8 packages (docs/eval/sql-server-source-report.md). The wheels bundle FreeTDS.
+    "pymssql==2.4.6",
+    # Reads the schema of an uploaded Parquet file (app/sources/files.py); the jobs read Hugging Face datasets with it too.
+    "pyarrow==26.0.0",
     # Company documents (app/onboarding): read-only parsers; uploads are multipart forms.
-    "openpyxl==3.1.5",
     "pydantic==2.14.1",
-    "pyjwt[crypto]==2.15.1",
     "pypdf==6.21.4",
+    # Reads XLSX uploads and documents (app/sources/files.py, app/onboarding/docs_parser.py) with a Rust reader:
+    # 50 000 rows in well under a second, against about two with openpyxl.
+    "python-calamine==0.9.1",
     "python-docx==1.2.0",
     "python-multipart==0.0.32",
     "pyyaml==6.0.3",
@@ -32,13 +49,13 @@ dependencies = [
 
 [dependency-groups]
 dev = [
+    # The tests build XLSX workbooks with it; the app reads them with python-calamine.
+    "openpyxl==3.1.5",
     "pytest==9.2.0",
 ]
 jobs = [
     "dbt-clickhouse==1.10.3",
     "dbt-core==1.12.6",
-    "huggingface-hub==2.4.0",
-    "pyarrow==26.0.0",
 ]
 
 [tool.uv]
@@ -47,3 +64,4 @@ default-groups = ["dev", "jobs"]
 [tool.pytest.ini_options]
 testpaths = ["tests", "../../jobs/tests"]
 pythonpath = [".", "../.."]
+markers = ["address_checks: run the api's Host, Origin and peer checks, which the other API tests skip"]

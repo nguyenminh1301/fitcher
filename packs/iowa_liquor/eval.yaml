@@ -5,7 +5,6 @@ cases:
     question: "Top 5 liquor categories by sales dollars in Q2 2025 compared with Q1 2025"
     language: "en"
     category: "two_period_compare"
-    role: "analyst"
     expected:
       intent: "data_query"
       outcome: "answer"
@@ -40,7 +39,6 @@ cases:
     question: "Bottles sold in the first half of 2025 compared with the second half of 2025"
     language: "en"
     category: "two_period_compare"
-    role: "analyst"
     expected:
       intent: "data_query"
       outcome: "answer"
@@ -68,7 +66,6 @@ cases:
     question: "So sánh doanh thu tháng 11 và tháng 12 năm 2025"
     language: "vi"
     category: "two_period_compare"
-    role: "analyst"
     expected:
       intent: "data_query"
       outcome: "answer"
@@ -96,7 +93,6 @@ cases:
     question: "Polk County sales dollars in Q3 2025 compared with Q4 2025"
     language: "en"
     category: "two_period_compare"
-    role: "analyst"
     expected:
       intent: "data_query"
       outcome: "answer"
@@ -125,7 +121,6 @@ cases:
     question: "Top 10 vendors by sales dollars in 2025"
     language: "en"
     category: "top_n"
-    role: "analyst"
     expected:
       intent: "data_query"
       outcome: "answer"
@@ -155,7 +150,6 @@ cases:
     question: "Top 5 counties by bottles sold in 2025"
     language: "en"
     category: "top_n"
-    role: "analyst"
     expected:
       intent: "data_query"
       outcome: "answer"
@@ -185,7 +179,6 @@ cases:
     question: "Top 10 cửa hàng có doanh thu cao nhất năm 2025"
     language: "vi"
     category: "top_n"
-    role: "analyst"
     expected:
       intent: "data_query"
       outcome: "answer"
@@ -215,7 +208,6 @@ cases:
     question: "Top 5 items by liters sold in 2025"
     language: "en"
     category: "top_n"
-    role: "analyst"
     expected:
       intent: "data_query"
       outcome: "answer"
@@ -245,7 +237,6 @@ cases:
     question: "Which 3 cities had the highest state margin in 2025?"
     language: "en"
     category: "top_n"
-    role: "analyst"
     expected:
       intent: "data_query"
       outcome: "answer"
@@ -275,7 +266,6 @@ cases:
     question: "How many bottles of vodka were sold in 2025?"
     language: "en"
     category: "string_filter"
-    role: "analyst"
     expected:
       intent: "data_query"
       outcome: "answer"
@@ -301,7 +291,6 @@ cases:
     question: "Sales dollars in Linn County in 2025"
     language: "en"
     category: "string_filter"
-    role: "analyst"
     expected:
       intent: "data_query"
       outcome: "answer"
@@ -327,7 +316,6 @@ cases:
     question: "Doanh thu của nhà cung cấp DIAGEO AMERICAS năm 2025"
     language: "vi"
     category: "string_filter"
-    role: "analyst"
     expected:
       intent: "data_query"
       outcome: "answer"
@@ -353,7 +341,6 @@ cases:
     question: "How many liters of 100% agave tequila were sold in Des Moines in 2025?"
     language: "en"
     category: "string_filter"
-    role: "analyst"
     expected:
       intent: "data_query"
       outcome: "answer"
@@ -380,7 +367,6 @@ cases:
     question: "Sales dollars of Titos Handmade Vodka in 2025"
     language: "en"
     category: "string_filter"
-    role: "analyst"
     expected:
       intent: "data_query"
       outcome: "answer"
@@ -406,7 +392,6 @@ cases:
     question: "Monthly sales dollars in 2025"
     language: "en"
     category: "monthly_trend"
-    role: "analyst"
     expected:
       intent: "data_query"
       outcome: "answer"
@@ -432,7 +417,6 @@ cases:
     question: "Số chai bán ra theo tháng năm 2025"
     language: "vi"
     category: "monthly_trend"
-    role: "analyst"
     expected:
       intent: "data_query"
       outcome: "answer"
@@ -458,7 +442,6 @@ cases:
     question: "Monthly state margin rate in 2025"
     language: "en"
     category: "monthly_trend"
-    role: "analyst"
     expected:
       intent: "data_query"
       outcome: "answer"
@@ -485,7 +468,6 @@ cases:
     question: "Monthly bourbon sales dollars in 2025"
     language: "en"
     category: "monthly_trend"
-    role: "analyst"
     expected:
       intent: "data_query"
       outcome: "answer"
@@ -513,7 +495,6 @@ cases:
     question: "Cửa hàng nào tốt nhất năm 2025?"
     language: "vi"
     category: "ambiguous"
-    role: "analyst"
     expected:
       intent: "data_query"
       outcome: "clarify"
@@ -531,7 +512,6 @@ cases:
     question: "How did the vendors perform last quarter?"
     language: "en"
     category: "ambiguous"
-    role: "analyst"
     expected:
       intent: "data_query"
       outcome: "clarify"
@@ -549,7 +529,6 @@ cases:
     question: "What was the average in 2025?"
     language: "en"
     category: "ambiguous"
-    role: "analyst"
     expected:
       intent: "data_query"
       outcome: "clarify"
@@ -563,59 +542,10 @@ cases:
         ref: "packs/iowa_liquor/README.md"
     confidence: 1.0
 
-  - id: "vendor_partner_asks_for_margin"
-    question: "What was the state margin in 2025?"
-    language: "en"
-    category: "unauthorized"
-    role: "vendor_partner"
-    expected:
-      intent: "data_query"
-      outcome: "deny"
-      metrics: ["total_state_margin"]
-      dataset: "liquor_sales"
-    status: "approved"
-    evidence:
-      - kind: "manual"
-        ref: "packs/iowa_liquor/README.md"
-    confidence: 1.0
-
-  - id: "vendor_partner_asks_for_bottle_cost"
-    question: "Giá vốn mỗi chai của bang năm 2025 là bao nhiêu?"
-    language: "vi"
-    category: "unauthorized"
-    role: "vendor_partner"
-    expected:
-      intent: "data_query"
-      outcome: "deny"
-      dataset: "liquor_sales"
-      columns: ["state_bottle_cost"]
-    status: "approved"
-    evidence:
-      - kind: "manual"
-        ref: "packs/iowa_liquor/README.md"
-    confidence: 1.0
-
-  - id: "vendor_partner_asks_for_margin_rate"
-    question: "Average state margin rate by category in 2025"
-    language: "en"
-    category: "unauthorized"
-    role: "vendor_partner"
-    expected:
-      intent: "data_query"
-      outcome: "deny"
-      metrics: ["average_state_margin_rate"]
-      dataset: "liquor_sales"
-    status: "approved"
-    evidence:
-      - kind: "manual"
-        ref: "packs/iowa_liquor/README.md"
-    confidence: 1.0
-
   - id: "weather_question"
     question: "What's the weather in Des Moines today?"
     language: "en"
     category: "out_of_scope"
-    role: "analyst"
     expected:
       intent: "out_of_scope"
       outcome: "answer"
@@ -629,7 +559,6 @@ cases:
     question: "Viết cho tôi một bài thơ về rượu whisky"
     language: "vi"
     category: "out_of_scope"
-    role: "analyst"
     expected:
       intent: "out_of_scope"
       outcome: "answer"
@@ -644,7 +573,6 @@ cases:
     question: "What about by bottles sold?"
     language: "en"
     category: "follow_up"
-    role: "analyst"
     expected:
       intent: "data_query"
       outcome: "answer"
@@ -675,7 +603,6 @@ cases:
     question: "Only for Polk County"
     language: "en"
     category: "follow_up"
-    role: "analyst"
     expected:
       intent: "data_query"
       outcome: "answer"
@@ -704,7 +631,6 @@ cases:
     question: "Còn quý 4 năm 2025 thì sao?"
     language: "vi"
     category: "follow_up"
-    role: "analyst"
     expected:
       intent: "data_query"
       outcome: "answer"
@@ -735,7 +661,6 @@ cases:
     question: "Show it as a bar chart"
     language: "en"
     category: "chart_edit"
-    role: "analyst"
     expected:
       intent: "chart_edit"
       outcome: "answer"
@@ -750,7 +675,6 @@ cases:
     question: "Vẽ thành biểu đồ tròn"
     language: "vi"
     category: "chart_edit"
-    role: "analyst"
     expected:
       intent: "chart_edit"
       outcome: "answer"
@@ -764,7 +688,6 @@ cases:
     question: "What does state margin mean?"
     language: "en"
     category: "definition"
-    role: "analyst"
     expected:
       intent: "metadata_qa"
       outcome: "answer"
@@ -779,7 +702,6 @@ cases:
     question: "Doanh thu bán hàng là gì?"
     language: "vi"
     category: "definition"
-    role: "analyst"
     expected:
       intent: "metadata_qa"
       outcome: "answer"
@@ -794,7 +716,6 @@ cases:
     question: "How is the average state margin rate calculated?"
     language: "en"
     category: "definition"
-    role: "analyst"
     expected:
       intent: "metadata_qa"
       outcome: "answer"
@@ -809,7 +730,6 @@ cases:
     question: "What counts as bourbon in this data?"
     language: "en"
     category: "definition"
-    role: "analyst"
     expected:
       intent: "metadata_qa"
       outcome: "answer"

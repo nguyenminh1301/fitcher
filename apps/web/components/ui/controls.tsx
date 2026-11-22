@@ -76,6 +76,18 @@ export function Checkbox({ label, checked, disabled, onChange }: { label: ReactN
 export type ChipProps = ButtonHTMLAttributes<HTMLButtonElement> & { selected?: boolean; size?: "sm"; icon?: string; count?: ReactNode };
 
 /** A toggle or suggestion pill; a selected chip shows a check mark, never colour alone. */
+/** An on/off switch; the label names what is turned on. */
+export function Switch({ label, checked, disabled, onChange }: { label: string; checked: boolean; disabled?: boolean; onChange: (checked: boolean) => void }) {
+  const id = useId();
+  return (
+    <label className="fc-switch">
+      <button type="button" role="switch" className="fc-switch-track" aria-checked={checked} aria-labelledby={id} disabled={disabled}
+        onClick={() => onChange(!checked)} />
+      <span id={id}>{label}</span>
+    </label>
+  );
+}
+
 export function Chip({ selected, size, icon, count, className, children, ...rest }: ChipProps) {
   return (
     <button type="button" aria-pressed={selected === undefined ? undefined : selected} {...rest} className={cx("fc-chip", size === "sm" && "fc-chip-sm", className)}>
@@ -124,12 +136,17 @@ export function Tabs({ tabs, value, onChange, label }: { tabs: Tab[]; value: str
   );
 }
 
-/** A segmented control: one choice of a few, as radio buttons. */
-export function Segmented({ options, value, onChange, label, size }: { options: [string, ReactNode][]; value: string; onChange: (value: string) => void; label?: string; size?: "sm" }) {
+/**
+ * A segmented control: one choice of a few, as radio buttons. An option may carry a third entry, its accessible
+ * name, when its content is only an icon; ``iconOnly`` makes those buttons square.
+ */
+export function Segmented({ options, value, onChange, label, size, iconOnly }: {
+  options: [string, ReactNode, string?][]; value: string; onChange: (value: string) => void; label?: string; size?: "sm"; iconOnly?: boolean;
+}) {
   return (
-    <div className={cx("fc-seg", size === "sm" && "fc-seg-sm")} role="radiogroup" aria-label={label}>
-      {options.map(([key, content]) => (
-        <button key={key} type="button" role="radio" aria-checked={value === key} className="fc-seg-btn" onClick={() => onChange(key)}>
+    <div className={cx("fc-seg", size === "sm" && "fc-seg-sm", iconOnly && "fc-seg-icon")} role="radiogroup" aria-label={label}>
+      {options.map(([key, content, name]) => (
+        <button key={key} type="button" role="radio" aria-checked={value === key} aria-label={name} className="fc-seg-btn" onClick={() => onChange(key)}>
           {content}
         </button>
       ))}

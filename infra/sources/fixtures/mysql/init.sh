@@ -2,7 +2,7 @@
 # Seeds the fixture MySQL on a fresh volume: the widget tables from /fixtures,
 # copied into the server's secure_file_priv directory, and a user that can only
 # read them.
-# The lab passwords are placed in SQL string literals, so they must not contain quotes.
+# The fixture passwords are placed in SQL string literals, so they must not contain quotes.
 # The mysql entrypoint sources a script that is not executable, so the body runs
 # in a subshell: its shell options must not leak into the entrypoint, which reads
 # unset variables such as MYSQL_ONETIME_PASSWORD after the init scripts.

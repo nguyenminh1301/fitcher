@@ -12,6 +12,8 @@ from datetime import date, datetime
 from decimal import Decimal
 import re
 
+from app.agent.nodes.build_spec import warning
+from app.agent.nodes.screen import question_language
 from app.agent.state import AgentDeps, AgentState
 from app.contracts.result import MAX_RESULT_ROWS, ColumnInfo, Result
 from app.data.clickhouse import QueryOutput
@@ -47,9 +49,12 @@ def describe_column(name: str, clickhouse_type: str, pack: Pack, dataset: str) -
     kind = value_type(clickhouse_type)
     if _is_percent(name):
         return ColumnInfo(name=name, type=kind, role="measure", format="percent")
-    for metric in pack.metrics.metrics:
+    # The longest id first, so a metric whose id extends another's is not named after the shorter one.
+    for metric in sorted(pack.metrics.metrics, key=lambda item: len(item.id), reverse=True):
         if name == metric.id or name.startswith(f"{metric.id}_"):
-            return ColumnInfo(name=name, type=kind, role="measure", format=metric.unit)
+            suffix = re.sub(r"\bq([1-4])\b", r"Q\1", name[len(metric.id):].strip("_").replace("_", " "))
+            label = f"{metric.name} {suffix}" if suffix else metric.name
+            return ColumnInfo(name=name, type=kind, role="measure", format=metric.unit, label=label)
     columns = {column.name: column for item in pack.datasets.datasets if item.id == dataset for column in item.columns}
     if name in columns:
         column = columns[name]
@@ -74,9 +79,27 @@ def to_result(output: QueryOutput, pack: Pack, dataset: str) -> Result:
     return Result(columns=columns, rows=rows, row_count=len(output.rows), truncated=len(output.rows) > MAX_RESULT_ROWS)
 
 
+# The heading of a time column grouped to a grain, in the question's language.
+GRAIN_HEADINGS = {
+    "en": {"day": "Day", "week": "Week", "month": "Month", "quarter": "Quarter", "year": "Year"},
+    "vi": {"day": "Ngày", "week": "Tuần", "month": "Tháng", "quarter": "Quý", "year": "Năm"},
+}
+
+
+def with_grain(result: Result, grain: str | None, language: str) -> Result:
+    """``result`` with its date columns marked as grouped to ``grain``, headed by the grain's name."""
+    if grain is None:
+        return result
+    headings = GRAIN_HEADINGS.get(language, GRAIN_HEADINGS["en"])
+    columns = [column.model_copy(update={"grain": grain, "label": column.label or headings[grain]})
+               if column.role == "time" and column.type in ("date", "datetime") else column for column in result.columns]
+    return result.model_copy(update={"columns": columns})
+
+
 def shape_result(state: AgentState, deps: AgentDeps) -> dict:
     result = to_result(state["output"], deps.compiled.pack, state["spec"].dataset)
+    result = with_grain(result, state.get("time_grain"), question_language(state))
     warnings = list(state.get("warnings", []))
     if result.truncated:
-        warnings.append(f"only the first {MAX_RESULT_ROWS} rows are shown")
+        warnings.append(warning(question_language(state), "first_rows", rows=MAX_RESULT_ROWS))
     return {"result": result, "warnings": warnings}

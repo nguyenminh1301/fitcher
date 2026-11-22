@@ -1,0 +1,52 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "backend": {
+      "enum": [
+        "local",
+        "provider"
+      ],
+      "title": "Backend",
+      "type": "string"
+    },
+    "model": {
+      "title": "Model",
+      "type": "string"
+    },
+    "provider_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Provider Id"
+    },
+    "dimensions": {
+      "anyOf": [
+        {
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Dimensions"
+    },
+    "confirm_reindex": {
+      "default": false,
+      "title": "Confirm Reindex",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "backend",
+    "model"
+  ],
+  "title": "EmbeddingChange",
+  "type": "object"
+}

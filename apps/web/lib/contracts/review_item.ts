@@ -11,7 +11,7 @@ export type Formula = string | null;
 export type Source = string;
 export type Quote = string | null;
 export type Deleted = boolean;
-export type Kind1 = "manual" | "profile" | "doc" | "error" | "trace";
+export type Kind1 = "manual" | "profile" | "doc" | "error" | "trace" | "source";
 export type Ref = string;
 export type EvidenceRefs = EvidenceRef[];
 /**
@@ -22,12 +22,15 @@ export type Name1 = string;
 export type Type = "string" | "number" | "date" | "datetime" | "boolean";
 export type Role = "dimension" | "measure" | "time";
 export type Format = ("currency" | "count" | "ratio" | "percent" | "days" | "number") | null;
+export type Label = string | null;
+export type Grain = ("day" | "week" | "month" | "quarter" | "year") | null;
 /**
  * @maxItems 5000
  */
 export type Rows = (string | number | boolean | null)[][];
 export type RowCount = number;
 export type Truncated = boolean;
+export type Reviewed = boolean | null;
 /**
  * @minItems 1
  */
@@ -57,6 +60,7 @@ export interface ReviewItem {
   evidence?: ReviewEvidence | null;
   evidence_refs?: EvidenceRefs;
   test_result?: Result | null;
+  reviewed?: Reviewed;
   spec?: ReviewedSpec | null;
   spec_reviewed?: SpecReviewed;
 }
@@ -83,6 +87,8 @@ export interface ColumnInfo {
   type: Type;
   role: Role;
   format?: Format;
+  label?: Label;
+  grain?: Grain;
 }
 /**
  * The QuerySpec a proposal's example settles for its question, without periods (DECISIONS §6 step 7).

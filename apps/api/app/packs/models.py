@@ -17,7 +17,7 @@ class PackModel(BaseModel):
 
 
 class Evidence(PackModel):
-    kind: Literal["manual", "profile", "doc", "error", "trace"]
+    kind: Literal["manual", "profile", "doc", "error", "trace", "source"]
     ref: str
 
 
@@ -27,6 +27,8 @@ class Draftable(PackModel):
     status: Literal["draft", "approved"]
     evidence: list[Evidence]
     confidence: float
+    # False on an item an instant pack approved without a person (DECISIONS §5); absent on reviewed packs.
+    reviewed: bool | None = None
 
 
 class Convention(Draftable):
@@ -56,8 +58,10 @@ class Dataset(Draftable):
     id: str
     description: str
     grain: str
-    time_column: str
-    allowed_roles: list[str]
+    # The column periods filter on; None for a table without dates, which answers without a period.
+    time_column: str | None = None
+    # Filled by the loader with the pack's one reader role; a value in an older pack file is ignored.
+    allowed_roles: list[str] = []
     columns: list[Column]
 
 
@@ -199,7 +203,8 @@ class EvalCase(Draftable):
         "two_period_compare", "top_n", "string_filter", "monthly_trend", "ambiguous", "unauthorized", "out_of_scope",
         "follow_up", "chart_edit", "definition",
     ]
-    role: str
+    # Every question runs as the pack's one reader role; a role in an older eval file is ignored.
+    role: str = "reader"
     expected: EvalExpected
     expected_sql: str | None = None
     expected_rows: list[dict[str, Scalar | None]] | None = None
@@ -235,6 +240,18 @@ PACK_FILES: dict[str, type[PackModel]] = {
     "metrics.yaml": MetricsFile,
     "relationships.yaml": RelationshipsFile,
     "examples.yaml": ExamplesFile,
-    "policies.yaml": PoliciesFile,
     "eval.yaml": EvalFile,
 }
+
+# fitcher is a personal app (DECISIONS §9): a pack has no roles of its own. The agent reads every approved
+# dataset through this one role, which the compiler turns into a read-only ClickHouse role and login user.
+READER_ROLE = "reader"
+
+
+def reader_policies(datasets: list[Dataset]) -> PoliciesFile:
+    """The pack's one role, granted every column of every dataset; the compiler keeps the approved ones."""
+    return PoliciesFile(roles=[Role(
+        id=READER_ROLE, description="Reads every column of every dataset of the pack.",
+        datasets=[DatasetGrant(dataset=dataset.id, columns=[column.name for column in dataset.columns]) for dataset in datasets],
+        status="approved", evidence=[{"kind": "manual", "ref": "generated for the personal app"}], confidence=1.0,
+    )])

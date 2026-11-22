@@ -1,0 +1,136 @@
+{
+  "$defs": {
+    "CatalogEntry": {
+      "additionalProperties": false,
+      "description": "One model of a provider with what it is for, its price, limits and measured speed (``app/llm/catalog.py``).",
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "provider_id": {
+          "title": "Provider Id",
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "chat",
+            "embedding",
+            "other"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "free": {
+          "enum": [
+            "none",
+            "free",
+            "free_tier"
+          ],
+          "title": "Free",
+          "type": "string"
+        },
+        "input_price": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Input Price"
+        },
+        "output_price": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Output Price"
+        },
+        "context": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Context"
+        },
+        "structured_output": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Structured Output"
+        },
+        "benchmark": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Benchmark"
+        },
+        "median_latency_ms": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Median Latency Ms"
+        }
+      },
+      "required": [
+        "id",
+        "provider_id",
+        "kind",
+        "free",
+        "input_price",
+        "output_price",
+        "context",
+        "structured_output",
+        "benchmark",
+        "median_latency_ms"
+      ],
+      "title": "CatalogEntry",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "provider_id": {
+      "title": "Provider Id",
+      "type": "string"
+    },
+    "models": {
+      "items": {
+        "$ref": "#/$defs/CatalogEntry"
+      },
+      "title": "Models",
+      "type": "array"
+    }
+  },
+  "required": [
+    "provider_id",
+    "models"
+  ],
+  "title": "ModelCatalog",
+  "type": "object"
+}

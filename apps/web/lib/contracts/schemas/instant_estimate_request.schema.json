@@ -1,0 +1,22 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "source_id": {
+      "title": "Source Id",
+      "type": "string"
+    },
+    "tables": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Tables",
+      "type": "array"
+    }
+  },
+  "required": [
+    "source_id",
+    "tables"
+  ],
+  "title": "InstantEstimateRequest",
+  "type": "object"
+}

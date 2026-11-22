@@ -16,19 +16,19 @@ Everything fitcher knows about a company comes from its Domain Pack: a set of re
 | Ask about data | Ask for rankings, trends, comparisons between periods and filtered totals. Relative periods such as "last quarter" use the company's fiscal calendar and your time zone. |
 | Hold a conversation | Ask a follow-up and it reuses the previous query. Ask to see the answer as a line chart and it redraws without querying again. Ask what a term means and it answers from the glossary and company documents. |
 | Get asked back | When a question is unclear, fitcher asks which meaning you intended and offers the options. |
-| See only your data | Each user works under a role. A question about data the role may not read is refused before any SQL is written, and the database enforces the same rules. |
+| Read only what you approved | A pack lists the tables and columns you approved. A question about other data is refused before any SQL is written, and the database user the agent runs as can read only the pack's marts. |
 | Stay safe | Every question is screened for prompt injection before it reaches an AI model. For now the screener records its verdict and lets the question through; blocking is switched on once it is accurate enough in both languages. |
-| Check the work | Each answer shows the SQL it ran and the steps it took, and admins can open the full trace of any run. |
-| Add a new company | fitcher profiles the company's tables, reads its documents and drafts a pack. A reviewer approves each item before it goes live. |
-| Measure quality | Each pack has a set of test questions with known answers. A pack goes live only when at least 80% of them return the right result. |
+| Check the work | Each answer shows the SQL it ran and the steps it took, and the console opens the full trace of any run. |
+| Add a new company | fitcher profiles the company's tables, reads its documents and drafts a pack. Drafted items answer at once, marked unreviewed until you approve them. |
+| Measure quality | Each pack has a set of test questions with known answers, and the console shows whether at least 80% of them return the right result with the chosen models. |
 
-The web app has a chat for everyone and a workspace console for reviewers and admins, in English and Vietnamese, light and dark themes, on desktop and phone.
+The web app has a chat and a workspace console, in English and Vietnamese, light and dark themes, on desktop and phone.
 
 ## How it works
 
 ![How the pieces fit together](docs/architecture/system.svg)
 
-The user talks to the web app, which signs them in through Keycloak and streams answers from the API. The API runs the agent: it looks up the company's terms in the search index, sends language tasks to AI models through the LiteLLM gateway, and runs SQL in ClickHouse as the user's role. Models are called by task (fast replies, simple SQL, harder SQL, embeddings), and an admin can switch a task to another model once that model passes the pack's test questions. All of these services run together with Docker Compose on one machine.
+The user talks to the web app, which streams answers from the API. fitcher is a personal app: there are no accounts, and the API answers only the machine it runs on unless an owner password is set and the browser signs in with it. The API runs the agent: it looks up the company's terms in the search index, sends language tasks to the AI models connected in the app, and runs SQL in ClickHouse as a read-only role. Models are called by task (fast replies, simple SQL, harder SQL), any task can use any model of a connected provider, and the pack's test results are shown next to each model. Search uses a local multilingual embedding model by default, or a provider's embedding model when one is chosen. All of these services run together in one Docker image on one machine.
 
 ![How a question is answered](docs/architecture/question-flow.svg)
 
@@ -38,103 +38,51 @@ The recording below shows one question in the app going through these steps, eac
 
 ![A question in the app going through the steps of the diagram, then its SQL and a chart change](docs/media/fitcher-question-flow.gif)
 
-![Who can see what](docs/architecture/access-control.svg)
+![What the agent can read](docs/architecture/access-control.svg)
 
-Each company's access rules live in one policy file. Publishing the pack turns it into database roles, column grants, row filters and aggregate-only views, so the database itself stops a role from reading what it should not. Every allow and deny decision goes to the audit log. The role-aware search only keeps the AI's context small and relevant; the database's own grants and row filters are what enforce access.
+A pack reads only the datasets you approved. Publishing the pack gives its marts to one read-only database user, which is the user every query runs as, so the database itself stops a query from reading anything else. A question about other data is refused before any SQL is written, and every query and refusal goes to the audit log. The pack's search only keeps the AI's context small and relevant; the database user's grants are what enforce it.
 
 | Component | Technology |
 | --- | --- |
 | Web app | Next.js, ECharts, TanStack Table |
-| Sign-in | Keycloak (OpenID Connect) |
 | API and agent | FastAPI with streamed responses, LangGraph, sqlglot |
-| AI model gateway | LiteLLM, with OpenAI, Anthropic, Gemini or a local Ollama model |
+| AI models | OpenAI, Anthropic, Gemini, a local Ollama model or any OpenAI-compatible endpoint, called in process through the LiteLLM SDK; a local multilingual embedding model with fastembed by default, or a provider's embedding model |
 | Data and run logs | ClickHouse |
-| Search index | Qdrant, combining meaning-based and keyword search |
+| Search index | ClickHouse, combining meaning-based and keyword search |
 | Data modelling | dbt |
 | Domain Packs | YAML checked against JSON Schema |
 
+## Status
+
+fitcher 1.0.0 is the first stable release, under the MIT License: a clarifying question is answered by the option picked, a question about all the data needs no period, a model that keeps failing rests longer, the console has six areas, fitcher has one owner without console roles, and the interface speaks of sources made ready to answer. 0.0.3 redrew the whole interface: a three-step setup (model, data, start) with company documents off until they are turned on, a calmer sign-in page, and a console that opens on an Overview of runs, cost and what needs a look, with every page rebuilt on the same layout. 0.0.2 made it a personal app: no accounts or team mode, an optional owner password that is required before the app answers on another host name, packs that read every approved dataset through one read-only database user, a curated list of model providers with an in-app guide to an OpenRouter key and its free models, and a first-run setup that can go back to an answered step. 0.0.1 was the first release of the one-image product: one `docker run`, setup in the browser, data sources and a first pack built in the application, backup and restore, and the security review of [docs/security.md](docs/security.md). The [decisions](docs/DECISIONS.md) and the [master plan](docs/MASTER_PLAN.md) record how it got here.
+
 ## Quick start
 
-You need Docker with Compose v2 and about 8 GB of memory for Docker. Run the commands from the repository root, in Bash or PowerShell.
-
-1. Copy [.env.example](.env.example) to `.env`, replace every `change-me` value and add a key for at least one model provider (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GEMINI_API_KEY`, or `OLLAMA_URL` with the `local-models` profile). Never commit `.env`.
-
-2. Start the services. They all report healthy even before a model key is set.
-
-   ```bash
-   docker compose up --build --wait
-   ```
-
-3. Load the sample e-commerce data and build the tables the agent reads. This downloads [FreeEcommerceTwin14M](https://huggingface.co/datasets/ziadatalabs/FreeEcommerceTwin14M), 14.3 million rows licensed for non-commercial use only. On Linux, `./data` must be writable by user ID 10001.
-
-   ```bash
-   docker compose run --rm jobs python -m jobs.refresh_data --source ecommerce_twin
-   ```
-
-4. Publish the e-commerce Domain Pack. This checks it, test-runs its metrics, writes the database permissions and builds the search index, which costs a little in embedding calls.
-
-   ```bash
-   docker compose run --rm jobs python -m jobs.compile_pack --pack ecommerce_twin
-   ```
-
-5. Install the prompt-injection classifier. Accept the licence of `meta-llama/Llama-Prompt-Guard-2-86M` on Hugging Face and put your token in `.env` as `HF_TOKEN`. Until the classifier is installed, every question is blocked.
-
-   ```bash
-   docker compose run --rm guard-model
-   ```
-
-6. Give the demo users the password set as `KEYCLOAK_LAB_USER_PASSWORD` in `.env`.
-
-   ```bash
-   docker compose run --rm jobs python -m jobs.set_lab_passwords
-   ```
-
-7. Open [localhost:3000](http://localhost:3000), choose Continue with company account, sign in as `lab.analyst` and pick one of the suggested questions. Every question is billed by your model provider.
-
-You can also ask from the command line:
+You need Docker. Start fitcher with one command:
 
 ```bash
-docker compose run --rm api python -m jobs.ask "Top 10 best-selling products in Q1 2024 compared with Q1 2025"
+docker run -d --name fitcher -p 127.0.0.1:3000:3000 -v fitcher-data:/data ghcr.io/nguyenminh1301/fitcher
 ```
 
-`make up`, `make ps`, `make logs`, `make smoke` and `make down` are shortcuts for the Compose commands. Stopping the services keeps the data.
+Open [localhost:3000](http://localhost:3000) and follow the setup: connect a model provider and its key, or a model server on this computer reached as `host.docker.internal` (on Linux add `--add-host=host.docker.internal:host-gateway` to the command). Everything is kept in the `fitcher-data` volume.
 
-### Demo users
+[docs/install.md](docs/install.md) covers the first start and the settings, [docs/operations.md](docs/operations.md) backup, restore, upgrades, limits and the load measurement, and [docs/security.md](docs/security.md) the threat model and hardening checklist. The install guide also covers jobs, local models and measured memory use.
 
-| User | What they can see |
-| --- | --- |
-| `lab.analyst` | All sales, returns and site traffic |
-| `lab.marketing` | Site traffic only, so a sales question is refused |
-| `lab.northwest` | Sales and returns of the Northwest region only |
-| `lab.partner` | Daily sales and units by product category, never single orders |
-| `lab.reviewer` | What the analyst sees, plus the console's Review, Documents, Datasets, Feedback and Evaluation pages |
-| `lab.admin` | What the analyst sees, plus Runs and trace, Audit, Costs, Models and Users |
+A demo of the web app on sample data, with no backend, starts with `docker run -p 127.0.0.1:3000:3000 ghcr.io/nguyenminh1301/fitcher-demo` once the Demo workflow has published it from `main`.
 
-### Services
-
-| Service | Address |
-| --- | --- |
-| Web app | [localhost:3000](http://localhost:3000) |
-| API | [localhost:8000](http://localhost:8000/health), with interactive [API docs](http://localhost:8000/docs) |
-| Keycloak | [localhost:8080](http://localhost:8080), realm `finch` |
-| LiteLLM | localhost:4000 |
-| Qdrant | localhost:6333 |
-| ClickHouse | localhost:8123 (HTTP) and localhost:9000 (native) |
-
-All ports listen on the local machine only.
+To work on fitcher itself with the development datasets, the sample packs and separate services, follow the [development setup](CONTRIBUTING.md#development-setup).
 
 ## Using the API
 
-The API streams each answer as server-sent events and needs a Keycloak access token. On a local setup, the `finch-cli` client issues one for a demo user:
+These examples use the [development setup](CONTRIBUTING.md#development-setup), which publishes the API on port 8000. The API streams each answer as server-sent events. A request from the local machine needs no sign-in; a request that changes something must name the page it comes from in `Origin`, which the example sends:
 
 ```bash
-TOKEN=$(curl -s -d grant_type=password -d client_id=finch-cli -d username=lab.analyst --data-urlencode "password=$KEYCLOAK_LAB_USER_PASSWORD" http://127.0.0.1:8080/realms/finch/protocol/openid-connect/token | python -c "import sys, json; print(json.load(sys.stdin)['access_token'])")
-curl -N -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" -d '{"question":"Top 10 best-selling products in Q1 2024 compared with Q1 2025","timezone":"Asia/Ho_Chi_Minh"}' http://127.0.0.1:8000/ask
+curl -N -H "Content-Type: application/json" -H "Origin: http://127.0.0.1:8000" -d '{"question":"Top 10 best-selling products in Q1 2024 compared with Q1 2025","timezone":"Asia/Ho_Chi_Minh"}' http://127.0.0.1:8000/ask
 ```
 
 The stream reports each step as it starts and finishes, then sends the SQL, the result, the chart and the summary. A question that cannot be answered ends with a clarifying question, a refusal, a blocked notice or an error instead. The response names the conversation it started; send that id with the next question to ask a follow-up. Closing the connection stops the run and its database query.
 
-Each user may ask 10 questions a minute by default. The same API manages conversations (list, search, rename, pin, group and delete), records likes and dislikes, and serves the console's admin pages. The [API docs](http://localhost:8000/docs) of a running stack list every endpoint.
+The owner may ask 10 questions a minute by default. The same API manages conversations (list, search, rename, pin, group and delete), records likes and dislikes, and serves the console's admin pages. The [API docs](http://localhost:8000/docs) of a running stack list every endpoint.
 
 ## Bringing in a new company
 
@@ -142,7 +90,7 @@ Each user may ask 10 questions a minute by default. The same API manages convers
 
 A new company needs its own Domain Pack and nothing else. The Iowa Liquor Sales pack was built this way from a PostgreSQL database.
 
-1. Connect the company's PostgreSQL, MySQL, MongoDB or file sources. ClickHouse either copies the data on a schedule or reads it live, and only ClickHouse holds the read-only credentials.
+1. Connect the company's PostgreSQL, MySQL or SQL Server database (SQL Server is copied, never read live), or upload a CSV, Excel or Parquet file, on the console's Sources page or in the setup's Data step: enter the connection, test it, choose the tables and whether to read each live or copy it on a schedule (the [Sources section of the jobs guide](jobs/README.md#connecting-a-source-in-the-interface) gives the read-only user to create). Only ClickHouse holds the credentials. MongoDB and S3 sources are declared in a manifest.
 2. Profile the tables to find their columns, date ranges and common values.
 3. Upload manuals, policies and glossaries on the console's Documents page.
 4. Let the AI draft the pack's terms, metrics and example questions, each with the evidence it used.
@@ -202,5 +150,7 @@ Unit tests replace every AI model and search call with a fake, so they need no k
 Branch from `develop` and open a pull request back to it. [CONTRIBUTING.md](CONTRIBUTING.md) describes the branch and commit message format, and [SECURITY.md](SECURITY.md) explains how to report a vulnerability.
 
 ## Data and licences
+
+fitcher is released under the [MIT License](LICENSE). The licence covers this repository's code and documentation, not the datasets or models it works with.
 
 Datasets are never committed; downloads stay in the Git-ignored `data/` folder. FreeEcommerceTwin14M is licensed CC BY-NC 4.0 for non-commercial use. Iowa Liquor Sales 2025 is published by the Iowa Department of Revenue under CC BY 4.0.

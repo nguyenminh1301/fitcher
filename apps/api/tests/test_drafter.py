@@ -105,20 +105,6 @@ def test_a_draft_item_is_filled_without_changing_its_structure(files):
     assert item["allowed_roles"] == []
 
 
-def test_a_new_dataset_gets_the_roles_its_policies_grant(files):
-    llm = FakeLLMClient([{"items": [{
-        "id": "widget_sales", "description": "x", "grain": "x", "time_column": "sold_on", "evidence": [],
-        "confidence": 0.5, "columns": [{"name": "sold_on", "type": "date", "role": "time", "description": "d", "indexable": False}],
-    }, {
-        "id": "widget_stock", "description": "Stock per day.", "grain": "one row per widget and day", "time_column": "day",
-        "evidence": [], "confidence": 0.5,
-        "columns": [{"name": "day", "type": "date", "role": "time", "description": "Day.", "indexable": False}],
-    }]}])
-    [item] = Drafter(llm, Warehouse()).draft("datasets.yaml", files, PROFILE, [])
-    assert item["id"] == "widget_stock" and item["allowed_roles"] == []
-    assert item["evidence"] == [{"kind": "profile", "ref": "widget_sales"}]
-
-
 def test_examples_are_explained_before_they_are_saved(files):
     llm = FakeLLMClient([{"items": [{
         "id": "count_sales", "question": "How many sales?", "language": "en", "sql": "SELECT count() FROM marts.widget_sales",
@@ -138,3 +124,60 @@ def test_drafting_needs_a_profile_or_documents(files):
 def test_estimate_counts_prompt_characters_per_file(files):
     estimate = Drafter(FakeLLMClient(), Warehouse()).estimate(files, PROFILE, CHUNKS)
     assert set(estimate) == set(DRAFT_FILES) and all(count > 100 for count in estimate.values())
+
+
+def test_a_filled_dataset_takes_the_models_time_column_only_among_its_time_columns(files):
+    files.merge_drafts("datasets.yaml", [{
+        "id": "staff", "description": "Description to draft.", "grain": "one row per person", "time_column": "born_on",
+        "evidence": [{"kind": "profile", "ref": "widget_sales.widget_name"}], "confidence": 0.5,
+        "columns": [{"name": "born_on", "type": "date", "role": "time", "description": "Description to draft."},
+                    {"name": "hired_on", "type": "date", "role": "time", "description": "Description to draft."}],
+    }])
+    reply = {"id": "staff", "description": "Staff.", "grain": "one row per person", "confidence": 0.8, "evidence": [],
+             "columns": [{"name": "hired_on", "type": "date", "role": "time", "description": "Hire day."}]}
+
+    [hired] = Drafter(FakeLLMClient([{"items": [{**reply, "time_column": "hired_on"}]}]), Warehouse()).draft(
+        "datasets.yaml", files, PROFILE, [])
+    [kept] = Drafter(FakeLLMClient([{"items": [{**reply, "time_column": "nowhere"}]}]), Warehouse()).draft(
+        "datasets.yaml", files, PROFILE, [])
+
+    assert hired["time_column"] == "hired_on" and kept["time_column"] == "born_on"
+    # The reply cited nothing known, so the item keeps the evidence it had instead of another table's profile.
+    assert hired["evidence"] == [{"kind": "profile", "ref": "widget_sales.widget_name"}]
+
+
+def test_a_new_dataset_is_held_to_the_pack_rules_instead_of_failing_the_compile(files):
+    # A reply for a table without dates: a number marked indexable and a time column that is not a time column.
+    llm = FakeLLMClient([{"items": [{
+        "id": "catalog", "description": "Every catalog item.", "grain": "one row per item", "time_column": "item_no",
+        "evidence": [{"kind": "profile", "ref": "widget_sales"}], "confidence": 0.8,
+        "columns": [
+            {"name": "item_no", "type": "number", "role": "dimension", "description": "Item number.", "indexable": True},
+            {"name": "colour", "type": "string", "role": "dimension", "description": "Colour.", "indexable": True},
+        ],
+    }]}])
+
+    [item] = Drafter(llm, Warehouse()).draft("datasets.yaml", files, PROFILE, [])
+
+    assert "time_column" not in item
+    assert [column.get("indexable", False) for column in item["columns"]] == [False, True]
+
+
+def test_drafted_ids_and_references_are_made_valid_instead_of_failing_the_pack(files):
+    llm = FakeLLMClient([{"items": [metric("sumIf_amount_status"), metric("Revenue-Total 2025"), metric("2nd_metric")]}])
+
+    items = Drafter(llm, Warehouse()).draft("metrics.yaml", files, PROFILE, CHUNKS)
+
+    assert [item["id"] for item in items] == ["sum_if_amount_status", "revenue_total_2025", "m_2nd_metric"]
+
+
+def test_metric_references_of_examples_follow_the_same_ids(files):
+    llm = FakeLLMClient([{"items": [{
+        "id": "OrdersPerMonth", "question": "Orders per month?", "language": "en", "sql": "SELECT 1",
+        "datasets": ["widget_sales"], "metrics": ["sumIf_amount_status"],
+        "evidence": [{"kind": "profile", "ref": "widget_sales"}], "confidence": 0.6,
+    }]}])
+
+    [item] = Drafter(llm, Warehouse()).draft("examples.yaml", files, PROFILE, CHUNKS)
+
+    assert (item["id"], item["metrics"]) == ("orders_per_month", ["sum_if_amount_status"])

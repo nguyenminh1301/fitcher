@@ -27,6 +27,18 @@ def hits(index: str, request) -> list[dict]:
     return []
 
 
+def test_with_documents_off_the_answer_comes_from_the_pack_without_searching_documents():
+    agent = replace(deps(["Widget revenue is the money received from widget sales."], search=hits), documents_enabled=False)
+
+    update = metadata_qa({"question": QUESTION, "language": "en"}, agent)
+
+    assert update["sources"] == ["glossary_terms:revenue", "metrics:widget_revenue"]
+    assert [request.collection for request in agent.search.queries] == [
+        f"minimal_{index}" for index in SEARCHED if index != "kb_docs"
+    ]
+    assert "Sales policy" not in agent.llm.calls[0].prompt
+
+
 def test_the_answer_comes_from_role_filtered_pack_hits_with_the_data_rules():
     agent = deps(["Widget revenue is the money received from widget sales."], search=hits)
 
@@ -37,9 +49,9 @@ def test_the_answer_comes_from_role_filtered_pack_hits_with_the_data_rules():
         "sources": ["glossary_terms:revenue", "metrics:widget_revenue", "kb_docs:policy#1"],
     }
     assert SEARCHED == ("glossary_terms", "metrics", "datasets", "kb_docs")
-    searched = [request.alias for request in agent.search.queries]
+    searched = [request.collection for request in agent.search.queries]
     assert searched == [f"minimal_{index}" for index in SEARCHED]
-    assert all(request.roles == ["viewer"] for request in agent.search.queries)
+    assert all(request.roles == ["reader"] for request in agent.search.queries)
     [call] = agent.llm.calls
     assert (call.method, call.tier) == ("text", TIER)
     prompt = call.prompt

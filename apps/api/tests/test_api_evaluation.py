@@ -6,7 +6,6 @@ from fastapi.testclient import TestClient
 import pytest
 
 from agent_fixtures import compiled_fixture
-from auth_fixtures import token, verifier
 
 from app.api import runtime
 from app.eval.console import EvalReports, EvalRuns, RunInProgress
@@ -14,9 +13,9 @@ from app.eval.runner import EvalRun
 from app.eval.scorers import CaseScore, LayerScore
 from app.main import app
 
-ADMIN = {"Authorization": f"Bearer {token(realm_access={'roles': ['admin']})}"}
-REVIEWER = {"Authorization": f"Bearer {token(realm_access={'roles': ['pack_reviewer']})}"}
-VIEWER = {"Authorization": f"Bearer {token()}"}
+ADMIN = {}
+REVIEWER = {}
+VIEWER = {}
 TS = datetime(2026, 11, 6, tzinfo=UTC)
 PASS, FAIL, SKIP = LayerScore(status="pass"), LayerScore(status="fail", reason="no result"), LayerScore(status="not_scored")
 
@@ -36,7 +35,6 @@ def reports(rows):
 
 @pytest.fixture
 def client():
-    app.dependency_overrides[runtime.get_verifier] = lambda: verifier()
     app.dependency_overrides[runtime.get_compiled_or_none] = lambda: compiled_fixture()
     app.dependency_overrides[runtime.get_eval_reports] = lambda: reports([("r1", TS, RUN.model_dump_json(), False)])
     with TestClient(app) as test_client:
@@ -53,21 +51,34 @@ def test_a_report_shows_layers_categories_and_failed_cases(client):
     assert [report["id"] for report in client.get("/admin/eval-reports", headers=ADMIN).json()] == ["r1"]
 
 
-def test_an_unknown_report_is_404_and_a_viewer_is_refused(client):
+def test_an_unknown_report_is_404(client):
     app.dependency_overrides[runtime.get_eval_reports] = lambda: reports([])
     assert client.get("/admin/eval-reports/nope", headers=ADMIN).status_code == 404
-    assert client.get("/admin/eval-reports", headers=VIEWER).status_code == 403
 
 
-def test_only_an_admin_starts_a_run_and_a_second_one_waits(client):
+def test_a_second_eval_run_waits_for_the_first(client):
     started = []
     runs = EvalRuns(lambda pack: started.append(pack) or 0, start_thread=lambda target: None)
     app.dependency_overrides[runtime.get_eval_runs] = lambda: runs
 
-    assert client.post("/admin/eval-runs", headers=REVIEWER).status_code == 403
     response = client.post("/admin/eval-runs", headers=ADMIN)
     assert response.status_code == 202 and response.json() == {"pack": "minimal", "running": True}
     assert client.post("/admin/eval-runs", headers=ADMIN).status_code == 409
+
+
+def test_a_pack_without_an_eval_set_is_refused_before_the_run_starts(client):
+    # A pack built from a source has no eval.yaml, so it has no reference date or cases to run.
+    compiled = compiled_fixture()
+    pack = compiled.pack.model_copy(update={"eval": compiled.pack.eval.model_copy(update={"reference_date": None})})
+    app.dependency_overrides[runtime.get_compiled_or_none] = lambda: compiled.model_copy(update={"pack": pack})
+    started = []
+    app.dependency_overrides[runtime.get_eval_runs] = lambda: EvalRuns(lambda name: started.append(name) or 0,
+                                                                        start_thread=lambda target: target())
+
+    response = client.post("/admin/eval-runs", headers=ADMIN)
+
+    assert response.status_code == 409 and response.json()["detail"].startswith("no_eval_set:")
+    assert started == []
 
 
 def test_a_finished_run_frees_the_pack():

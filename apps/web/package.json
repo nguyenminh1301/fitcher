@@ -1,7 +1,8 @@
 {
   "name": "fitcher-web",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "private": true,
+  "license": "MIT",
   "engines": {
     "node": "24.x",
     "npm": "11.x"
@@ -19,7 +20,7 @@
     "@tanstack/react-table": "8.21.3",
     "echarts": "6.1.0",
     "echarts-for-react": "3.0.6",
-    "next": "16.4.3",
+    "next": "16.4.5",
     "react": "19.3.1",
     "react-dom": "19.3.1"
   },

@@ -96,17 +96,17 @@ def test_table_is_aligned_and_limited():
 
 
 def test_role_defaults_to_the_first_policy_role():
-    assert choose_role(compiled_fixture().pack, None) == "viewer"
+    assert choose_role(compiled_fixture().pack, None) == "reader"
 
 
 def test_named_role_must_be_a_role_of_the_pack():
-    assert choose_role(compiled_fixture().pack, "viewer") == "viewer"
-    with pytest.raises(RuntimeError, match="'nobody' is not a role of pack minimal; roles: viewer"):
+    assert choose_role(compiled_fixture().pack, "reader") == "reader"
+    with pytest.raises(RuntimeError, match="'nobody' is not a role of pack minimal; roles: reader"):
         choose_role(compiled_fixture().pack, "nobody")
 
 
 def test_role_flag_is_parsed():
-    assert parse_args(["Top widgets", "--role", "viewer"]).role == "viewer"
+    assert parse_args(["Top widgets", "--role", "reader"]).role == "reader"
     assert parse_args(["Top widgets"]).role is None
 
 

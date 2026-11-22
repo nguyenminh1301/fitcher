@@ -5,6 +5,7 @@ import { createMockChat } from "@/lib/api/mock/chat";
 import { createMockConversations } from "@/lib/api/mock/conversations";
 import { EMPTY_CONSOLE, type SampleData } from "@/lib/api/mock/load";
 import type { FitcherApi } from "@/lib/api/client";
+import { AskRefused } from "@/lib/api/http/chat";
 import type { Identity, Scenario } from "@/lib/api/provisional";
 import { ChatProvider, useChat, type ChatState } from "@/lib/chat/ChatContext";
 
@@ -15,13 +16,13 @@ const SCENARIO: Scenario = {
 };
 const IDENTITY: Identity = { user_id: "ana", display_name: "Ana", roles: ["analyst"] };
 
-function api(stepMs = 0): FitcherApi {
-  const data: SampleData = { console: { ...EMPTY_CONSOLE, identities: [IDENTITY] }, scenarios: { suggestions: [], scenarios: [SCENARIO] }, status: "ok" };
+function api(stepMs = 0, overrides: Partial<{ pack: FitcherApi["auth"]["pack"]; chat: FitcherApi["chat"] }> = {}): FitcherApi {
+  const data: SampleData = { console: { ...EMPTY_CONSOLE,}, scenarios: { suggestions: [], scenarios: [SCENARIO] }, status: "ok" };
   const load = async () => data;
   const identity = async () => IDENTITY;
   return {
-    auth: { current: identity, identities: async () => [IDENTITY], switchTo: identity, pack: async () => ({ name: "shop", display_name: "Shop", roles: ["analyst"] }) },
-    chat: createMockChat(load, identity, { stepMs }),
+    auth: { current: identity, identities: async () => [IDENTITY], switchTo: identity, pack: overrides.pack ?? (async () => ({ name: "shop", display_name: "Shop", roles: ["analyst"] })) },
+    chat: overrides.chat ?? createMockChat(load, identity, { stepMs }),
     conversations: createMockConversations(load, identity),
   } as unknown as FitcherApi;
 }
@@ -32,10 +33,10 @@ function Probe() {
   return null;
 }
 
-function setup(stepMs = 0) {
+function setup(stepMs = 0, overrides: Parameters<typeof api>[1] = {}) {
   const navigate = vi.fn();
   render(
-    <ChatProvider api={api(stepMs)} navigate={navigate} activeId={null}>
+    <ChatProvider api={api(stepMs, overrides)} navigate={navigate} activeId={null}>
       <Probe />
     </ChatProvider>,
   );
@@ -63,6 +64,30 @@ describe("asking a question", () => {
     expect((await state.api.conversations.get(id))?.turns[0].events.at(-1)?.event).toBe("done");
   });
 
+  it("loads the identity and conversations when no pack is active yet", async () => {
+    setup(0, { pack: async () => null });
+
+    await waitFor(() => expect(state.loaded).toBe(true));
+    expect(state.identity).toEqual(IDENTITY);
+    expect(state.pack).toBeNull();
+  });
+
+  it("ends a question the api refused with its reason rather than a lost connection", async () => {
+    const refusing = {
+      async *ask() { throw new AskRefused(503, "no pack is active"); },
+      suggestions: async () => [],
+    } as unknown as FitcherApi["chat"];
+    setup(0, { chat: refusing });
+    await waitFor(() => expect(state.loaded).toBe(true));
+
+    let id = "";
+    await act(async () => {
+      id = await state.ask("top");
+    });
+
+    await waitFor(() => expect(state.threads[id]?.turns[0].events.at(-1)).toMatchObject({ event: "error", kind: "refused", message: "no pack is active" }));
+  });
+
   it("stops the running answer", async () => {
     setup(40);
     await waitFor(() => expect(state.loaded).toBe(true));
@@ -75,6 +100,33 @@ describe("asking a question", () => {
 
     await waitFor(() => expect(state.threads[id]?.turns[0].events.at(-1)).toMatchObject({ event: "error", kind: "stopped" }));
     expect(state.busy).toBeNull();
+  });
+
+  it("follows a question the api is still answering after the page was left, until its answer is stored", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const answering = { conversation: { id: "c1", title: "top", pinned: false, group_id: null, updated_at: "2026-11-20T08:00:00Z", pack: "shop" },
+      turns: [{ turn: 1, revision: 1, question: "top", question_lang: "en", events: [] }], running: true };
+    const answered = { ...answering, running: false, turns: [{ ...answering.turns[0], events: [{ event: "done" as const, trace_id: "t" }] }] };
+    const get = vi.fn().mockResolvedValueOnce(answering).mockResolvedValueOnce(answering).mockResolvedValue(answered);
+    const stop = vi.fn(async () => undefined);
+    const base = api();
+    const chat = { ...base.chat, stop };
+    render(
+      <ChatProvider api={{ ...base, chat, conversations: { ...base.conversations, get } } as FitcherApi} navigate={vi.fn()} activeId={null}>
+        <Probe />
+      </ChatProvider>,
+    );
+    await waitFor(() => expect(state.loaded).toBe(true));
+
+    await act(async () => { await state.loadThread("c1"); });
+    expect(state.threads.c1.running).toBe(true);
+    act(() => state.stop("c1"));
+    expect(stop).toHaveBeenCalledWith("c1");
+
+    await act(async () => { await vi.advanceTimersByTimeAsync(4500); });
+    await waitFor(() => expect(state.threads.c1.running).toBe(false));
+    expect(state.threads.c1.turns[0].events).toEqual([{ event: "done", trace_id: "t" }]);
+    vi.useRealTimers();
   });
 
   it("ignores a second question while one is running", async () => {
@@ -90,6 +142,8 @@ describe("asking a question", () => {
     });
 
     expect(state.threads[id].turns).toHaveLength(1);
+    // The first answer is still streaming; let it finish before the test environment is torn down.
+    await waitFor(() => expect(state.busy).toBeNull());
   });
 
   it("editing a question replaces that turn and drops the turns after it", async () => {
@@ -121,6 +175,7 @@ describe("asking through the api", () => {
     const base = api();
     const chat: FitcherApi["chat"] = {
       suggestions: async () => [],
+      stop: async () => undefined,
       async *ask(request, _signal, onConversation) {
         requests.push(request);
         onConversation?.(conversationId);
@@ -175,5 +230,6 @@ describe("asking through the api", () => {
 
     expect(requests[1]).toMatchObject({ question: "top gadgets", conversation_id: "api-1", edit_of_turn: 1, retry_of_turn: null });
     expect(requests[2]).toMatchObject({ question: "top gadgets", conversation_id: "api-1", edit_of_turn: null, retry_of_turn: 1 });
+    await waitFor(() => expect(state.busy).toBeNull());
   });
 });

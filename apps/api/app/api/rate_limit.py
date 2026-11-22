@@ -2,7 +2,7 @@
 
 Each user may ask ``per_minute`` questions in a burst; the bucket refills
 evenly over a minute. The buckets live in the api process, so each worker
-counts on its own; the lab runs one worker.
+counts on its own; fitcher runs one api process.
 """
 
 from collections.abc import Callable

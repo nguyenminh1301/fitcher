@@ -1,6 +1,7 @@
 // Generated from the backend Pydantic contract by npm run contracts:generate; do not edit.
 
 export type TraceId = string;
+export type Pack = string;
 export type Ts = string;
 export type UserId = string;
 export type Role = string;
@@ -10,6 +11,11 @@ export type Status = string;
 export type LatencyMs = number;
 export type CostUsd = number;
 export type Error = string;
+export type InputTokens = number;
+export type OutputTokens = number;
+export type Models = string[];
+export type CostUnknown = boolean;
+export type AnswerTo = string;
 export type Name = string;
 export type Kind = "node" | "llm" | "sql" | "access";
 export type Status1 = "ok" | "err" | "deny";
@@ -25,6 +31,7 @@ export interface RunTrace {
 }
 export interface RunRow {
   trace_id: TraceId;
+  pack?: Pack;
   ts: Ts;
   user_id: UserId;
   role: Role;
@@ -34,6 +41,11 @@ export interface RunRow {
   latency_ms: LatencyMs;
   cost_usd: CostUsd;
   error?: Error;
+  input_tokens?: InputTokens;
+  output_tokens?: OutputTokens;
+  models?: Models;
+  cost_unknown?: CostUnknown;
+  answer_to?: AnswerTo;
 }
 /**
  * One step of a run, in time order: a graph node, an LLM call, a SQL attempt or an access decision.

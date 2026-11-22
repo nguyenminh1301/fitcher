@@ -1,0 +1,16 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "concurrent_questions": {
+      "maximum": 64,
+      "minimum": 1,
+      "title": "Concurrent Questions",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "concurrent_questions"
+  ],
+  "title": "LimitSettings",
+  "type": "object"
+}

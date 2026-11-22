@@ -1,0 +1,6 @@
+{"object": "list", "data": [
+  {"id": "glm-4.6", "object": "model", "created": 1759276800, "owned_by": "z-ai"},
+  {"id": "glm-5.3-flash", "object": "model", "created": 1786636800, "owned_by": "z-ai"},
+  {"id": "glm-5.3-flashx", "object": "model", "created": 1786636800, "owned_by": "z-ai"},
+  {"id": "glm-4.5-flash", "object": "model", "created": 1753632000, "owned_by": "z-ai"}
+]}

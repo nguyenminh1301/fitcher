@@ -6,7 +6,7 @@
         server start; grants on tables that do not exist yet take effect
         once jobs.apply_log_schema or initdb creates them.
 
-        agent_logs_writer        api log writer, LiteLLM callback and eval
+        agent_logs_writer        api log writer (runs, llm_calls) and eval
                                  reports; insert only, no reads.
         agent_logs_trace_reader  admin paths: run, node, LLM, SQL, audit,
                                  eval, input-screening, conversation and

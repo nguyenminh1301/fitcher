@@ -5,15 +5,18 @@ references and the warehouse catalog; keep approved items only; test-run every
 metric; reconcile the ClickHouse roles, grants, row policies, views and users
 of the pack's policies; read each dataset's date coverage and the top values of
 indexable columns; screen document chunks and column values (DECISIONS §9);
-write a new generation of the six Qdrant collections; move all six
-aliases in one request; write ``compiled.json``; and only then delete older
-generations. A failure before the alias move deletes the partial generation
-and leaves the live aliases untouched.
+write a new generation of the six search collections; make it live for all
+six in one step; write ``compiled.json``; and only then delete older
+generations. A failure before the switch deletes the partial generation and
+leaves the live generation untouched.
 
 ``kb_docs`` is rebuilt from the document registry: the chunks of every
 ``indexed`` document are copied with their vectors from the live generation
 when ``compiled.json`` names the same embedding alias and dimensions, and
-otherwise each stored file is parsed, chunked, screened and embedded again.
+otherwise, or for a document with no live chunk (company documents were
+turned off and on again), its stored file is parsed, chunked, screened and
+embedded again. With documents off the caller passes no registry and
+``kb_docs`` holds no chunk.
 
 Screening drops a ``kb_docs`` chunk whose verdict is ``block`` or, without
 the classifier, ``unavailable``, and lists it in the summary; a column value
@@ -40,10 +43,10 @@ from app.onboarding.documents import KB_DOCS, DocumentRegistry, chunk_payloads
 from app.llm.embeddings import EmbeddingClient
 from app.packs.loader import check_references, load_pack
 from app.packs.models import Pack
-from app.packs.policy_compiler import AccessControl, apply_policies
-from app.packs.search_indices import INDEX_NAMES, ColumnValue, alias_name, build_documents, generation_of, physical_name, points
+from app.packs.policy_compiler import AccessControl, apply_policies, memory_cap
+from app.packs.search_indices import INDEX_NAMES, ColumnValue, alias_name, build_documents, points
 from app.screening.screen import Screener
-from app.search.client import QdrantSearch
+from app.search.engine import SearchEngine
 
 MARTS_DATABASE = "marts"
 # readonly=2 allows only reads while still letting the query carry its own settings.
@@ -203,9 +206,13 @@ def _iso(value: object) -> str | None:
 
 
 def read_coverage(pack: Pack, warehouse: Warehouse) -> dict[str, DateCoverage]:
-    """Row count and min/max of each dataset's time column."""
+    """Row count and min/max of each dataset's time column; a dataset without one has its row count only."""
     coverage: dict[str, DateCoverage] = {}
     for dataset in pack.datasets.datasets:
+        if dataset.time_column is None:
+            rows = warehouse.query(f"SELECT count() FROM {table_ref(dataset.id)}", settings=SCAN_SETTINGS)[0][0]
+            coverage[dataset.id] = DateCoverage(rows=rows, min_date=None, max_date=None)
+            continue
         column = quote(dataset.time_column)
         rows, low, high = warehouse.query(
             f"SELECT count(), min({column}), max({column}) FROM {table_ref(dataset.id)}", settings=SCAN_SETTINGS
@@ -239,7 +246,18 @@ def _screen_note(verdict) -> str:
     )
 
 
-def screen_documents(documents: dict[str, list[dict]], screener: Screener, summary: CompileSummary) -> None:
+# How far a compile is: the phase ("screen" while the classifier scores column values, "index" while they are
+# embedded), the items done and the phase's total.
+Progress = Callable[[str, int, int], None]
+# Items screened or embedded per call while compiling, so the progress of a pack with thousands of values moves often.
+# A classifier on a provider scores one value per request (Groq's Prompt Guard about 35 a minute), so screening
+# reports every 25 values; local embedding and the local classifier batch well, so indexing reports every 500.
+PROGRESS_CHUNK = 500
+SCREEN_CHUNK = 25
+
+
+def screen_documents(documents: dict[str, list[dict]], screener: Screener, summary: CompileSummary,
+                     progress: Progress | None = None) -> None:
     """Drop blocked kb_docs chunks and report flagged column values, recording both in ``summary``."""
     chunks = documents["kb_docs"]
     kept: list[dict] = []
@@ -251,27 +269,36 @@ def screen_documents(documents: dict[str, list[dict]], screener: Screener, summa
     documents["kb_docs"] = kept
     values = documents["column_values"]
     texts = [value["payload"]["value"] for value in values]
-    for value, verdict in zip(values, screener.screen_many(texts, "column_value"), strict=True):
+    verdicts = []
+    for start in range(0, len(texts), SCREEN_CHUNK):
+        if progress is not None:
+            progress("screen", start, len(texts))
+        verdicts.extend(screener.screen_many(texts[start:start + SCREEN_CHUNK], "column_value"))
+    for value, verdict in zip(values, verdicts, strict=True):
         if verdict.verdict in ("flag", "block") or verdict.rule_hits:
             shown = value["payload"]["value"][:SHOWN_VALUE]
             summary.flagged_values.append(f"{value['dataset']}.{value['column']}={shown!r} ({_screen_note(verdict)})")
-    if screener.classifier is None:
+    if screener.state == "disabled":
+        summary.warnings.append(
+            "the screening classifier is off: documents and column values were checked by the rules only"
+        )
+    elif screener.state == "unavailable":
         summary.warnings.append(
             "the screening classifier is unavailable: column values were checked by the rules only "
             "and no document chunk was indexed"
         )
 
 
-def _delete_quietly(search: QdrantSearch, names: Sequence[str]) -> None:
-    for name in names:
+def _drop_quietly(search: SearchEngine, pack: str, generation: int) -> None:
+    for index in INDEX_NAMES:
         try:
-            search.delete_collection(name)
+            search.drop(alias_name(pack, index), generation)
         except Exception:  # noqa: BLE001, S110 - cleanup must not hide the original failure
             pass
 
 
-def next_generation(search: QdrantSearch, pack: str) -> int:
-    generations = [parsed[1] for name in search.list_collections() if (parsed := generation_of(pack, name))]
+def next_generation(search: SearchEngine, pack: str) -> int:
+    generations = [generation for index in INDEX_NAMES for generation in search.generations(alias_name(pack, index))]
     return max(generations, default=0) + 1
 
 
@@ -283,7 +310,7 @@ def _live_compiled(output_dir: Path, pack: str) -> CompiledPack | None:
 
 
 def registry_chunks(
-    search: QdrantSearch, pack: str, registry: DocumentRegistry, documents_dir: Path, live: CompiledPack | None,
+    search: SearchEngine, pack: str, registry: DocumentRegistry, documents_dir: Path, live: CompiledPack | None,
     embedding_alias: str, dimensions: int, summary: "CompileSummary",
 ) -> tuple[list[dict], list[dict]]:
     """``(points copied from the live kb_docs, chunk documents to screen and embed)`` of the indexed documents."""
@@ -293,16 +320,18 @@ def registry_chunks(
     alias = alias_name(pack, KB_DOCS)
     same_model = (
         live is not None and live.embedding_alias == embedding_alias and live.embedding_dimensions == dimensions
-        and alias in search.alias_targets()
+        and alias in search.live()
     )
+    copied: list[dict] = []
     if same_model:
-        live_points = search.scroll(alias, with_vectors=True)
-        return [
+        copied = [
             {"id": point["id"], "vector": point["vector"], "payload": point["payload"]}
-            for point in live_points if point["payload"].get("document_id") in indexed
-        ], []
+            for point in search.live_points(alias, with_vectors=True) if point["payload"].get("document_id") in indexed
+        ]
+    # A document without live chunks, as after documents were turned off and on again, is read from its file.
+    present = {point["payload"]["document_id"] for point in copied}
     fresh: list[dict] = []
-    for record in indexed.values():
+    for record in (record for record in indexed.values() if record.id not in present):
         path = documents_dir / pack / record.id
         if not path.is_file():
             summary.warnings.append(f"document {record.id} ({record.file_name}) has no stored file and was not indexed")
@@ -313,55 +342,59 @@ def registry_chunks(
             summary.warnings.append(f"document {record.id} ({record.file_name}) cannot be parsed again: {error}")
             continue
         fresh.extend(chunk_payloads(record, chunks))
-    return [], fresh
+    return copied, fresh
 
 
 def build_generation(
-    search: QdrantSearch, embeddings: EmbeddingClient, pack: str, documents: dict[str, list[dict]],
-    carried: dict[str, list[dict]] | None = None,
+    search: SearchEngine, embeddings: EmbeddingClient, pack: str, documents: dict[str, list[dict]],
+    carried: dict[str, list[dict]] | None = None, progress: Progress | None = None,
 ) -> tuple[int, dict[str, int]]:
     """Create and fill generation N+1 of every collection; delete it again on any failure.
 
-    ``carried`` holds ready points per index, copied with their vectors and not embedded again.
+    ``carried`` holds ready points per index, copied with their vectors and not embedded again. ``progress``
+    hears the texts embedded so far and the total in its "index" phase, before the first text and after each chunk.
     """
     carried = carried or {}
     generation = next_generation(search, pack)
-    created: list[str] = []
     counts: dict[str, int] = {}
+    total = sum(len(documents[index]) for index in INDEX_NAMES)
+    done = 0
+    if progress is not None:
+        progress("index", done, total)
     try:
         for index in INDEX_NAMES:
-            name = physical_name(pack, index, generation)
-            search.create_collection(name, embeddings.dimensions)
-            created.append(name)
+            name = alias_name(pack, index)
+            search.create(name, generation, embeddings.dimensions)
             docs = documents[index]
-            vectors = embeddings.embed([document["embedding_text"] for document in docs]) if docs else []
-            search.upsert(name, [*points(name, docs, vectors), *carried.get(index, [])])
-            counts[index] = search.count(name)
+            vectors: list[list[float]] = []
+            for start in range(0, len(docs), PROGRESS_CHUNK):
+                vectors.extend(embeddings.embed([document["embedding_text"] for document in docs[start:start + PROGRESS_CHUNK]]))
+                done += len(docs[start:start + PROGRESS_CHUNK])
+                if progress is not None:
+                    progress("index", done, total)
+            search.write(name, [*points(name, docs, vectors), *carried.get(index, [])], generation)
+            counts[index] = search.size(name, generation)
             expected = len(docs) + len(carried.get(index, []))
             if counts[index] != expected:
-                raise CompileError(f"{name} holds {counts[index]} points, expected {expected}")
+                raise CompileError(f"{name} generation {generation} holds {counts[index]} points, expected {expected}")
     except Exception as error:
-        _delete_quietly(search, created)
+        _drop_quietly(search, pack, generation)
         raise CompileError(f"building index generation {generation} failed: {_first_line(error)}") from error
     return generation, counts
 
 
-def swap_aliases(search: QdrantSearch, pack: str, generation: int) -> None:
-    """Point all six aliases at ``generation`` in one atomic request, so a reader never sees a mixed generation."""
-    current = search.alias_targets()
-    actions: list[dict] = []
-    for index in INDEX_NAMES:
-        alias = alias_name(pack, index)
-        if alias in current:
-            actions.append({"delete_alias": {"alias_name": alias}})
-        actions.append({"create_alias": {"collection_name": physical_name(pack, index, generation), "alias_name": alias}})
-    search.update_aliases(actions)
+def make_live(search: SearchEngine, pack: str, generation: int) -> None:
+    """Make ``generation`` of all six collections live in one step, so a reader never sees a mixed generation."""
+    search.switch_live({alias_name(pack, index): generation for index in INDEX_NAMES})
 
 
-def delete_older_generations(search: QdrantSearch, pack: str, generation: int) -> list[str]:
-    old = [name for name in search.list_collections() if (parsed := generation_of(pack, name)) and parsed[1] < generation]
-    for name in old:
-        search.delete_collection(name)
+def delete_older_generations(search: SearchEngine, pack: str, generation: int) -> list[str]:
+    old: list[str] = []
+    for collection in sorted(alias_name(pack, index) for index in INDEX_NAMES):
+        for older in search.generations(collection):
+            if older < generation:
+                search.drop(collection, older)
+                old.append(f"{collection} generation {older}")
     return old
 
 
@@ -381,7 +414,7 @@ def compile_pack(
     *,
     warehouse: Warehouse,
     top_k: int,
-    search: QdrantSearch | None = None,
+    search: SearchEngine | None = None,
     embeddings: EmbeddingClient | None = None,
     output_dir: Path | None = None,
     schema_dir: Path | None = None,
@@ -393,6 +426,7 @@ def compile_pack(
     registry: DocumentRegistry | None = None,
     documents_dir: Path | None = None,
     embedding_alias: str = "",
+    progress: Progress | None = None,
 ) -> CompileSummary:
     """Compile ``pack_dir``; with ``skip_index`` stop after the metric test-run and the access policies.
 
@@ -407,7 +441,7 @@ def compile_pack(
     if access is not None:
         if not agent_secret:
             raise CompileError("CLICKHOUSE_AGENT_PASSWORD must be set to apply the access policies")
-        apply_policies(pack, access, agent_secret)
+        apply_policies(pack, access, agent_secret, memory_cap())
         roles_applied = [role.id for role in pack.policies.roles]
     summary = CompileSummary(
         pack=pack.name, metrics_tested=metrics_tested, coverage=read_coverage(pack, warehouse),
@@ -426,8 +460,8 @@ def compile_pack(
             embeddings.dimensions, summary,
         )
         documents[KB_DOCS].extend(fresh)
-    screen_documents(documents, screener or Screener(None), summary)
-    generation, counts = build_generation(search, embeddings, pack.name, documents, {KB_DOCS: carried})
+    screen_documents(documents, screener or Screener(None), summary, progress)
+    generation, counts = build_generation(search, embeddings, pack.name, documents, {KB_DOCS: carried}, progress)
     compiled = CompiledPack(
         pack=pack, generation=generation, embedding_dimensions=embeddings.dimensions,
         coverage=summary.coverage, compiled_at=clock().isoformat(), embedding_alias=embedding_alias,
@@ -437,10 +471,10 @@ def compile_pack(
     try:
         target.parent.mkdir(parents=True, exist_ok=True)
         staged.write_text(compiled.model_dump_json(indent=2), encoding="utf-8")
-        swap_aliases(search, pack.name, generation)
+        make_live(search, pack.name, generation)
     except Exception as error:
         staged.unlink(missing_ok=True)
-        _delete_quietly(search, [physical_name(pack.name, index, generation) for index in INDEX_NAMES])
+        _drop_quietly(search, pack.name, generation)
         raise CompileError(f"publishing index generation {generation} failed: {_first_line(error)}") from error
     os.replace(staged, target)
     try:

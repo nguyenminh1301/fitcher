@@ -1,0 +1,110 @@
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+import { OwnerSignIn } from "@/components/chat/OwnerSignIn";
+import type { FitcherApi } from "@/lib/api/client";
+import { createHttpOwner, OwnerSignInError } from "@/lib/api/http/owner";
+import type { OwnerStatus } from "@/lib/contracts";
+import { I18nProvider } from "@/lib/i18n/react";
+import { ThemeProvider } from "@/lib/theme";
+
+afterEach(cleanup);
+
+function fakeOwner(status: OwnerStatus, signIn: FitcherApi["owner"]["signIn"] = vi.fn(async () => undefined)): FitcherApi["owner"] {
+  return {
+    status: vi.fn(async () => status), signIn, signOut: vi.fn(async () => undefined),
+    setPassword: vi.fn(async () => undefined), removePassword: vi.fn(async () => undefined),
+    limits: vi.fn(async () => ({ concurrent_questions: 2 })),
+    setLimits: vi.fn(async (concurrent_questions: number) => ({ concurrent_questions })),
+  };
+}
+
+function wrap(node: React.ReactNode) {
+  return render(<ThemeProvider><I18nProvider initial="en">{node}</I18nProvider></ThemeProvider>);
+}
+
+describe("owner sign-in page", () => {
+  it("opens the app at once when no password is set", async () => {
+    const onSignedIn = vi.fn();
+    wrap(<OwnerSignIn owner={fakeOwner({ password_set: false, signed_in: false, exposed: false })} onSignedIn={onSignedIn} />);
+
+    await waitFor(() => expect(onSignedIn).toHaveBeenCalled());
+  });
+
+  it("signs in with the password and opens the app", async () => {
+    const owner = fakeOwner({ password_set: true, signed_in: false, exposed: false });
+    const onSignedIn = vi.fn();
+    wrap(<OwnerSignIn owner={owner} onSignedIn={onSignedIn} />);
+
+    await userEvent.type(await screen.findByLabelText("Owner password"), "correct horse battery");
+    await userEvent.click(screen.getByRole("button", { name: "Unlock" }));
+
+    expect(owner.signIn).toHaveBeenCalledWith("correct horse battery");
+    expect(onSignedIn).toHaveBeenCalled();
+  });
+
+  it.each([["wrong", "The password is not right."], ["throttled", "Too many wrong passwords. Wait a few minutes and try again."]] as const)(
+    "says why a sign-in was refused (%s)", async (reason, text) => {
+      const owner = fakeOwner({ password_set: true, signed_in: false, exposed: false }, vi.fn(async () => { throw new OwnerSignInError(reason); }));
+      wrap(<OwnerSignIn owner={owner} onSignedIn={vi.fn()} />);
+
+      await userEvent.type(await screen.findByLabelText("Owner password"), "nope nope nope");
+      await userEvent.click(screen.getByRole("button", { name: "Unlock" }));
+
+      expect(await screen.findByRole("alert")).toHaveProperty("textContent", text);
+      const field = screen.getByLabelText("Owner password") as HTMLInputElement;
+      expect(field.value).toBe("");
+      expect(field.getAttribute("aria-invalid")).toBe("true");
+      expect(field.getAttribute("aria-describedby")).toBe(screen.getByRole("alert").id);
+    });
+
+  it("keeps the typed password when the api could not be reached", async () => {
+    const owner = fakeOwner({ password_set: true, signed_in: false, exposed: false }, vi.fn(async () => { throw new OwnerSignInError("unavailable"); }));
+    wrap(<OwnerSignIn owner={owner} onSignedIn={vi.fn()} />);
+
+    await userEvent.type(await screen.findByLabelText("Owner password"), "kept password");
+    await userEvent.click(screen.getByRole("button", { name: "Unlock" }));
+
+    expect((await screen.findByRole("alert")).textContent).toBe("Signing in did not work. Try again.");
+    expect((screen.getByLabelText("Owner password") as HTMLInputElement).value).toBe("kept password");
+  });
+
+  it("shows and hides the password, and says a forgotten password cannot be recovered", async () => {
+    wrap(<OwnerSignIn owner={fakeOwner({ password_set: true, signed_in: false, exposed: false })} onSignedIn={vi.fn()} />);
+    const field = (await screen.findByLabelText("Owner password")) as HTMLInputElement;
+    expect(field.type).toBe("password");
+
+    await userEvent.click(screen.getByRole("button", { name: "Show password" }));
+    expect(field.type).toBe("text");
+    expect(screen.getByRole("button", { name: "Hide password" }).getAttribute("aria-pressed")).toBe("true");
+    expect(screen.getByText(/no way to recover it/)).toBeTruthy();
+  });
+});
+
+describe("http owner client", () => {
+  function fetcher(status: number, body: unknown = {}) {
+    return vi.fn(async (_url: string, _init?: RequestInit) => Response.json(body, { status }));
+  }
+
+  it("reads the status and sends the password changes as JSON", async () => {
+    const fetch = fetcher(200, { password_set: true, signed_in: true, exposed: false });
+    const owner = createHttpOwner(fetch as unknown as typeof globalThis.fetch);
+
+    expect(await owner.status()).toEqual({ password_set: true, signed_in: true, exposed: false });
+    await owner.setPassword("new long password", "old long password");
+    await owner.removePassword("new long password");
+
+    expect(fetch.mock.calls.map(([url, init]) => [url, init?.method ?? "GET", init?.body ? JSON.parse(init.body as string) : null])).toEqual([
+      ["/api/owner/status", "GET", null],
+      ["/api/owner/password", "PUT", { new_password: "new long password", current_password: "old long password" }],
+      ["/api/owner/password", "DELETE", { current_password: "new long password" }],
+    ]);
+  });
+
+  it.each([[401, "wrong"], [429, "throttled"], [500, "unavailable"]] as const)("tells a refused sign-in (%s) apart", async (status, reason) => {
+    const owner = createHttpOwner(fetcher(status) as unknown as typeof globalThis.fetch);
+
+    await expect(owner.signIn("whatever password")).rejects.toMatchObject({ reason });
+  });
+});

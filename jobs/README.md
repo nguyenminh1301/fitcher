@@ -5,21 +5,20 @@ They share the `api` image, which copies this directory to `/app/jobs`, and run 
 
 | Job | Command | Notes |
 | --- | --- | --- |
-| `smoke_llm.py` | `docker compose exec -T api python -m jobs.smoke_llm [--alias <name>]` | One tiny billable request per loaded catalog alias, checking structured output; prints only pass or fail |
+| `smoke_llm.py` | `docker compose exec -T api python -m jobs.smoke_llm [--tier <tier>]` | One tiny request per model mapped to a tier (billable for a hosted provider), checking structured output, and one local or provider embedding; prints only pass or fail |
 | `load_data.py` | `docker compose run --rm jobs python -m jobs.load_data --source <name>` | Loads the Hugging Face source described by `sources/<name>.yaml` into ClickHouse `raw`; publishes all tables or none |
 | `sync_sources.py` | `docker compose run --rm jobs python -m jobs.sync_sources --source <name>` | Copies any other source into `raw.<source>__<table>` (all tables or none) or, in live mode, defines `src_<source>`, and counts each table against the manifest; `--mode copy` or `--mode live` overrides the manifest |
 | `refresh_data.py` | `docker compose run --rm jobs python -m jobs.refresh_data --source <name>` | Loads or syncs the source, then runs `dbt build --select +tag:<dbt_tag>` over it; records the generation in `data_meta.refresh_log`; `--mode` as for `sync_sources` |
-| `ask.py` | `docker compose run --rm api python -m jobs.ask "<question>"` | Runs the `data_query` agent as one pack role (`--role`, the pack's first role by default) and its ClickHouse user and prints the SQL attempts, result table, warnings and summary; billable LiteLLM calls; writes the run, node events and SQL attempts to `agent_logs` under the printed trace id; `--timezone`, `--reference-date`, `--inject-sql-fault` |
+| `ask.py` | `docker compose run --rm api python -m jobs.ask "<question>"` | Runs the `data_query` agent as one pack role (`--role`, the pack's first role by default) and its ClickHouse user and prints the SQL attempts, result table, warnings and summary; billable model calls through the gateway; writes the run, node events and SQL attempts to `agent_logs` under the printed trace id; `--timezone`, `--reference-date`, `--inject-sql-fault` |
 | `compile_pack.py` | `docker compose run --rm jobs python -m jobs.compile_pack --pack <name>` | Validates the pack, test-runs its metrics, applies its access policies to ClickHouse and publishes a new generation of its search indices; billable embeddings unless `--skip-index`; `--check-search "<query>"` searches the live pack |
 | `profile.py` | `docker compose run --rm jobs python -m jobs.profile --pack <name> [--tables a,b]` | Profiles the pack's marts (its `datasets.yaml` ids, or `--tables` for a new pack) into `build/packs/<pack>/profile.json`: row counts, column types and distinct counts, date ranges, top values of low-cardinality strings, sample rows and join-key candidates; no LLM call |
 | `ingest_docs.py` | `docker compose run --rm jobs python -m jobs.ingest_docs --pack <name> --folder <dir>` | Uploads every document listed in `<dir>/manifest.yaml` (`default_allowed_roles`, `documents: [{file, allowed_roles}]`) through the same code as the console's Documents page; billable embeddings; skips duplicates and exits 1 if any document failed |
 | `draft_pack.py` | `docker compose run --rm jobs python -m jobs.draft_pack --pack <name> --allow-billable` | Drafts `datasets.yaml`, `glossary.yaml`, `metrics.yaml` and `examples.yaml` (`--files` picks some) from `profile.json` and the pack's `kb_docs` chunks (`--document <id>` for one document) with one billable `sql-gen` call per file; drafts never replace approved items; without `--allow-billable` it prints the prompt size and exits 2 |
 | `propose_examples.py` | `docker compose run --rm jobs python -m jobs.propose_examples --pack <name> [--days 90]` | Turns every disliked or failed `data_query` run of the pack in the last `--days` days that produced a QuerySpec and SQL into one row of `agent_logs.example_proposals`, after masking emails, phone numbers and long digit runs; skips clarified, denied, rejected and blocked runs and questions already proposed, and prints the count of each; a `pack_reviewer` approves or deletes each proposal in the console's Review section; no LLM call |
-| `set_lab_passwords.py` | `docker compose run --rm jobs python -m jobs.set_lab_passwords` | Gives every lab user of `infra/keycloak/realm-finch.json` the permanent password `KEYCLOAK_LAB_USER_PASSWORD` through the Keycloak admin API; never prints it |
-| `apply_log_schema.py` | `docker compose run --rm jobs python -m jobs.apply_log_schema` | Creates the `agent_logs` database and tables, `data_meta.model_tiers` and the document registry `data_meta.documents` on a volume created before they existed; the fresh-volume `initdb` runs the same file, and a rerun changes nothing |
+| `migrate.py` | `docker compose run --rm jobs python -m jobs.migrate` | Applies the pending numbered schema changes to ClickHouse (`infra/clickhouse/changes`, recorded in `data_meta.schema_changes`) and to the app state (`<FITCHER_DATA_DIR>/app.db`, recorded in `schema_changes`); a second run applies nothing, a volume created before the runner is recorded as up to date without changing a row, and a store written by a newer version is refused. `jobs.apply_log_schema` remains as an alias |
 | `fetch_guard_model.py` | `docker compose run --rm guard-model` | Downloads the gated prompt-injection classifier (`meta-llama/Llama-Prompt-Guard-2-86M`) with `HF_TOKEN`, exports it to ONNX in its own PyTorch image (`fetch_guard_model.Dockerfile`), checks the export against PyTorch and known inputs and writes `model.onnx`, `tokenizer.json` and `version.json` to the `guard-models` volume; never prints the token; `--revision` |
 | `screen_eval.py` | `docker compose run --rm api python -m jobs.screen_eval --pack <name>` | Screens the benign set (the pack's eval questions and sample questions plus `apps/api/tests/screening/benign.yaml`) and the attack set (`attacks.yaml`) with the local classifier and prints the false-positive rate, recall, latency and misclassified items per language, and whether the DECISIONS §9 gate for `SCREEN_MODE=enforce` holds; no LLM call; `--json <file>` |
-| `eval.py` | `docker compose run --rm -v ./build/eval:/app/build/eval api python -m jobs.eval --pack <name> --output-dir build/eval` | Scores the pack's approved eval cases per layer at temperature 0 and prints a Markdown report; writes `<pack>-eval.md` and `<pack>-eval.json` with `--output-dir`; `--only <ids>`, `--baseline <json>`, `--timeout`, `--threshold`; billable LiteLLM calls; exits 0, 1 on a regression or below the threshold, 2 on a setup or reference-query error |
+| `eval.py` | `docker compose run --rm -v ./build/eval:/app/build/eval api python -m jobs.eval --pack <name> --output-dir build/eval` | Scores the pack's approved eval cases per layer at temperature 0 and prints a Markdown report; writes `<pack>-eval.md` and `<pack>-eval.json` with `--output-dir`; `--only <ids>`, `--baseline <json>`, `--timeout`, `--threshold`; billable model calls through the gateway; exits 0, 1 on a regression or below the threshold, 2 on a setup or reference-query error |
 
 A refresh records `started`, then `completed` only when the load and every dbt model and test succeed, or `failed` otherwise.
 Readers trust a source only when its latest `refresh_log` row is the same `completed` generation before and after their operation.
@@ -65,9 +64,55 @@ Column grants, row policies and aggregate-only views behave the same on live mar
 A MongoDB collection is read live only when it is flat; a nested collection is copied with its documents' top-level fields and flattened in dbt.
 After a PostgreSQL source restarts, ClickHouse's `PostgreSQL` engine fails the first query on each pooled connection with `broken_connection` and reconnects for the next one, so a live question can fail once and succeed when asked again; the MySQL, MongoDB and S3 engines reconnect without an error.
 
+### Connecting a source in the interface
+
+The owner connects a PostgreSQL, MySQL/MariaDB or SQL Server database, or uploads a CSV, XLSX or Parquet file, on the Sources page of the console or in the Data step of the setup, with no manifest and no `.env` change ([DECISIONS §4 and §15](../docs/DECISIONS.md#data-sources)):
+
+1. Create the read-only user below on the source system.
+2. Open Sources, choose Add source, enter the name, host, port, database, schema (PostgreSQL), user and password, and choose a TLS mode (a CA certificate verifies a server with its own authority). A database on the Docker host is reached as `host.docker.internal`; on Linux the `docker run` command adds `--add-host=host.docker.internal:host-gateway`.
+3. Test the connection. It lists each table with its row estimate and size from the source's own statistics (labelled approximate), its keys and the mode fitcher proposes: live below 1 million rows and 1 GB, copy above or for a view of the source. A failed test shows one reason: unreachable, refused, authentication, TLS, database not found or permission.
+4. Connect, then choose the tables, the mode of each, how often a copy refreshes (every 15 minutes up to every week) and, for a copy, optionally a numeric or date column to follow. Without a column a sync reloads the table and swaps it in atomically; with one it appends only the rows above the last value seen, so a row changed in place is not picked up. Live tables joined with another live table are flagged slow.
+5. Sync now, or wait for the schedule: the api runs due copies itself, one sync per source at a time, and keeps the previous copy when a sync fails.
+
+A file is loaded as a copy of one table: its column types are inferred from a sample and shown for confirmation, and its original is kept so Sync reloads it. Arrays, JSON, enums and geometry columns arrive as text and are marked in the table list.
+
+The password is written once into a ClickHouse named collection (`CREATE NAMED COLLECTION`, stored encrypted) by the `source_admin` user, which cannot read it back; the app state, the api's responses and logs and ClickHouse's query log never hold it. A source cannot be deleted while a mart reads it; deleting drops its `src_<name>` database, its `raw.<name>__*` tables and its collection.
+
+**PostgreSQL** (run as a superuser on the source; replace `fitcher_reader`, the password, `erp` and `public`):
+
+```sql
+CREATE ROLE fitcher_reader LOGIN PASSWORD 'choose-a-password';
+ALTER ROLE fitcher_reader SET default_transaction_read_only = on;
+GRANT CONNECT ON DATABASE erp TO fitcher_reader;
+GRANT USAGE ON SCHEMA public TO fitcher_reader;
+GRANT SELECT ON ALL TABLES IN SCHEMA public TO fitcher_reader;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO fitcher_reader;
+```
+
+**MySQL / MariaDB** (replace the user, password and `erp`):
+
+```sql
+CREATE USER 'fitcher_reader'@'%' IDENTIFIED BY 'choose-a-password';
+GRANT SELECT ON erp.* TO 'fitcher_reader'@'%';
+```
+
+**SQL Server** (run on the source; replace the login, password and `erp`):
+
+```sql
+CREATE LOGIN fitcher_reader WITH PASSWORD = 'choose-a-password';
+USE erp;
+CREATE USER fitcher_reader FOR LOGIN fitcher_reader;
+ALTER ROLE db_datareader ADD MEMBER fitcher_reader;
+```
+
+A SQL Server source is copy only: ClickHouse has no engine for it, so the api reads the tables itself over TDS 7.4 with encryption required (choose "when the server offers it" to relax that), streams them into `raw.<name>__<table>` in batches and keeps the previous copy when a sync fails. The schema defaults to `dbo`, the port to 1433, and only SQL authentication works. The driver does not verify the server's certificate, and a database that does not exist is reported like a wrong password. Its password is stored encrypted in the app state, not in ClickHouse ([report](../docs/eval/sql-server-source-report.md)).
+
+The catalog is read with these same grants: PostgreSQL's `pg_catalog` and `information_schema`, MySQL's `information_schema` and SQL Server's `sys` views are readable by any user for the objects it may select, and a table the user may not select simply does not appear.
+`SOURCES_LIVE_TEST=1 uv run --project apps/api pytest -c apps/api/pyproject.toml -k sources` with the `sources` profile up checks this path against the fixtures.
+
 ### Fixture sources
 
-The `sources` Compose profile starts lab-only PostgreSQL, MySQL, MongoDB and S3-compatible (SeaweedFS) fixtures seeded with the synthetic widget dataset of [`infra/sources/fixtures`](../infra/sources/fixtures) (40 widgets, 3,000 sales and 300 refunds), each with a read-only user.
+The `sources` Compose profile starts development-only PostgreSQL, MySQL, MongoDB, S3-compatible (SeaweedFS) and SQL Server fixtures seeded with the synthetic widget dataset of [`infra/sources/fixtures`](../infra/sources/fixtures) (40 widgets, 3,000 sales and 300 refunds), each with a read-only user.
 The manifests `fixture_postgres`, `fixture_mysql`, `fixture_mongodb` and `fixture_files` feed the `fixture_widgets` marts `widget_sales` and `widget_refunds`, whose columns cover the minimal test pack.
 
 ```bash

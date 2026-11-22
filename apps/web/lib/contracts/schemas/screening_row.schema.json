@@ -1,0 +1,60 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "ts": {
+      "format": "date-time",
+      "title": "Ts",
+      "type": "string"
+    },
+    "trace_id": {
+      "title": "Trace Id",
+      "type": "string"
+    },
+    "user_id": {
+      "title": "User Id",
+      "type": "string"
+    },
+    "source": {
+      "title": "Source",
+      "type": "string"
+    },
+    "verdict": {
+      "title": "Verdict",
+      "type": "string"
+    },
+    "mode": {
+      "title": "Mode",
+      "type": "string"
+    },
+    "score": {
+      "anyOf": [
+        {
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Score"
+    },
+    "rule_hits": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Rule Hits",
+      "type": "array"
+    }
+  },
+  "required": [
+    "ts",
+    "trace_id",
+    "user_id",
+    "source",
+    "verdict",
+    "mode",
+    "score",
+    "rule_hits"
+  ],
+  "title": "ScreeningRow",
+  "type": "object"
+}

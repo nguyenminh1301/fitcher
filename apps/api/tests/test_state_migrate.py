@@ -1,0 +1,210 @@
+import pytest
+
+from app.state import migrate
+from app.state.db import StateDb
+from app.state.settings import Settings
+
+
+def write_changes(directory, **files):
+    directory.mkdir(parents=True, exist_ok=True)
+    for name, sql in files.items():
+        (directory / f"{name}.sql").write_text(sql, encoding="utf-8")
+    return directory
+
+
+def applied(db):
+    return [tuple(r) for r in db.connection().execute("SELECT number, name FROM schema_changes ORDER BY number")]
+
+
+def test_shipped_changes_are_numbered_without_gaps():
+    changes = migrate.discover(migrate.CHANGES_DIR)
+    assert [c.number for c in changes] == list(range(1, len(changes) + 1))
+    assert [c.name for c in changes][:3] == ["settings", "secrets", "setup"]
+
+
+def test_applies_pending_changes_in_order_and_records_them(tmp_path):
+    db = StateDb(tmp_path / "app.db")
+    directory = write_changes(tmp_path / "c", **{"0001_a": "CREATE TABLE a (x INTEGER);", "0002_b": "CREATE TABLE b (y INTEGER);"})
+    assert migrate.apply_pending(db, directory) == [1, 2]
+    assert applied(db) == [(1, "a"), (2, "b")]
+    assert migrate.apply_pending(db, directory) == []
+
+
+def test_applies_only_changes_added_later(tmp_path):
+    db = StateDb(tmp_path / "app.db")
+    directory = write_changes(tmp_path / "c", **{"0001_a": "CREATE TABLE a (x INTEGER);"})
+    migrate.apply_pending(db, directory)
+    write_changes(directory, **{"0002_b": "CREATE TABLE b (y INTEGER);"})
+    assert migrate.apply_pending(db, directory) == [2]
+
+
+def test_a_failing_change_leaves_no_trace_of_itself(tmp_path):
+    db = StateDb(tmp_path / "app.db")
+    directory = write_changes(tmp_path / "c", **{
+        "0001_a": "CREATE TABLE a (x INTEGER);",
+        "0002_bad": "CREATE TABLE b (y INTEGER);\nINSERT INTO missing VALUES (1);",
+    })
+    with pytest.raises(migrate.MigrationError, match="0002_bad"):
+        migrate.apply_pending(db, directory)
+    assert applied(db) == [(1, "a")]
+    tables = {r[0] for r in db.connection().execute("SELECT name FROM sqlite_master WHERE type='table'")}
+    assert "b" not in tables
+
+
+def test_refuses_a_store_written_by_a_newer_version(tmp_path):
+    db = StateDb(tmp_path / "app.db")
+    directory = write_changes(tmp_path / "c", **{"0001_a": "CREATE TABLE a (x INTEGER);", "0002_b": "CREATE TABLE b (y INTEGER);"})
+    migrate.apply_pending(db, directory)
+    older = write_changes(tmp_path / "older", **{"0001_a": "CREATE TABLE a (x INTEGER);"})
+    with pytest.raises(migrate.MigrationError, match="newer"):
+        migrate.apply_pending(db, older)
+
+
+def test_rejects_gaps_and_duplicate_numbers(tmp_path):
+    gap = write_changes(tmp_path / "gap", **{"0001_a": "SELECT 1;", "0003_c": "SELECT 1;"})
+    with pytest.raises(migrate.MigrationError, match="gap"):
+        migrate.discover(gap)
+    dup = write_changes(tmp_path / "dup", **{"0001_a": "SELECT 1;", "0001_b": "SELECT 1;"})
+    with pytest.raises(migrate.MigrationError, match="twice"):
+        migrate.discover(dup)
+
+
+def test_shipped_changes_create_the_state_tables(tmp_path):
+    db = StateDb(tmp_path / "app.db")
+    migrate.apply_pending(db)
+    tables = {r[0] for r in db.connection().execute("SELECT name FROM sqlite_master WHERE type='table'")}
+    assert {"schema_changes", "settings", "secrets", "setup_steps"} <= tables
+
+
+def _state_before(tmp_path, number):
+    """A store with the shipped changes up to ``number`` applied, as an older release left it."""
+    older = tmp_path / "older"
+    older.mkdir()
+    for change in migrate.discover(migrate.CHANGES_DIR):
+        if change.number <= number:
+            (older / change.path.name).write_text(change.path.read_text(encoding="utf-8"), encoding="utf-8")
+    db = StateDb(tmp_path / "app.db")
+    migrate.apply_pending(db, older)
+    return db
+
+
+def _documents_setting(db):
+    row = db.connection().execute(
+        "SELECT value FROM settings WHERE group_name = 'documents' AND key = 'enabled'"
+    ).fetchone()
+    return None if row is None else row[0]
+
+
+def test_an_instance_set_up_before_documents_left_the_setup_keeps_them_on(tmp_path):
+    db = _state_before(tmp_path, 9)
+    with db.write() as conn:
+        conn.execute("INSERT INTO setup_steps (id, state, updated_at) VALUES ('models', 'done', 'x')")
+        conn.execute("INSERT INTO setup_steps (id, state, updated_at) VALUES ('documents', 'skipped', 'x')")
+
+    migrate.apply_pending(db)
+
+    assert _documents_setting(db) == "true"
+    steps = [row[0] for row in db.connection().execute("SELECT id FROM setup_steps")]
+    assert steps == ["models"]
+
+
+def test_documents_turned_off_before_the_change_stay_off(tmp_path):
+    db = _state_before(tmp_path, 9)
+    with db.write() as conn:
+        conn.execute("INSERT INTO setup_steps (id, state, updated_at) VALUES ('documents', 'done', 'x')")
+        conn.execute("INSERT INTO settings (group_name, key, value, updated_at) VALUES ('documents', 'enabled', 'false', 'x')")
+
+    migrate.apply_pending(db)
+
+    assert _documents_setting(db) == "false"
+
+
+def test_a_new_instance_stores_no_documents_setting(tmp_path):
+    db = StateDb(tmp_path / "app.db")
+    migrate.apply_pending(db)
+    assert _documents_setting(db) is None
+
+
+def test_a_stored_key_and_tier_models_become_the_first_key_and_the_first_link_of_each_chain(tmp_path):
+    from app.llm.providers import ProviderStore
+    from app.llm.routes import TierMapping, TierModel
+    from app.state.secrets import SecretVault
+
+    db = _state_before(tmp_path, 10)
+    vault = SecretVault(db, bytes(32))
+    stored = "stored-before-1234"
+    with db.write() as conn:
+        conn.execute("INSERT INTO providers (id, name, kind, base_url, created_at) VALUES ('openai', 'OpenAI', 'openai', NULL, 'x')")
+        conn.execute("INSERT INTO providers (id, name, kind, base_url, created_at) VALUES ('ollama', 'Ollama', 'ollama', 'http://h:1', 'y')")
+        vault.set_in(conn, "provider:openai:api_key", stored)
+        for tier, value in (("fast", '{"provider_id": "openai", "model": "gpt-5.4-mini"}'),
+                            ("sql-gen", '{"provider_id": "gone", "model": "m"}')):
+            conn.execute("INSERT INTO settings (group_name, key, value, updated_at) VALUES ('llm.tiers', ?, ?, 'x')",
+                         (tier, value))
+
+    migrate.apply_pending(db)
+
+    store = ProviderStore(db, vault)
+    mapping = TierMapping(db, store)
+    assert [(key.id, key.last4) for key in store.get("openai").keys] == [("legacy", "1234")]
+    assert store.route("openai", "gpt-5.4-mini", vault.reader()).api_key == stored
+    assert store.get("ollama").keys == ()
+    assert mapping.chain("fast") == [TierModel("openai", "gpt-5.4-mini")]
+    assert mapping.chain("sql-gen") == []
+    assert mapping.mode() == ("manual", None)
+    assert db.connection().execute("SELECT count(*) FROM settings WHERE group_name = 'llm.tiers'").fetchone()[0] == 0
+
+
+def test_conversations_stored_before_packs_per_conversation_keep_the_pack_active_then(tmp_path):
+    db = _state_before(tmp_path, 11)
+    with db.write() as conn:
+        conn.execute("INSERT INTO settings (group_name, key, value, updated_at) VALUES ('pack', 'active', '\"chinook\"', 'x')")
+
+    migrate.apply_pending(db)
+
+    row = db.connection().execute(
+        "SELECT value FROM settings WHERE group_name = 'pack' AND key = 'earlier_conversations'").fetchone()
+    assert row == ('"chinook"',)
+
+
+def test_a_new_instance_records_no_earlier_conversation_pack(tmp_path):
+    db = StateDb(tmp_path / "app.db")
+    migrate.apply_pending(db)
+    assert db.connection().execute(
+        "SELECT count(*) FROM settings WHERE group_name = 'pack' AND key = 'earlier_conversations'").fetchone() == (0,)
+
+
+def test_a_classifier_turned_on_before_the_engines_keeps_running_on_this_computer(tmp_path):
+    db = _state_before(tmp_path, 12)
+    with db.write() as conn:
+        conn.execute("INSERT INTO settings (group_name, key, value, updated_at) VALUES ('screening', 'classifier_enabled', 'true', 'x')")
+
+    migrate.apply_pending(db)
+
+    assert Settings(db).get("screening", "classifier_engine") == "local_onnx"
+
+
+def test_a_new_instance_runs_the_classifier_through_a_provider(tmp_path):
+    db = StateDb(tmp_path / "app.db")
+    migrate.apply_pending(db)
+    assert Settings(db).get("screening", "classifier_engine") == "provider"
+
+
+def test_syncs_stored_before_partial_syncs_keep_their_rows_and_the_one_running_rule(tmp_path):
+    db = _state_before(tmp_path, 14)
+    with db.write() as conn:
+        conn.execute("INSERT INTO sources (id, kind, created_at, updated_at) VALUES ('shop', 'file', 'x', 'x')")
+        conn.execute("INSERT INTO source_syncs (source_id, started_by, status, started_at, heartbeat_at, results, error) "
+                     "VALUES ('shop', 'manual', 'failed', 'a', 'a', '[]', 'unknown')")
+
+    migrate.apply_pending(db)
+
+    with db.write() as conn:
+        assert conn.execute("SELECT id, status, error FROM source_syncs").fetchall() == [(1, "failed", "unknown")]
+        conn.execute("INSERT INTO source_syncs (source_id, started_by, status, started_at, heartbeat_at) "
+                     "VALUES ('shop', 'manual', 'partial', 'b', 'b')")
+        conn.execute("INSERT INTO source_syncs (source_id, started_by, status, started_at, heartbeat_at) "
+                     "VALUES ('shop', 'manual', 'running', 'c', 'c')")
+    with pytest.raises(Exception, match="UNIQUE"), db.write() as conn:
+        conn.execute("INSERT INTO source_syncs (source_id, started_by, status, started_at, heartbeat_at) "
+                     "VALUES ('shop', 'manual', 'running', 'd', 'd')")

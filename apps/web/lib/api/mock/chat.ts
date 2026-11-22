@@ -53,12 +53,12 @@ function plan(scenario: Scenario | null, question: string, identity: Identity | 
     return [...head, { event: "deny", message: scenario.deny_message, role: asked, blocked: scenario.blocked, lang: scenario.lang }, { event: "done" }];
   }
   if (scenario.kind === "clarify" && scenario.clarify) {
-    return [...head.slice(0, 4), { event: "clarify", ...scenario.clarify, lang: scenario.lang }, { event: "done" }];
+    return [...head.slice(0, 4), { event: "clarify", about: "", chosen: [], ...scenario.clarify, lang: scenario.lang }, { event: "done" }];
   }
   const attempts: Untraced[] = [];
   const sqls = scenario.kind === "failed" ? [scenario.sql ?? "", scenario.sql ?? "", scenario.sql ?? "", scenario.sql ?? ""] : [...(scenario.repair ? [scenario.repair.sql] : []), scenario.sql ?? ""];
   sqls.forEach((sql, index) => {
-    attempts.push(status("generate_sql", index + 1), { event: "sql", sql, attempt: index + 1 }, ...SQL_ATTEMPT.slice(1).map((node) => status(node)));
+    attempts.push(status("generate_sql", index + 1), { event: "sql", sql, attempt: index + 1, unreviewed_metrics: [] }, ...SQL_ATTEMPT.slice(1).map((node) => status(node)));
   });
   if (scenario.kind === "failed") {
     return [...head, ...attempts, { event: "error", kind: "failed", message: scenario.error ?? "", sql: scenario.sql ?? null, error: scenario.error ?? null }];
@@ -95,6 +95,8 @@ export function createMockChat(
   const stepMs = options.stepMs ?? 280;
   return {
     suggestions: async () => (await load()).scenarios.suggestions,
+    // The sample chat streams in the page, so aborting the stream is the stop.
+    stop: async () => undefined,
     async *ask(request, signal) {
       const data = await load();
       const events = plan(matchScenario(request.question, data.scenarios.scenarios), request.question, await identity());

@@ -24,12 +24,11 @@ import sys
 import yaml
 
 from app.config import load_settings
-from app.llm.embeddings import LiteLLMEmbeddings
-from app.llm.tiers import EMBED_TIER
+from app.llm import clients
 from app.onboarding.docs_parser import DocumentRejected
 from app.onboarding.documents import ClickHouseDocumentRegistry, DocumentService, DuplicateDocument
 from app.screening.screen import Screener
-from app.search.client import QdrantSearch
+from app.search.engine import open_search
 from jobs.lib.clickhouse import admin_client
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -77,11 +76,8 @@ def build_service(pack: str, roles: list[str]) -> DocumentService:
     settings = load_settings()
     return DocumentService(
         pack=pack, pack_roles=roles, registry=ClickHouseDocumentRegistry(admin_client()),
-        search=QdrantSearch(settings.qdrant_url),
-        embeddings=LiteLLMEmbeddings(
-            settings.litellm_base_url, settings.litellm_master_key, settings.embedding_dimensions,
-            alias=settings.model_tiers[EMBED_TIER],
-        ),
+        search=open_search(),
+        embeddings=clients.index_embeddings()[0],
         screener=Screener.from_settings(settings), store_dir=Path(settings.documents_dir),
         compiled_dir=Path(settings.compiled_pack_dir), max_bytes=settings.document_max_bytes,
     )
@@ -112,6 +108,7 @@ def main(argv: list[str] | None = None) -> int:
     except (ManifestError, OSError) as error:
         print(error, file=sys.stderr)
         return 2
+    clients.bootstrap()
     print(f"Ingesting {len(entries)} documents into pack {args.pack}:")
     failed = ingest(build_service(args.pack, roles), entries, uploaded_by="jobs.ingest_docs")
     return 1 if failed else 0

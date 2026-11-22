@@ -9,7 +9,7 @@ from app.onboarding.documents import (
     DocumentNotFound, DocumentService, DuplicateDocument, InMemoryDocumentRegistry, PackCompiling, compile_lock_path,
     is_compiling,
 )
-from app.search.client import SearchError
+from app.search.engine import SearchError
 from document_fixtures import MARKDOWN, pdf_bytes
 from fakes import FakeEmbeddings, FakeSearch
 
@@ -35,8 +35,8 @@ class WordScreener:
 @pytest.fixture
 def search():
     search = FakeSearch()
-    search.create_collection("shop_kb_docs_v1", 4)
-    search.aliases[ALIAS] = "shop_kb_docs_v1"
+    search.create("shop_kb_docs", 1, 4)
+    search.switch_live({"shop_kb_docs": 1})
     return search
 
 
@@ -50,7 +50,7 @@ def service(tmp_path, search):
 
 
 def chunks(search):
-    return search.points["shop_kb_docs_v1"]
+    return search.points["shop_kb_docs__1"]
 
 
 def test_upload_stores_screens_embeds_and_indexes_every_chunk(service, search, tmp_path):
@@ -73,7 +73,6 @@ def test_upload_stores_screens_embeds_and_indexes_every_chunk(service, search, t
 
 @pytest.mark.parametrize(("data", "roles", "error", "status"), [
     (b"x" * 10_001, ["analyst"], "larger than", 413),
-    (MARKDOWN, [], "at least one", 422),
     (MARKDOWN, ["analyst", "stranger"], "not roles of this pack: stranger", 422),
     (b"", ["analyst"], "empty", 422),
 ])
@@ -108,13 +107,13 @@ def test_a_failed_parse_leaves_a_failed_row_and_no_chunks_or_file(service, searc
 
 
 def test_an_index_failure_removes_the_chunks_already_written(service, search):
-    service.search = FakeSearch(fail_upsert_into="kb_docs")
-    service.search.create_collection("shop_kb_docs_v1", 4)
-    service.search.aliases[ALIAS] = "shop_kb_docs_v1"
+    service.search = FakeSearch(fail_write_into="kb_docs")
+    service.search.create("shop_kb_docs", 1, 4)
+    service.search.switch_live({"shop_kb_docs": 1})
     with pytest.raises(SearchError):
         service.upload("glossary.md", MARKDOWN, ["analyst"], "u-1")
     [record] = service.registry.list("shop")
-    assert record.status == "failed" and "HTTP 500" in record.error
+    assert record.status == "failed" and "write into" in record.error
 
 
 def test_blocked_chunks_are_counted_and_kept_out(service, search):
@@ -195,6 +194,6 @@ def test_a_pack_never_compiled_gets_a_kb_docs_alias_on_its_first_upload(tmp_path
     )
     record = service.upload("notes.txt", b"First document.", ["analyst"], "u-1")
     # Generation 0 sorts before every compiled generation, so the first compile replaces it.
-    assert search.aliases == {"fresh_kb_docs": "fresh_kb_docs_v0"}
-    assert search.collections["fresh_kb_docs_v0"] == 4
-    assert [point["payload"]["document_id"] for point in search.points["fresh_kb_docs_v0"]] == [record.id]
+    assert search.live() == {"fresh_kb_docs": 0}
+    assert search.tables["fresh_kb_docs__0"] == 4
+    assert [point["payload"]["document_id"] for point in search.points["fresh_kb_docs__0"]] == [record.id]

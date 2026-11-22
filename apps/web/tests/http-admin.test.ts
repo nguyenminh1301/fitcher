@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import {
-  createHttpAudit, createHttpCosts, createHttpEvaluation, createHttpFeedbackReview, createHttpRuns, createHttpUsers,
+  createHttpAudit, createHttpCosts, createHttpEvaluation, createHttpFeedbackReview, createHttpRuns,
 } from "@/lib/api/http/admin";
 
 function fetcher(status = 200, body: unknown = []) {
@@ -43,15 +43,4 @@ describe("http admin sections", () => {
       .rejects.toThrow("409: an eval run of shop is still running");
   });
 
-  it("sets roles and enables or disables a user", async () => {
-    const fetch = fetcher(204);
-    const users = createHttpUsers(fetch);
-    await users.setRoles("u1", ["analyst"]);
-    await users.setEnabled("u1", false);
-    await users.setEnabled("u1", true);
-    expect(calls(fetch)).toEqual([
-      ["/api/admin/users/u1/roles", "PUT"], ["/api/admin/users/u1/disable", "POST"], ["/api/admin/users/u1/enable", "POST"],
-    ]);
-    expect(JSON.parse(fetch.mock.calls[0][1]?.body as string)).toEqual({ roles: ["analyst"] });
-  });
 });

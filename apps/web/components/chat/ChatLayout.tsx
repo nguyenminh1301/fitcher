@@ -12,6 +12,7 @@ import { Button, TextField } from "@/components/ui/controls";
 import { Dialog, Menu, type MenuItem } from "@/components/ui/overlay";
 import { SampleDataBadge } from "@/components/ui/SampleDataBadge";
 import type { Conversation, ConversationGroup } from "@/lib/api/conversations";
+import { ExposureBanner } from "@/components/ui/ExposureBanner";
 import { recency, useChat } from "@/lib/chat/ChatContext";
 import { useI18n } from "@/lib/i18n/react";
 
@@ -25,9 +26,9 @@ const SIDE_DEFAULT = 272;
 type MenuState = { anchor: HTMLElement; items: MenuItem[]; align: "start" | "end"; label: string } | null;
 type DialogState = { kind: "rename-conv" | "rename-group" | "delete-conv" | "delete-group"; id: string } | null;
 
-export function ChatLayout({ children, onConsole, onSignOut }: { children: ReactNode; onConsole?: () => void; onSignOut?: () => void }) {
+export function ChatLayout({ children, onConsole }: { children: ReactNode; onConsole?: () => void }) {
   const { t } = useI18n();
-  const { api, conversations, groups, activeId, navigate, refresh, now } = useChat();
+  const { api, conversations, groups, activeId, navigate, refresh, now, identity, refused } = useChat();
   const [drawer, setDrawer] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
   const [width, setWidth] = useState(SIDE_DEFAULT);
@@ -161,7 +162,7 @@ export function ChatLayout({ children, onConsole, onSignOut }: { children: React
     const menuOpen = menu?.label === label;
     return (
       <li key={conversation.id} className="fc-conv" data-open={menuOpen ? "true" : undefined}>
-        <button type="button" className="fc-navitem" aria-current={activeId === conversation.id ? "true" : undefined} title={conversation.title} onClick={() => open(conversation.id)}>
+        <button type="button" className="fc-navitem" aria-label={conversation.title} aria-current={activeId === conversation.id ? "true" : undefined} title={conversation.title} onClick={() => open(conversation.id)}>
           <span className="fc-navitem-text">{conversation.title}</span>
         </button>
         <button type="button" className="fc-conv-more" aria-label={label} aria-haspopup="menu" aria-expanded={menuOpen} onClick={(event) => conversationMenu(event.currentTarget, conversation)}>
@@ -173,7 +174,7 @@ export function ChatLayout({ children, onConsole, onSignOut }: { children: React
 
   const head = (key: keyof typeof sections, label: string, extra?: ReactNode) => (
     <div className="fc-sec">
-      <button type="button" className="fc-sec-toggle" aria-expanded={sections[key]} onClick={() => setSections({ ...sections, [key]: !sections[key] })}>
+      <button type="button" className="fc-sec-toggle" aria-label={label} aria-expanded={sections[key]} onClick={() => setSections({ ...sections, [key]: !sections[key] })}>
         {label}
         <Icon name={sections[key] ? "chevronDown" : "chevronRight"} />
       </button>
@@ -204,10 +205,11 @@ export function ChatLayout({ children, onConsole, onSignOut }: { children: React
           <Button variant="ghost" iconOnly icon="x" label={t("ui.closeHistory")} className="fc-drawer-only" onClick={() => setDrawer(false)} />
         </div>
         <div className="fc-side-actions">
-          <button type="button" className="fc-navitem" onClick={() => open(null)}>
+          {/* Named by aria-label as well: a collapsed sidebar shows the icon alone. */}
+          <button type="button" className="fc-navitem" aria-label={t("ui.newChat")} title={t("ui.newChat")} onClick={() => open(null)}>
             <Icon name="squarePen" /><span className="fc-navitem-text">{t("ui.newChat")}</span>
           </button>
-          <button type="button" className="fc-navitem" aria-haspopup="dialog" onClick={() => setSearch(true)}>
+          <button type="button" className="fc-navitem" aria-label={t("ui.search")} title={t("ui.search")} aria-haspopup="dialog" onClick={() => setSearch(true)}>
             <Icon name="search" /><span className="fc-navitem-text">{t("ui.search")}</span><kbd className="fc-kbd fc-desk-only">Ctrl K</kbd>
           </button>
         </div>
@@ -231,6 +233,7 @@ export function ChatLayout({ children, onConsole, onSignOut }: { children: React
                         <button
                           type="button"
                           className="fc-navitem"
+                          aria-label={group.name}
                           aria-expanded={isOpen}
                           onClick={() => {
                             const next = new Set(closedGroups);
@@ -269,7 +272,7 @@ export function ChatLayout({ children, onConsole, onSignOut }: { children: React
           </section>
         </div>
         <div className="fc-side-foot">
-          <AccountMenu onConsole={onConsole ?? (() => window.location.assign("/console"))} onSignOut={onSignOut} />
+          <AccountMenu onConsole={onConsole ?? (() => window.location.assign("/console"))} onSecurity={() => window.location.assign("/console/security")} />
         </div>
         <div
           className="fc-side-resize fc-desk-only"
@@ -314,6 +317,7 @@ export function ChatLayout({ children, onConsole, onSignOut }: { children: React
           <SampleDataBadge feature="chat" />
           <Button variant="ghost" iconOnly icon="squarePen" label={t("ui.newChat")} className="fc-drawer-only" onClick={() => open(null)} />
         </header>
+        <ExposureBanner identity={identity} refused={refused} />
         {children}
       </div>
       {drawer ? <div className="fc-drawer-scrim" onClick={() => setDrawer(false)} /> : null}

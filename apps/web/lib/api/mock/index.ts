@@ -2,8 +2,6 @@
 // (approvals, role changes, uploads) live in memory for the page's lifetime, and demo conversations in
 // browser storage, so each feature behaves as it will once its api exists.
 
-import { readStored, writeStored } from "@/lib/storage";
-
 import type { FitcherApi } from "../client";
 import type { DocumentView, EvalRunStarted, ReviewItem } from "@/lib/contracts";
 
@@ -11,8 +9,6 @@ import type { Identity, SampleDocument } from "../provisional";
 import { createMockChat } from "./chat";
 import { createMockConversations } from "./conversations";
 import { sampleLoader, type SampleStatus } from "./load";
-
-const IDENTITY_KEY = "fitcher.demo.identity";
 
 export type MockApi = FitcherApi & { sampleStatus(): Promise<SampleStatus> };
 
@@ -25,18 +21,19 @@ function delay<T>(value: T, ms = 150): Promise<T> {
   return new Promise((resolve) => setTimeout(() => resolve(value), ms));
 }
 
-/** ``identity`` replaces the demo identities with the signed-in user once sign-in is real. */
+/** ``identity`` replaces the sample owner with the signed-in one once sign-in is real. */
 export function createMockApi(options: { latencyMs?: number; identity?: () => Promise<Identity | null> } = {}): MockApi {
   const load = sampleLoader();
   const wait = <T>(value: T) => delay(value, options.latencyMs ?? 0);
   let current: Identity | null = null;
+  let documentsEnabled = true;
 
   async function identity(): Promise<Identity | null> {
     if (options.identity) return options.identity();
     if (current) return current;
+    // The sample instance has one owner, who holds every role of the pack like the real one.
     const { console } = await load();
-    const stored = readStored(IDENTITY_KEY);
-    current = console.identities.find((item) => item.user_id === stored) ?? console.identities[0] ?? null;
+    current = { user_id: "owner", display_name: "Owner", roles: console.pack_roles };
     return current;
   }
 
@@ -49,20 +46,16 @@ export function createMockApi(options: { latencyMs?: number; identity?: () => Pr
   return {
     sampleStatus: async () => (await load()).status,
     auth: {
-      identities: async () => wait((await load()).console.identities),
       current: async () => wait(await identity()),
-      switchTo: async (userId) => {
-        const next = (await load()).console.identities.find((item) => item.user_id === userId);
-        if (!next) throw new Error(`no demo identity ${userId}`);
-        current = next;
-        writeStored(IDENTITY_KEY, userId);
-        return next;
-      },
       pack: async () => {
         const { console } = await load();
         return { ...console.pack, roles: console.pack_roles };
       },
-      signOut: async () => "/sign-in",
+      // The sample data has one pack, so choosing a source keeps it.
+      choosePack: async () => {
+        const { console } = await load();
+        return { ...console.pack, roles: console.pack_roles };
+      },
     },
     chat: createMockChat(load, identity),
     conversations: createMockConversations(load, identity),
@@ -74,7 +67,9 @@ export function createMockApi(options: { latencyMs?: number; identity?: () => Pr
         Object.assign(find((await load()).console.review_items, id), patch);
       },
       approve: async (id) => {
-        find((await load()).console.review_items, id).status = "approved";
+        const approved = find((await load()).console.review_items, id);
+        approved.status = "approved";
+        if (approved.reviewed === false) approved.reviewed = true;
       },
       remove: async (id) => {
         const state = (await load()).console;
@@ -102,6 +97,11 @@ export function createMockApi(options: { latencyMs?: number; identity?: () => Pr
         find((await load()).console.documents, id).roles = roles;
       },
       draft: async () => delay({ added: [], updated: [], skipped_approved: [] }, 1200),
+      settings: async () => wait({ enabled: documentsEnabled, documents: (await load()).console.documents.length }),
+      setEnabled: async (enabled) => {
+        documentsEnabled = enabled;
+        return { enabled, documents: (await load()).console.documents.length };
+      },
     },
     feedbackReview: {
       list: async () => wait((await load()).console.feedback),
@@ -124,28 +124,42 @@ export function createMockApi(options: { latencyMs?: number; identity?: () => Pr
       },
     },
     runs: {
-      list: async () => wait((await load()).console.runs),
+      list: async (query) => wait((query?.page ?? 1) > 1 ? [] : (await load()).console.runs),
       trace: async (traceId) => {
         const { console } = await load();
         const run = console.runs.find((item) => item.trace_id === traceId);
         return wait(run ? { run, items: console.traces[traceId] ?? [] } : null);
       },
     },
-    audit: { list: async () => wait((await load()).console.audit) },
+    audit: { list: async () => wait((await load()).console.audit), screening: async () => wait([]) },
     costs: { list: async () => wait((await load()).console.costs) },
-    users: {
-      list: async () => wait((await load()).console.users),
-      setRoles: async (id, roles) => {
-        find((await load()).console.users, id).roles = roles;
-      },
-      setEnabled: async (id, enabled) => {
-        find((await load()).console.users, id).enabled = enabled;
-      },
+    // The Models page has no sample data: providers, keys and tiers live in the instance's app state.
+    models: Object.fromEntries([
+      "providers", "addProvider", "changeProvider", "removeProvider", "providerModels", "testProvider", "tiers", "setTier",
+      "catalog", "setMode", "setEmbedding", "classifier", "setClassifier", "changeClassifier",
+      "startClassifierDownload", "classifierDownload", "cancelClassifierDownload",
+    ].map((name) => [name, () => Promise.reject(new Error("The Models page needs the api; it has no sample data."))])) as unknown as FitcherApi["models"],
+    sources: Object.fromEntries([
+      "list", "test", "create", "update", "remove", "tables", "changeTables", "sync", "cancel", "syncs", "upload", "loadFile",
+      "drift", "instantEstimate", "instantStart", "instantJob",
+    ].map((name) => [name, () => Promise.reject(new Error("The Sources page needs the api; it has no sample data."))])) as unknown as FitcherApi["sources"],
+    // The demo has no owner password, so it never asks to sign in.
+    owner: {
+      status: async () => ({ password_set: false, signed_in: false, exposed: false }),
+      limits: async () => ({ concurrent_questions: 2 }),
+      setLimits: () => Promise.reject(new Error("The limits need the api; they have no sample data.")),
+      signIn: () => Promise.reject(new Error("The owner password needs the api; it has no sample data.")),
+      signOut: async () => undefined,
+      setPassword: () => Promise.reject(new Error("The owner password needs the api; it has no sample data.")),
+      removePassword: () => Promise.reject(new Error("The owner password needs the api; it has no sample data.")),
     },
-    // The Models page has no sample data: it reads the gateway catalog and eval reports from the api.
-    models: {
-      list: () => Promise.reject(new Error("The Models page needs the api; it has no sample data.")),
-      set: () => Promise.reject(new Error("The Models page needs the api; it has no sample data.")),
+    // The demo is an instance that was set up already, so it never redirects to the setup.
+    setup: {
+      status: async () => ({
+        steps: [{ id: "models", state: "done" }, { id: "data", state: "done" }], complete: true,
+      }),
+      skip: () => Promise.reject(new Error("The setup needs the api; it has no sample data.")),
+      complete: () => Promise.reject(new Error("The setup needs the api; it has no sample data.")),
     },
   };
 }

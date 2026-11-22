@@ -3,7 +3,7 @@
 // Draws a ChartSpec with ECharts, in the design's data colours read from the theme tokens; a KPI is a
 // large number. Charts are images with a description; the data table below is their accessible equivalent.
 
-import type { EChartsInstance } from "echarts-for-react";
+import type { EChartsInstance, EChartsReactProps } from "echarts-for-react";
 import dynamic from "next/dynamic";
 import { useEffect, useState } from "react";
 
@@ -11,7 +11,13 @@ import { formatCell, toEChartsOption } from "@/lib/chart/toEChartsOption";
 import type { ChartSpec, Result } from "@/lib/contracts";
 import { useI18n } from "@/lib/i18n/react";
 
-const ReactECharts = dynamic(() => import("echarts-for-react"), { ssr: false });
+// The chart component and the trimmed ECharts build load together, only when a chart is drawn.
+const ReactECharts = dynamic(async () => {
+  const [{ default: EChartsCore }, { echarts }] = await Promise.all([import("echarts-for-react/lib/core"), import("@/lib/chart/echarts")]);
+  return function Chart(props: Omit<EChartsReactProps, "echarts">) {
+    return <EChartsCore echarts={echarts} {...props} />;
+  };
+}, { ssr: false });
 
 const FALLBACK = ["#0969da", "#c9c9cf", "#bc4c00", "#1a7f37", "#8250df", "#bf3989"];
 
@@ -47,9 +53,9 @@ export function ChartView({ spec, result, onReady }: { spec: ChartSpec; result: 
     const column = result.columns.find((item) => item.name === spec.y[0]) ?? result.columns[0];
     const value = result.rows[0]?.[result.columns.indexOf(column)];
     return (
-      <div className="fc-kpi" role="img" aria-label={`${column.name}: ${formatCell(value, column, locale)}`}>
+      <div className="fc-kpi" role="img" aria-label={`${column.label ?? column.name}: ${formatCell(value, column, locale)}`}>
         <div className="fc-kpi-value fc-num">{formatCell(value, column, locale)}</div>
-        <div className="fc-kpi-label fc-mono">{column.name}</div>
+        <div className={column.label ? "fc-kpi-label" : "fc-kpi-label fc-mono"} title={column.name}>{column.label ?? column.name}</div>
       </div>
     );
   }

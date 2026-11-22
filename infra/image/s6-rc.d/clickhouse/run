@@ -1,0 +1,13 @@
+#!/command/with-contenv sh
+# The embedded ClickHouse server as `app`, configured by init-data under /run/fitcher/clickhouse. Its rendered
+# configuration holds every password hash, so it starts with none of the container's environment, where
+# FITCHER_SECRET_KEY or a ClickHouse password may be supplied. With CLICKHOUSE_URL the external server is used and
+# this service only holds its place.
+if [ -n "${CLICKHOUSE_URL:-}" ]; then
+    exec s6-pause
+fi
+exec 2>&1
+set --
+[ -n "${TZ:-}" ] && set -- "TZ=$TZ"
+exec env -i PATH=/usr/local/bin:/usr/bin:/bin HOME=/home/app "$@" \
+    /command/s6-setuidgid app clickhouse server --config-file=/run/fitcher/clickhouse/config.xml

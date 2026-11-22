@@ -203,6 +203,19 @@
         "lang": {
           "title": "Lang",
           "type": "string"
+        },
+        "about": {
+          "default": "",
+          "title": "About",
+          "type": "string"
+        },
+        "chosen": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Chosen",
+          "type": "array"
         }
       },
       "required": [
@@ -210,7 +223,9 @@
         "event",
         "question",
         "options",
-        "lang"
+        "lang",
+        "about",
+        "chosen"
       ],
       "title": "ClarifyEvent",
       "type": "object"
@@ -281,6 +296,37 @@
           ],
           "default": null,
           "title": "Format"
+        },
+        "label": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Label"
+        },
+        "grain": {
+          "anyOf": [
+            {
+              "enum": [
+                "day",
+                "week",
+                "month",
+                "quarter",
+                "year"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Grain"
         }
       },
       "required": [
@@ -321,6 +367,18 @@
           "format": "date-time",
           "title": "Updated At",
           "type": "string"
+        },
+        "pack": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Pack"
         }
       },
       "required": [
@@ -478,7 +536,7 @@
     },
     "ErrorEvent": {
       "additionalProperties": false,
-      "description": "``failed``: no SQL attempt produced a result; ``internal``: the run broke, with no detail for the client.",
+      "description": "``failed``: no SQL attempt produced a result; ``internal``: the run broke, with no detail for the client;\n``model``: the model call that reads the question failed, with the provider's reason in ``error``.",
       "properties": {
         "trace_id": {
           "title": "Trace Id",
@@ -493,7 +551,8 @@
         "kind": {
           "enum": [
             "failed",
-            "internal"
+            "internal",
+            "model"
           ],
           "title": "Kind",
           "type": "string"
@@ -641,13 +700,22 @@
           "minimum": 1,
           "title": "Attempt",
           "type": "integer"
+        },
+        "unreviewed_metrics": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Unreviewed Metrics",
+          "type": "array"
         }
       },
       "required": [
         "trace_id",
         "event",
         "sql",
-        "attempt"
+        "attempt",
+        "unreviewed_metrics"
       ],
       "title": "SqlEvent",
       "type": "object"
@@ -752,6 +820,11 @@
       },
       "title": "Turns",
       "type": "array"
+    },
+    "running": {
+      "default": false,
+      "title": "Running",
+      "type": "boolean"
     }
   },
   "required": [

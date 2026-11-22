@@ -8,7 +8,7 @@ const PNG_URL = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfF
 
 const canvasChart = { setOption: vi.fn(), getDataURL: vi.fn(() => PNG_URL), dispose: vi.fn() };
 const init = vi.fn((..._args: unknown[]) => canvasChart);
-vi.mock("echarts", () => ({ init: (...args: unknown[]) => init(...args) }));
+vi.mock("@/lib/chart/echarts", () => ({ echarts: { init: (...args: unknown[]) => init(...args) } }));
 
 function drawnChart(): EChartsInstance {
   const dom = document.createElement("div");

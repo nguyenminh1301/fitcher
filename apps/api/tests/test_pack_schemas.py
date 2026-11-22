@@ -51,9 +51,6 @@ INVALID_FILES = [
     ("examples.yaml", _delete(("examples", 0, "sql")), "examples[0].sql", "required field is missing"),
     ("examples.yaml", _set(("examples", 0, "colour"), "red"), "examples[0].colour", "unknown field"),
     ("examples.yaml", _set(("examples", 0, "evidence", 0, "kind"), "rumour"), "examples[0].evidence[0].kind", "is not one of"),
-    ("policies.yaml", _delete(("roles", 0, "datasets", 0, "columns")), "roles[0].datasets[0].columns", "required field is missing"),
-    ("policies.yaml", _set(("roles", 0, "colour"), "red"), "roles[0].colour", "unknown field"),
-    ("policies.yaml", _set(("roles", 0, "status"), "maybe"), "roles[0].status", "is not one of"),
     ("eval.yaml", _delete(("cases", 0, "expected", "intent")), "cases[0].expected.intent", "required field is missing"),
     ("eval.yaml", _set(("cases", 0, "expected", "colour"), "red"), "cases[0].expected.colour", "unknown field"),
     ("eval.yaml", _set(("cases", 0, "category"), "trivia"), "cases[0].category", "is not one of"),
@@ -99,14 +96,13 @@ def test_eval_expected_rows_accept_scalars_and_null(pack_dir, edit_pack):
 
 
 def test_duplicate_key_is_reported(pack_dir: Path):
-    path = pack_dir / "policies.yaml"
+    path = pack_dir / "metrics.yaml"
     text = path.read_text(encoding="utf-8")
-    # A second columns key would silently replace the first grant list.
-    text = text.replace("columns: [sale_ref, sold_on, widget_name, sale_amount]",
-                        "columns: [sale_ref, sold_on, widget_name, sale_amount]\n        columns: [sale_ref]")
+    # A second sql_expr key would silently replace the first expression.
+    text = text.replace("sql_expr:", "sql_expr: count()\n    sql_expr:", 1)
     path.write_text(text, encoding="utf-8")
 
-    with pytest.raises(PackValidationError, match="policies.yaml: invalid YAML: .*duplicate key 'columns'"):
+    with pytest.raises(PackValidationError, match="metrics.yaml: invalid YAML: .*duplicate key 'sql_expr'"):
         load_pack(pack_dir, schema_dir=SCHEMA_DIR)
 
 
@@ -121,10 +117,30 @@ def test_yes_and_on_are_not_booleans(pack_dir, edit_pack):
 
 
 def test_missing_file_is_reported(pack_dir: Path):
+    (pack_dir / "metrics.yaml").unlink()
+
+    with pytest.raises(PackValidationError, match="metrics.yaml: file is missing"):
+        load_pack(pack_dir, schema_dir=SCHEMA_DIR)
+
+
+def test_a_pack_without_an_eval_set_loads_with_no_cases(pack_dir: Path):
     (pack_dir / "eval.yaml").unlink()
 
-    with pytest.raises(PackValidationError, match="eval.yaml: file is missing"):
-        load_pack(pack_dir, schema_dir=SCHEMA_DIR)
+    assert load_pack(pack_dir, schema_dir=SCHEMA_DIR).eval.cases == []
+
+
+@pytest.mark.parametrize(("file_name", "path"), [
+    ("datasets.yaml", ("datasets", 0)), ("glossary.yaml", ("terms", 0)), ("metrics.yaml", ("metrics", 0)),
+    ("relationships.yaml", ("relationships", 0)), ("examples.yaml", ("examples", 0))
+])
+def test_a_generated_item_may_be_marked_unreviewed(pack_dir, edit_pack, file_name, path):
+    edit_pack(file_name, _set((*path, "reviewed"), False))
+
+    pack = load_pack(pack_dir, schema_dir=SCHEMA_DIR)
+
+    items = {"datasets.yaml": pack.datasets.datasets, "glossary.yaml": pack.glossary.terms, "metrics.yaml": pack.metrics.metrics,
+             "relationships.yaml": pack.relationships.relationships, "examples.yaml": pack.examples.examples}[file_name]
+    assert items[0].reviewed is False and all(item.reviewed is None for item in items[1:])
 
 
 def test_invalid_yaml_is_reported(pack_dir: Path):
@@ -155,3 +171,12 @@ def test_every_problem_is_reported_at_once(pack_dir, edit_pack):
         ("metrics.yaml", "metrics[0].unit"),
         ("glossary.yaml", "terms[1].term"),
     }
+
+
+def test_a_join_path_may_cite_the_source_catalog_as_evidence(pack_dir, edit_pack):
+    evidence = [{"kind": "source", "ref": "foreign key widget_refunds(sale_ref) -> widget_sales(sale_ref)"}]
+    edit_pack("relationships.yaml", _set(("relationships", 0, "evidence"), evidence))
+
+    pack = load_pack(pack_dir, schema_dir=SCHEMA_DIR)
+
+    assert pack.relationships.relationships[0].evidence[0].kind == "source"

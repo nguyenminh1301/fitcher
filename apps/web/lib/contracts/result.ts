@@ -8,6 +8,8 @@ export type Name = string;
 export type Type = "string" | "number" | "date" | "datetime" | "boolean";
 export type Role = "dimension" | "measure" | "time";
 export type Format = ("currency" | "count" | "ratio" | "percent" | "days" | "number") | null;
+export type Label = string | null;
+export type Grain = ("day" | "week" | "month" | "quarter" | "year") | null;
 /**
  * @maxItems 5000
  */
@@ -26,4 +28,6 @@ export interface ColumnInfo {
   type: Type;
   role: Role;
   format?: Format;
+  label?: Label;
+  grain?: Grain;
 }

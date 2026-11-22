@@ -47,6 +47,37 @@
           ],
           "default": null,
           "title": "Format"
+        },
+        "label": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Label"
+        },
+        "grain": {
+          "anyOf": [
+            {
+              "enum": [
+                "day",
+                "week",
+                "month",
+                "quarter",
+                "year"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Grain"
         }
       },
       "required": [
@@ -66,7 +97,8 @@
             "profile",
             "doc",
             "error",
-            "trace"
+            "trace",
+            "source"
           ],
           "title": "Kind",
           "type": "string"
@@ -366,6 +398,18 @@
         }
       ],
       "default": null
+    },
+    "reviewed": {
+      "anyOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Reviewed"
     },
     "spec": {
       "anyOf": [

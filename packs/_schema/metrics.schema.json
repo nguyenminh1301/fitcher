@@ -22,6 +22,7 @@
           "unit": {"type": "string", "enum": ["currency", "count", "ratio", "percent", "days", "number"]},
           "owner": {"$ref": "common.schema.json#/$defs/text"},
           "status": {"$ref": "common.schema.json#/$defs/status"},
+          "reviewed": {"$ref": "common.schema.json#/$defs/reviewed"},
           "evidence": {"$ref": "common.schema.json#/$defs/evidence"},
           "confidence": {"$ref": "common.schema.json#/$defs/confidence"}
         }

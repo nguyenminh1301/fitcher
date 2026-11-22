@@ -3,7 +3,6 @@
 import { useRef, useState } from "react";
 
 import { Icon } from "@/components/brand/Icon";
-import { Button } from "@/components/ui/controls";
 import { useI18n } from "@/lib/i18n/react";
 
 /** The document types and size the Documents page accepts (DECISIONS §5). */
@@ -19,23 +18,16 @@ export function UploadDropzone({ disabled, onFiles }: { disabled?: boolean; onFi
     if (!disabled && files?.length) onFiles(Array.from(files));
   };
   return (
-    <div
-      className="fc-drop"
-      data-over={over ? "true" : undefined}
-      aria-disabled={disabled ? "true" : undefined}
+    <div className="drop" data-state={over ? "drag" : undefined} aria-disabled={disabled ? "true" : undefined}
       onDragOver={(event) => { event.preventDefault(); if (!disabled) setOver(true); }}
       onDragLeave={() => setOver(false)}
-      onDrop={(event) => { event.preventDefault(); setOver(false); take(event.dataTransfer.files); }}
-    >
-      <Icon name={disabled ? "lock" : "upload"} />
-      {disabled ? <span>{t("ui.dropBlocked")}</span> : (
-        <span className="fc-row" style={{ justifyContent: "center" }}>
-          <strong>{t("ui.dropTitle")}</strong>
-          <Button size="sm" onClick={() => input.current?.click()}>{t("ui.browse")}</Button>
-        </span>
+      onDrop={(event) => { event.preventDefault(); setOver(false); take(event.dataTransfer.files); }}>
+      <div className="drop-icon"><Icon name={disabled ? "lock" : "upload"} size="lg" /></div>
+      {disabled ? <div>{t("ui.dropBlocked")}</div> : (
+        <div className="drop-line">{t("ui.dropTitle")} <button type="button" className="fc-btn fc-btn-sm" onClick={() => input.current?.click()}>{t("ui.browse")}</button></div>
       )}
-      <span style={{ fontSize: 12 }}>{t("ui.dropSub")}</span>
-      <input ref={input} type="file" multiple hidden accept={ALLOWED_EXTENSIONS.map((extension) => `.${extension}`).join(",")}
+      <div className="fc-muted">{t("ui.dropSub")}</div>
+      <input ref={input} type="file" multiple hidden aria-label={t("ui.browse")} accept={ALLOWED_EXTENSIONS.map((extension) => `.${extension}`).join(",")}
         onChange={(event) => { take(event.target.files); event.target.value = ""; }} />
     </div>
   );

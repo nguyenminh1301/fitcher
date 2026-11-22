@@ -1,0 +1,56 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "provider_id": {
+      "title": "Provider Id",
+      "type": "string"
+    },
+    "models": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Models",
+      "type": "array"
+    },
+    "model": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Model"
+    },
+    "structured_output": {
+      "title": "Structured Output",
+      "type": "boolean"
+    },
+    "paid": {
+      "title": "Paid",
+      "type": "boolean"
+    },
+    "error": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Error"
+    }
+  },
+  "required": [
+    "provider_id",
+    "models",
+    "model",
+    "structured_output",
+    "paid",
+    "error"
+  ],
+  "title": "ProviderTestResult",
+  "type": "object"
+}

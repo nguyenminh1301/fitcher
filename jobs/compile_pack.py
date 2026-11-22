@@ -7,7 +7,7 @@ through the ``embed`` alias, which is a billable request sent with
 screened first with the classifier in ``GUARD_MODEL_DIR`` and the report lists
 what screening kept out or flagged; ``--skip-index``
 stops after validation, the metric test-run and the access policies and calls
-neither LiteLLM nor Qdrant.
+neither a model nor the search engine.
 
 The pack's policies are applied to ClickHouse as the admin user after the
 metric test-run: roles, column grants, row policies, aggregate-only views and
@@ -35,19 +35,22 @@ import time
 from clickhouse_connect.driver.exceptions import Error as ClickHouseError
 
 from app.config import SettingsError, load_settings
-from app.llm.embeddings import EmbeddingError, LiteLLMEmbeddings
-from app.llm.tiers import EMBED_TIER
+from app.llm import clients
+from app.llm.embeddings import EmbeddingError
 from app.packs.compiler import CompileError, CompileSummary, compile_pack, load_compiled
 from app.observability.tracing import trusted_pack_calls
 from app.onboarding.documents import ClickHouseDocumentRegistry, DocumentRegistry, compile_lock_path, processing
 from app.packs.loader import PackValidationError
 from app.packs.search_indices import search_pack
 from app.screening.screen import Screener
-from app.search.client import QdrantSearch, SearchError
+from app.search.engine import SearchEngine, SearchError, open_search
+from app.state.db import shared_state
+from app.state.settings import documents_enabled
 from jobs.lib.clickhouse import admin_client
 
 ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_PACKS_DIR = ROOT / "packs"
+# PACKS_DIR is /data/packs in the release image, where instant packs and edited packs live.
+DEFAULT_PACKS_DIR = Path(os.environ.get("PACKS_DIR") or ROOT / "packs")
 CHECK_SEARCH_SIZE = 3
 UPLOAD_WAIT_SECONDS = 120
 UPLOAD_POLL_SECONDS = 2
@@ -98,7 +101,7 @@ def print_summary(summary: CompileSummary) -> None:
         print(f"  warning: {warning}")
 
 
-def check_search(args: argparse.Namespace, settings, search: QdrantSearch, embeddings) -> int:
+def check_search(args: argparse.Namespace, settings, search: SearchEngine, embeddings) -> int:
     compiled = load_compiled(Path(settings.compiled_pack_dir), args.pack)
     roles = args.role or [role.id for role in compiled.pack.policies.roles]
     results = search_pack(search, embeddings, args.pack, args.check_search, roles, CHECK_SEARCH_SIZE)
@@ -140,32 +143,27 @@ def wait_for_uploads(registry: DocumentRegistry, pack: str) -> None:
 
 def main(argv: list[str] | None = None) -> int:
     # Every gateway request of a compile embeds reviewed pack content or screened chunks (DECISIONS §9).
-    with trusted_pack_calls():
-        return _main(argv)
+    clients.bootstrap()
+    with trusted_pack_calls(), clients.job_call_log() as call_log:
+        return _main(argv, call_log)
 
 
-def _main(argv: list[str] | None) -> int:
+def _main(argv: list[str] | None, call_log=None) -> int:
     args = parse_args(argv)
     try:
         settings = load_settings()
-        search = QdrantSearch(settings.qdrant_url)
+        search = open_search()
         if args.check_search is not None:
-            embeddings = LiteLLMEmbeddings(
-                settings.litellm_base_url, settings.litellm_master_key, settings.embedding_dimensions,
-                alias=settings.model_tiers[EMBED_TIER],
-            )
+            embeddings, _ = clients.index_embeddings(call_log=call_log)
             return check_search(args, settings, search, embeddings)
 
-        embeddings = None
+        embeddings, label = None, ""
         if not args.skip_index:
-            embeddings = LiteLLMEmbeddings(
-                settings.litellm_base_url, settings.litellm_master_key, settings.embedding_dimensions,
-                alias=settings.model_tiers[EMBED_TIER],
-            )
+            embeddings, label = clients.index_embeddings(call_log=call_log)
         warehouse = ClickHouseWarehouse(admin_client())
         compiled_dir = Path(settings.compiled_pack_dir)
         with compile_lock(compiled_dir, args.pack):
-            summary = _compile(args, settings, warehouse, search, embeddings)
+            summary = _compile(args, settings, warehouse, search, embeddings, label)
     except (PackValidationError, CompileError, SettingsError, SearchError, EmbeddingError, ClickHouseError) as error:
         print(error, file=sys.stderr)
         return 1
@@ -173,9 +171,12 @@ def _main(argv: list[str] | None) -> int:
     return 0
 
 
-def _compile(args: argparse.Namespace, settings, warehouse: ClickHouseWarehouse, search, embeddings) -> CompileSummary:
+def _compile(
+    args: argparse.Namespace, settings, warehouse: ClickHouseWarehouse, search, embeddings, embedding_label: str,
+) -> CompileSummary:
     registry = None
-    if not args.skip_index:
+    # With company documents off (the app state's documents.enabled) kb_docs holds no chunk.
+    if not args.skip_index and documents_enabled(shared_state()):
         registry = ClickHouseDocumentRegistry(admin_client())
         wait_for_uploads(registry, args.pack)
     return compile_pack(
@@ -191,7 +192,8 @@ def _compile(args: argparse.Namespace, settings, warehouse: ClickHouseWarehouse,
         screener=Screener.from_settings(settings),
         registry=registry,
         documents_dir=Path(settings.documents_dir),
-        embedding_alias=settings.model_tiers[EMBED_TIER],
+        # The embedding model's provider/model label: a later compile copies document chunks only with the same one.
+        embedding_alias=embedding_label,
     )
 
 

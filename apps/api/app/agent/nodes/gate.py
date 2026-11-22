@@ -18,6 +18,7 @@ from pydantic import BaseModel, ConfigDict
 
 from app.agent.audit import audit
 from app.agent.nodes.clarify import clarification
+from app.agent.nodes.screen import question_language
 from app.agent.state import AgentDeps, AgentState
 from app.contracts.query_spec import QuerySpec
 from app.packs.models import Pack
@@ -56,7 +57,7 @@ def authorize(spec: QuerySpec, pack: Pack, role: str, language: str) -> Denial |
         return Denial(dataset=spec.dataset, blocked=blocked, message=_message(role, blocked, language, None))
     dataset = next(item for item in pack.datasets.datasets if item.id == spec.dataset)
     needed = [*spec.dimensions, *(item.column for item in spec.filters)]
-    if spec.periods:
+    if spec.periods and dataset.time_column is not None:
         needed.append(dataset.time_column)
     metrics = {metric.id: metric for metric in pack.metrics.metrics}
     aggregate = None
@@ -89,7 +90,7 @@ def may_read_metric(pack: Pack, role: str, metric_id: str) -> bool:
 
 
 def gate(state: AgentState, deps: AgentDeps) -> dict:
-    language = getattr(state.get("extraction"), "language", None) or state.get("language") or "en"
+    language = question_language(state)
     pack = deps.compiled.pack
     if state.get("need") is not None:
         asked = clarification(state["need"], language, pack, lambda metric_id: may_read_metric(pack, deps.role, metric_id))

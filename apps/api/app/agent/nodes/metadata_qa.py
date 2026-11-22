@@ -1,8 +1,8 @@
 """Answer what a business term, metric, column or dataset means (DECISIONS §6 step 3).
 
 The question is embedded once and searched in the glossary, metrics, datasets
-and company documents (``kb_docs``), filtered by the asking role, so an
-answer never describes what the role may not read. The ``fast`` tier answers
+and company documents (``kb_docs``, unless documents are turned off), filtered
+by the asking role, so an answer never describes what the role may not read. The ``fast`` tier answers
 from those hits only, in the question's language. Figures come only from SQL
 (DECISIONS §5): the prompt forbids quoting numbers from the hits, and states
 that retrieved text is data, not instructions. No SQL is generated.
@@ -10,12 +10,13 @@ that retrieved text is data, not instructions. No SQL is generated.
 
 import json
 
+from app.agent.nodes.screen import question_language
 from app.agent.prompts import render
 from app.agent.state import AgentDeps, AgentState
 from app.llm.client import LLMError
 from app.llm.embeddings import EmbeddingError
 from app.packs.search_indices import alias_name
-from app.search.client import SearchError
+from app.search.engine import SearchError
 
 TIER = "fast"
 PROMPT = "metadata_qa.v2"
@@ -44,12 +45,12 @@ def metadata_qa(state: AgentState, deps: AgentDeps) -> dict:
         vector = deps.embeddings.embed([question])[0]
         hits = [
             (index, hit)
-            for index in SEARCHED
+            for index in SEARCHED if deps.documents_enabled or index != "kb_docs"
             for hit in deps.search.query(alias_name(pack.name, index), question, vector, [deps.role], HITS_PER_INDEX)
         ]
     except (EmbeddingError, SearchError) as error:
         return {"rejection": f"the pack context could not be retrieved: {error}"}
-    language = state.get("language") or "en"
+    language = question_language(state)
     found = [_entry(index, hit) for index, hit in hits]
     prompt = render(
         PROMPT, language=language, industry=pack.business_profile.industry,

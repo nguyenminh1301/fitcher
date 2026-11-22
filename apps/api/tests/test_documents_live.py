@@ -1,10 +1,11 @@
-"""Company documents against a running Qdrant (Phase 10 definition of done).
+"""Company documents against a running ClickHouse search database (Phase 10 definition of done).
 
-Set ``QDRANT_LIVE_URL`` (for example ``http://127.0.0.1:6333`` with the
-Compose stack up) to run these. Each test uses its own scratch pack name, a
+Set ``SEARCH_LIVE_TEST=1`` and ``CLICKHOUSE_SEARCH_PASSWORD`` (and
+``CLICKHOUSE_HOST`` when ClickHouse is not reachable as ``clickhouse``) to
+run these. Each test uses its own scratch pack name, a
 deterministic fake embedding model and the real EN/VI screening rules with a
 classifier stub that scores everything 0, so no request is billable; the
-scratch collections are deleted afterwards.
+scratch tables are dropped afterwards.
 """
 
 from datetime import UTC, datetime
@@ -20,16 +21,15 @@ from app.onboarding.docs_parser import DocumentRejected
 from app.onboarding.documents import DocumentService, InMemoryDocumentRegistry
 from app.packs.search_indices import alias_name
 from app.screening.screen import Screener
-from app.search.client import QdrantSearch
+from app.search.clickhouse_index import ClickHouseSearch, search_client
 
-LIVE_URL = os.environ.get("QDRANT_LIVE_URL", "")
 ATTACKS = Path(__file__).parent / "screening" / "attacks.yaml"
-pytestmark = pytest.mark.skipif(not LIVE_URL, reason="set QDRANT_LIVE_URL to a running Qdrant")
+pytestmark = pytest.mark.skipif(os.environ.get("SEARCH_LIVE_TEST") != "1", reason="needs a running ClickHouse")
 
 
 @pytest.fixture
 def live(tmp_path):
-    search = QdrantSearch(LIVE_URL)
+    search = ClickHouseSearch(search_client())
     pack = f"live_docs_{uuid.uuid4().hex[:8]}"
     embeddings = FakeEmbeddings()
     screener = Screener(FakeClassifier())
@@ -39,9 +39,9 @@ def live(tmp_path):
         max_bytes=100_000, clock=lambda: datetime.now(UTC),
     )
     yield service
-    for name in search.list_collections():
-        if name.startswith(pack):
-            search.delete_collection(name)
+    collection = alias_name(pack, "kb_docs")
+    for generation in search.generations(collection):
+        search.drop(collection, generation)
 
 
 def search_hits(service: DocumentService, text: str, roles: list[str]) -> list[dict]:
@@ -71,11 +71,11 @@ def test_a_document_carrying_an_injection_is_not_indexed(live):
     )
 
     benign = live.upload("returns.md", b"# Returns\n\nRefunds follow the returns policy.", ["analyst"], "lab")
-    before = live.search.count(alias_name(live.pack, "kb_docs"))
+    before = len(live.search.live_points(alias_name(live.pack, "kb_docs")))
 
     with pytest.raises(DocumentRejected, match="every chunk was blocked"):
         live.upload("note.txt", attack.encode("utf-8"), ["analyst"], "lab")
 
     failed = next(record for record in live.registry.list(live.pack) if record.id != benign.id)
     assert failed.status == "failed" and failed.blocked_chunks == 1
-    assert live.search.count(alias_name(live.pack, "kb_docs")) == before == benign.chunk_count
+    assert len(live.search.live_points(alias_name(live.pack, "kb_docs"))) == before == benign.chunk_count

@@ -11,7 +11,6 @@ import { EvaluationReport, EvaluationSection } from "@/components/console/sectio
 import { FeedbackSection } from "@/components/console/sections/FeedbackSection";
 import { ReviewDetail, ReviewSection } from "@/components/console/sections/ReviewSection";
 import { RunDetail, RunsSection } from "@/components/console/sections/RunsSection";
-import { UsersSection } from "@/components/console/sections/UsersSection";
 import { createMockApi } from "@/lib/api/mock";
 import type { ConsoleFile } from "@/lib/api/provisional";
 import { FEATURES, type Sources } from "@/lib/api/sources";
@@ -26,7 +25,6 @@ configure({ asyncUtilTimeout: 4000 });
 const CONSOLE: Partial<ConsoleFile> = {
   pack: { name: "shop", display_name: "Shop" },
   pack_roles: ["analyst"],
-  identities: [{ user_id: "both", display_name: "Bo Both", roles: ["pack_reviewer", "admin"] }],
   conversations: [],
   review_items: [{ id: "i1", file: "glossary.yaml", name: "term_one", kind: "item", status: "draft", confidence: 0.9, body: "A definition." }],
   eval_reports: [{ id: "e1", ts: "2026-11-02T13:40:00Z", passed: true, threshold: 0.8, layers: {}, categories: {}, failed_cases: [] }],
@@ -47,11 +45,9 @@ const SURFACES: [string, string, ReactNode][] = [
   ["run trace", "runs", <RunDetail key="s" traceId="t1" />],
   ["audit", "audit", <AuditSection key="s" />],
   ["costs", "costs", <CostsSection key="s" />],
-  ["users", "users", <UsersSection key="s" />],
 ];
 
 function show(section: string, page: ReactNode, sources?: Partial<Sources>) {
-  window.localStorage.setItem("fitcher.demo.identity", "both");
   render(
     <ThemeProvider>
       <I18nProvider initial="en">

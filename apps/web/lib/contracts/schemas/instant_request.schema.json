@@ -1,0 +1,27 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "source_id": {
+      "title": "Source Id",
+      "type": "string"
+    },
+    "tables": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Tables",
+      "type": "array"
+    },
+    "confirm_billable": {
+      "title": "Confirm Billable",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "source_id",
+    "tables",
+    "confirm_billable"
+  ],
+  "title": "InstantRequest",
+  "type": "object"
+}

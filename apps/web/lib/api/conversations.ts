@@ -20,4 +20,6 @@ export interface Turn {
 export interface ConversationThread {
   conversation: Conversation;
   turns: Turn[];
+  /** Whether the api is still answering its last question, after the page that asked it was left. */
+  running?: boolean;
 }

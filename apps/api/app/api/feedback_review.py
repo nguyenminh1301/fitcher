@@ -1,6 +1,6 @@
 """The console's Feedback section: likes and dislikes, and proposing an example from one run (DECISIONS §15).
 
-Only a ``pack_reviewer`` reaches these endpoints. Proposing runs the same code
+The owner reaches these endpoints. Proposing runs the same code
 as ``jobs.propose_examples`` for one run: the answer is the stored proposal,
 or ``proposed: false`` with the reason the run is not eligible.
 """
@@ -11,9 +11,8 @@ from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
-from app.api.console import require_reviewer
+from app.api.console import Owner
 from app.api.runtime import get_compiled_or_none, get_proposal_store, pack_identity, unavailable
-from app.auth.jwt import Principal
 from app.contracts.admin_feedback import FeedbackRow, ProposalResult
 from app.feedback.proposals import build_proposal, ineligible_reason, normalize
 from app.feedback.store import ClickHouseProposalStore
@@ -21,25 +20,25 @@ from app.packs.compiler import CompiledPack
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/admin/feedback")
-Reviewer = Annotated[Principal, Depends(require_reviewer)]
 Store = Annotated[ClickHouseProposalStore, Depends(get_proposal_store)]
 Compiled = Annotated[CompiledPack | None, Depends(get_compiled_or_none)]
 
 
 @router.get("")
 def list_feedback(
-    _: Reviewer, store: Store, compiled: Compiled, rating: Literal["like", "dislike"] | None = None,
+    _: Owner, store: Store, compiled: Compiled, rating: Literal["like", "dislike"] | None = None,
     start: Annotated[datetime | None, Query(alias="from")] = None, end: Annotated[datetime | None, Query(alias="to")] = None,
 ) -> list[FeedbackRow]:
+    pack = pack_identity(compiled).name
     try:
-        return store.feedback(pack_identity(compiled).name, rating, start, end)
+        return store.feedback(pack, rating, start, end)
     except Exception as error:  # noqa: BLE001 - ClickHouse unreachable or refused the reader
         logger.error("the feedback read failed", exc_info=error)
         raise unavailable("the feedback store is unavailable") from None
 
 
 @router.post("/{trace_id}/proposal")
-def propose_from_run(trace_id: str, _: Reviewer, store: Store, compiled: Compiled) -> ProposalResult:
+def propose_from_run(trace_id: str, _: Owner, store: Store, compiled: Compiled) -> ProposalResult:
     pack = pack_identity(compiled).name
     try:
         run = store.run(pack, trace_id)

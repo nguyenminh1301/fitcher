@@ -40,6 +40,8 @@ def test_pack_loads_against_the_marts(pack_dir: Path):
 @pytest.mark.parametrize("pack_dir", PACKS, ids=lambda path: path.name)
 def test_eval_covers_every_required_category(pack_dir: Path):
     pack = load_pack(pack_dir)
-    categories = set(typing.get_args(EvalCase.model_fields["category"].annotation))
+    # A pack has one reader role (DECISIONS §9), so no question is refused for its role; an older eval set's
+    # unauthorized cases still load but are no longer required.
+    categories = set(typing.get_args(EvalCase.model_fields["category"].annotation)) - {"unauthorized"}
 
     assert {case.category for case in pack.eval.cases} == categories

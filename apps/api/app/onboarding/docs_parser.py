@@ -10,6 +10,7 @@ Their text is data, never instructions (DECISIONS §9).
 
 from dataclasses import dataclass
 from io import BytesIO
+from typing import BinaryIO
 import re
 import zipfile
 
@@ -21,6 +22,12 @@ TEXT = "text/plain"
 MEDIA_TYPES = (PDF, DOCX, XLSX, MARKDOWN, TEXT)
 MAX_PDF_PAGES = 500
 MAX_SHEET_ROWS = 50_000
+# An Office archive is refused before anything is parsed when its members would expand past these limits, so a
+# decompression bomb (a few megabytes that inflate to gigabytes of sheet XML) costs a read of its directory.
+# A real workbook's XML compresses about 5 to 30 times; a member under the ratio floor is never judged by ratio.
+MAX_OFFICE_UNCOMPRESSED_BYTES = 1024 * 1024 * 1024
+MAX_OFFICE_RATIO = 100
+OFFICE_RATIO_FLOOR_BYTES = 1024 * 1024
 _MARKDOWN_NAMES = (".md", ".markdown")
 _HEADING = re.compile(r"^(#{1,6})\s+(.+?)\s*#*\s*$")
 _DOCX_HEADING = re.compile(r"^Heading (\d)$")
@@ -46,9 +53,27 @@ def _unsupported() -> DocumentRejected:
     return DocumentRejected("the file is not a supported type (PDF, DOCX, XLSX, Markdown or UTF-8 text)", 415)
 
 
-def _office_type(data: bytes) -> str:
+def _check_expansion(archive: zipfile.ZipFile) -> None:
+    """Refuse an archive whose central directory declares too much uncompressed data or too high a ratio.
+
+    The declared sizes bound what is read: Python's zip reader returns at most a member's declared size.
+    """
+    members = archive.infolist()
+    if sum(member.file_size for member in members) > MAX_OFFICE_UNCOMPRESSED_BYTES:
+        raise DocumentRejected(
+            f"the file expands to more than {MAX_OFFICE_UNCOMPRESSED_BYTES} bytes when unpacked", 413)
+    for member in members:
+        if member.file_size > OFFICE_RATIO_FLOOR_BYTES and member.file_size > MAX_OFFICE_RATIO * max(member.compress_size, 1):
+            raise DocumentRejected(
+                f"the file is compressed more than {MAX_OFFICE_RATIO} times, which a real document is not", 413)
+
+
+def _office_type(data: bytes | BinaryIO) -> str:
+    """DOCX or XLSX for an Office Open XML archive given as bytes or as a seekable file; macros and archives
+    that would expand past the limits above are refused."""
     try:
-        archive = zipfile.ZipFile(BytesIO(data))
+        archive = zipfile.ZipFile(BytesIO(data) if isinstance(data, bytes) else data)
+        _check_expansion(archive)
         names = set(archive.namelist())
         content_types = archive.read("[Content_Types].xml").decode("utf-8", "replace") if "[Content_Types].xml" in names else ""
     except zipfile.BadZipFile:
@@ -158,38 +183,43 @@ def _markdown(text: str) -> list[Section]:
 
 
 def _cell(value: object) -> str:
+    if isinstance(value, float) and value.is_integer() and abs(value) < 1e15:
+        # The workbook reader returns every number as a float; a whole one reads as an integer.
+        value = int(value)
     return "" if value is None else " ".join(str(value).split())
 
 
 def _xlsx(data: bytes) -> list[Section]:
-    from openpyxl import load_workbook
+    from python_calamine import CalamineWorkbook
 
     try:
-        workbook = load_workbook(BytesIO(data), read_only=True, data_only=True)
-    except Exception as error:  # noqa: BLE001 - openpyxl raises many types for a corrupt workbook
+        workbook = CalamineWorkbook.from_filelike(BytesIO(data))
+        names = list(workbook.sheet_names)
+    except Exception as error:  # noqa: BLE001 - the reader raises its own types for a corrupt workbook
         raise DocumentRejected(f"the workbook cannot be read: {type(error).__name__}") from None
     sections: list[Section] = []
     total = 0
-    try:
-        for sheet in workbook.worksheets:
-            header: str | None = None
-            lines: list[str] = []
-            for row in sheet.iter_rows(values_only=True):
-                cells = [_cell(value) for value in row]
-                if not any(cells):
-                    continue
-                total += 1
-                if total > MAX_SHEET_ROWS:
-                    raise DocumentRejected(f"the workbook has more than {MAX_SHEET_ROWS} rows")
-                line = " | ".join(cells).rstrip(" |")
-                if header is None:
-                    header = line
-                else:
-                    lines.append(line)
-            if header is not None:
-                sections.append(Section([sheet.title], "\n".join(lines) or header, header=header))
-    finally:
-        workbook.close()
+    for name in names:
+        try:
+            rows = workbook.get_sheet_by_name(name).iter_rows()
+        except Exception as error:  # noqa: BLE001
+            raise DocumentRejected(f"the workbook cannot be read: {type(error).__name__}") from None
+        header: str | None = None
+        lines: list[str] = []
+        for row in rows:
+            cells = [_cell(value) for value in row]
+            if not any(cells):
+                continue
+            total += 1
+            if total > MAX_SHEET_ROWS:
+                raise DocumentRejected(f"the workbook has more than {MAX_SHEET_ROWS} rows")
+            line = " | ".join(cells).rstrip(" |")
+            if header is None:
+                header = line
+            else:
+                lines.append(line)
+        if header is not None:
+            sections.append(Section([name], "\n".join(lines) or header, header=header))
     return sections
 
 

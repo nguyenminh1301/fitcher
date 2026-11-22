@@ -32,12 +32,18 @@ class AskRequest(ContractModel):
     question: str = Field(min_length=1, max_length=4000)
     # A conversation of the asking user to continue; null starts one. The response names it in X-Conversation-Id.
     conversation_id: str | None = None
+    # The pack (one per data source) a new conversation is answered from; the pack used last when null. A
+    # conversation that continues keeps its own pack.
+    pack: str | None = Field(default=None, pattern=r"^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$")
     # The browser's IANA time zone; UTC when null (DECISIONS §6 step 5).
     timezone: str | None = None
     # Ask this question in place of that turn of the conversation, under a new revision; later turns leave the thread.
     edit_of_turn: int | None = Field(default=None, ge=1)
     # Ask that turn's stored question again under a new revision; ``question`` is not used.
     retry_of_turn: int | None = Field(default=None, ge=1)
+    # The id of the option of the conversation's last clarifying question that ``question`` picks
+    # ("period:this_year"); the api then answers the clarified question with that choice applied.
+    clarify_option: str | None = Field(default=None, pattern=r"^(period|metric|column):[A-Za-z0-9_.-]{1,200}$")
 
     @model_validator(mode="after")
     def _one_turn_of_a_conversation(self) -> Self:
@@ -72,6 +78,9 @@ class ClarifyEvent(EventModel):
     question: str
     options: list[ClarifyOption] = []
     lang: str
+    # The question this asks about and the option ids already picked for it; the next pick adds to them.
+    about: str = ""
+    chosen: list[str] = []
 
 
 class DenyEvent(EventModel):
@@ -93,6 +102,8 @@ class SqlEvent(EventModel):
     event: Literal["sql"] = "sql"
     sql: str
     attempt: int = Field(ge=1)
+    # Metrics of the question an instant pack approved without a person; the answer says so under the SQL (DECISIONS §5).
+    unreviewed_metrics: list[str] = []
 
 
 class ResultEvent(EventModel):
@@ -117,10 +128,11 @@ class DoneEvent(EventModel):
 
 
 class ErrorEvent(EventModel):
-    """``failed``: no SQL attempt produced a result; ``internal``: the run broke, with no detail for the client."""
+    """``failed``: no SQL attempt produced a result; ``internal``: the run broke, with no detail for the client;
+    ``model``: the model call that reads the question failed, with the provider's reason in ``error``."""
 
     event: Literal["error"] = "error"
-    kind: Literal["failed", "internal"]
+    kind: Literal["failed", "internal", "model"]
     message: str
     # The last SQL attempt and its error, for a failed run.
     sql: str | None = None

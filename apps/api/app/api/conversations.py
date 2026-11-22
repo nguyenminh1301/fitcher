@@ -13,8 +13,9 @@ from typing import Annotated, TypeVar
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 
 from app.api.auth import current_principal
+from app.api.live_runs import LIVE_RUNS
 from app.api.runtime import get_conversation_store, unavailable
-from app.auth.jwt import Principal
+from app.auth.principal import Principal
 from app.contracts.conversations import Conversation, ConversationGroup, ConversationPatch, ConversationThread, GroupInput
 from app.conversation.store import ConversationNotFound, ConversationStore, GroupNotFound
 
@@ -57,7 +58,8 @@ def search_conversations(
 
 @router.get("/conversations/{conversation_id}")
 def read_conversation(conversation_id: str, user: User, store: Store) -> ConversationThread:
-    return _call(lambda: store.thread(user.user_id, conversation_id))
+    thread = _call(lambda: store.thread(user.user_id, conversation_id))
+    return thread.model_copy(update={"running": LIVE_RUNS.running(user.user_id, conversation_id)})
 
 
 @router.patch("/conversations/{conversation_id}")
@@ -67,7 +69,8 @@ def update_conversation(conversation_id: str, patch: ConversationPatch, user: Us
 
 @router.delete("/conversations/{conversation_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_conversation(conversation_id: str, user: User, store: Store) -> Response:
-    _call(lambda: store.delete(user.user_id, conversation_id))
+    """Deletes the conversation for good: its rows, messages and the feedback on its answers."""
+    _call(lambda: store.erase(user.user_id, conversation_id))
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 

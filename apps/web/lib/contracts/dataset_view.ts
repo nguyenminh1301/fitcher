@@ -3,7 +3,7 @@
 export type Id = string;
 export type Description = string;
 export type Grain = string;
-export type TimeColumn = string;
+export type TimeColumn = string | null;
 export type ReadableRoles = string[];
 export type Name = string;
 export type Type = string;
@@ -15,7 +15,7 @@ export interface DatasetView {
   id: Id;
   description: Description;
   grain: Grain;
-  time_column: TimeColumn;
+  time_column?: TimeColumn;
   readable_roles: ReadableRoles;
   columns: Columns;
 }

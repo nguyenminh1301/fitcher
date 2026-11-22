@@ -1,4 +1,5 @@
-// /console opens the first section the signed-in roles allow; the layout redirects there.
+import { OverviewSection } from "@/components/console/sections/OverviewSection";
+
 export default function ConsoleHome() {
-  return null;
+  return <OverviewSection />;
 }

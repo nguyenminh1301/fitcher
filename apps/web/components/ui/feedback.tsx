@@ -17,9 +17,9 @@ const STATUS: Record<string, [string, string]> = {
   allow: ["success", "shieldCheck"], deny: ["neutral", "lock"], estimate: ["warning", "info"], warning: ["warning", "alert"],
   definition: ["done", "book"], neutral: ["neutral", "user"], liked: ["success", "thumbsUp"], disliked: ["danger", "thumbsDown"],
   fb_new: ["accent", "info"], proposed: ["done", "clipboardCheck"], dismissed: ["muted", "x"], active: ["success", "circleCheck"],
-  disabled: ["neutral", "ban"], passed: ["success", "circleCheck"], belowThreshold: ["danger", "alert"], packEnabled: ["success", "circleCheck"],
+  disabled: ["neutral", "ban"], passed: ["success", "circleCheck"], belowThreshold: ["danger", "alert"], meetsThreshold: ["success", "circleCheck"],
   succeeded: ["success", "circleCheck"], rejected: ["warning", "alert"], error: ["danger", "circleX"], running: ["muted", "loader"],
-  eligible: ["success", "circleCheck"], ineligible: ["warning", "alert"],
+  eligible: ["success", "circleCheck"], ineligible: ["warning", "alert"], unreviewed: ["warning", "info"],
 };
 
 export function StatusPill({ status, children }: { status: string; children?: ReactNode }) {

@@ -1,27 +1,20 @@
 "use client";
 
 // The parts of an assistant turn (docs/design/web-app.md, Anatomy of an answer): progress steps, the
-// summary, notices, clarify options and the feedback bar. Content keeps the language it was written in;
-// labels and buttons follow the interface language.
+// summary, notices, clarify options and the feedback bar. Text a model or the api wrote for the question keeps
+// the question's language; titles, fixed explanations, labels and buttons follow the interface language.
 
 import { Fragment, useState, type ReactNode } from "react";
 
 import { Icon } from "@/components/brand/Icon";
 import { Button, Chip, TextField } from "@/components/ui/controls";
 import { cx } from "@/lib/cx";
-import { DICTIONARIES, translate, type Locale } from "@/lib/i18n";
 import { useI18n } from "@/lib/i18n/react";
 import type { StepId } from "@/lib/steps";
 
 import { SqlView } from "./SqlView";
 
 export type Step = { id: StepId; attempt?: number; status: "done" | "active" | "failed" | "denied" };
-
-/** A text in the language it was written in (en or vi), whatever the interface language is. */
-function contentText(lang: string, key: string, vars?: Record<string, string | number>): string {
-  const locale: Locale = lang === "vi" ? "vi" : "en";
-  return translate(DICTIONARIES.en, DICTIONARIES[locale], key, vars);
-}
 
 /** The live step list while an answer streams, then a "How I got this" toggle. */
 export function ProgressSteps({ steps, live, onStop }: { steps: Step[]; live: boolean; onStop?: () => void }) {
@@ -60,9 +53,15 @@ export function ProgressSteps({ steps, live, onStop }: { steps: Step[]; live: bo
   );
 }
 
-/** The summary, with **figures** in bold, in the language the answer was written in. */
+// A figure of a summary: a number with thousands separators or decimals, a percentage, an amount with a currency
+// sign, or a number of five digits or more. A plain year or a small count stays as it is.
+const FIGURE = /((?:[$€£₫]\s?)?\d{1,3}(?:[.,\u00a0\u202f\u2009 ]\d{3})+(?:[.,]\d+)?(?:\s?%)?|(?:[$€£₫]\s?)\d+(?:[.,]\d+)?|\d+[.,]\d+(?:\s?%)?|\d+\s?%|\d{5,})/g;
+
+/** The summary in the language the answer was written in, with its figures in bold: the ones the model marked
+ * with ``**``, or, when it marked none, every figure the text holds. */
 export function Summary({ text, lang }: { text: string; lang: string }) {
-  const parts = text.split(/\*\*(.+?)\*\*/g);
+  const marked = /\*\*(.+?)\*\*/.test(text);
+  const parts = marked ? text.split(/\*\*(.+?)\*\*/g) : text.split(FIGURE);
   return (
     <p className="fc-answer-summary" lang={lang}>
       {parts.map((part, index) => (index % 2 ? <b key={index}>{part}</b> : <Fragment key={index}>{part}</Fragment>))}
@@ -72,7 +71,8 @@ export function Summary({ text, lang }: { text: string; lang: string }) {
 
 const NOTICE = {
   denied: ["lock", "neutral", "deniedTitle"], blocked: ["shieldCheck", "warning", "blockedTitle"], failed: ["circleX", "danger", "failedTitle"], empty: ["searchX", "neutral", "emptyTitle"],
-  network: ["wifiOff", "warning", "networkTitle"], stopped: ["stop", "neutral", "stoppedTitle"],
+  network: ["wifiOff", "warning", "networkTitle"], stopped: ["stop", "neutral", "stoppedTitle"], refused: ["warning", "warning", "refusedTitle"],
+  model: ["alert", "warning", "modelTitle"],
 } as const;
 
 type NoticeProps = {
@@ -87,30 +87,40 @@ type NoticeProps = {
 };
 
 /** Denied, blocked, failed, empty, lost-connection and stopped answers: calm, specific, never a guessed result.
- * A blocked notice shows the api's message, written in the question's language, and never the question itself. */
+ * The title and the fixed explanations follow the interface language. A message the api wrote for the question
+ * (a denial or a block) keeps the question's language, and a blocked notice never shows the question itself. */
 export function NoticeCard({ kind, lang, text, blocked, sql, error, onRetry, onRephrase }: NoticeProps) {
   const { t } = useI18n();
   const [icon, tone, title] = NOTICE[kind];
-  const fallback = { denied: "", blocked: "blockedText", failed: "failedText", empty: "emptyText", network: "networkText", stopped: "stoppedText" }[kind];
+  const fallback = {
+    denied: "", blocked: "blockedText", failed: "failedText", empty: "emptyText", network: "networkText", stopped: "stoppedText",
+    refused: "refusedText", model: "modelText",
+  }[kind];
   return (
     <div className={cx("fc-notice", tone !== "neutral" && `fc-notice-${tone}`)} role={kind === "failed" || kind === "network" ? "alert" : "status"}>
-      <div className="fc-notice-head" lang={lang}>
+      <div className="fc-notice-head">
         <span className="fc-notice-badge"><Icon name={icon} /></span>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <h3 className="fc-notice-title">{contentText(lang, `ui.${title}`)}</h3>
+          <h3 className="fc-notice-title">{t(`ui.${title}`)}</h3>
           <p className="fc-notice-text">
-            {text ?? contentText(lang, `ui.${fallback}`)}
+            {text !== undefined ? <span lang={lang}>{text}</span> : t(`ui.${fallback}`)}
             {kind === "denied" && blocked?.length ? (
               <span> {blocked.map((item, index) => <Fragment key={item}>{index ? ", " : ""}<code className="fc-code">{item}</code></Fragment>)}</span>
             ) : null}
           </p>
-          {kind === "denied" ? <p className="fc-notice-text">{contentText(lang, "ui.deniedHint")}</p> : null}
+          {kind === "denied" ? <p className="fc-notice-text">{t("ui.deniedHint")}</p> : null}
         </div>
       </div>
       {kind === "failed" && sql ? <SqlView sql={sql} title={t("ui.lastSql")} badge={false} defaultOpen /> : null}
       {kind === "failed" && error ? (
         <div className="fc-answer-section">
           <span className="fc-field-label">{t("ui.dbError")}</span>
+          <pre className="fc-dberr">{error}</pre>
+        </div>
+      ) : null}
+      {kind === "model" && error ? (
+        <div className="fc-answer-section">
+          <span className="fc-field-label">{t("ui.providerMessage")}</span>
           <pre className="fc-dberr">{error}</pre>
         </div>
       ) : null}
@@ -125,8 +135,8 @@ export function NoticeCard({ kind, lang, text, blocked, sql, error, onRetry, onR
   );
 }
 
-/** A clarifying question with its options; picking one sends it as the next question. */
-export function ClarifyOptions({ question, options, lang, onPick }: { question: string; options: { id: string; label: string }[]; lang: string; onPick: (label: string) => void }) {
+/** A clarifying question with its options; picking one sends its label as the next question, with its id. */
+export function ClarifyOptions({ question, options, lang, onPick }: { question: string; options: { id: string; label: string }[]; lang: string; onPick: (label: string, option: string) => void }) {
   const [picked, setPicked] = useState<string | null>(null);
   return (
     <div className="fc-clarify" role="group" aria-label={question} lang={lang}>
@@ -140,7 +150,7 @@ export function ClarifyOptions({ question, options, lang, onPick }: { question: 
             onClick={() => {
               if (picked !== null) return;
               setPicked(option.id);
-              onPick(option.label);
+              onPick(option.label, option.id);
             }}
           >
             {option.label}

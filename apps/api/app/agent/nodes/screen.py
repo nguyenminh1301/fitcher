@@ -53,12 +53,24 @@ def language_of(text: str) -> str:
     return "vi" if _VIETNAMESE.search(text) else "en"
 
 
+def question_language(state) -> str:
+    """The language to reply in: Vietnamese whenever the question has Vietnamese letters, else what the models read.
+
+    The letters decide first because a model may leave its ``language`` field at the English default for a
+    Vietnamese question, which made clarifying questions and denials come back in English.
+    """
+    if language_of(state.get("question") or "") == "vi":
+        return "vi"
+    return getattr(state.get("extraction"), "language", None) or state.get("language") or "en"
+
+
 def blocked_message(reason: BlockedReason, lang: str) -> str:
     return MESSAGES[reason]["vi" if lang == "vi" else "en"]
 
 
 def screen(state: AgentState, deps: AgentDeps) -> dict:
-    question = state["question"]
+    # The user's own words are screened: the label they sent for a picked option, otherwise the question.
+    question = state.get("asked") or state["question"]
     if deps.screener is None:
         verdict = Verdict(verdict="unavailable", score=None, rule_hits=[], model_version=RULES_VERSION)
     else:

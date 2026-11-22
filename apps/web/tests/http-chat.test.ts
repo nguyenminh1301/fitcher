@@ -100,11 +100,27 @@ describe("http chat", () => {
     const { chat: http } = chat(() => Response.json({ detail: "too many questions; try again shortly" }, { status: 429 }));
 
     await expect(collect(http.ask({ question: "q" }, new AbortController().signal))).rejects.toThrow("429: too many questions");
+    await expect(collect(http.ask({ question: "q" }, new AbortController().signal))).rejects.toMatchObject({
+      name: "AskRefused", status: 429, reason: "too many questions; try again shortly",
+    });
   });
 
   it("treats a stream that ends before done or error as a lost connection", async () => {
     const { chat: http } = chat(() => new Response(stream([frame(STATUS)])));
 
     await expect(collect(http.ask({ question: "q" }, new AbortController().signal))).rejects.toThrow("ended before");
+  });
+});
+
+describe("http chat suggestions", () => {
+  it("uses the pack's sample suggestions and otherwise asks the api for the pack's example questions", async () => {
+    const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
+    const sample = chat(() => json({ suggestions: [{ text: "From the sample", lang: "en" }], scenarios: [] }));
+    expect(await sample.chat.suggestions()).toEqual([{ text: "From the sample", lang: "en" }]);
+
+    const answers = [json({ detail: "no sample data" }, 404), json([{ text: "Total sales?", lang: "en" }])];
+    const generated = chat(() => answers.shift() as Response);
+    expect(await generated.chat.suggestions()).toEqual([{ text: "Total sales?", lang: "en" }]);
+    expect(generated.fetcher.mock.calls.map((call) => call[0])).toEqual(["/api/sample/scenarios", "/api/pack/suggestions"]);
   });
 });

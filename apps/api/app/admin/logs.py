@@ -3,7 +3,8 @@
 ``AdminLogs`` runs parameterized SELECTs as ``agent_logs_trace_reader``, the
 read-only user whose profile caps execution time and result rows. Runs and
 audit rows are those of the active pack; conversations include the ones their
-owner deleted, which only an admin may read. Costs are LiteLLM's estimates.
+owner deleted, which only an admin may read. Costs are LiteLLM's estimates; token counts
+are what the providers reported.
 """
 
 from collections.abc import Mapping, Sequence
@@ -14,7 +15,7 @@ from typing import Protocol
 import clickhouse_connect
 
 from app.contracts.admin import (
-    AdminConversation, AdminConversationThread, AdminMessage, AuditRow, CostRow, RunRow, RunTrace, ScreeningRow,
+    AuditRow, CostRow, RunRow, RunTrace, ScreeningRow,
     TraceItem,
 )
 from app.llm.tiers import provider_of
@@ -45,17 +46,47 @@ def _aware(value: datetime) -> datetime:
     return value if value.tzinfo else value.replace(tzinfo=UTC)
 
 
+# The LiteLLM prefixes the gateway puts before a model when it logs a call (``app/llm/providers.py``).
+SDK_PREFIXES = frozenset({"openai", "anthropic", "gemini", "ollama", "ollama_chat"})
+
+
+def model_name(logged: str) -> str:
+    """The provider's own model name of a logged call: ``openai/nvidia/model:free`` becomes ``nvidia/model:free``."""
+    prefix, _, rest = logged.partition("/")
+    return rest if rest and prefix in SDK_PREFIXES else logged
+
+
 def _short(value: object) -> str:
     return " ".join(str(value or "").split())[:TEXT_LIMIT]
 
 
 RUN_SELECT = """
-SELECT r.trace_id, r.ts, r.user_id, a.role, r.question, r.intent, r.status, r.latency_ms, c.cost, r.error
+SELECT r.trace_id, r.ts, r.user_id, a.role, r.question, r.intent, r.status, r.latency_ms, c.cost, r.error,
+    c.input_tokens, c.output_tokens, c.models, r.pack, c.unpriced > 0, if(p.status = 'clarified', p.question, '')
 FROM agent_logs.runs AS r FINAL
 LEFT JOIN (SELECT trace_id, any(role) AS role FROM agent_logs.audit GROUP BY trace_id) AS a ON a.trace_id = r.trace_id
-LEFT JOIN (SELECT trace_id, sum(cost_usd) AS cost FROM agent_logs.llm_calls GROUP BY trace_id) AS c
-    ON c.trace_id = r.trace_id
-WHERE r.pack = {pack:String}"""
+LEFT JOIN (
+    SELECT trace_id, sum(cost_usd) AS cost, sum(prompt_tokens) AS input_tokens, sum(completion_tokens) AS output_tokens,
+        -- Calls the gateway had no price for: the run's cost is then unknown, not the sum of the priced ones.
+        countIf(cost_usd IS NULL AND status IN ('success', 'ok')) AS unpriced,
+        -- The answering models in the order they first answered.
+        arrayDistinct(arrayMap(call -> call.2, arraySort(groupArrayIf((ts, model), status IN ('success', 'ok'))))) AS models
+    FROM agent_logs.llm_calls GROUP BY trace_id
+) AS c ON c.trace_id = r.trace_id
+-- The run of the conversation's previous turn (its latest revision): a run that answers a question asked back names it.
+LEFT JOIN (
+    SELECT turns.trace_id AS trace_id, any(previous.latest_trace) AS asked_trace
+    FROM (SELECT DISTINCT trace_id, user_id, conversation_id, turn FROM agent_logs.chat_messages WHERE trace_id != '') AS turns
+    INNER JOIN (
+        SELECT user_id, conversation_id, turn + 1 AS next_turn, argMax(trace_id, (revision, ts)) AS latest_trace
+        FROM agent_logs.chat_messages WHERE trace_id != '' GROUP BY user_id, conversation_id, turn
+    ) AS previous
+        ON previous.user_id = turns.user_id AND previous.conversation_id = turns.conversation_id
+        AND previous.next_turn = turns.turn
+    GROUP BY turns.trace_id
+) AS q ON q.trace_id = r.trace_id
+LEFT JOIN (SELECT trace_id, question, status FROM agent_logs.runs FINAL) AS p ON p.trace_id = q.asked_trace
+WHERE (r.pack = {pack:String} OR {every_pack:Bool})"""
 
 
 class AdminLogs:
@@ -69,18 +100,24 @@ class AdminLogs:
 
     @staticmethod
     def _run(row: Sequence) -> RunRow:
-        trace_id, ts, user_id, role, question, intent, status, latency_ms, cost, error = row
+        (trace_id, ts, user_id, role, question, intent, status, latency_ms, cost, error, input_tokens, output_tokens, models,
+         pack, unpriced, answer_to) = row
         return RunRow(
+            pack=pack or "",
             trace_id=trace_id, ts=_aware(ts), user_id=user_id, role=role or "", question=question, intent=intent,
             status=status, latency_ms=int(latency_ms or 0), cost_usd=round(float(cost or 0.0), 6), error=error or "",
+            input_tokens=int(input_tokens or 0), output_tokens=int(output_tokens or 0),
+            models=list(dict.fromkeys(model_name(model) for model in (models or []) if model)),
+            cost_unknown=bool(unpriced), answer_to=answer_to or "",
         )
 
     def runs(
         self, *, user: str | None = None, start: date | None = None, end: date | None = None,
-        status: str | None = None, page: int = 1,
+        status: str | None = None, page: int = 1, every_pack: bool = False,
     ) -> list[RunRow]:
-        """Runs newest first, ``PAGE_SIZE`` per page; ``end`` is exclusive."""
-        where, parameters = [], {"pack": self.pack, "limit": PAGE_SIZE, "offset": (max(page, 1) - 1) * PAGE_SIZE}
+        """Runs newest first, ``PAGE_SIZE`` per page; ``end`` is exclusive; ``every_pack`` reads every pack's runs."""
+        where, parameters = [], {"pack": self.pack, "every_pack": every_pack, "limit": PAGE_SIZE,
+                                 "offset": (max(page, 1) - 1) * PAGE_SIZE}
         if user:
             where.append("r.user_id = {user:String}")
             parameters["user"] = user
@@ -98,7 +135,9 @@ class AdminLogs:
         return [self._run(row) for row in self.query(sql, parameters)]
 
     def trace(self, trace_id: str) -> RunTrace | None:
-        rows = self.query(RUN_SELECT + "\n  AND r.trace_id = {trace_id:String}", {"pack": self.pack, "trace_id": trace_id})
+        # A trace id names one run, whichever pack answered it, so a run listed among every pack's runs opens.
+        rows = self.query(RUN_SELECT + "\n  AND r.trace_id = {trace_id:String}",
+                          {"pack": self.pack, "every_pack": True, "trace_id": trace_id})
         if not rows:
             return None
         parameters = {"trace_id": trace_id}
@@ -110,14 +149,16 @@ class AdminLogs:
             items.append((_aware(ts), TraceItem(
                 name=node, kind="node", status="ok" if status == "ok" else "err", ms=int(duration_ms or 0),
             )))
-        for ts, node, alias, model, tokens, cost, latency_ms, status, error in self.query(
-            "SELECT ts, node, alias, model, total_tokens, cost_usd, latency_ms, status, error "
+        for ts, node, alias, provider, model, tokens, cost, latency_ms, status, error in self.query(
+            "SELECT ts, node, alias, provider, model, total_tokens, cost_usd, latency_ms, status, error "
             "FROM agent_logs.llm_calls WHERE trace_id = {trace_id:String} ORDER BY ts",
             parameters,
         ):
             items.append((_aware(ts), TraceItem(
                 name=f"LLM {node}", kind="llm", status="ok" if status in ("ok", "success") else "err",
-                ms=int(latency_ms or 0), meta=[alias, model, f"{int(tokens or 0)} tokens", f"${float(cost or 0):.6f}"],
+                ms=int(latency_ms or 0),
+                meta=[alias or provider, model_name(model or ""), f"{int(tokens or 0)} tokens",
+                      "price unknown" if cost is None else f"${float(cost):.6f}"],
                 error=_short(error) or None,
             )))
         for ts, attempt, sql, rows_read, error in self.query(
@@ -173,50 +214,38 @@ class AdminLogs:
             for ts, trace_id, user_id, src, result, mode, score, hits in self.query(sql, parameters)
         ]
 
-    def costs(self, *, start: date, end: date) -> list[CostRow]:
+    def costs(self, *, start: date, end: date, pack: str | None = None) -> list[CostRow]:
+        """Model call costs by day; with ``pack``, only the calls of runs that pack answered."""
+        parameters: dict = {"start": start, "end": end}
+        scope = ""
+        if pack:
+            scope = "AND trace_id IN (SELECT trace_id FROM agent_logs.runs WHERE pack = {pack:String}) "
+            parameters["pack"] = pack
         rows = self.query(
-            "SELECT toString(toDate(ts)) AS day, alias, model, tier, count() AS calls, sum(cost_usd) AS cost "
-            "FROM agent_logs.llm_calls WHERE ts >= {start:Date} AND ts < {end:Date} "
-            "GROUP BY day, alias, model, tier ORDER BY day, alias, model, tier",
-            {"start": start, "end": end},
+            "SELECT toString(toDate(ts)) AS day, alias, provider, model, tier, count() AS calls, sum(cost_usd) AS cost, "
+            "sum(prompt_tokens) AS input_tokens, sum(completion_tokens) AS output_tokens "
+            "FROM agent_logs.llm_calls WHERE ts >= {start:Date} AND ts < {end:Date} " + scope +
+            "GROUP BY day, alias, provider, model, tier ORDER BY day, alias, provider, model, tier",
+            parameters,
         )
         return [
-            CostRow(day=day, alias=alias, model=model, tier=tier, provider=provider_of(alias), calls=int(calls),
-                    cost_usd=round(float(cost or 0.0), 6))
-            for day, alias, model, tier, calls, cost in rows
+            # Rows written through the LiteLLM Proxy have no provider column value; their alias names it.
+            CostRow(day=day, alias=alias, model=model, tier=tier, provider=provider or provider_of(alias), calls=int(calls),
+                    cost_usd=round(float(cost or 0.0), 6), input_tokens=int(input_tokens or 0),
+                    output_tokens=int(output_tokens or 0))
+            for day, alias, provider, model, tier, calls, cost, input_tokens, output_tokens in rows
         ]
 
-    @staticmethod
-    def _conversation(row: Sequence) -> AdminConversation:
-        conversation_id, user_id, title, deleted, updated_at = row
-        return AdminConversation(conversation_id=conversation_id, user_id=user_id, title=title, deleted=bool(deleted),
-                                 updated_at=_aware(updated_at))
+    def median_latency(self, *, days: int = 7) -> dict[tuple[str, str], int]:
+        """The median latency of each provider's model over its successful calls of the last ``days`` days.
 
-    def conversations(self, *, user: str | None = None) -> list[AdminConversation]:
-        sql = "SELECT conversation_id, user_id, title, deleted, updated_at FROM agent_logs.conversations FINAL"
-        parameters: dict = {"limit": 200}
-        if user:
-            sql += " WHERE user_id = {user:String}"
-            parameters["user"] = user
-        sql += " ORDER BY updated_at DESC LIMIT {limit:UInt32}"
-        return [self._conversation(row) for row in self.query(sql, parameters)]
-
-    def conversation(self, conversation_id: str) -> AdminConversationThread | None:
+        Keyed by provider id and the provider's own model name; every pack's calls count.
+        """
         rows = self.query(
-            "SELECT conversation_id, user_id, title, deleted, updated_at FROM agent_logs.conversations FINAL "
-            "WHERE conversation_id = {id:String} LIMIT 1",
-            {"id": conversation_id},
+            "SELECT provider, model, quantileExact(0.5)(latency_ms) FROM agent_logs.llm_calls "
+            "WHERE ts >= now() - toIntervalDay({days:UInt16}) AND status IN ('success', 'ok') AND provider != '' "
+            "GROUP BY provider, model",
+            {"days": days},
         )
-        if not rows:
-            return None
-        messages = [
-            AdminMessage(ts=_aware(ts), role=role, content=content, trace_id=trace_id, turn=int(turn),
-                         revision=int(revision))
-            for ts, role, content, trace_id, turn, revision in self.query(
-                "SELECT ts, role, content, trace_id, turn, revision FROM agent_logs.chat_messages "
-                "WHERE conversation_id = {id:String} ORDER BY turn, revision, ts",
-                {"id": conversation_id},
-            )
-        ]
-        return AdminConversationThread(conversation=self._conversation(rows[0]), messages=messages)
+        return {(provider, model_name(model)): int(median) for provider, model, median in rows}
 

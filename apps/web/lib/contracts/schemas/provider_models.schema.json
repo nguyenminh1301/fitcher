@@ -1,0 +1,22 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "provider_id": {
+      "title": "Provider Id",
+      "type": "string"
+    },
+    "models": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Models",
+      "type": "array"
+    }
+  },
+  "required": [
+    "provider_id",
+    "models"
+  ],
+  "title": "ProviderModels",
+  "type": "object"
+}

@@ -11,7 +11,6 @@ import { I18nProvider } from "@/lib/i18n/react";
 const CONSOLE = {
   pack: { name: "shop", display_name: "Shop" },
   pack_roles: ["analyst", "marketing"],
-  identities: [{ user_id: "u1", display_name: "Ana", roles: ["analyst", "admin"] }],
   conversations: [],
   datasets: [{ id: "orders", description: "Orders.", grain: "one row per order", time_column: "day", readable_roles: ["analyst"], columns: [] }],
   review_items: [],
@@ -22,7 +21,7 @@ const CONSOLE = {
   traces: {},
   audit: [],
   costs: [],
-  users: [{ id: "u2", username: "lab.marketing", display_name: "Lab Marketing", roles: ["marketing"], enabled: true }],
+  users: [{ id: "u2", email: "marketing@example.com", display_name: "Lab Marketing", roles: ["marketing"], enabled: true }],
 };
 
 function fakeFetch(files: Record<string, unknown>) {
@@ -58,16 +57,6 @@ describe("api client", () => {
     expect(await mock.sampleStatus()).toBe("missing");
   });
 
-  it("console actions change the sample state", async () => {
-    vi.stubGlobal("fetch", fakeFetch({ console: CONSOLE, scenarios: { suggestions: [], scenarios: [] } }));
-    const mock = createMockApi();
-
-    await mock.users.setRoles("u2", ["analyst"]);
-    await mock.users.setEnabled("u2", false);
-
-    expect(await mock.users.list()).toEqual([{ ...CONSOLE.users[0], roles: ["analyst"], enabled: false }]);
-    expect(await mock.datasets.list()).toEqual(CONSOLE.datasets);
-  });
 });
 
 describe("sample data badge", () => {

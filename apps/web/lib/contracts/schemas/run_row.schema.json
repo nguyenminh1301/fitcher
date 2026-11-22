@@ -5,6 +5,11 @@
       "title": "Trace Id",
       "type": "string"
     },
+    "pack": {
+      "default": "",
+      "title": "Pack",
+      "type": "string"
+    },
     "ts": {
       "format": "date-time",
       "title": "Ts",
@@ -41,6 +46,34 @@
     "error": {
       "default": "",
       "title": "Error",
+      "type": "string"
+    },
+    "input_tokens": {
+      "default": 0,
+      "title": "Input Tokens",
+      "type": "integer"
+    },
+    "output_tokens": {
+      "default": 0,
+      "title": "Output Tokens",
+      "type": "integer"
+    },
+    "models": {
+      "default": [],
+      "items": {
+        "type": "string"
+      },
+      "title": "Models",
+      "type": "array"
+    },
+    "cost_unknown": {
+      "default": false,
+      "title": "Cost Unknown",
+      "type": "boolean"
+    },
+    "answer_to": {
+      "default": "",
+      "title": "Answer To",
       "type": "string"
     }
   },

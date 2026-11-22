@@ -3,8 +3,11 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 
 import { Icon } from "@/components/brand/Icon";
+import { useChat } from "@/lib/chat/ChatContext";
 import { cx } from "@/lib/cx";
 import { useI18n } from "@/lib/i18n/react";
+
+import { SourceSwitcher } from "./SourceSwitcher";
 
 export type ComposerProps = { onSend: (text: string) => void; onStop?: () => void; running?: boolean; large?: boolean; meta?: ReactNode; id?: string };
 
@@ -64,4 +67,17 @@ export function Composer({ onSend, onStop, running, large, meta, id = "fc-compos
 export function PackChip({ name }: { name: string }) {
   const { t } = useI18n();
   return <span className="fc-composer-pack" title={t("ui.activePack")}><Icon name="database" />{name}</span>;
+}
+
+/**
+ * The data source a new conversation is answered from: every source whose pack is ready. A conversation keeps the
+ * source it started with, so this is offered only before the first question. Without the sources (a reader's
+ * session or the demo) it is the plain chip of the pack used last.
+ */
+export function PackPicker({ fallback }: { fallback: string }) {
+  const { chosenPack, choosePack } = useChat();
+  return (
+    <SourceSwitcher variant="composer" current={chosenPack ?? fallback} onChoose={(name) => void choosePack(name)}
+      onManage={() => window.location.assign("/console/sources")} />
+  );
 }

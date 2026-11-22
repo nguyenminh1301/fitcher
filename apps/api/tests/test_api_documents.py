@@ -6,7 +6,6 @@ from fastapi.testclient import TestClient
 import pytest
 
 from agent_fixtures import compiled_fixture
-from auth_fixtures import token, verifier
 from document_fixtures import MARKDOWN
 from fakes import FakeEmbeddings, FakeSearch
 from test_documents_service import WordScreener
@@ -14,19 +13,21 @@ from test_documents_service import WordScreener
 from app.api import runtime
 from app.main import app
 from app.onboarding.documents import DocumentService, InMemoryDocumentRegistry, compile_lock_path
+from app.state.db import shared_state
+from app.state.settings import Settings
 
 NOW = datetime(2026, 11, 5, 8, 0, tzinfo=UTC)
-REVIEWER = {"Authorization": f"Bearer {token(realm_access={'roles': ['pack_reviewer']})}"}
-VIEWER = {"Authorization": f"Bearer {token()}"}
+REVIEWER = {}
+VIEWER = {}
 
 
 @pytest.fixture
 def service(tmp_path):
     search = FakeSearch()
-    search.create_collection("minimal_kb_docs_v1", 4)
-    search.aliases["minimal_kb_docs"] = "minimal_kb_docs_v1"
+    search.create("minimal_kb_docs", 1, 4)
+    search.switch_live({"minimal_kb_docs": 1})
     return DocumentService(
-        pack="minimal", pack_roles=["viewer"], registry=InMemoryDocumentRegistry(), search=search,
+        pack="minimal", pack_roles=["reader"], registry=InMemoryDocumentRegistry(), search=search,
         embeddings=FakeEmbeddings(), screener=WordScreener(), store_dir=tmp_path / "documents",
         compiled_dir=tmp_path / "compiled", max_bytes=10_000, clock=lambda: NOW,
     )
@@ -34,15 +35,18 @@ def service(tmp_path):
 
 @pytest.fixture
 def client(service):
-    app.dependency_overrides[runtime.get_verifier] = lambda: verifier()
     app.dependency_overrides[runtime.get_compiled] = lambda: compiled_fixture()
+    app.dependency_overrides[runtime.get_compiled_or_none] = lambda: compiled_fixture()
     app.dependency_overrides[runtime.get_document_service] = lambda: service
+    app.dependency_overrides[runtime.get_document_service_or_none] = lambda: service
+    # Company documents are off on a new instance; these tests use them, so the owner has turned them on.
+    Settings(shared_state()).set("documents", "enabled", True)
     with TestClient(app) as test_client:
         yield test_client
     app.dependency_overrides.clear()
 
 
-def upload(client, data=MARKDOWN, name="glossary.md", roles=("viewer",), headers=REVIEWER):
+def upload(client, data=MARKDOWN, name="glossary.md", roles=("reader",), headers=REVIEWER):
     return client.post("/documents", headers=headers, files={"file": (name, data, "application/octet-stream")},
                        data={"allowed_roles": list(roles)})
 
@@ -52,8 +56,8 @@ def test_upload_indexes_the_document_and_lists_it(client):
 
     assert response.status_code == 201
     body = response.json()
-    assert body["name"] == "glossary.md" and body["status"] == "indexed" and body["roles"] == ["viewer"]
-    assert body["chunk_count"] == 3 and body["blocked_chunks"] == 0 and body["uploaded_by"] == "lab.viewer"
+    assert body["name"] == "glossary.md" and body["status"] == "indexed" and body["roles"] == ["reader"]
+    assert body["chunk_count"] == 3 and body["blocked_chunks"] == 0 and body["uploaded_by"] == "owner"
     listed = client.get("/documents", headers=REVIEWER).json()
     assert listed["compiling"] is False
     assert [item["id"] for item in listed["documents"]] == [body["id"]]
@@ -61,7 +65,6 @@ def test_upload_indexes_the_document_and_lists_it(client):
 
 @pytest.mark.parametrize(("kwargs", "status", "detail"), [
     ({"data": b"x" * 10_001}, 413, "larger than"),
-    ({"roles": ()}, 422, "at least one"),
     ({"roles": ("stranger",)}, 422, "stranger"),
     ({"data": b"PK\x03\x04junk", "name": "a.pdf"}, 415, "not a supported type"),
     ({"data": b"%PDF-1.4\n"}, 422, "PDF"),
@@ -98,19 +101,10 @@ def test_delete_removes_the_document(client):
 
 def test_patch_changes_the_roles(client):
     document = upload(client).json()
-    response = client.patch(f"/documents/{document['id']}", headers=REVIEWER, json={"allowed_roles": ["viewer"]})
-    assert response.status_code == 200 and response.json()["roles"] == ["viewer"]
+    response = client.patch(f"/documents/{document['id']}", headers=REVIEWER, json={"allowed_roles": ["reader"]})
+    assert response.status_code == 200 and response.json()["roles"] == ["reader"]
     bad = client.patch(f"/documents/{document['id']}", headers=REVIEWER, json={"allowed_roles": ["stranger"]})
     assert bad.status_code == 422
-
-
-@pytest.mark.parametrize(("method", "path"), [
-    ("get", "/documents"), ("delete", "/documents/abc"), ("patch", "/documents/abc"),
-])
-def test_only_a_pack_reviewer_reaches_documents(client, method, path):
-    response = client.request(method.upper(), path, headers=VIEWER, json={"allowed_roles": ["viewer"]})
-    assert response.status_code == 403
-    assert upload(client, headers=VIEWER).status_code == 403
 
 
 class StubDrafter:
@@ -159,4 +153,47 @@ def test_draft_from_one_document_writes_drafts_and_reports_review_ids(client, dr
 
 def test_draft_needs_an_indexed_document(client, drafting):
     assert client.post("/documents/nope/draft", headers=REVIEWER).status_code == 404
-    assert client.post("/documents/nope/draft", headers=VIEWER).status_code == 403
+
+
+# Turning company documents off (DECISIONS §15)
+
+ADMIN = {}
+
+
+def test_documents_are_off_on_a_new_instance(client):
+    with shared_state().write() as conn:
+        conn.execute("DELETE FROM settings WHERE group_name = 'documents'")
+
+    assert client.get("/settings/documents", headers=REVIEWER).json() == {"enabled": False, "documents": 0}
+    assert client.get("/documents", headers=REVIEWER).status_code == 404
+
+
+def test_turning_documents_off_needs_confirmation_while_documents_exist(client):
+    upload(client)
+    assert client.get("/settings/documents", headers=REVIEWER).json() == {"enabled": True, "documents": 1}
+
+    refused = client.put("/settings/documents", headers=ADMIN, json={"enabled": False})
+    assert refused.status_code == 409 and "1 document" in refused.json()["detail"]
+    assert client.get("/settings/documents", headers=REVIEWER).json()["enabled"] is True
+
+    turned_off = client.put("/settings/documents", headers=ADMIN, json={"enabled": False, "confirm": True})
+    assert turned_off.json() == {"enabled": False, "documents": 1}
+
+
+def test_with_documents_off_no_document_endpoint_answers_and_the_files_are_kept(client):
+    record = upload(client).json()
+    client.put("/settings/documents", headers=ADMIN, json={"enabled": False, "confirm": True})
+
+    assert client.get("/documents", headers=REVIEWER).status_code == 404
+    assert upload(client, name="other.md").status_code == 404
+    assert client.delete(f"/documents/{record['id']}", headers=REVIEWER).status_code == 404
+
+    client.put("/settings/documents", headers=ADMIN, json={"enabled": True})
+    assert [item["id"] for item in client.get("/documents", headers=REVIEWER).json()["documents"]] == [record["id"]]
+
+
+def test_turning_documents_on_or_off_is_not_a_setup_step(client):
+    client.put("/settings/documents", headers=ADMIN, json={"enabled": False})
+
+    steps = [step["id"] for step in client.get("/setup/status", headers=ADMIN).json()["steps"]]
+    assert steps == ["models", "data"]

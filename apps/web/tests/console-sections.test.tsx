@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from "vitest";
 
 import { ConsoleLayout } from "@/components/console/ConsoleLayout";
+import { AuditSection } from "@/components/console/sections/AuditSection";
 import { DatasetsSection } from "@/components/console/sections/DatasetsSection";
 import { DocumentsSection } from "@/components/console/sections/DocumentsSection";
 import { FeedbackSection } from "@/components/console/sections/FeedbackSection";
@@ -23,16 +24,13 @@ const TEST_RESULT: Result = {
 const CONSOLE: Partial<ConsoleFile> = {
   pack: { name: "shop", display_name: "Shop" },
   pack_roles: ["analyst", "viewer"],
-  identities: [
-    { user_id: "rev", display_name: "Rae Reviewer", roles: ["pack_reviewer", "analyst"] },
-    { user_id: "adm", display_name: "Ada Admin", roles: ["admin", "analyst"] },
-  ],
   conversations: [],
   review_items: [
     { id: "m1", file: "metrics.yaml", name: "metric_one", kind: "item", status: "draft", confidence: 0.82, body: "Units returned over units sold.", formula: "sum(a) / sum(b)", evidence: { source: "Handbook.pdf, page 2", quote: "Measured in units." }, test_result: TEST_RESULT },
     { id: "g1", file: "glossary.yaml", name: "term_one", kind: "item", status: "approved", confidence: 0.95, body: "A plain definition.", evidence: { source: "Old guide.docx", deleted: true } },
     // The api sends a null formula for an item that has none.
     { id: "g2", file: "glossary.yaml", name: "term_two", kind: "item", status: "draft", confidence: 0.7, body: "Second definition.", formula: null },
+    { id: "u1", file: "metrics.yaml", name: "metric_generated", kind: "item", status: "approved", reviewed: false, confidence: 0.5, body: "Drafted with the instant pack.", formula: "sum(c)" },
     { id: "p1", file: "examples.yaml", name: "Proposal one", kind: "proposal", status: "draft", confidence: 0.6, body: "Total for [MASKED_NAME] in 2025?", formula: "SELECT sum(x) FROM marts.t WHERE name = '[MASKED_NAME]'", evidence: { source: "Disliked chat" }, test_result: TEST_RESULT },
   ],
   documents: [
@@ -55,7 +53,6 @@ let api: MockApi;
 let navigate: Mock<(path: string, options?: { replace: boolean }) => void>;
 
 function show(section: string, page: ReactNode, user = "rev") {
-  window.localStorage.setItem("fitcher.demo.identity", user);
   render(
     <ThemeProvider>
       <I18nProvider initial="en">
@@ -93,9 +90,12 @@ describe("review", () => {
     expect(navigate).toHaveBeenCalledWith("/console/review/g1");
   });
 
-  it("moves an approved item from draft to approved", async () => {
+  it("moves an approved item from draft to approved, once its formula is test-run", async () => {
     show("review", <ReviewDetail id="m1" />);
     const approve = await screen.findByRole("button", { name: "Approve" });
+    expect(approve.hasAttribute("disabled")).toBe(true);
+    fireEvent.click(screen.getByRole("button", { name: "Test run" }));
+    await waitFor(() => expect(approve.hasAttribute("disabled")).toBe(false));
     await act(async () => fireEvent.click(approve));
     await screen.findByText("metric_one approved");
     cleanup();
@@ -106,6 +106,21 @@ describe("review", () => {
     expect(screen.queryByText("metric_one")).toBeNull();
     fireEvent.click(screen.getByRole("radio", { name: "Approved" }));
     expect(screen.getByText("metric_one")).toBeTruthy();
+  });
+
+  it("labels an item approved without a person as unreviewed until a reviewer confirms it", async () => {
+    show("review", <ReviewSection />);
+    const row = (await screen.findByText("metric_generated")).closest("tr") as HTMLElement;
+    expect(within(row).getByText("Unreviewed")).toBeTruthy();
+    cleanup();
+
+    show("review", <ReviewDetail id="u1" />);
+    const confirm = await screen.findByRole("button", { name: "Confirm" });
+    fireEvent.click(screen.getByRole("button", { name: "Test run" }));
+    await waitFor(() => expect(confirm.hasAttribute("disabled")).toBe(false));
+    await act(async () => fireEvent.click(confirm));
+    await screen.findByText("metric_generated approved");
+    expect(screen.queryByRole("button", { name: "Confirm" })).toBeNull();
   });
 
   it("test-runs a metric and shows the sample result", async () => {
@@ -133,7 +148,7 @@ describe("review", () => {
     show("review", <ReviewDetail id="g1" />);
 
     expect(await screen.findByText(/Evidence cites a deleted document/)).toBeTruthy();
-    expect(screen.getByText("Nothing to run")).toBeTruthy();
+    expect(screen.getByText(/checked against their evidence, not run/)).toBeTruthy();
   });
 
   it("approves a proposal only after its masked values are replaced and it is test-run", async () => {
@@ -211,7 +226,7 @@ describe("documents", () => {
     Object.defineProperty(big, "size", { value: 21 * 1024 * 1024 });
     fireEvent.change(input, { target: { files: [big] } });
     expect(await screen.findByText("big.pdf is larger than 20 MB.")).toBeTruthy();
-    expect(screen.queryByText("big.pdf", { selector: ".fc-doc-name" })).toBeNull();
+    expect(screen.queryByText("big.pdf", { selector: ".doc-name" })).toBeNull();
   });
 
   it("shows an accepted file as processing, then indexed", async () => {
@@ -220,30 +235,23 @@ describe("documents", () => {
 
     await act(async () => fireEvent.change(document.querySelector("input[type=file]")!, { target: { files: [new File(["x"], "notes.md")] } }));
 
-    const row = (await screen.findByText("notes.md", { selector: ".fc-doc-name" })).closest(".fc-doc") as HTMLElement;
+    const row = (await screen.findByText("notes.md", { selector: ".doc-name" })).closest("tr") as HTMLElement;
     expect(within(row).getByText("Processing")).toBeTruthy();
     await waitFor(() => expect(within(row).getByText("Indexed")).toBeTruthy());
-  });
-
-  it("lets the reviewer choose which pack roles may see a document", async () => {
-    show("documents", <DocumentsSection />);
-    const row = (await screen.findByText("Handbook.pdf")).closest(".fc-doc") as HTMLElement;
-
-    await act(async () => fireEvent.click(within(row).getByRole("button", { name: "viewer" })));
-
-    await waitFor(() => expect(within(row).getByRole("button", { name: "viewer" }).getAttribute("aria-pressed")).toBe("true"));
-    expect((await api.documents.list()).documents.find((doc) => doc.id === "d1")?.roles).toEqual(["analyst", "viewer"]);
   });
 
   it("labels Draft pack items as paid AI and asks before drafting", async () => {
     const draft = vi.spyOn(api.documents, "draft");
     show("documents", <DocumentsSection />);
-    const row = (await screen.findByText("Handbook.pdf")).closest(".fc-doc") as HTMLElement;
+    const row = (await screen.findByText("Handbook.pdf")).closest("tr") as HTMLElement;
 
-    fireEvent.click(within(row).getByRole("button", { name: /Draft pack items.*Uses paid AI/ }));
-    const dialog = screen.getByRole("dialog", { name: "This uses paid AI" });
+    const button = within(row).getByRole("button", { name: "Draft knowledge items" });
+    expect(document.getElementById(button.getAttribute("aria-describedby") ?? "")?.textContent).toBe("Uses paid AI");
+    fireEvent.click(button);
+    const dialog = screen.getByRole("dialog", { name: "Draft knowledge items from Handbook.pdf?" });
+    expect(within(dialog).getByText(/The provider bills each call/)).toBeTruthy();
     expect(draft).not.toHaveBeenCalled();
-    await act(async () => fireEvent.click(within(dialog).getByRole("button", { name: /Continue/ })));
+    await act(async () => fireEvent.click(within(dialog).getByRole("button", { name: "Draft items" })));
 
     await waitFor(() => expect(draft).toHaveBeenCalledWith("d1"));
   });
@@ -253,16 +261,35 @@ describe("documents", () => {
 
     expect(await screen.findByText("Merged header cells.")).toBeTruthy();
   });
+
+  it("turns documents on, and asks before turning them off while documents are stored", async () => {
+    const settings = vi.spyOn(api.documents, "settings").mockResolvedValue({ enabled: false, documents: 2 });
+    const setEnabled = vi.spyOn(api.documents, "setEnabled").mockImplementation(async (enabled) => ({ enabled, documents: 2 }));
+    show("documents", <DocumentsSection />);
+
+    expect(await screen.findByText(/Numbers always come from your data/)).toBeTruthy();
+    await act(async () => fireEvent.click(screen.getByRole("switch", { name: "Use company documents" })));
+    expect(setEnabled).toHaveBeenLastCalledWith(true, false);
+    await screen.findByText("Handbook.pdf");
+
+    await act(async () => fireEvent.click(screen.getByRole("switch", { name: "Use company documents" })));
+    const dialog = screen.getByRole("dialog", { name: "Turn documents off?" });
+    expect(within(dialog).getByText("2 documents stay stored but are no longer searched.")).toBeTruthy();
+    await act(async () => fireEvent.click(within(dialog).getByRole("button", { name: "Turn documents off" })));
+    expect(setEnabled).toHaveBeenLastCalledWith(false, true);
+    settings.mockRestore();
+    setEnabled.mockRestore();
+  });
 });
 
 describe("datasets", () => {
-  it("lists the compiled datasets and opens one with its columns and readable roles", async () => {
+  it("lists the compiled datasets and opens one with its columns, without roles", async () => {
     show("datasets", <DatasetsSection />);
 
     fireEvent.click(await screen.findByRole("button", { name: /table_one/ }));
 
     expect(await screen.findByText("Line amount")).toBeTruthy();
-    expect(screen.getByText("analyst", { selector: ".fc-pill" })).toBeTruthy();
+    expect(screen.queryByText("analyst", { selector: ".fc-pill" })).toBeNull();
   });
 });
 
@@ -275,5 +302,21 @@ describe("feedback", () => {
 
     await waitFor(() => expect(screen.getAllByText("Proposed").length).toBeGreaterThan(0));
     expect((await api.feedbackReview.list()).find((row) => row.trace_id === "t1")?.proposal).toBe("proposed");
+  });
+});
+
+describe("query log", () => {
+  it("lists the access decisions, then the screening verdict of each question", async () => {
+    vi.spyOn(api.audit, "list").mockResolvedValue([]);
+    vi.spyOn(api.audit, "screening").mockResolvedValue([
+      { ts: "2026-11-21T10:00:00Z", trace_id: "t1", user_id: "owner", source: "question", verdict: "flag", mode: "log", score: 0.91, rule_hits: ["ignore_instructions"] },
+    ]);
+    show("audit", <AuditSection />);
+
+    const screening = await screen.findByRole("region", { name: "Question screening" });
+    expect(within(screening).getByText("Flagged")).toBeTruthy();
+    expect(within(screening).getByText("Recorded only")).toBeTruthy();
+    expect(within(screening).getByText("ignore_instructions")).toBeTruthy();
+    expect(screen.getByText("No decision yet.")).toBeTruthy();
   });
 });

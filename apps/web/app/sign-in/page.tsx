@@ -1,6 +1,14 @@
-import { SignInScreen } from "@/components/chat/SignInScreen";
+"use client";
 
-export default async function SignInPage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
-  const { error } = await searchParams;
-  return <SignInScreen failed={error === "sign_in_failed"} />;
+import { useRouter } from "next/navigation";
+import { useCallback } from "react";
+
+import { OwnerSignIn } from "@/components/chat/OwnerSignIn";
+import { api } from "@/lib/api";
+
+// Signing in with the owner password; the app sends a browser here when the api asks for a session.
+export default function SignInPage() {
+  const router = useRouter();
+  const open = useCallback(() => router.replace("/"), [router]);
+  return <OwnerSignIn owner={api.owner} onSignedIn={open} />;
 }

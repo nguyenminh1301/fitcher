@@ -67,6 +67,7 @@ def test_extract_refuses_when_the_gateway_fails():
     update = extract({"question": "q"}, deps([LLMError("alias fast returned HTTP 500")]))
 
     assert update["rejection"] == "the question could not be read: alias fast returned HTTP 500"
+    assert update["model_error"] == "alias fast returned HTTP 500"
 
 
 # retrieve
@@ -95,9 +96,9 @@ def test_retrieve_embeds_once_and_searches_each_term():
     assert set(retrieval.dimension_terms) == {"widgets", "widget"}
     assert set(retrieval.values) == {"Blue Widget"}
     assert retrieval.examples[0].id == "revenue_by_widget"
-    searched = {request.alias for request in agent.search.queries}
+    searched = {request.collection for request in agent.search.queries}
     assert searched == {f"minimal_{name}" for name in ("glossary_terms", "metrics", "datasets", "column_values", "examples")}
-    assert all(request.roles == ["viewer"] and len(request.vector) == embeddings.dimensions for request in agent.search.queries)
+    assert all(request.roles == ["reader"] and len(request.vector) == embeddings.dimensions for request in agent.search.queries)
 
 
 def test_term_candidates_come_from_the_whole_pack_and_context_from_the_asking_role():
@@ -113,9 +114,9 @@ def test_term_candidates_come_from_the_whole_pack_and_context_from_the_asking_ro
 
     roles_by_index = {}
     for request in agent.search.queries:
-        roles_by_index.setdefault(request.alias, set()).update(request.roles)
-    assert roles_by_index["minimal_metrics"] == {"viewer", "refunds_clerk"}
-    assert roles_by_index["minimal_column_values"] == {"viewer", "refunds_clerk"}
+        roles_by_index.setdefault(request.collection, set()).update(request.roles)
+    assert roles_by_index["minimal_metrics"] == {"reader", "refunds_clerk"}
+    assert roles_by_index["minimal_column_values"] == {"reader", "refunds_clerk"}
     assert roles_by_index["minimal_examples"] == {"refunds_clerk"}
 
 
@@ -154,6 +155,53 @@ def test_period_outside_coverage_adds_a_warning():
         "2022 is outside the data, which covers 2023-01-02 to 2025-06-30",
         "2025 is only partly covered by the data, which covers 2023-01-02 to 2025-06-30",
     ]
+
+
+def test_a_coverage_warning_is_in_the_language_of_the_question():
+    extraction = extraction_reply(periods=[{"kind": "year", "year": 2025}])
+    state = {**state_for(extraction), "question": "Doanh thu năm 2025 là bao nhiêu?"}
+
+    spec = make_spec(state, compiled_fixture())
+
+    assert spec.warnings == ["Câu hỏi chỉ nêu một khoảng thời gian nên không có gì để so sánh",
+                             "Dữ liệu chỉ có một phần của 2025: dữ liệu có từ 2023-01-02 đến 2025-06-30"]
+
+
+def _without_dates(dataset_id: str):
+    """The fixture pack with ``dataset_id`` turned into a table without a time column."""
+    compiled = compiled_fixture()
+    datasets = [
+        item.model_copy(update={
+            "time_column": None,
+            "columns": [column.model_copy(update={"role": "dimension"}) if column.role == "time" else column
+                        for column in item.columns],
+        }) if item.id == dataset_id else item
+        for item in compiled.pack.datasets.datasets
+    ]
+    pack = compiled.pack.model_copy(update={"datasets": compiled.pack.datasets.model_copy(update={"datasets": datasets})})
+    coverage = {**compiled.coverage, dataset_id: compiled.coverage[dataset_id].model_copy(update={"min_date": None, "max_date": None})}
+    return compiled.model_copy(update={"pack": pack, "coverage": coverage})
+
+
+def test_a_table_without_dates_is_answered_without_asking_for_a_period():
+    extraction = extraction_reply(metric_terms=["refunded value"], rank_term=None, dimension_terms=[], top_n=None,
+                                  periods=[], compare=False)
+    # The resolve_time node leaves no periods when the question names none.
+    state = {**state_for(extraction_reply()), "extraction": Extraction.model_validate(extraction), "periods": []}
+
+    spec = make_spec(state, _without_dates("widget_refunds"))
+
+    assert (spec.dataset, spec.periods, spec.warnings) == ("widget_refunds", [], [])
+
+
+def test_a_period_named_for_a_table_without_dates_is_dropped_with_a_warning():
+    extraction = extraction_reply(metric_terms=["refunded value"], rank_term=None, dimension_terms=[], top_n=None,
+                                  compare=False)
+
+    spec = make_spec(state_for(extraction), _without_dates("widget_refunds"))
+
+    assert spec.periods == [] and not spec.compare
+    assert spec.warnings == ["widget_refunds has no date column, so the question was answered over all its rows"]
 
 
 def test_metric_found_only_by_search_uses_the_best_hit():
@@ -473,6 +521,8 @@ def test_result_columns_take_types_roles_and_formats_from_the_pack():
         ("lines", "number", "measure", None),
     ]
     assert result.rows == [["Blue", "2025-01-02", 12.3, None, 1.5, 3]]
+    name = next(metric.name for metric in compiled_fixture().pack.metrics.metrics if metric.id == "widget_revenue")
+    assert [c.label for c in result.columns] == [None, None, f"{name} Q1 2025", None, None, None]
 
 
 def test_result_is_capped_at_5000_rows():
@@ -481,3 +531,20 @@ def test_result_is_capped_at_5000_rows():
     result = to_result(output, compiled_fixture().pack, "widget_sales")
 
     assert (len(result.rows), result.row_count, result.truncated) == (5000, 5001, True)
+
+
+@pytest.mark.parametrize(("question", "dimensions"), [
+    ("Revenue by product in Q1 2025", ["widget_name"]),
+    ("Doanh thu theo widget name quý 1 năm 2025", ["widget_name"]),
+    ("Revenue per sale ref in Q1 2025", ["sale_ref"]),
+    ("Revenue by month in 2025", []),
+    ("Revenue by colour in Q1 2025", []),
+    ("Revenue by sale amount in Q1 2025", []),
+])
+def test_a_grouping_the_question_names_is_used_when_the_extraction_misses_it(question, dimensions):
+    reply = extraction_reply(metric_terms=["revenue"], dimension_terms=[], top_n=None, rank_term=None, compare=False)
+    state = state_for(reply, question=question)
+
+    update = build_spec(state, deps([]))
+
+    assert update["spec"].dimensions == dimensions

@@ -6,13 +6,10 @@ export type Intent = "data_query";
  */
 export type MetricIds = [string, ...string[]];
 export type Dimensions = string[];
-/**
- * @minItems 1
- */
-export type Periods = [Period, ...Period[]];
 export type Label = string;
 export type Start = string;
 export type End = string;
+export type Periods = Period[];
 export type Column = string;
 export type Op = "=" | "!=" | "<" | "<=" | ">" | ">=" | "in" | "not in";
 export type Value = string | number | boolean | (string | number | boolean)[];
@@ -28,7 +25,7 @@ export interface QuerySpec {
   intent?: Intent;
   metric_ids: MetricIds;
   dimensions?: Dimensions;
-  periods: Periods;
+  periods?: Periods;
   filters?: Filters;
   top_n?: TopN;
   rank_by?: RankBy;

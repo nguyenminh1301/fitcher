@@ -6,17 +6,17 @@ reviews it before it compiles. The prompts say the profile, the items and
 document text are data, never instructions, and that no figures are taken
 from text. The code then keeps only evidence that exists in the input (a
 profile table or column, or a chunk id), never returns an approved id,
-fills an existing draft's text without changing its structure, gives a new
-dataset the roles its policies grant, and test-runs every metric expression
+fills an existing draft's text without changing its structure, and test-runs every metric expression
 and example query: a failure stays a draft with the error as evidence and a
 confidence of at most 0.2. Calls are billable.
 """
 
 from collections.abc import Sequence
 import json
-from typing import Literal
+import re
+from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import AfterValidator, BaseModel, ConfigDict, Field
 
 from app.agent.prompts import render
 from app.llm.client import LLMClient
@@ -43,6 +43,19 @@ class DraftError(RuntimeError):
     """There is nothing to draft from."""
 
 
+def pack_id(value: str) -> str:
+    """A drafted id in the pack's form (``^[a-z][a-z0-9_]*$``): a model's ``sumIf_amount`` or ``Revenue-Total``
+    would otherwise fail the whole pack's validation, so it becomes ``sum_if_amount`` or ``revenue_total``."""
+    snake = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", "_", value.strip())
+    cleaned = re.sub(r"[^a-z0-9_]+", "_", snake.lower()).strip("_")
+    if not cleaned:
+        return "item"
+    return cleaned if cleaned[0].isalpha() else f"m_{cleaned}"
+
+
+PackId = Annotated[str, AfterValidator(pack_id)]
+
+
 class _Reply(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -53,7 +66,7 @@ class DraftEvidence(_Reply):
 
 
 class _Drafted(_Reply):
-    id: str
+    id: PackId
     evidence: list[DraftEvidence] = []
     confidence: float = 0.5
 
@@ -69,7 +82,7 @@ class DraftedColumn(_Reply):
 class DraftedDataset(_Drafted):
     description: str
     grain: str
-    time_column: str
+    time_column: str | None = None
     columns: list[DraftedColumn]
 
 
@@ -80,7 +93,7 @@ class DraftedAliases(_Reply):
 
 class DraftedTarget(_Reply):
     kind: Literal["metric", "column", "value"]
-    metric: str | None = None
+    metric: PackId | None = None
     dataset: str | None = None
     column: str | None = None
     value: str | None = None
@@ -108,7 +121,7 @@ class DraftedExample(_Drafted):
     language: str
     sql: str
     datasets: list[str] = Field(min_length=1)
-    metrics: list[str] = []
+    metrics: list[PackId] = []
 
 
 class DraftedDatasets(_Reply):
@@ -150,14 +163,6 @@ def profile_refs(profile: dict | None) -> list[str]:
         refs.append(table)
         refs.extend(f"{table}.{column}" for column in facts["columns"])
     return refs
-
-
-def _granted_roles(files: PackFiles) -> dict[str, list[str]]:
-    granted: dict[str, list[str]] = {}
-    for role in files.items("policies.yaml"):
-        for grant in role.get("datasets") or []:
-            granted.setdefault(grant["dataset"], []).append(role["id"])
-    return granted
 
 
 class Drafter:
@@ -203,24 +208,36 @@ class Drafter:
             {"kind": "profile", "ref": next(iter(profile["tables"]))} if profile and profile["tables"]
             else {"kind": "doc", "ref": chunks[0]["id"]}
         )
-        granted = _granted_roles(files)
         drafted: list[dict] = []
         for model in reply.items:
             current = existing.get(model.id)
             if current is not None and current.get("status") == "approved":
                 continue
             item = model.model_dump(exclude_none=True)
-            evidence = [e for e in item.pop("evidence") if (e["kind"], e["ref"]) in refs] or [fallback]
+            evidence = [e for e in item.pop("evidence") if (e["kind"], e["ref"]) in refs] or self._own_evidence(
+                file, item, current, profile) or [fallback]
             item["confidence"] = round(min(max(float(item["confidence"]), 0.0), 1.0), 3)
             if current is not None:
                 item = self._fill(file, _plain(current), item)
             elif file == "datasets.yaml":
-                item = self._new_dataset(item, granted)
+                item = self._new_dataset(item)
             item["evidence"] = evidence
             item["status"] = "draft"
             self._test_run(file, item)
             drafted.append(item)
         return drafted
+
+    @staticmethod
+    def _own_evidence(file: str, item: dict, current: dict | None, profile: dict | None) -> list[dict]:
+        """Evidence for an item whose reply cited nothing known: what the item already cites, else its own table."""
+        if current is not None:
+            kept = [e for e in _plain(current).get("evidence") or [] if e.get("kind") in ("profile", "doc")]
+            if kept:
+                return kept
+        table = item.get("id") if file == "datasets.yaml" else item.get("dataset")
+        if profile and table in profile["tables"]:
+            return [{"kind": "profile", "ref": table}]
+        return []
 
     @staticmethod
     def _fill(file: str, current: dict, drafted: dict) -> dict:
@@ -230,6 +247,11 @@ class Drafter:
                 filled[key] = drafted[key]
         filled["confidence"] = drafted["confidence"]
         if file == "datasets.yaml":
+            # The profile picks the first date column; the model may name a better one among the time columns
+            # (a hire date rather than a birth date), and anything else keeps the profile's choice.
+            times = [column["name"] for column in current.get("columns") or [] if column.get("role") == "time"]
+            if drafted.get("time_column") in times:
+                filled["time_column"] = drafted["time_column"]
             descriptions = {column["name"]: column["description"] for column in drafted.get("columns", [])}
             filled["columns"] = [
                 {**column, "description": descriptions.get(column["name"], column["description"])}
@@ -238,11 +260,19 @@ class Drafter:
         return filled
 
     @staticmethod
-    def _new_dataset(item: dict, granted: dict[str, list[str]]) -> dict:
-        item["allowed_roles"] = granted.get(item["id"], [])
+    def _new_dataset(item: dict) -> dict:
+        # The model's reply is held to the loader's rules: only string columns are indexable, and the time
+        # column must be a column whose role is time, or there is none.
         item["columns"] = [
-            {key: value for key, value in column.items() if key != "indexable" or value} for column in item["columns"]
+            {key: value for key, value in column.items()
+             if key != "indexable" or (value and column["type"] == "string")}
+            for column in item["columns"]
         ]
+        times = [column["name"] for column in item["columns"] if column["role"] == "time"]
+        if item.get("time_column") not in times:
+            item.pop("time_column", None)
+            if times:
+                item["time_column"] = times[0]
         return item
 
     def _test_run(self, file: str, item: dict) -> None:

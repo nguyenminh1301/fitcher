@@ -13,17 +13,18 @@ import type {
   ReviewItem,
   RunRow,
   TraceItem,
-  UserRow,
 } from "@/lib/contracts";
 
 import type { ConversationThread } from "./conversations";
 import type { AskEvent } from "./events";
 
-/** Who is signed in; Keycloak replaces the demo identities in Phase 7. */
+/** Who a request acts as: the owner of this personal app. */
 export interface Identity {
   user_id: string;
   display_name: string;
   roles: string[];
+  /** Reachable through a name other than localhost (DECISIONS §9). */
+  exposed?: boolean;
 }
 
 /** A sample document row; the mock fills the rest of DocumentView, which only the api knows. */
@@ -60,7 +61,6 @@ export interface ScenarioFile {
 export interface ConsoleFile {
   pack: { name: string; display_name: string };
   pack_roles: string[];
-  identities: Identity[];
   conversations: ConversationThread[];
   datasets: DatasetView[];
   review_items: ReviewItem[];
@@ -71,5 +71,4 @@ export interface ConsoleFile {
   traces: Record<string, TraceItem[]>;
   audit: AuditRow[];
   costs: CostRow[];
-  users: UserRow[];
 }

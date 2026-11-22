@@ -8,6 +8,8 @@ from app.contracts.query_spec import ContractModel
 
 class RunRow(ContractModel):
     trace_id: str
+    # The pack (one per data source) that answered the run.
+    pack: str = ""
     ts: datetime
     user_id: str
     # The pack role the run used, from its access decision; empty when it stopped before one.
@@ -18,6 +20,16 @@ class RunRow(ContractModel):
     latency_ms: int
     cost_usd: float
     error: str = ""
+    # Tokens sent to and written by every model call of the run, from its ``llm_calls`` rows.
+    input_tokens: int = 0
+    output_tokens: int = 0
+    # The models whose calls answered, in the order they first answered, without the
+    # gateway's SDK prefix; a failed or blocked call is not listed.
+    models: list[str] = []
+    # A call that answered had no known price, so ``cost_usd`` sums the priced calls only.
+    cost_unknown: bool = False
+    # For a run that answered a question asked back, the question the previous turn asked; else empty.
+    answer_to: str = ""
 
 
 class TraceItem(ContractModel):
@@ -60,7 +72,7 @@ class ScreeningRow(ContractModel):
 
 
 class CostRow(ContractModel):
-    """Estimated LLM cost of one day, alias and model, from LiteLLM's cost table."""
+    """Estimated LLM cost of one day, provider, model and tier, from the LiteLLM SDK's price table."""
 
     day: str
     alias: str
@@ -69,26 +81,6 @@ class CostRow(ContractModel):
     provider: str
     calls: int
     cost_usd: float
-
-
-class AdminConversation(ContractModel):
-    conversation_id: str
-    user_id: str
-    title: str
-    # Deleted by its owner: hidden from them, still readable here until the 90-day TTL.
-    deleted: bool
-    updated_at: datetime
-
-
-class AdminMessage(ContractModel):
-    ts: datetime
-    role: str
-    content: str
-    trace_id: str
-    turn: int
-    revision: int
-
-
-class AdminConversationThread(ContractModel):
-    conversation: AdminConversation
-    messages: list[AdminMessage]
+    # Tokens sent to (prompt) and written by (completion) the calls, as the provider reported them.
+    input_tokens: int = 0
+    output_tokens: int = 0

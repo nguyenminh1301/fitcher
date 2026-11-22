@@ -13,21 +13,35 @@ import sys
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "apps" / "api"))
 
-from app.contracts.admin import AuditRow, CostRow, RunRow, RunTrace  # noqa: E402 - needs apps/api on the path
+from app.contracts.admin import AuditRow, CostRow, RunRow, RunTrace, ScreeningRow  # noqa: E402 - needs apps/api on the path
 from app.contracts.admin_feedback import FeedbackRow, ProposalResult  # noqa: E402
 from app.contracts.chart_spec import ChartSpec  # noqa: E402
 from app.contracts.conversations import (  # noqa: E402
     Conversation, ConversationGroup, ConversationPatch, ConversationThread, GroupInput,
 )
-from app.contracts.documents import DocumentList, DocumentRolesChange, DocumentView, DraftResult  # noqa: E402
+from app.contracts.documents import (  # noqa: E402
+    DocumentList, DocumentRolesChange, DocumentSettings, DocumentSettingsChange, DocumentView, DraftResult,
+)
 from app.contracts.evaluation import EvalReportView, EvalRunStarted  # noqa: E402
 from app.contracts.events import AskEvent, AskRequest  # noqa: E402
 from app.contracts.feedback import FeedbackInput  # noqa: E402
-from app.contracts.model_tiers import ModelTierChange, ModelTiers  # noqa: E402
+from app.contracts.providers import (  # noqa: E402
+    EmbeddingChange, EmbeddingView, ModeChange, ModelCatalog, ModelTiersView, ProviderCreate, ProviderKeyCreate,
+    ProviderModels, ProviderTestRequest, ProviderTestResult, ProviderUpdate, ProviderView, TierChange, TierView,
+)
 from app.contracts.query_spec import QuerySpec  # noqa: E402
 from app.contracts.result import Result  # noqa: E402
 from app.contracts.review import DatasetView, ReviewItem, ReviewItemPatch  # noqa: E402
-from app.contracts.users import UserRoles, UserView  # noqa: E402
+from app.contracts.screening import ClassifierChange, ClassifierDownload, ClassifierStatus  # noqa: E402
+from app.contracts.owner import OwnerPasswordChange, OwnerPasswordRemoval, OwnerSignIn, OwnerStatus  # noqa: E402
+from app.contracts.limits import LimitSettings  # noqa: E402
+from app.contracts.setup import SetupStatus  # noqa: E402
+from app.contracts.instant import InstantEstimate, InstantEstimateRequest, InstantJobReply, InstantRequest  # noqa: E402
+from app.contracts.sources import (  # noqa: E402
+    FileLoad, FileUploadView, ProbeResult, SourceCreate, SourceDetail, SourceDrift, SourcePatch, SourceView, SyncView,
+    TablesChange,
+    SourceConnection,
+)
 
 # Each contract with the JSON Schema mode of its direction: what the api accepts ("validation") or
 # what it sends ("serialization", where every field is present).
@@ -43,8 +57,23 @@ CONTRACTS = {
     "conversation_patch": (ConversationPatch, "validation"),
     "group_input": (GroupInput, "validation"),
     "feedback_input": (FeedbackInput, "validation"),
-    "model_tiers": (ModelTiers, "serialization"),
-    "model_tier_change": (ModelTierChange, "validation"),
+    "provider_view": (ProviderView, "serialization"),
+    "provider_create": (ProviderCreate, "validation"),
+    "provider_update": (ProviderUpdate, "validation"),
+    "provider_key_create": (ProviderKeyCreate, "validation"),
+    "mode_change": (ModeChange, "validation"),
+    "provider_models": (ProviderModels, "serialization"),
+    "model_catalog": (ModelCatalog, "serialization"),
+    "provider_test_request": (ProviderTestRequest, "validation"),
+    "provider_test_result": (ProviderTestResult, "serialization"),
+    "model_tiers_view": (ModelTiersView, "serialization"),
+    "tier_view": (TierView, "serialization"),
+    "tier_change": (TierChange, "validation"),
+    "embedding_view": (EmbeddingView, "serialization"),
+    "embedding_change": (EmbeddingChange, "validation"),
+    "classifier_status": (ClassifierStatus, "serialization"),
+    "classifier_change": (ClassifierChange, "validation"),
+    "classifier_download": (ClassifierDownload, "serialization"),
     "dataset_view": (DatasetView, "serialization"),
     "review_item": (ReviewItem, "serialization"),
     "review_item_patch": (ReviewItemPatch, "validation"),
@@ -52,16 +81,38 @@ CONTRACTS = {
     "document_list": (DocumentList, "serialization"),
     "document_roles_change": (DocumentRolesChange, "validation"),
     "draft_result": (DraftResult, "serialization"),
+    "document_settings": (DocumentSettings, "serialization"),
+    "document_settings_change": (DocumentSettingsChange, "validation"),
     "run_row": (RunRow, "serialization"),
     "run_trace": (RunTrace, "serialization"),
     "audit_row": (AuditRow, "serialization"),
+    "screening_row": (ScreeningRow, "serialization"),
     "cost_row": (CostRow, "serialization"),
     "feedback_row": (FeedbackRow, "serialization"),
     "proposal_result": (ProposalResult, "serialization"),
     "eval_report_view": (EvalReportView, "serialization"),
     "eval_run_started": (EvalRunStarted, "serialization"),
-    "user_view": (UserView, "serialization"),
-    "user_roles": (UserRoles, "validation"),
+    "source_connection": (SourceConnection, "validation"),
+    "source_create": (SourceCreate, "validation"),
+    "source_patch": (SourcePatch, "validation"),
+    "source_view": (SourceView, "serialization"),
+    "instant_estimate_request": (InstantEstimateRequest, "validation"),
+    "instant_request": (InstantRequest, "validation"),
+    "instant_estimate": (InstantEstimate, "serialization"),
+    "instant_job_reply": (InstantJobReply, "serialization"),
+    "source_detail": (SourceDetail, "serialization"),
+    "source_drift": (SourceDrift, "serialization"),
+    "probe_result": (ProbeResult, "serialization"),
+    "tables_change": (TablesChange, "validation"),
+    "sync_view": (SyncView, "serialization"),
+    "file_upload_view": (FileUploadView, "serialization"),
+    "file_load": (FileLoad, "validation"),
+    "setup_status": (SetupStatus, "serialization"),
+    "limit_settings": (LimitSettings, "serialization"),
+    "owner_status": (OwnerStatus, "serialization"),
+    "owner_sign_in": (OwnerSignIn, "validation"),
+    "owner_password_change": (OwnerPasswordChange, "validation"),
+    "owner_password_removal": (OwnerPasswordRemoval, "validation"),
 }
 SCHEMAS = ROOT / "apps" / "web" / "lib" / "contracts" / "schemas"
 

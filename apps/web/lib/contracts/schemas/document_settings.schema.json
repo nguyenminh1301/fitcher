@@ -1,0 +1,19 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "enabled": {
+      "title": "Enabled",
+      "type": "boolean"
+    },
+    "documents": {
+      "title": "Documents",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "enabled",
+    "documents"
+  ],
+  "title": "DocumentSettings",
+  "type": "object"
+}

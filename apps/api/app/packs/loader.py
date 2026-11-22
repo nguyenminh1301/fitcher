@@ -19,7 +19,7 @@ from referencing import Registry, Resource
 import yaml
 from yaml.constructor import ConstructorError
 
-from app.packs.models import PACK_FILES, Example, Pack
+from app.packs.models import PACK_FILES, READER_ROLE, DatasetsFile, Example, Pack, reader_policies
 from app.packs.policy_compiler import ROW_COUNT_COLUMN, adds_up, check_row_filter
 
 
@@ -238,7 +238,9 @@ def check_references(pack: Pack, catalog: Catalog | None = None) -> list[PackIss
             names.add(column.name)
             if column.indexable and column.type != "string":
                 refs.add("datasets.yaml", [*path, "columns", position, "indexable"], "only string columns can be indexable")
-        if not any(column.name == dataset.time_column and column.role == "time" for column in dataset.columns):
+        if dataset.time_column is not None and not any(
+            column.name == dataset.time_column and column.role == "time" for column in dataset.columns
+        ):
             refs.add("datasets.yaml", [*path, "time_column"], "must name a column with role time")
         granted = [role.id for role in pack.policies.roles if any(grant.dataset == dataset.id for grant in role.datasets)]
         if set(dataset.allowed_roles) != set(granted):
@@ -334,6 +336,24 @@ def check_references(pack: Pack, catalog: Catalog | None = None) -> list[PackIss
     return refs.issues
 
 
+# Files a pack may leave out, with the content they then have: a generated pack has no eval set (DECISIONS §11).
+OPTIONAL_FILES = {"eval.yaml": {"cases": []}}
+
+
+def with_reader_role(pack: Pack) -> Pack:
+    """The pack read through its one reader role (DECISIONS §9).
+
+    A ``policies.yaml``, ``allowed_roles`` or an eval case's ``role`` left by an older pack is ignored: every
+    dataset is granted in full to the reader role, and every question runs as it.
+    """
+    datasets = [dataset.model_copy(update={"allowed_roles": [READER_ROLE]}) for dataset in pack.datasets.datasets]
+    cases = [case.model_copy(update={"role": READER_ROLE}) for case in pack.eval.cases]
+    return pack.model_copy(update={
+        "datasets": DatasetsFile(datasets=datasets), "policies": reader_policies(datasets),
+        "eval": pack.eval.model_copy(update={"cases": cases}),
+    })
+
+
 def load_pack(pack_dir: Path, *, schema_dir: Path | None = None, catalog: Catalog | None = None) -> Pack:
     """Load and validate the pack in ``pack_dir``; raise PackValidationError listing every problem.
 
@@ -344,6 +364,9 @@ def load_pack(pack_dir: Path, *, schema_dir: Path | None = None, catalog: Catalo
     issues: list[PackIssue] = []
     for file, validator in validators.items():
         path = pack_dir / file
+        if not path.is_file() and file in OPTIONAL_FILES:
+            contents[file.removesuffix(".yaml")] = OPTIONAL_FILES[file]
+            continue
         if not path.is_file():
             issues.append(PackIssue(file, "", "file is missing"))
             continue
@@ -356,7 +379,7 @@ def load_pack(pack_dir: Path, *, schema_dir: Path | None = None, catalog: Catalo
         contents[file.removesuffix(".yaml")] = data
     if issues:
         raise PackValidationError(pack_dir, issues)
-    pack = Pack(name=pack_dir.name, **contents)
+    pack = with_reader_role(Pack(name=pack_dir.name, policies={"roles": []}, **contents))
     issues = check_references(pack, catalog)
     if issues:
         raise PackValidationError(pack_dir, issues)

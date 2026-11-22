@@ -7,7 +7,6 @@ from fastapi.testclient import TestClient
 import pytest
 
 from agent_fixtures import compiled_fixture
-from auth_fixtures import token, verifier
 from test_review_service import NOW, Warehouse, pack_dir, registry  # noqa: F401 - fixtures
 
 from app.api import runtime
@@ -19,8 +18,8 @@ from app.main import app
 from app.onboarding.pack_yaml import ItemNotFound, PackFiles
 from app.onboarding.review import ReviewRefused, ReviewService
 
-REVIEWER = {"Authorization": f"Bearer {token(realm_access={'roles': ['pack_reviewer']})}"}
-ADMIN = {"Authorization": f"Bearer {token(realm_access={'roles': ['admin']})}"}
+REVIEWER = {}
+ADMIN = {}
 TS = datetime(2026, 11, 5, tzinfo=UTC)
 
 
@@ -55,7 +54,7 @@ class Store:
         return self.known
 
     def feedback(self, pack, rating, start, end):
-        return [FeedbackRow(trace_id="t9", ts=TS, user_id="lab.analyst", rating="dislike", question="Revenue?",
+        return [FeedbackRow(trace_id="t9", ts=TS, user_id="dev.analyst", rating="dislike", question="Revenue?",
                             note="wrong", run_status="succeeded", proposal="proposed")]
 
 
@@ -195,18 +194,26 @@ RUN = RunFacts(trace_id="t9", pack="minimal", question="Revenue for a@b.co", sta
 
 @pytest.fixture
 def client():
-    app.dependency_overrides[runtime.get_verifier] = lambda: verifier()
     app.dependency_overrides[runtime.get_compiled_or_none] = lambda: compiled_fixture()
     with TestClient(app) as test_client:
         yield test_client
     app.dependency_overrides.clear()
 
 
-def test_feedback_is_listed_for_a_reviewer(client):
+def test_feedback_is_listed_with_its_proposal(client):
     app.dependency_overrides[runtime.get_proposal_store] = lambda: Store()
     response = client.get("/admin/feedback", headers=REVIEWER, params={"rating": "dislike"})
     assert response.status_code == 200 and response.json()[0]["proposal"] == "proposed"
-    assert client.get("/admin/feedback", headers=ADMIN).status_code == 403
+
+
+def test_feedback_without_a_pack_says_so_without_logging_a_store_failure(client, caplog):
+    app.dependency_overrides[runtime.get_compiled_or_none] = lambda: None
+    app.dependency_overrides[runtime.get_proposal_store] = lambda: Store()
+
+    response = client.get("/admin/feedback", headers=REVIEWER)
+
+    assert response.status_code == 503 and "no pack is active" in response.json()["detail"]
+    assert "the feedback read failed" not in caplog.text
 
 
 def test_proposing_from_one_run(client):

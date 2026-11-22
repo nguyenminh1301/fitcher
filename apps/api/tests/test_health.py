@@ -39,3 +39,19 @@ def test_health_never_loads_the_classifier(monkeypatch, health):
 
     screener = Screener(None, loader=loader, clock=lambda: 10_000.0)
     assert health(screener).json()["screening"] == "unavailable"
+
+
+def test_health_reports_rules_only_screening_when_the_classifier_is_off(health):
+    assert health(Screener(None, enabled=lambda: False)).json() == {
+        "status": "ok", "screening": "rules_only", "classifier": None,
+    }
+
+
+def test_importing_the_api_loads_no_onnx_runtime():
+    import subprocess
+    import sys
+
+    code = "import sys, app.main; print('onnxruntime' in sys.modules, 'fastembed' in sys.modules)"
+    out = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, check=True,
+                         cwd=str(__import__("pathlib").Path(__file__).resolve().parents[1]))
+    assert out.stdout.strip() == "False False"

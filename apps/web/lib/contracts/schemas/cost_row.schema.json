@@ -1,6 +1,6 @@
 {
   "additionalProperties": false,
-  "description": "Estimated LLM cost of one day, alias and model, from LiteLLM's cost table.",
+  "description": "Estimated LLM cost of one day, provider, model and tier, from the LiteLLM SDK's price table.",
   "properties": {
     "day": {
       "title": "Day",
@@ -29,6 +29,16 @@
     "cost_usd": {
       "title": "Cost Usd",
       "type": "number"
+    },
+    "input_tokens": {
+      "default": 0,
+      "title": "Input Tokens",
+      "type": "integer"
+    },
+    "output_tokens": {
+      "default": 0,
+      "title": "Output Tokens",
+      "type": "integer"
     }
   },
   "required": [

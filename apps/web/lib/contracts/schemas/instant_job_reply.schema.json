@@ -1,0 +1,280 @@
+{
+  "$defs": {
+    "InstantJobView": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "source_id": {
+          "title": "Source Id",
+          "type": "string"
+        },
+        "tables": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Tables",
+          "type": "array"
+        },
+        "status": {
+          "enum": [
+            "running",
+            "succeeded",
+            "failed"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "steps": {
+          "items": {
+            "$ref": "#/$defs/InstantStep"
+          },
+          "title": "Steps",
+          "type": "array"
+        },
+        "failed_step": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Failed Step"
+        },
+        "error": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Error"
+        },
+        "error_reason": {
+          "anyOf": [
+            {
+              "enum": [
+                "unreachable",
+                "refused",
+                "authentication",
+                "tls",
+                "database_not_found",
+                "permission",
+                "unsupported_name",
+                "value_out_of_range",
+                "empty_or_unreadable",
+                "unknown",
+                "interrupted"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Error Reason"
+        },
+        "had_pack": {
+          "default": false,
+          "title": "Had Pack",
+          "type": "boolean"
+        },
+        "result": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/InstantResult"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "started_at": {
+          "title": "Started At",
+          "type": "string"
+        },
+        "finished_at": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Finished At"
+        }
+      },
+      "required": [
+        "id",
+        "source_id",
+        "tables",
+        "status",
+        "steps",
+        "started_at"
+      ],
+      "title": "InstantJobView",
+      "type": "object"
+    },
+    "InstantResult": {
+      "additionalProperties": false,
+      "properties": {
+        "pack": {
+          "title": "Pack",
+          "type": "string"
+        },
+        "datasets": {
+          "default": 0,
+          "title": "Datasets",
+          "type": "integer"
+        },
+        "relationships": {
+          "default": 0,
+          "title": "Relationships",
+          "type": "integer"
+        },
+        "skipped": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Skipped",
+          "type": "array"
+        },
+        "dropped": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Dropped",
+          "type": "array"
+        },
+        "slow": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Slow",
+          "type": "array"
+        },
+        "unreadable_columns": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Unreadable Columns",
+          "type": "array"
+        },
+        "suggested_questions": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Suggested Questions",
+          "type": "array"
+        }
+      },
+      "required": [
+        "pack"
+      ],
+      "title": "InstantResult",
+      "type": "object"
+    },
+    "InstantStep": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "enum": [
+            "marts",
+            "profile",
+            "files",
+            "draft",
+            "approve",
+            "compile",
+            "activate"
+          ],
+          "title": "Id",
+          "type": "string"
+        },
+        "state": {
+          "enum": [
+            "pending",
+            "running",
+            "done",
+            "failed"
+          ],
+          "title": "State",
+          "type": "string"
+        },
+        "phase": {
+          "anyOf": [
+            {
+              "enum": [
+                "screen",
+                "index"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Phase"
+        },
+        "done": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Done"
+        },
+        "total": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Total"
+        }
+      },
+      "required": [
+        "id",
+        "state"
+      ],
+      "title": "InstantStep",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "job": {
+      "$ref": "#/$defs/InstantJobView"
+    }
+  },
+  "required": [
+    "job"
+  ],
+  "title": "InstantJobReply",
+  "type": "object"
+}

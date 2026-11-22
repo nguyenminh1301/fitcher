@@ -1,10 +1,12 @@
-# Finch-Lab: Master Plan
+# fitcher: Master Plan
 
 Each phase has three parts: goal, deliverables and definition of done (DoD). A phase is complete only when its DoD is met; the next phase starts after that.
 
 Every phase follows [DECISIONS.md](DECISIONS.md). Each phase has a detailed plan under [plans/](plans/README.md); a code-level, test-first task plan is written when the phase starts.
 
 Phases are ordered to reach **one end-to-end flow as early as possible**. Each part is deepened afterwards.
+
+Phases 0 to 12 built the six-service version described by DECISIONS v3 and are complete. Phases 13 to 21 turn it into the self-hosted single-container product of DECISIONS v4; [DECISIONS §16](DECISIONS.md#16-transition-from-v3) maps each replaced behaviour to its phase, and [self-hosted-product-assessment.md](self-hosted-product-assessment.md) gives the reasoning.
 
 | Phase | Detailed plan |
 |---|---|
@@ -26,6 +28,15 @@ Phases are ordered to reach **one end-to-end flow as early as possible**. Each p
 | 10 | [Automated onboarding](plans/phase-10-automated-onboarding.md) |
 | 11 | [Industry neutrality proof](plans/phase-11-industry-neutrality.md) |
 | 12 | [Admin, audit and feedback loop](plans/phase-12-admin-audit-feedback.md) |
+| 13 | [App state and first-run setup](plans/phase-13-app-state-and-setup.md) |
+| 14 | [Model providers in the application](plans/phase-14-model-providers.md) |
+| 15 | [Individual and team sign-in](plans/phase-15-sign-in-modes.md) |
+| 16 | [One image, one container](plans/phase-16-single-container-image.md) |
+| 17 | [Connect data sources in the application](plans/phase-17-data-source-connections.md) |
+| 18 | [SQL Server sources](plans/phase-18-sql-server-sources.md) |
+| 19 | [Instant pack from a connected source](plans/phase-19-instant-pack.md) |
+| 20 | [Search in ClickHouse and optional documents](plans/phase-20-search-in-clickhouse.md) |
+| 21 | [Hardening and first release](plans/phase-21-hardening-and-release.md) |
 
 ---
 
@@ -291,6 +302,109 @@ Phases are ordered to reach **one end-to-end flow as early as possible**. Each p
   - A job proposing new examples from disliked or failed runs -> into the Review UI
 - **DoD:**
   - A disliked question -> appears as a proposal -> is approved -> passes in the next eval run
+
+## Phase 13: App state and first-run setup
+
+- **Goal:** keep what a user chooses in the application instead of `.env`, and upgrade existing volumes safely.
+- **Deliverables:**
+  - SQLite app state with typed settings and encrypted secrets
+  - Numbered schema changes for the app state and ClickHouse, applied by `jobs.migrate`
+  - Setup API and the `/setup` page with its first step (individual or team)
+- **DoD:**
+  - A fresh and a pre-existing volume reach the same recorded schema version
+  - A stored secret is unreadable on disk and through every endpoint
+  - A new instance opens on the setup
+
+## Phase 14: Model providers in the application
+
+- **Goal:** connect models in the interface and remove the LiteLLM Proxy service.
+- **Deliverables:**
+  - LiteLLM SDK gateway inside `api`, with screening and call logging
+  - Provider store, test call, tier mapping, the setup's Models step and the Models page
+  - Local embedding model, measured in English and Vietnamese
+  - Optional prompt-injection classifier
+- **DoD:**
+  - A key entered in the setup answers the acceptance question and is never returned or logged
+  - A local model server alone compiles a pack and answers a question
+  - No `litellm` service; the pack eval does not regress
+
+## Phase 15: Individual and team sign-in
+
+- **Goal:** remove Keycloak; individual mode has no sign-in, team mode has local accounts and optional OIDC.
+- **Deliverables:**
+  - One principal per request from the mode in force; Host and Origin checks
+  - Local accounts, Argon2id, server-side sessions, the Users API on local accounts
+  - Optional OpenID Connect sign-in; change from individual to team
+- **DoD:**
+  - Individual mode refuses a foreign `Host` and a cross-origin write
+  - The development users get the same answers and denials as before, and stay signed in across a restart
+  - No `keycloak` service
+
+## Phase 16: One image, one container
+
+- **Goal:** one command starts everything and `docker ps` shows one container.
+- **Deliverables:**
+  - Release image with web, api and embedded ClickHouse under s6-overlay; Qdrant as an internal process until Phase 20
+  - First-start initialization, low-memory ClickHouse profile, healthcheck
+  - Release workflow publishing a multi-architecture image; install guide
+- **DoD:**
+  - The one command leads to the setup and to an answered question on a machine with only Docker
+  - A killed process is restarted under supervision; the acceptance question is answered under a 4 GB limit
+  - An older volume upgrades in place
+
+## Phase 17: Connect data sources in the application
+
+- **Goal:** connect PostgreSQL, MySQL/MariaDB and uploaded files from the interface, with credentials held only by ClickHouse.
+- **Deliverables:**
+  - Source store, connection test, table listing with sizes and a proposed mode
+  - Named collections created with SQL; scheduled and incremental copies
+  - Sources page and the setup's Data step
+- **DoD:**
+  - The fixture databases are connected, attached live or copied and kept fresh without a command
+  - No source password is readable outside ClickHouse's encrypted storage
+
+## Phase 18: SQL Server sources
+
+- **Goal:** connect SQL Server through ClickHouse's ODBC bridge, or copy-only if the bridge fails its proof.
+- **Deliverables:**
+  - A proof with fixed pass criteria and its report
+  - The `sqlserver` source kind and its form
+- **DoD:**
+  - The report states the path taken; a SQL Server fixture is connected and copied from the interface
+
+## Phase 19: Instant pack from a connected source
+
+- **Goal:** ask the first question minutes after connecting a source, without dbt or hand-written YAML.
+- **Deliverables:**
+  - Mart views and wide views generated from selected tables; relationships from foreign keys
+  - Generated pack approved as unreviewed; one job from source to compiled pack
+  - Eval no longer gates a pack; quality report against the hand-written packs
+- **DoD:**
+  - Connecting the development source and confirming the draft leads to an answered question with no terminal
+  - Instant-pack execution match is recorded for both development sources and the hand-written packs do not regress
+
+## Phase 20: Search in ClickHouse and optional documents
+
+- **Goal:** remove Qdrant if recall holds, and make company documents a setup choice.
+- **Deliverables:**
+  - ClickHouse search index behind one engine interface; recall and latency report for both engines
+  - Qdrant removed, or the recorded decision to keep it
+  - Documents switch and the setup's Documents step
+- **DoD:**
+  - The report states the decision; if switched, the container runs three processes and the pack evals hold
+  - With documents off, no document endpoint answers
+
+## Phase 21: Hardening and first release
+
+- **Goal:** make the image safe to hand to strangers and publish 1.0.
+- **Deliverables:**
+  - Conversations kept until deleted; concurrency limits and a load measurement
+  - Secrets kept out of logs; web security headers; supply-chain pinning
+  - Backup and restore; security review; sample-data demo; README and diagrams for v4
+- **DoD:**
+  - A restored backup answers a question with the same history
+  - The security review has no open finding without a recorded reason
+  - `v1.0.0` is published and the README's one command works on a clean machine
 
 ---
 

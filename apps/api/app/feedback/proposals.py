@@ -76,7 +76,7 @@ def ineligible_reason(run: RunFacts) -> str | None:
     """Why ``run`` cannot become a proposal, or None when it can."""
     if run.intent != "data_query":
         return "not a data question"
-    if run.status in ("clarified", "denied", "rejected", "blocked", "cancelled"):
+    if run.status in ("clarified", "declined", "denied", "rejected", "blocked", "cancelled"):
         return f"the run was {run.status}"
     if run.status != "failed" and run.rating != "dislike":
         return "the run was neither disliked nor failed"

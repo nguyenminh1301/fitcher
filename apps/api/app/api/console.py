@@ -1,30 +1,15 @@
-"""Role checks of the workspace console's endpoints (DECISIONS §15).
+"""Who reaches the workspace console's endpoints (DECISIONS §9, §15).
 
-The console's navigation (``apps/web/lib/console/sections.ts``) lists a
-section only for these roles, and every endpoint behind a section enforces
-the same rule here.
+fitcher is a personal app: the owner holds the whole console, and the address
+checks and the optional owner password of ``app/auth/origin.py`` decide who is
+the owner. ``Owner`` names that principal in the console's endpoints.
 """
 
 from typing import Annotated
 
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends
 
 from app.api.auth import current_principal
-from app.auth.jwt import Principal
+from app.auth.principal import Principal
 
-PACK_REVIEWER = "pack_reviewer"
-ADMIN = "admin"
-
-
-def require_reviewer(principal: Annotated[Principal, Depends(current_principal)]) -> Principal:
-    """Review, Documents and Datasets belong to the ``pack_reviewer`` role."""
-    if PACK_REVIEWER not in principal.roles:
-        raise HTTPException(status.HTTP_403_FORBIDDEN, detail="this console section needs the pack_reviewer role")
-    return principal
-
-
-def require_admin(principal: Annotated[Principal, Depends(current_principal)]) -> Principal:
-    """Runs and trace, Audit, Costs, Users and Models belong to the ``admin`` role."""
-    if ADMIN not in principal.roles:
-        raise HTTPException(status.HTTP_403_FORBIDDEN, detail="this console section needs the admin role")
-    return principal
+Owner = Annotated[Principal, Depends(current_principal)]

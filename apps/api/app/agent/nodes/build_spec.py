@@ -28,8 +28,9 @@ from datetime import date
 
 from pydantic import ValidationError
 
-from app.agent.nodes.clarify import Need
+from app.agent.nodes.clarify import Need, chosen
 from app.agent.nodes.retrieve import Hit, Retrieval
+from app.agent.nodes.screen import question_language
 from app.agent.state import AgentDeps, AgentState
 from app.contracts.query_spec import Filter, Period, QuerySpec
 from app.packs.compiler import CompiledPack, DateCoverage
@@ -59,6 +60,10 @@ class _Tie(Exception):
         self.candidates = candidates
 
 
+# Words after which a question names what to group by, folded: "by region", "theo khu vực", "mỗi cửa hàng".
+_GROUPING_WORDS = frozenset({"by", "per", "across", "each", "theo", "moi", "tung"})
+
+
 def _forms(term: str) -> set[str]:
     folded = fold(term)
     forms = {folded}
@@ -72,9 +77,11 @@ def _forms(term: str) -> set[str]:
 class _Catalog:
     """Exact-match lookups over the approved pack."""
 
-    def __init__(self, compiled: CompiledPack):
+    def __init__(self, compiled: CompiledPack, choices: list[str] | None = None):
         pack = compiled.pack
         self.pack = pack
+        # The clarifying options the user picked for this question ("metric:revenue"), applied before asking again.
+        self.choices = choices or []
         self.datasets = {dataset.id: dataset for dataset in pack.datasets.datasets}
         self.metrics = {metric.id: metric for metric in pack.metrics.metrics}
         self.terms = {}
@@ -89,6 +96,16 @@ class _Catalog:
             for name in [term.term, *term.aliases.vi, *term.aliases.en] if fold(name)
         }
         self.value_terms = sorted(((words, term) for (words, _), term in named.items()), key=lambda item: -len(item[0]))
+
+    def pick(self, need: Need) -> str:
+        """The option the user already picked for ``need``; otherwise ask for it."""
+        for value in reversed(chosen(self.choices, need.kind)):
+            # The options offered are the candidates, or every metric the role may read when none is; the gate
+            # still checks that the role may read the one picked.
+            if value in need.candidates or (need.kind == "metric" and value in self.metrics):
+                # A column option is "dataset.column"; the spec names the column alone.
+                return value.split(".", 1)[1] if need.kind == "column" else value
+        raise NeedsChoice(need)
 
     def split_values(self, term: str) -> tuple[str, list[GlossaryTerm]]:
         """The words left after removing value-naming glossary terms, and those terms; ``(term, [])`` if none or nothing is left."""
@@ -122,6 +139,27 @@ class _Catalog:
             if fold(entry.id) in self.conventions:
                 return self.conventions[fold(entry.id)]
         return None
+
+    def named_columns(self, question: str, dataset: Dataset) -> list[str]:
+        """Columns the question groups by outright ("by region", "theo khu vực", "mỗi cửa hàng"): the longest run
+        of up to four words after a grouping word that names exactly one dimension column of ``dataset``. The time
+        column is left to the time grain, and a measure ("by sale amount") is never grouped by."""
+        words = fold(question).split()
+        roles = {column.name: column.role for column in dataset.columns}
+        found: list[str] = []
+        for index, word in enumerate(words):
+            if word not in _GROUPING_WORDS:
+                continue
+            for length in range(min(4, len(words) - index - 1), 0, -1):
+                columns = [
+                    column for column in self.exact_columns(" ".join(words[index + 1:index + 1 + length]), dataset)
+                    if roles.get(column) == "dimension"
+                ]
+                if len(columns) == 1:
+                    if columns[0] != dataset.time_column and columns[0] not in found:
+                        found.append(columns[0])
+                    break
+        return found
 
     def exact_columns(self, term: str, dataset: Dataset) -> list[str]:
         names = {column.name for column in dataset.columns}
@@ -168,11 +206,11 @@ def _resolve_metric(term: str, catalog: _Catalog, retrieval: Retrieval, words: s
         convention = catalog.convention_metric(term)
         if convention in exact:
             return convention
-        raise NeedsChoice(Need(kind="metric", term=term, candidates=exact))
+        return catalog.pick(Need(kind="metric", term=term, candidates=exact))
     try:
         found = _best(_metric_from_hits(retrieval.metric_terms.get(term, [])))
     except _Tie as tie:
-        raise NeedsChoice(Need(kind="metric", term=term, candidates=tie.candidates)) from None
+        return catalog.pick(Need(kind="metric", term=term, candidates=tie.candidates))
     if found is None or found not in catalog.metrics:
         raise SpecRejected(f"no metric matches '{term}'")
     return found
@@ -186,7 +224,7 @@ def _resolve_rank_metric(term: str, catalog: _Catalog, retrieval: Retrieval) -> 
     if convention is not None:
         return convention
     candidates = exact or _ranked(_metric_from_hits(retrieval.metric_terms.get(term, [])))
-    raise NeedsChoice(Need(kind="metric", term=term, candidates=candidates))
+    return catalog.pick(Need(kind="metric", term=term, candidates=candidates))
 
 
 def _column_from_hits(hits: Iterable[Hit], dataset: Dataset) -> dict[str, float]:
@@ -213,11 +251,11 @@ def _resolve_column(term: str, dataset: Dataset, catalog: _Catalog, retrieval: R
     if len(exact) == 1:
         return exact[0]
     if len(exact) > 1:
-        raise NeedsChoice(Need(kind="column", term=term, candidates=[f"{dataset.id}.{column}" for column in exact]))
+        return catalog.pick(Need(kind="column", term=term, candidates=[f"{dataset.id}.{column}" for column in exact]))
     try:
         found = _best(_column_from_hits(retrieval.dimension_terms.get(term, []), dataset))
     except _Tie as tie:
-        raise NeedsChoice(Need(kind="column", term=term, candidates=[f"{dataset.id}.{c}" for c in tie.candidates])) from None
+        return catalog.pick(Need(kind="column", term=term, candidates=[f"{dataset.id}.{c}" for c in tie.candidates]))
     if found is None:
         raise SpecRejected(f"no column of {dataset.id} matches '{term}'")
     return found
@@ -258,17 +296,52 @@ def _value_term_filters(terms: list[GlossaryTerm], dataset: Dataset, filtered: s
     ]
 
 
-def coverage_warnings(periods: list[Period], dataset: str, coverage: DateCoverage | None) -> list[str]:
-    if coverage is None or coverage.rows == 0 or coverage.min_date is None or coverage.max_date is None:
-        return [f"{dataset} has no data"]
+def _require_period(state: AgentState, dataset: Dataset) -> None:
+    """A dataset with a time column needs a period unless the question covers all the data; one without dates
+    is answered over all its rows."""
+    if not state["periods"] and dataset.time_column is not None and not state.get("all_time"):
+        raise NeedsChoice(Need(kind="period"))
+
+
+# The warnings shown with an answer, in the language of the question (the design keeps a warning in the question's
+# language, like the summary).
+WARNINGS = {
+    "en": {
+        "no_data": "{dataset} has no data",
+        "outside": "{period} is outside the data, which covers {low} to {high}",
+        "partly": "{period} is only partly covered by the data, which covers {low} to {high}",
+        "no_dates": "{dataset} has no date column, so the question was answered over all its rows",
+        "one_period": "only one period was named, so nothing is compared",
+        "first_rows": "only the first {rows} rows are shown",
+    },
+    "vi": {
+        "no_data": "{dataset} không có dữ liệu",
+        "outside": "{period} nằm ngoài dữ liệu, dữ liệu có từ {low} đến {high}",
+        "partly": "Dữ liệu chỉ có một phần của {period}: dữ liệu có từ {low} đến {high}",
+        "no_dates": "{dataset} không có cột ngày, nên câu hỏi được trả lời trên toàn bộ các dòng",
+        "one_period": "Câu hỏi chỉ nêu một khoảng thời gian nên không có gì để so sánh",
+        "first_rows": "Chỉ hiển thị {rows} dòng đầu tiên",
+    },
+}
+
+
+def warning(language: str, key: str, **values) -> str:
+    return WARNINGS["vi" if language == "vi" else "en"][key].format(**values)
+
+
+def coverage_warnings(periods: list[Period], dataset: str, coverage: DateCoverage | None, language: str = "en") -> list[str]:
+    if coverage is None or coverage.rows == 0:
+        return [warning(language, "no_data", dataset=dataset)]
+    if coverage.min_date is None or coverage.max_date is None:
+        return []
     low, high = date.fromisoformat(coverage.min_date), date.fromisoformat(coverage.max_date)
     warnings = []
     for period in periods:
         last = period.end.toordinal() - 1
         if period.start > high or last < low.toordinal():
-            warnings.append(f"{period.label} is outside the data, which covers {low} to {high}")
+            warnings.append(warning(language, "outside", period=period.label, low=low, high=high))
         elif period.start < low or last > high.toordinal():
-            warnings.append(f"{period.label} is only partly covered by the data, which covers {low} to {high}")
+            warnings.append(warning(language, "partly", period=period.label, low=low, high=high))
     return warnings
 
 
@@ -290,11 +363,9 @@ def _reviewed_spec(state: AgentState, compiled: CompiledPack, example: Hit) -> Q
     payload = example.source["payload"]
     reviewed = payload["spec"]
     dataset = {item.id: item for item in compiled.pack.datasets.datasets}[payload["datasets"][0]]
-    periods = state["periods"]
-    if not periods:
-        raise NeedsChoice(Need(kind="period"))
+    _require_period(state, dataset)
     dimensions = list(reviewed.get("dimensions", []))
-    if state.get("time_grain") and dataset.time_column not in dimensions:
+    if state.get("time_grain") and dataset.time_column is not None and dataset.time_column not in dimensions:
         dimensions.append(dataset.time_column)
     filters = [
         Filter(column=item["column"], op=item["op"], value=item["values"] if item["op"] in ("in", "not in") else item["values"][0])
@@ -309,12 +380,18 @@ def _reviewed_spec(state: AgentState, compiled: CompiledPack, example: Hit) -> Q
 def _finish(state: AgentState, compiled: CompiledPack, metric_ids: list[str], dataset: Dataset, dimensions: list[str],
             filters: list[Filter], top_n: int | None, rank_by: str | None) -> QuerySpec:
     extraction, periods = state["extraction"], state["periods"]
+    language = question_language(state)
     warnings = []
+    if dataset.time_column is None:
+        # A table without dates is read whole: a named period or time grain cannot narrow it.
+        if periods or state.get("time_grain"):
+            warnings.append(warning(language, "no_dates", dataset=dataset.id))
+        periods = []
     compare = extraction.compare and len(periods) > 1
     if extraction.compare and not compare:
-        warnings.append("only one period was named, so nothing is compared")
+        warnings.append(warning(language, "one_period"))
     rank_period = max(periods, key=lambda period: period.start).label if rank_by and len(periods) > 1 else None
-    warnings += coverage_warnings(periods, dataset.id, compiled.coverage.get(dataset.id))
+    warnings += coverage_warnings(periods, dataset.id, compiled.coverage.get(dataset.id), language)
     return QuerySpec(
         metric_ids=metric_ids, dimensions=list(dict.fromkeys(dimensions)), periods=periods, filters=filters,
         top_n=top_n, rank_by=rank_by, rank_period=rank_period, compare=compare, dataset=dataset.id,
@@ -331,11 +408,12 @@ def make_spec(state: AgentState, compiled: CompiledPack, example: Hit | None = N
     extraction = state["extraction"]
     retrieval = state["retrieval"]
     periods = state["periods"]
-    catalog = _Catalog(compiled)
+    catalog = _Catalog(compiled, state.get("choices"))
 
     if not extraction.metric_terms and not extraction.rank_term:
-        raise NeedsChoice(Need(kind="metric", candidates=_ranked(_metric_from_hits(retrieval.question_metrics))))
-    metric_ids = []
+        metric_ids = [catalog.pick(Need(kind="metric", candidates=_ranked(_metric_from_hits(retrieval.question_metrics))))]
+    else:
+        metric_ids = []
     value_terms: list[GlossaryTerm] = []
     for term in extraction.metric_terms:
         words, named = (term, []) if catalog.exact_metrics(term) else catalog.split_values(term)
@@ -358,11 +436,13 @@ def make_spec(state: AgentState, compiled: CompiledPack, example: Hit | None = N
     if len(datasets) != 1:
         raise SpecRejected(f"the metrics {', '.join(metric_ids)} come from different datasets")
     dataset = catalog.datasets[datasets.pop()]
-    if not periods:
-        raise NeedsChoice(Need(kind="period"))
+    _require_period(state, dataset)
 
     dimensions = [_resolve_column(term, dataset, catalog, retrieval) for term in extraction.dimension_terms]
-    if state.get("time_grain") and dataset.time_column not in dimensions:
+    if not dimensions:
+        # The extraction model can miss a grouping the question spells out; a column it names exactly is used.
+        dimensions = catalog.named_columns(state.get("question", ""), dataset)
+    if state.get("time_grain") and dataset.time_column is not None and dataset.time_column not in dimensions:
         dimensions.append(dataset.time_column)
     filters = []
     for extracted in extraction.filters:

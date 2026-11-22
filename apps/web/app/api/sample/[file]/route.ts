@@ -1,8 +1,16 @@
 // The active pack's sample data for the sample-data mode (DECISIONS §15): only console.json and
-// scenarios.json of packs/<ACTIVE_PACK>/sample_data are served; anything else is a 404.
+// scenarios.json of packs/<ACTIVE_PACK>/sample_data are served; anything else is a 404. A pack without sample
+// scenarios (every pack built in the app, or no sample pack at all) has no suggested questions to offer, so
+// scenarios answers an empty list instead of a 404 the chat would log on every new conversation.
+// Outside the demo build, which has no api behind it, a pack's files are read only for a request the api accepts
+// (GET /me): the same address checks and owner password as every other route. The release image passes no
+// ACTIVE_PACK to the web server, so there this route never reads a file.
 
 import { readFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
+
+import { DEMO } from "@/lib/api/sources";
+import { jsonError, rawApi } from "@/lib/server/api";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -14,16 +22,23 @@ function missing(): Response {
   return Response.json({ error: "sample_data_missing" }, { status: 404 });
 }
 
+const NO_SCENARIOS = { suggestions: [], scenarios: [] };
+
 export async function GET(_request: Request, { params }: { params: Promise<{ file: string }> }): Promise<Response> {
   const { file } = await params;
   const pack = process.env.ACTIVE_PACK ?? "";
-  if (!FILES.has(file) || !PACK_NAME.test(pack)) return missing();
+  if (!FILES.has(file)) return missing();
+  if (!PACK_NAME.test(pack)) return file === "scenarios" ? Response.json(NO_SCENARIOS) : missing();
+  if (!DEMO) {
+    const allowed = await rawApi("/me");
+    if (!allowed.ok) return allowed.status === 401 ? jsonError("signed_out", 401) : jsonError("refused", allowed.status === 502 ? 502 : 403);
+  }
   // `npm run dev` runs in apps/web; Compose mounts the packs and sets PACKS_DIR.
   const packs = process.env.PACKS_DIR ?? resolve(process.cwd(), "..", "..", "packs");
   try {
     const text = await readFile(join(packs, pack, "sample_data", `${file}.json`), "utf-8");
     return new Response(text, { headers: { "content-type": "application/json", "cache-control": "no-store" } });
   } catch {
-    return missing();
+    return file === "scenarios" ? Response.json(NO_SCENARIOS) : missing();
   }
 }

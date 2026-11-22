@@ -36,10 +36,13 @@ from datetime import UTC, date, datetime
 from decimal import Decimal
 from itertools import combinations
 import json
+import logging
 from pathlib import Path
 import re
 
 from app.packs.compiler import MARTS_DATABASE, SCAN_SETTINGS, CompileError, Warehouse, quote, table_ref
+
+logger = logging.getLogger(__name__)
 
 _WRAPPER = re.compile(r"^(Nullable|LowCardinality)\((.*)\)$")
 
@@ -159,16 +162,25 @@ def profile_marts(
         if table not in found:
             raise CompileError(f"marts has no table '{table}'")
     profiled: dict[str, dict] = {}
+    unreadable: list[str] = []
     for table in tables:
         rows = int(_scalar(warehouse, f"SELECT count() FROM {table_ref(table)}"))
-        columns = {
-            column: _profile_column(warehouse, table, column, base_type(column_type), rows, top_k, low_cardinality)
-            for column, column_type in found[table]
-        }
+        columns = {}
+        for column, column_type in found[table]:
+            try:
+                columns[column] = _profile_column(warehouse, table, column, base_type(column_type), rows, top_k,
+                                                  low_cardinality)
+            except Exception:  # noqa: BLE001 - a value ClickHouse cannot read (one too large for its type) drops
+                # only its column from the profile, so the pack is drafted without it instead of failing.
+                logger.warning("column %s.%s could not be profiled", table, column)
+                unreadable.append(f"{table}.{column}")
+        readable = [quote(column) for column, _ in found[table] if column in columns]
+        selected = "*" if len(readable) == len(found[table]) else ", ".join(readable)
         samples = warehouse.query(
-            f"SELECT * FROM {table_ref(table)} LIMIT {int(sample_rows)}", settings=SCAN_SETTINGS
-        ) if rows else []
+            f"SELECT {selected} FROM {table_ref(table)} LIMIT {int(sample_rows)}", settings=SCAN_SETTINGS
+        ) if rows and readable else []
         profiled[table] = {
             "rows": rows, "columns": columns, "sample_rows": [[_json_value(value) for value in row] for row in samples],
         }
-    return {"profiled_at": clock().isoformat(), "tables": profiled, "join_candidates": _join_candidates(warehouse, profiled)}
+    return {"profiled_at": clock().isoformat(), "tables": profiled, "join_candidates": _join_candidates(warehouse, profiled),
+            "unreadable_columns": unreadable}

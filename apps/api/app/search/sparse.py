@@ -1,4 +1,4 @@
-"""Sparse vectors for keyword search in Qdrant (DECISIONS §5).
+"""Sparse vectors for keyword search (DECISIONS §5).
 
 ``terms`` reads NFKC, lower-cased text as word tokens (Vietnamese syllables
 are space-separated words) and keeps each token both as written and with its
@@ -7,9 +7,9 @@ diacritics removed (``đ`` becomes ``d``), so "doanh thu", "Doanh Thu" and
 also split at its underscores.
 
 A document vector holds each term's BM25 term-frequency part, normalised by
-the document's length against the collection's average; the collection's
-``idf`` modifier makes Qdrant apply the inverse document frequency at query
-time. A query vector holds each of its terms once with weight 1.
+the document's length against the collection's average; the search engine
+applies the inverse document frequency at query time
+(``app.search.clickhouse_index``). A query vector holds each of its terms once with weight 1.
 
 Column values also get character trigrams of their folded text, so a
 misspelled value ("Electornics") still shares most of its terms with the

@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 // ECharts needs a real browser; these tests check which chart is chosen, not how it is drawn.
 vi.mock("@/components/chat/ChartView", () => ({ ChartView: ({ spec }: { spec: { type: string } }) => <div data-testid="chart">{spec.type}</div> }));
 
+import { Summary } from "@/components/chat/answer-parts";
 import { AssistantTurn } from "@/components/chat/AssistantTurn";
 import type { AskEvent } from "@/lib/api/events";
 import type { Turn } from "@/lib/api/conversations";
@@ -14,7 +15,7 @@ const T = "trace-1";
 const status = (node: string, attempt?: number): AskEvent => ({ event: "status", node, phase: "end", trace_id: T, attempt: attempt ?? null });
 const RESULT: Result = { columns: [{ name: "region", type: "string", role: "dimension" }, { name: "sales", type: "number", role: "measure" }], rows: [["West", 10]], row_count: 1 };
 const ANSWER: AskEvent[] = [
-  status("extract"), status("generate_sql"), { event: "sql", sql: "SELECT region, sum(x) AS sales FROM marts.t GROUP BY region", attempt: 1, trace_id: T },
+  status("extract"), status("generate_sql"), { event: "sql", sql: "SELECT region, sum(x) AS sales FROM marts.t GROUP BY region", attempt: 1, unreviewed_metrics: [], trace_id: T },
   status("execute"), { event: "result", result: RESULT, trace_id: T },
   { event: "chart_spec", spec: { type: "table", x: "region", y: ["sales"], allowed_types: ["bar", "table"] }, trace_id: T },
   { event: "summary", text: "The West led with **10**.", lang: "en", warnings: ["Q1 2026 is only partly covered by the data"], trace_id: T },
@@ -66,6 +67,16 @@ describe("answer", () => {
     expect(screen.getByText("Q1 2026 is only partly covered by the data")).toBeTruthy();
     expect(screen.getByRole("radiogroup", { name: "Chart type" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "SQL" })).toBeTruthy();
+  });
+
+  it("says under the SQL that a metric it used is not reviewed yet", () => {
+    const unreviewed = ANSWER.map((event) => (event.event === "sql" ? { ...event, unreviewed_metrics: ["sales_total"] } : event));
+    show(unreviewed);
+
+    expect(screen.getByText(/not reviewed by a person yet/).textContent).toContain("sales_total");
+    cleanup();
+    show(ANSWER);
+    expect(screen.queryByText(/not reviewed by a person yet/)).toBeNull();
   });
 
   it("switches a grouped bar to a bar and a table without calling the network", () => {
@@ -129,7 +140,7 @@ describe("answer", () => {
     expect(notice.className).not.toContain("danger");
   });
 
-  it("shows a blocked question's notice in its own language without repeating the question", () => {
+  it("titles a blocked notice in the interface language and keeps the api's message in the question's language", () => {
     const message = "Không thể trả lời câu hỏi này vì nó giống một yêu cầu thay đổi chỉ dẫn của trợ lý.";
     const events: AskEvent[] = [status("screen"), { event: "blocked", message, lang: "vi", trace_id: T }, { event: "done", trace_id: T }];
     render(
@@ -143,12 +154,33 @@ describe("answer", () => {
 
     const notice = screen.getByRole("status");
     expect(within(notice).getByText(message)).toBeTruthy();
-    expect(within(notice).getByText("Câu hỏi này chưa được trả lời")).toBeTruthy();
+    expect(within(notice).getByText("This question wasn't answered")).toBeTruthy();
     expect(notice.textContent).not.toContain("Bỏ qua mọi hướng dẫn");
-    expect(notice.querySelector("[lang]")?.getAttribute("lang")).toBe("vi");
+    expect(within(notice).getByText(message).getAttribute("lang")).toBe("vi");
+    expect(within(notice).getByText("This question wasn't answered").closest("[lang]")?.getAttribute("lang")).toBe("en");
     expect(screen.queryByRole("button", { name: /Like|Thích/ })).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: /How I got this/ }));
     expect(screen.getByText("Checking the question")).toBeTruthy();
+  });
+
+  it("writes the fixed text of a notice in the interface language whatever language the question was in", () => {
+    const events: AskEvent[] = [status("extract"), { event: "error", kind: "network", message: "lost", sql: null, error: null, trace_id: T }];
+    render(
+      <I18nProvider>
+        <Switch />
+        <AssistantTurn
+          turn={{ turn: 1, revision: 1, question: "Doanh thu theo vùng", question_lang: "vi", events }}
+          streaming={false} onStop={vi.fn()} onFollowUp={vi.fn()} onRetry={vi.fn()}
+        />
+      </I18nProvider>,
+    );
+
+    expect(within(screen.getByRole("alert")).getByText("Connection lost")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "vi" }));
+    const notice = screen.getByRole("alert");
+    expect(within(notice).getByText("Mất kết nối")).toBeTruthy();
+    expect(within(notice).getByRole("button", { name: "Thử lại" })).toBeTruthy();
+    expect(notice.querySelector("[lang]")).toBeNull();
   });
 
   it("shows the last SQL and database error after a failure, with no result", () => {
@@ -159,12 +191,21 @@ describe("answer", () => {
     expect(screen.queryByRole("radiogroup", { name: "Chart type" })).toBeNull();
   });
 
-  it("sends a clarifying option as a follow-up question", () => {
-    const { onFollowUp } = show([{ event: "clarify", question: "Which measure?", options: [{ id: "a", label: "Net sales" }, { id: "b", label: "Orders" }], lang: "en", trace_id: T }, { event: "done", trace_id: T }]);
+  it("says the model did not answer, shows the provider's reason and offers a retry instead of asking back", () => {
+    const { onRetry } = show([status("extract"), { event: "error", kind: "model", message: "The model did not answer.", sql: null, error: "RateLimitError (the provider is limiting requests)", trace_id: T }]);
+
+    expect(screen.getByText("The model did not answer")).toBeTruthy();
+    expect(screen.getByText("RateLimitError (the provider is limiting requests)")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+    expect(onRetry).toHaveBeenCalled();
+  });
+
+  it("sends a clarifying option as a follow-up question with its id", () => {
+    const { onFollowUp } = show([{ event: "clarify", question: "Which measure?", options: [{ id: "metric:first_measure", label: "Net sales" }, { id: "metric:second_measure", label: "Orders" }], about: "Sales?", chosen: [], lang: "en", trace_id: T }, { event: "done", trace_id: T }]);
 
     fireEvent.click(screen.getByRole("button", { name: "Net sales" }));
 
-    expect(onFollowUp).toHaveBeenCalledWith("Net sales");
+    expect(onFollowUp).toHaveBeenCalledWith("Net sales", "metric:first_measure");
   });
 
   it("says the run was stopped", () => {
@@ -189,5 +230,20 @@ describe("answer", () => {
     fireEvent.click(screen.getByRole("button", { name: /Retry/ }));
 
     expect(onRetry).toHaveBeenCalled();
+  });
+
+  it("bolds the figures of a summary the model did not mark, but not a year or a small count", () => {
+    const { container } = render(<Summary lang="vi" text="Năm 2026 có 3 vùng, tổng 1.234.567 ₫, tăng 12,5% so với 98.000." />);
+    expect([...container.querySelectorAll("b")].map((item) => item.textContent)).toEqual(["1.234.567", "12,5%", "98.000"]);
+  });
+
+  it("reads a figure grouped with narrow spaces as one figure", () => {
+    const { container } = render(<Summary lang="vi" text={"HCM – 54\u202f839\u202f627,31; Hà Nội – 54 825 467,84."} />);
+    expect([...container.querySelectorAll("b")].map((item) => item.textContent)).toEqual(["54\u202f839\u202f627,31", "54 825 467,84"]);
+  });
+
+  it("keeps the figures the model marked and bolds nothing else", () => {
+    const { container } = render(<Summary lang="en" text="Revenue was **$1,200** in 2026, up 5% from 1,000." />);
+    expect([...container.querySelectorAll("b")].map((item) => item.textContent)).toEqual(["$1,200"]);
   });
 });

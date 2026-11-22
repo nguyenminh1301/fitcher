@@ -1,9 +1,9 @@
-"""Bearer authentication and role mapping on the HTTP endpoints."""
+"""The owner and the active role on the HTTP endpoints, and the pack identity."""
 
 from agent_fixtures import compiled_fixture
-from auth_fixtures import token, verifier
 from fastapi.testclient import TestClient
 import pytest
+
 
 from app.api import runtime
 from app.main import app
@@ -11,7 +11,6 @@ from app.main import app
 
 @pytest.fixture
 def client():
-    app.dependency_overrides[runtime.get_verifier] = lambda: verifier()
     app.dependency_overrides[runtime.get_compiled] = compiled_fixture
     app.dependency_overrides[runtime.get_compiled_or_none] = compiled_fixture
     with TestClient(app) as test_client:
@@ -19,51 +18,15 @@ def client():
     app.dependency_overrides.clear()
 
 
-def bearer(text: str) -> dict:
-    return {"Authorization": f"Bearer {text}"}
-
-
-def test_me_returns_the_verified_user_and_active_role(client):
-    response = client.get("/me", headers=bearer(token()))
-
-    assert response.status_code == 200
-    assert response.json() == {
-        "user_id": "lab.viewer", "display_name": "Lab Viewer", "roles": ["viewer"], "active_role": "viewer",
-    }
-
-
-def test_a_missing_token_is_unauthorized(client):
+def test_me_is_the_owner_with_every_pack_role(client):
     response = client.get("/me")
 
-    assert response.status_code == 401
-    assert response.headers["www-authenticate"] == "Bearer"
-
-
-@pytest.mark.parametrize("header", ["Basic abc", "Bearer", "Bearer not-a-token", "token-without-scheme"])
-def test_a_malformed_authorization_header_is_unauthorized(client, header):
-    assert client.get("/me", headers={"Authorization": header}).status_code == 401
-
-
-@pytest.mark.parametrize("overrides", [{"exp": 1_000_000}, {"iss": "http://other.test"}, {"aud": "other"}])
-def test_an_invalid_token_is_unauthorized_without_detail_of_the_check(client, overrides):
-    response = client.get("/me", headers=bearer(token(**overrides)))
-
-    assert response.status_code == 401
-    assert response.json() == {"detail": "invalid or expired access token"}
-
-
-def test_a_user_without_a_pack_role_has_no_active_role(client):
-    response = client.get("/me", headers=bearer(token(realm_access={"roles": ["admin"]})))
-
     assert response.status_code == 200
-    assert response.json()["roles"] == ["admin"]
-    assert response.json()["active_role"] is None
-
-
-def test_an_active_role_header_the_token_does_not_hold_is_forbidden(client):
-    response = client.get("/me", headers={**bearer(token()), "X-Active-Role": "auditor"})
-
-    assert response.status_code == 403
+    pack_roles = [role.id for role in compiled_fixture().pack.policies.roles]
+    assert response.json() == {
+        "user_id": "owner", "display_name": "Owner", "roles": pack_roles,
+        "active_role": pack_roles[0], "exposed": False,
+    }
 
 
 def test_pack_names_the_active_pack_and_its_roles_without_a_token(client):
@@ -77,24 +40,24 @@ def test_pack_names_the_active_pack_and_its_roles_without_a_token(client):
     }
 
 
-def test_a_pack_under_onboarding_signs_in_from_its_pack_files(client, monkeypatch, tmp_path):
+def test_a_pack_under_onboarding_is_named_from_its_pack_files(client, monkeypatch, tmp_path):
     from conftest import FIXTURE_PACK
 
     del app.dependency_overrides[runtime.get_compiled_or_none]
-    runtime.get_compiled.cache_clear()
+    runtime.reload_pack()
     monkeypatch.setenv("ACTIVE_PACK", "minimal")
     monkeypatch.setenv("COMPILED_PACK_DIR", str(tmp_path / "build"))
     monkeypatch.setenv("PACKS_DIR", str(FIXTURE_PACK.parent))
 
-    assert client.get("/pack").json() == {"name": "minimal", "display_name": "Minimal widget shop", "roles": ["viewer"]}
-    me = client.get("/me", headers=bearer(token(realm_access={"roles": ["viewer", "pack_reviewer"]}))).json()
-    assert me["roles"] == ["viewer", "pack_reviewer"] and me["active_role"] == "viewer"
+    assert client.get("/pack").json() == {"name": "minimal", "display_name": "Minimal widget shop", "roles": ["reader"]}
+    me = client.get("/me").json()
+    assert me["roles"] == ["reader"] and me["active_role"] == "reader"
 
 
 def test_an_uncompiled_pack_makes_the_endpoints_unavailable(client, monkeypatch, tmp_path):
     del app.dependency_overrides[runtime.get_compiled]
     del app.dependency_overrides[runtime.get_compiled_or_none]
-    runtime.get_compiled.cache_clear()
+    runtime.reload_pack()
     monkeypatch.setenv("ACTIVE_PACK", "demo")
     monkeypatch.setenv("COMPILED_PACK_DIR", str(tmp_path))
     monkeypatch.setenv("PACKS_DIR", str(tmp_path / "packs"))
@@ -103,17 +66,91 @@ def test_an_uncompiled_pack_makes_the_endpoints_unavailable(client, monkeypatch,
 
     assert response.status_code == 503
     assert "compile the pack first" in response.json()["detail"]
-    assert client.get("/me", headers=bearer(token())).status_code == 503
-    runtime.get_compiled.cache_clear()
+    assert client.get("/me", headers={}).status_code == 503
+    runtime.reload_pack()
 
 
-def test_unconfigured_token_settings_make_authenticated_endpoints_unavailable(client, monkeypatch):
-    del app.dependency_overrides[runtime.get_verifier]
-    runtime.get_verifier.cache_clear()
-    for name in ("KEYCLOAK_ISSUER", "KEYCLOAK_AUDIENCE", "KEYCLOAK_JWKS_URL"):
-        monkeypatch.delenv(name, raising=False)
+def test_suggestions_are_the_first_three_approved_example_questions_of_each_language(client):
+    response = client.get("/pack/suggestions", headers={})
 
-    response = client.get("/me", headers=bearer(token()))
+    examples = compiled_fixture().pack.examples.examples
+    expected = [
+        {"text": example.question, "lang": example.language} for example in examples
+        if [other.language for other in examples[: examples.index(example) + 1]].count(example.language) <= 3
+    ]
+    assert response.status_code == 200
+    assert response.json() == expected
+    assert {item["lang"] for item in expected} == {example.language for example in examples}
 
-    assert response.status_code == 503
-    runtime.get_verifier.cache_clear()
+
+def test_a_new_instance_without_any_pack_still_knows_the_owner(client, monkeypatch):
+    del app.dependency_overrides[runtime.get_compiled]
+    del app.dependency_overrides[runtime.get_compiled_or_none]
+    runtime.reload_pack()
+    monkeypatch.setattr(runtime, "current_pack", lambda: "")
+
+    response = client.get("/me")
+
+    assert response.status_code == 200
+    assert response.json()["active_role"] is None and response.json()["roles"] == []
+    runtime.reload_pack()
+
+
+def test_a_request_names_the_pack_it_reads_and_others_keep_the_pack_used_last(client, monkeypatch, tmp_path):
+    from conftest import FIXTURE_PACK
+
+    del app.dependency_overrides[runtime.get_compiled_or_none]
+    runtime.reload_pack()
+    monkeypatch.setenv("ACTIVE_PACK", "elsewhere")
+    monkeypatch.setenv("COMPILED_PACK_DIR", str(tmp_path / "build"))
+    monkeypatch.setenv("PACKS_DIR", str(FIXTURE_PACK.parent))
+
+    named = client.get("/pack", params={"pack": "minimal"})
+    default = client.get("/pack")
+
+    assert named.status_code == 200 and named.json()["name"] == "minimal"
+    assert default.status_code == 503 and "elsewhere" in default.json()["detail"]
+    runtime.reload_pack()
+
+
+def test_choosing_a_compiled_pack_makes_it_the_current_one(client, monkeypatch):
+    chosen = []
+    served = []
+    monkeypatch.setattr(runtime, "get_compiled", lambda: served.append(runtime.current_pack()) or compiled_fixture())
+    monkeypatch.setattr(runtime, "set_active_pack", lambda db, name: chosen.append(name))
+
+    response = client.put("/pack", json={"name": "minimal"})
+
+    assert response.status_code == 200 and response.json()["name"] == compiled_fixture().pack.name
+    assert served == ["minimal"] and chosen == ["minimal"]
+
+
+def test_a_pack_that_was_never_compiled_cannot_be_chosen(client, monkeypatch):
+    chosen = []
+
+    def missing():
+        raise runtime.unavailable("compile the pack first")
+
+    monkeypatch.setattr(runtime, "get_compiled", missing)
+    monkeypatch.setattr(runtime, "set_active_pack", lambda db, name: chosen.append(name))
+
+    assert client.put("/pack", json={"name": "nothing_here"}).status_code == 503
+    assert client.put("/pack", json={"name": "../etc"}).status_code == 422
+    assert chosen == []
+
+
+def test_suggestions_keep_three_questions_of_each_language():
+    from app.api.auth import suggestions
+    from app.auth.principal import owner
+
+    compiled = compiled_fixture()
+    first = compiled.pack.examples.examples[0]
+    examples = [first.model_copy(update={"id": f"q{index}", "question": f"Question {index}?", "language": lang})
+                for index, lang in enumerate(["en", "en", "en", "en", "vi", "vi"])]
+    pack = compiled.pack.model_copy(update={"examples": compiled.pack.examples.model_copy(update={"examples": examples})})
+
+    listed = suggestions(owner([]), compiled.model_copy(update={"pack": pack}))
+
+    assert [(item["text"], item["lang"]) for item in listed] == [
+        ("Question 0?", "en"), ("Question 1?", "en"), ("Question 2?", "en"), ("Question 4?", "vi"), ("Question 5?", "vi"),
+    ]

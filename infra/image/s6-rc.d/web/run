@@ -1,0 +1,17 @@
+#!/command/with-contenv sh
+# The web server, the only process on the published port, as `web`: it reads neither /data nor the rendered
+# ClickHouse configuration, and starts with only the variables it reads, never the container's environment, where
+# FITCHER_SECRET_KEY or a ClickHouse password may be supplied. It reaches the api over loopback.
+exec 2>&1
+install -d -m 0700 -o web -g web /tmp/web
+set --
+# The upload limits the web server checks before forwarding a file (apps/web/lib/server/api.ts).
+for name in SOURCE_FILE_MAX_BYTES DOCUMENT_MAX_BYTES TZ; do
+    eval "value=\${$name:-}"
+    [ -n "$value" ] && set -- "$@" "$name=$value"
+done
+cd /opt/web
+# peer-address.cjs records each connection's address for the api's local-peer check.
+exec env -i PATH=/usr/local/bin:/usr/bin:/bin HOME=/tmp/web TMPDIR=/tmp/web NODE_ENV=production \
+    NEXT_TELEMETRY_DISABLED=1 HOSTNAME=0.0.0.0 PORT=3000 API_URL=http://127.0.0.1:8000 "$@" \
+    /command/s6-setuidgid web node --require ./peer-address.cjs server.js

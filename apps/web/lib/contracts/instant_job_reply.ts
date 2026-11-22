@@ -1,0 +1,75 @@
+// Generated from the backend Pydantic contract by npm run contracts:generate; do not edit.
+
+export type Id = string;
+export type SourceId = string;
+export type Tables = string[];
+export type Status = "running" | "succeeded" | "failed";
+export type Id1 = "marts" | "profile" | "files" | "draft" | "approve" | "compile" | "activate";
+export type State = "pending" | "running" | "done" | "failed";
+export type Phase = ("screen" | "index") | null;
+export type Done = number | null;
+export type Total = number | null;
+export type Steps = InstantStep[];
+export type FailedStep = string | null;
+export type Error = string | null;
+export type ErrorReason =
+  | (
+      | "unreachable"
+      | "refused"
+      | "authentication"
+      | "tls"
+      | "database_not_found"
+      | "permission"
+      | "unsupported_name"
+      | "value_out_of_range"
+      | "empty_or_unreadable"
+      | "unknown"
+      | "interrupted"
+    )
+  | null;
+export type HadPack = boolean;
+export type Pack = string;
+export type Datasets = number;
+export type Relationships = number;
+export type Skipped = string[];
+export type Dropped = string[];
+export type Slow = string[];
+export type UnreadableColumns = string[];
+export type SuggestedQuestions = string[];
+export type StartedAt = string;
+export type FinishedAt = string | null;
+
+export interface InstantJobReply {
+  job: InstantJobView;
+}
+export interface InstantJobView {
+  id: Id;
+  source_id: SourceId;
+  tables: Tables;
+  status: Status;
+  steps: Steps;
+  failed_step?: FailedStep;
+  error?: Error;
+  error_reason?: ErrorReason;
+  had_pack?: HadPack;
+  result?: InstantResult | null;
+  started_at: StartedAt;
+  finished_at?: FinishedAt;
+}
+export interface InstantStep {
+  id: Id1;
+  state: State;
+  phase?: Phase;
+  done?: Done;
+  total?: Total;
+}
+export interface InstantResult {
+  pack: Pack;
+  datasets?: Datasets;
+  relationships?: Relationships;
+  skipped?: Skipped;
+  dropped?: Dropped;
+  slow?: Slow;
+  unreadable_columns?: UnreadableColumns;
+  suggested_questions?: SuggestedQuestions;
+}

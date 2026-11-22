@@ -30,7 +30,7 @@ class Warehouse:
 def document(document_id: str, deleted: bool = False) -> DocumentRecord:
     return DocumentRecord(
         id=document_id, pack="minimal", file_name=f"{document_id}.pdf", media_type="application/pdf", size_bytes=1,
-        sha256=document_id, uploaded_by="u", allowed_roles=["viewer"], status="indexed", uploaded_at=NOW,
+        sha256=document_id, uploaded_by="u", allowed_roles=["reader"], status="indexed", uploaded_at=NOW,
         updated_at=NOW, deleted_at=NOW if deleted else None,
     )
 
@@ -119,7 +119,7 @@ def test_test_run_returns_a_result_with_the_review_limits(pack_dir, registry):
     warehouse = Warehouse()
     item = service(pack_dir, registry, warehouse).test_run("metrics.widget_revenue")
     assert item.test_result.rows == [[1234.5]]
-    assert item.test_result.columns[0].model_dump() == {"name": "value", "type": "number", "role": "measure", "format": None}
+    assert item.test_result.columns[0].model_dump() == {"name": "value", "type": "number", "role": "measure", "format": None, "label": None, "grain": None}
     sql, settings = warehouse.queries[0]
     assert sql == "SELECT sum(sale_amount) AS value FROM `marts`.`widget_sales` LIMIT 1"
     assert settings["readonly"] == 2 and settings["max_execution_time"] == 30 and settings["max_result_rows"] == 100
@@ -147,3 +147,28 @@ def test_changes_wait_while_the_pack_compiles(pack_dir, registry):
     with pytest.raises(ReviewRefused, match="compiling") as raised:
         service(pack_dir, registry).approve("metrics.widget_revenue")
     assert raised.value.status == 409
+
+
+def _mark_unreviewed(pack_dir, file: str, item_id: str) -> None:
+    files = PackFiles(pack_dir)
+    files.find(file, item_id)["reviewed"] = False
+    files._changed.add(file)  # noqa: SLF001 - the test writes the flag the instant pack writes
+    files.save(file)
+
+
+def test_unreviewed_items_are_listed_first_and_carry_the_flag(pack_dir, registry):
+    _mark_unreviewed(pack_dir, "metrics.yaml", "refunded_value")
+
+    items = service(pack_dir, registry).items()
+
+    assert items[0].id == "metrics.refunded_value" and items[0].reviewed is False
+    assert all(item.reviewed is None for item in items[1:])
+
+
+def test_confirming_an_unreviewed_item_marks_it_reviewed(pack_dir, registry):
+    _mark_unreviewed(pack_dir, "metrics.yaml", "refunded_value")
+
+    approved = service(pack_dir, registry).approve("metrics.refunded_value")
+
+    assert approved.reviewed is True and approved.status == "approved"
+    assert PackFiles(pack_dir).find("metrics.yaml", "refunded_value")["reviewed"] is True

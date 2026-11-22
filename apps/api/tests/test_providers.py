@@ -1,0 +1,282 @@
+"""The provider store over the app state: kinds, validation, keys kept in the vault, routes."""
+
+import sqlite3
+
+import pytest
+from state_fixtures import new_state
+
+from app.llm import defaults
+from app.llm.providers import key_name, KINDS, ProviderError, ProviderNotFound, ProviderStore
+
+KEY = "sk-test-provider-key-9876"
+
+
+@pytest.fixture
+def state(tmp_path):
+    return new_state(tmp_path)
+
+
+@pytest.fixture
+def store(state):
+    return ProviderStore(*state)
+
+
+def test_a_hosted_provider_keeps_its_key_in_the_vault_and_shows_only_the_last_four(state, store):
+    db, vault = state
+
+    provider = store.create("openai", api_key=KEY)
+
+    assert (provider.id, provider.name, provider.kind) == ("openai", "OpenAI", "openai")
+    assert provider.key_set and provider.key_last4 == "9876"
+    assert [key.last4 for key in provider.keys] == ["9876"]
+    assert vault.reader().get(key_name("openai", provider.keys[0].id)) == KEY
+    dump = "\n".join(db.connection().iterdump())
+    assert KEY not in dump
+    assert KEY not in repr(provider)
+
+
+def test_a_second_provider_of_a_kind_gets_its_own_id(store):
+    store.create("openai", api_key=KEY)
+
+    second = store.create("openai", name="OpenAI (team)", api_key="sk-other-0001")
+
+    assert second.id == "openai-2"
+    assert [p.id for p in store.list()] == ["openai", "openai-2"]
+
+
+def test_names_are_unique(store):
+    store.create("ollama", base_url="http://host.docker.internal:11434")
+    with pytest.raises(ProviderError, match="name"):
+        store.create("ollama", base_url="http://other:11434")
+
+
+@pytest.mark.parametrize("kind", ["openai", "anthropic", "gemini"])
+def test_a_hosted_provider_needs_a_key_and_takes_no_base_url(store, kind):
+    with pytest.raises(ProviderError, match="needs an API key"):
+        store.create(kind)
+    with pytest.raises(ProviderError, match="base URL"):
+        store.create(kind, api_key=KEY, base_url="http://example:1/v1")
+
+
+@pytest.mark.parametrize("kind", ["ollama", "openai_compatible"])
+def test_a_model_server_needs_an_http_base_url(store, kind):
+    with pytest.raises(ProviderError, match="needs a base URL"):
+        store.create(kind)
+    with pytest.raises(ProviderError, match="http"):
+        store.create(kind, base_url="file:///etc/passwd")
+
+
+def test_an_openai_compatible_endpoint_takes_an_optional_key(store):
+    keyless = store.create("openai_compatible", name="LM Studio", base_url="http://host.docker.internal:1234/v1/")
+    keyed = store.create("openai_compatible", name="OpenRouter", base_url="https://openrouter.ai/api/v1", api_key=KEY)
+
+    assert keyless.base_url == "http://host.docker.internal:1234/v1"
+    assert not keyless.key_set and keyless.key_last4 is None
+    assert keyed.key_set
+
+
+def test_an_unknown_kind_is_refused(store):
+    with pytest.raises(ProviderError, match="kind"):
+        store.create("azure", api_key=KEY)
+    assert set(KINDS) == {"openai", "anthropic", "gemini", "ollama", "openai_compatible"}
+
+
+def test_the_state_refuses_an_unknown_kind_as_well(state):
+    db, _ = state
+    with pytest.raises(sqlite3.IntegrityError), db.write() as conn:
+        conn.execute("INSERT INTO providers (id, name, kind, base_url, created_at) VALUES ('x', 'x', 'azure', NULL, '')")
+
+
+def test_update_replaces_the_key_and_renames_without_touching_the_rest(state, store):
+    store.create("anthropic", api_key=KEY)
+
+    updated = store.update("anthropic", name="Claude", api_key="sk-ant-new-4321")
+
+    assert (updated.name, updated.key_last4, updated.kind) == ("Claude", "4321", "anthropic")
+    assert [key.last4 for key in updated.keys] == ["4321"]
+    assert state[1].reader().get(key_name("anthropic", updated.keys[0].id)) == "sk-ant-new-4321"
+    assert not state[1].has(key_name("anthropic", "legacy"))
+    assert store.update("anthropic").key_last4 == "4321"
+
+
+def test_update_checks_the_base_url_like_create(store):
+    store.create("ollama", base_url="http://host.docker.internal:11434")
+    with pytest.raises(ProviderError, match="http"):
+        store.update("ollama", base_url="ftp://x")
+
+
+def test_delete_removes_the_row_and_its_key(state, store):
+    created = store.create("gemini", api_key=KEY)
+    second = store.add_key("gemini", "AIza-second-5555")
+
+    store.delete("gemini")
+
+    assert store.list() == []
+    assert not state[1].has(key_name("gemini", created.keys[0].id))
+    assert not state[1].has(key_name("gemini", second.id))
+    with pytest.raises(ProviderNotFound):
+        store.get("gemini")
+    with pytest.raises(ProviderNotFound):
+        store.delete("gemini")
+
+
+@pytest.mark.parametrize(("kind", "options", "model", "expected"), [
+    ("openai", {"api_key": KEY}, "gpt-5.4-mini", ("openai/gpt-5.4-mini", KEY, None)),
+    ("anthropic", {"api_key": KEY}, "claude-haiku-5-5", ("anthropic/claude-haiku-5-5", KEY, None)),
+    ("gemini", {"api_key": KEY}, "gemini-2.5-flash", ("gemini/gemini-2.5-flash", KEY, None)),
+    ("ollama", {"base_url": "http://host.docker.internal:11434"}, "qwen2.5-coder:7b",
+     ("ollama_chat/qwen2.5-coder:7b", None, "http://host.docker.internal:11434")),
+    ("openai_compatible", {"base_url": "http://lab:1234/v1"}, "local-model",
+     ("openai/local-model", None, "http://lab:1234/v1")),
+])
+def test_a_route_names_the_sdk_model_and_carries_the_decrypted_key(state, store, kind, options, model, expected):
+    provider = store.create(kind, **options)
+
+    route = store.route(provider.id, model, state[1].reader())
+
+    assert (route.model, route.api_key, route.api_base) == expected
+    assert route.provider == provider.id
+
+
+def test_every_kind_has_a_proposed_model_for_each_chat_tier_or_none():
+    for kind in KINDS:
+        proposal = defaults.chat_models(kind)
+        assert set(proposal) <= {"fast", "sql-small", "sql-gen", "sql-gen-hard"}
+    assert defaults.chat_models("openai") == {
+        "fast": "gpt-5.4-mini", "sql-small": "gpt-5.4-mini", "sql-gen": "gpt-5.4", "sql-gen-hard": "gpt-5.5",
+    }
+    assert defaults.chat_models("openai_compatible") == {}
+    assert defaults.embedding_model("openai") == "text-embedding-3-large"
+    assert defaults.embedding_model("anthropic") is None
+
+
+def test_a_base_url_never_carries_credentials(store):
+    # A key goes through api_key and the vault; the base URL is stored and shown in plain text.
+    with pytest.raises(ProviderError, match="user information"):
+        store.create("openai_compatible", base_url="https://user:sk-secret@openrouter.ai/api/v1")
+    store.create("ollama", base_url="http://host.docker.internal:11434")
+    with pytest.raises(ProviderError, match="user information"):
+        store.update("ollama", base_url="http://admin@host.docker.internal:11434")
+
+
+class FailingVault:
+    """Wraps a vault so that writing or deleting a secret fails inside the caller's transaction."""
+
+    def __init__(self, vault):
+        self._vault = vault
+
+    def __getattr__(self, name):
+        return getattr(self._vault, name)
+
+    def set_in(self, conn, name, value):
+        raise OSError("disk full")
+
+    def delete_in(self, conn, name):
+        raise OSError("disk full")
+
+
+def test_a_new_base_url_of_a_keyed_provider_needs_the_key_again(state, store):
+    store.create("openai_compatible", name="Lab", base_url="https://models.example/v1", api_key=KEY)
+
+    with pytest.raises(ProviderError, match="key"):
+        store.update("openai-compatible", base_url="http://attacker.example/v1")
+
+    kept = store.get("openai-compatible")
+    assert (kept.base_url, kept.key_last4) == ("https://models.example/v1", "9876")
+
+
+def test_the_same_base_url_needs_no_key_and_a_keyless_provider_moves_freely(store):
+    store.create("openai_compatible", name="Lab", base_url="https://models.example/v1", api_key=KEY)
+    store.create("ollama", base_url="http://host.docker.internal:11434")
+
+    assert store.update("openai-compatible", name="Lab 2", base_url="https://models.example/v1").name == "Lab 2"
+    assert store.update("ollama", base_url="http://gpu-box:11434").base_url == "http://gpu-box:11434"
+
+
+def test_a_new_base_url_with_its_new_key_is_accepted(state, store):
+    store.create("openai_compatible", name="Lab", base_url="https://models.example/v1", api_key=KEY)
+
+    moved = store.update("openai-compatible", base_url="https://other.example/v1", api_key="sk-other-1111")
+
+    assert (moved.base_url, moved.key_last4) == ("https://other.example/v1", "1111")
+
+
+def test_a_provider_whose_key_is_not_stored_is_not_created(state):
+    db, vault = state
+    with pytest.raises(OSError):
+        ProviderStore(db, FailingVault(vault)).create("openai", api_key=KEY)
+    assert ProviderStore(db, vault).list() == []
+
+
+def test_a_new_base_url_and_its_key_are_stored_together_or_not_at_all(state):
+    db, vault = state
+    ProviderStore(db, vault).create("openai_compatible", name="Lab", base_url="http://old:1/v1", api_key=KEY)
+
+    with pytest.raises(OSError):
+        ProviderStore(db, FailingVault(vault)).update("openai-compatible", base_url="http://new:1/v1", api_key="sk-new-0000")
+
+    kept = ProviderStore(db, vault).get("openai-compatible")
+    assert (kept.base_url, kept.key_last4) == ("http://old:1/v1", "9876")
+
+
+def test_a_provider_and_its_key_are_removed_together_or_not_at_all(state):
+    db, vault = state
+    ProviderStore(db, vault).create("gemini", api_key=KEY)
+
+    with pytest.raises(OSError):
+        ProviderStore(db, FailingVault(vault)).delete("gemini")
+
+    assert ProviderStore(db, vault).get("gemini").key_set
+
+
+def test_an_ollama_embedding_route_uses_the_sdks_embedding_prefix(state, store):
+    store.create("ollama", base_url="http://host.docker.internal:11434")
+    reader = state[1].reader()
+
+    assert store.route("ollama", "nomic-embed-text", reader, embedding=True).model == "ollama/nomic-embed-text"
+    assert store.route("ollama", "qwen2.5-coder:7b", reader).model == "ollama_chat/qwen2.5-coder:7b"
+
+
+def test_a_provider_holds_several_keys_and_routes_one_per_key_oldest_first(state, store):
+    store.create("openai_compatible", name="Groq", base_url="https://api.groq.com/openai/v1", api_key="gsk-first-1111")
+
+    added = store.add_key("openai-compatible", "gsk-second-2222", label=" spare ")
+    routes = store.routes("openai-compatible", "openai/gpt-oss-120b", state[1].reader())
+
+    assert (added.label, added.last4) == ("spare", "2222")
+    assert [route.api_key for route in routes] == ["gsk-first-1111", "gsk-second-2222"]
+    assert [route.key_id for route in routes] == [key.id for key in store.get("openai-compatible").keys]
+    assert {route.model for route in routes} == {"openai/openai/gpt-oss-120b"}
+    assert store.route("openai-compatible", "m", state[1].reader()).api_key == "gsk-first-1111"
+
+
+def test_a_key_is_removed_alone_but_a_hosted_provider_keeps_its_last_key(state, store):
+    first = store.create("openai", api_key=KEY).keys[0]
+    second = store.add_key("openai", "sk-second-2222")
+
+    store.remove_key("openai", first.id)
+
+    assert [key.id for key in store.get("openai").keys] == [second.id]
+    assert not state[1].has(key_name("openai", first.id))
+    with pytest.raises(ProviderError, match="needs an API key"):
+        store.remove_key("openai", second.id)
+    with pytest.raises(ProviderNotFound):
+        store.remove_key("openai", "missing")
+
+
+def test_keys_are_refused_where_they_do_not_fit(store):
+    store.create("ollama", base_url="http://host.docker.internal:11434")
+    store.create("openai", api_key=KEY)
+
+    with pytest.raises(ProviderError, match="no API key"):
+        store.add_key("ollama", "anything")
+    with pytest.raises(ProviderError, match="empty"):
+        store.add_key("openai", "  ")
+
+
+def test_a_provider_without_keys_routes_once_without_a_key(state, store):
+    store.create("openai_compatible", base_url="http://lab:1234/v1")
+
+    routes = store.routes("openai-compatible", "local-model", state[1].reader())
+
+    assert [(route.api_key, route.key_id) for route in routes] == [(None, None)]

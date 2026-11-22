@@ -27,6 +27,17 @@ class Drafter:
                  "evidence": [{"kind": "profile", "ref": "widget_sales"}], "confidence": 0.5}]
 
 
+@pytest.fixture(autouse=True)
+def isolated_data_dir(tmp_path, monkeypatch):
+    """The job opens the app state for its model clients: keep it out of the real data directory."""
+    from app.state.db import reset_shared_state
+
+    monkeypatch.setenv("FITCHER_DATA_DIR", str(tmp_path / "fitcher-data"))
+    reset_shared_state()
+    yield
+    reset_shared_state()
+
+
 @pytest.fixture
 def packs_dir(tmp_path, monkeypatch):
     shutil.copytree(FIXTURE_PACK, tmp_path / "packs" / "minimal")
@@ -34,7 +45,6 @@ def packs_dir(tmp_path, monkeypatch):
     (tmp_path / "build" / "minimal").mkdir(parents=True)
     (tmp_path / "build" / "minimal" / "profile.json").write_text(json.dumps({"tables": {"widget_sales": {}}}), encoding="utf-8")
     monkeypatch.setenv("COMPILED_PACK_DIR", str(tmp_path / "build"))
-    monkeypatch.setenv("LITELLM_MASTER_KEY", "sk-test")
     monkeypatch.setattr(job, "admin_client", lambda: object())
     monkeypatch.setattr(job, "Drafter", Drafter)
     monkeypatch.setattr(job, "read_chunks", lambda search, pack, document: [])

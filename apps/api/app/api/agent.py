@@ -23,14 +23,12 @@ from app.agent.state import AgentDeps, AgentState, Progress
 from app.config import Settings
 from app.conversation.store import Turn
 from app.data.clickhouse import ClickHouseRunner, QueryLimits, QueryStopper, agent_client, stopper_client
-from app.llm.client import LiteLLMClient
-from app.llm.embeddings import LiteLLMEmbeddings
-from app.llm.tiers import EMBED_TIER, TierMap
+from app.llm.clients import chat_client, embedding_client
 from app.observability.log_writer import start_log_writer
 from app.packs.compiler import CompiledPack
 from app.packs.policy_compiler import Names
 from app.screening.screen import Screener
-from app.search.client import QdrantSearch
+from app.search.engine import open_search
 
 logger = logging.getLogger(__name__)
 
@@ -58,8 +56,12 @@ class GraphRun:
     query_ids: QueryIds | None = None
     # Returns the stopper and the ClickHouse user whose query it stops.
     stopper: Callable[[], tuple[QueryStopper, str]] | None = None
+    # The clarified question a picked option answers; the run answers it, and logs what the user sent.
+    question: str | None = None
 
     def run(self, question: str, progress: Progress) -> AgentState:
+        if self.question is not None and self.question != question:
+            return run_question(self.question, replace(self.deps, progress=progress, asked=question))
         return run_question(question, replace(self.deps, progress=progress))
 
     def cancel(self) -> None:
@@ -74,19 +76,22 @@ class GraphRun:
 
 
 class Agent:
-    def __init__(self, settings: Settings, compiled: CompiledPack, screener: Screener, tiers: TierMap):
+    def __init__(
+        self, settings: Settings, compiled: CompiledPack, screener: Screener,
+        documents_enabled: Callable[[], bool] = lambda: True,
+    ):
         self.compiled = compiled
+        # Read for every question, so turning documents off applies without rebuilding the agent.
+        self._documents_enabled = documents_enabled
         self._screener = screener
         self._screen_mode = settings.screen_mode
-        self._llm = LiteLLMClient(settings.litellm_base_url, settings.litellm_master_key, tiers=tiers)
-        self._search = QdrantSearch(settings.qdrant_url)
-        # Query vectors must match the indexed ones, so the compiled size wins over the environment.
-        self._embeddings = LiteLLMEmbeddings(
-            settings.litellm_base_url, settings.litellm_master_key, compiled.embedding_dimensions,
-            alias=tiers.alias(EMBED_TIER),
-        )
-        self._limits = QueryLimits.from_env()
         self._logs = start_log_writer(settings)
+        # Each provider call writes its llm_calls row through the run's log writer.
+        self._llm = chat_client(call_log=self._logs.enqueue)
+        self._search = open_search()
+        # Query vectors must match the indexed ones, so the compiled size wins over the setting.
+        self._embeddings = embedding_client(compiled.embedding_dimensions, call_log=self._logs.enqueue)
+        self._limits = QueryLimits.from_env()
         self._clients: dict[str, object] = {}
         self._stopper: QueryStopper | None = None
         self._lock = threading.Lock()
@@ -103,15 +108,21 @@ class Agent:
                 self._stopper = QueryStopper(stopper_client())
         return self._stopper, Names(self.compiled.pack.name).user(role)
 
-    def start(self, *, role: str, user_id: str, today: date, history: Sequence[Turn] = ()) -> GraphRun:
+    def start(
+        self, *, role: str, user_id: str, today: date, history: Sequence[Turn] = (),
+        clarified: tuple[str, tuple[str, ...]] | None = None,
+    ) -> GraphRun:
+        """``clarified`` is the question a picked option answers and every option picked for it."""
         query_ids = QueryIds()
         runner = ClickHouseRunner(self._client(role), self._limits, new_query_id=query_ids)
         deps = AgentDeps(
             llm=self._llm, search=self._search, embeddings=self._embeddings, runner=runner,
             compiled=self.compiled, today=today, logs=self._logs, user_id=user_id, role=role, history=tuple(history),
-            screener=self._screener, screen_mode=self._screen_mode,
+            screener=self._screener, screen_mode=self._screen_mode, documents_enabled=self._documents_enabled(),
         )
-        return GraphRun(deps, query_ids, partial(self._stopper_for, role))
+        if clarified is not None:
+            deps = replace(deps, choices=clarified[1])
+        return GraphRun(deps, query_ids, partial(self._stopper_for, role), question=clarified[0] if clarified else None)
 
     def close(self) -> None:
         self._logs.close()

@@ -26,6 +26,8 @@ export type Id = string;
 export type Label = string;
 export type Options = ClarifyOption[];
 export type Lang = string;
+export type About = string;
+export type Chosen = string[];
 export type TraceId2 = string;
 export type Event2 = "deny";
 export type Message = string;
@@ -40,6 +42,7 @@ export type TraceId4 = string;
 export type Event4 = "sql";
 export type Sql = string;
 export type Attempt1 = number;
+export type UnreviewedMetrics = string[];
 export type TraceId5 = string;
 export type Event5 = "result";
 /**
@@ -50,6 +53,8 @@ export type Name = string;
 export type Type = "string" | "number" | "date" | "datetime" | "boolean";
 export type Role1 = "dimension" | "measure" | "time";
 export type Format = ("currency" | "count" | "ratio" | "percent" | "days" | "number") | null;
+export type Label1 = string | null;
+export type Grain = ("day" | "week" | "month" | "quarter" | "year") | null;
 /**
  * @maxItems 5000
  */
@@ -81,7 +86,7 @@ export type TraceId8 = string;
 export type Event8 = "done";
 export type TraceId9 = string;
 export type Event9 = "error";
-export type Kind = "failed" | "internal";
+export type Kind = "failed" | "internal" | "model";
 export type Message2 = string;
 export type Sql1 = string | null;
 export type Error = string | null;
@@ -99,6 +104,8 @@ export interface ClarifyEvent {
   question: Question;
   options: Options;
   lang: Lang;
+  about: About;
+  chosen: Chosen;
 }
 export interface ClarifyOption {
   id: Id;
@@ -123,6 +130,7 @@ export interface SqlEvent {
   event: Event4;
   sql: Sql;
   attempt: Attempt1;
+  unreviewed_metrics: UnreviewedMetrics;
 }
 export interface ResultEvent {
   trace_id: TraceId5;
@@ -140,6 +148,8 @@ export interface ColumnInfo {
   type: Type;
   role: Role1;
   format?: Format;
+  label?: Label1;
+  grain?: Grain;
 }
 export interface ChartSpecEvent {
   trace_id: TraceId6;
@@ -168,7 +178,8 @@ export interface DoneEvent {
   event: Event8;
 }
 /**
- * ``failed``: no SQL attempt produced a result; ``internal``: the run broke, with no detail for the client.
+ * ``failed``: no SQL attempt produced a result; ``internal``: the run broke, with no detail for the client;
+ * ``model``: the model call that reads the question failed, with the provider's reason in ``error``.
  */
 export interface ErrorEvent {
   trace_id: TraceId9;

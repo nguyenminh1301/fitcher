@@ -3,6 +3,6 @@
 
 import type { ErrorEvent, StreamEvent } from "@/lib/contracts";
 
-export type ClientErrorEvent = Omit<ErrorEvent, "kind"> & { kind: "network" | "stopped" };
+export type ClientErrorEvent = Omit<ErrorEvent, "kind"> & { kind: "network" | "stopped" | "refused" };
 
 export type AskEvent = StreamEvent | ClientErrorEvent;

@@ -7,7 +7,6 @@ import { AuditSection } from "@/components/console/sections/AuditSection";
 import { CostsSection } from "@/components/console/sections/CostsSection";
 import { EvaluationSection } from "@/components/console/sections/EvaluationSection";
 import { RunDetail, RunsSection } from "@/components/console/sections/RunsSection";
-import { UsersSection } from "@/components/console/sections/UsersSection";
 import { createMockApi, type MockApi } from "@/lib/api/mock";
 import type { ConsoleFile } from "@/lib/api/provisional";
 import { ChatProvider } from "@/lib/chat/ChatContext";
@@ -22,10 +21,6 @@ configure({ asyncUtilTimeout: 4000 });
 const CONSOLE: Partial<ConsoleFile> = {
   pack: { name: "shop", display_name: "Shop" },
   pack_roles: ["analyst", "viewer"],
-  identities: [
-    { user_id: "adm", display_name: "Ada Admin", roles: ["admin", "analyst"] },
-    { user_id: "rev", display_name: "Rae Reviewer", roles: ["pack_reviewer", "analyst"] },
-  ],
   conversations: [],
   eval_reports: [
     {
@@ -63,17 +58,12 @@ const CONSOLE: Partial<ConsoleFile> = {
     { day: "2026-11-01", alias: "fast", model: "model-small", tier: "fast", provider: "openai", calls: 10, cost_usd: 0.25 },
     { day: "2026-11-02", alias: "sql-gen", model: "model-large", tier: "sql-gen", provider: "openai", calls: 4, cost_usd: 1.5 },
   ],
-  users: [
-    { id: "adm", username: "adm", display_name: "Ada Admin", roles: ["admin", "analyst"], enabled: true },
-    { id: "ana", username: "ana", display_name: "Ana Analyst", roles: ["analyst"], enabled: true },
-  ],
 };
 
 let api: MockApi;
 let navigate: Mock<(path: string, options?: { replace: boolean }) => void>;
 
 function show(section: string, page: ReactNode, user = "adm") {
-  window.localStorage.setItem("fitcher.demo.identity", user);
   render(
     <ThemeProvider>
       <I18nProvider initial="en">
@@ -101,10 +91,11 @@ describe("evaluation", () => {
   it("shows the latest report's per-layer rates against the 80% threshold", async () => {
     show("evaluation", <EvaluationSection />);
 
-    expect(await screen.findByRole("img", { name: /Execution match 85% · Threshold 80%/ })).toBeTruthy();
+    expect(await screen.findByRole("img", { name: /Correct results 85% · Threshold 80%/ })).toBeTruthy();
     expect(screen.getByRole("img", { name: /Retrieval recall 100%/ })).toBeTruthy();
-    expect(screen.getAllByText("Pack enabled").length).toBeGreaterThan(0);
-    const intent = screen.getByText("Intent routing").closest(".fc-meter-row") as HTMLElement;
+    expect(screen.getByText("Correct results · threshold 80%")).toBeTruthy();
+    expect(screen.getAllByText("Meets threshold").length).toBeGreaterThan(0);
+    const intent = screen.getByText("Intent routing").closest(".ev-layer") as HTMLElement;
     expect(within(intent).getByText("Not scored yet")).toBeTruthy();
   });
 
@@ -112,47 +103,91 @@ describe("evaluation", () => {
     show("evaluation", <EvaluationSection />);
     const required = await screen.findByRole("region", { name: "Required question set" });
 
-    expect(within(required).getByText("Two-period comparison")).toBeTruthy();
+    const compare = within(required).getByText("Two-period comparison").closest("tr") as HTMLElement;
+    expect(within(compare).getByText("5")).toBeTruthy();
+    expect(within(compare).getByText("4")).toBeTruthy();
     expect(within(required).getAllByText("Not scored yet").length).toBe(5);
     expect(screen.getByText("case_one")).toBeTruthy();
     expect(screen.getByText("expected 10 rows, got 4")).toBeTruthy();
 
-    fireEvent.click(within(screen.getByRole("region", { name: "Reports" })).getAllByRole("button")[1]);
+    const history = screen.getByRole("region", { name: "Earlier reports" });
+    expect(within(history).getByText("Below threshold")).toBeTruthy();
+    fireEvent.click(within(history).getAllByRole("button")[1]);
     expect(navigate).toHaveBeenCalledWith("/console/evaluation/e1");
   });
 
-  it("labels Run evaluation as paid AI and asks before an admin starts it", async () => {
+  it("labels Run evaluation as paid AI and asks before starting it", async () => {
     const start = vi.spyOn(api.evaluation, "start");
     show("evaluation", <EvaluationSection />);
 
-    fireEvent.click(await screen.findByRole("button", { name: /Run evaluation.*Uses paid AI/ }));
+    const run = await screen.findByRole("button", { name: "Run evaluation" });
+    expect(run.getAttribute("aria-describedby")).toBe("eval-paid");
+    expect(screen.getByText("Uses paid AI")).toBeTruthy();
+    fireEvent.click(run);
     expect(start).not.toHaveBeenCalled();
-    await act(async () => fireEvent.click(within(screen.getByRole("dialog", { name: "This uses paid AI" })).getByRole("button", { name: /Continue/ })));
+    await act(async () => fireEvent.click(within(screen.getByRole("dialog", { name: "Run the evaluation?" })).getByRole("button", { name: "Run evaluation" })));
 
     await waitFor(() => expect(start).toHaveBeenCalled());
   });
+});
 
-  it("does not let a reviewer run the evaluation set", async () => {
-    show("evaluation", <EvaluationSection />, "rev");
+describe("evaluation without an eval set", () => {
+  it("says the pack has no evaluation questions instead of failing silently", async () => {
+    vi.spyOn(api.evaluation, "start").mockRejectedValue(new Error("no_eval_set: eval.yaml of pack shop must set reference_date"));
+    show("evaluation", <EvaluationSection />);
 
-    await screen.findAllByText("Pack enabled");
-    expect(screen.queryByRole("button", { name: /Run evaluation/ })).toBeNull();
+    fireEvent.click(await screen.findByRole("button", { name: "Run evaluation" }));
+    await act(async () => fireEvent.click(within(screen.getByRole("dialog", { name: "Run the evaluation?" })).getByRole("button", { name: "Run evaluation" })));
+
+    expect((await screen.findByRole("alert")).textContent).toContain("This source has no evaluation questions yet");
   });
 });
 
 describe("runs and trace", () => {
-  it("filters runs by status and user and opens a run's trace", async () => {
+  it("filters runs by status and opens a run's trace", async () => {
     show("runs", <RunsSection />);
     await screen.findByText("Totals by month");
 
-    fireEvent.click(screen.getByRole("radio", { name: "Denied" }));
-    expect(screen.queryByText("Totals by month")).toBeNull();
-    fireEvent.click(screen.getByRole("radio", { name: "All" }));
-    fireEvent.change(screen.getByRole("textbox", { name: "User" }), { target: { value: "bo" } });
+    fireEvent.change(screen.getByRole("combobox", { name: "Status" }), { target: { value: "denied" } });
     expect(screen.queryByText("Totals by month")).toBeNull();
 
     fireEvent.click(screen.getByRole("button", { name: "Refunds in 2025" }));
     expect(navigate).toHaveBeenCalledWith("/console/runs/t2");
+  });
+
+  it("filters stopped runs, links an answer to the question asked back and says when a cost is unknown", async () => {
+    const list = vi.fn(async () => [
+      { trace_id: "t5", pack: "shop", ts: "2026-11-02T08:16:00Z", user_id: "ana", role: "analyst", question: "Năm nay", intent: "data_query",
+        status: "succeeded", latency_ms: 10, cost_usd: 0, cost_unknown: true, answer_to: "Tổng amount theo region" },
+      { trace_id: "t6", pack: "shop", ts: "2026-11-02T08:20:00Z", user_id: "ana", role: "analyst", question: "Stopped one", intent: "",
+        status: "cancelled", latency_ms: 10, cost_usd: 0.002, cost_unknown: true },
+    ]);
+    Object.assign(api.runs, { list });
+    show("runs", <RunsSection />);
+
+    const answer = (await screen.findByRole("button", { name: "Năm nay" })).closest("tr") as HTMLElement;
+    expect(answer.textContent).toContain("Answer to: Tổng amount theo region");
+    expect(within(answer).getByText("Unknown")).toBeTruthy();
+    expect(screen.getByText("At least $0.0020")).toBeTruthy();
+    fireEvent.change(screen.getByRole("combobox", { name: "Status" }), { target: { value: "cancelled" } });
+    expect(screen.queryByText("Năm nay")).toBeNull();
+    expect(screen.getByRole("option", { name: "Stopped" })).toBeTruthy();
+  });
+
+  it("lists every source's runs together, with a Source column and filter", async () => {
+    const list = vi.fn(async () => [
+      { trace_id: "t1", pack: "shop", ts: "2026-11-02T08:15:00Z", user_id: "ana", role: "analyst", question: "Totals by month", intent: "data_query", status: "succeeded", latency_ms: 10, cost_usd: 0 },
+      { trace_id: "t3", pack: "crm", ts: "2026-11-02T10:15:00Z", user_id: "ana", role: "analyst", question: "Leads per country", intent: "data_query", status: "succeeded", latency_ms: 10, cost_usd: 0 },
+    ]);
+    Object.assign(api.runs, { list });
+    show("runs", <RunsSection />);
+    await screen.findByText("Leads per country");
+
+    expect(list).toHaveBeenCalledWith({ all: true });
+    expect(screen.getByRole("columnheader", { name: "Source" })).toBeTruthy();
+    fireEvent.change(screen.getByRole("combobox", { name: "Source" }), { target: { value: "crm" } });
+    expect(screen.queryByText("Totals by month")).toBeNull();
+    expect(screen.getByText("Leads per country")).toBeTruthy();
   });
 
   it("lists the trace's steps with durations, LLM calls by alias, SQL errors and the access decision", async () => {
@@ -164,7 +199,32 @@ describe("runs and trace", () => {
     expect(within(timeline).getByText("$0.0004")).toBeTruthy();
     expect(within(timeline).getByText("Code: 47. Unknown identifier")).toBeTruthy();
     expect(within(timeline).getByText("ALLOW")).toBeTruthy();
-    expect(screen.getByText("Estimate")).toBeTruthy();
+  });
+
+  it("reads a running run again until it ends, so a failure shows without reloading", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const running = { trace_id: "t9", ts: new Date(Date.now() - 5000).toISOString(), user_id: "adm", role: "", question: "Slow one",
+      intent: "", status: "running", latency_ms: 0, cost_usd: 0 };
+    const trace = vi.fn()
+      .mockResolvedValueOnce({ run: running, items: [] })
+      .mockResolvedValue({ run: { ...running, status: "failed", latency_ms: 31000, error: "Timeout" }, items: [] });
+    Object.assign(api.runs, { trace });
+    try {
+      show("runs", <RunDetail traceId="t9" />);
+      expect(await screen.findByText(/^Running/)).toBeTruthy();
+      // While it runs, the duration counts from its start instead of showing 0 ms.
+      expect(screen.queryByText("0 ms")).toBeNull();
+
+      await act(async () => { await vi.advanceTimersByTimeAsync(2100); });
+
+      expect(await screen.findByText("Failed")).toBeTruthy();
+      expect(screen.getByText("31.0 s")).toBeTruthy();
+      const calls = trace.mock.calls.length;
+      await act(async () => { await vi.advanceTimersByTimeAsync(4500); });
+      expect(trace.mock.calls.length).toBe(calls);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("says when a trace does not exist", async () => {
@@ -177,7 +237,7 @@ describe("runs and trace", () => {
 describe("audit", () => {
   it("lists allow and deny decisions with the blocked tables", async () => {
     show("audit", <AuditSection />);
-    const row = (await screen.findByText("table_two", { selector: "td code" })).closest("tr") as HTMLElement;
+    const row = (await screen.findAllByText("table_two"))[0].closest("tr") as HTMLElement;
 
     expect(within(row).getByText("Denied")).toBeTruthy();
     expect(screen.getByText("Allowed")).toBeTruthy();
@@ -185,50 +245,19 @@ describe("audit", () => {
 });
 
 describe("costs", () => {
-  it("labels every cost as an estimate", async () => {
-    show("costs", <CostsSection />);
+  it("totals the estimated spend for the period by task and by model", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-11-03T12:00:00Z"));
+    try {
+      show("costs", <CostsSection />);
+      const totals = await screen.findByRole("region", { name: "Totals" });
 
-    expect(await screen.findByText("$1.75")).toBeTruthy();
-    expect(screen.getAllByText("Estimate").length).toBeGreaterThanOrEqual(3);
-    expect(screen.getByText(/Estimated from token counts/)).toBeTruthy();
-  });
-});
-
-describe("users", () => {
-  it("changes a user's roles and disables them after confirmation", async () => {
-    show("users", <UsersSection />);
-    const row = (await screen.findByText("Ana Analyst")).closest("tr") as HTMLElement;
-
-    await act(async () => fireEvent.click(within(row).getByRole("button", { name: "viewer" })));
-    await waitFor(() => expect(within(row).getByRole("button", { name: "viewer" }).getAttribute("aria-pressed")).toBe("true"));
-
-    fireEvent.click(within(row).getByRole("button", { name: "Disable" }));
-    await act(async () => fireEvent.click(within(screen.getByRole("alertdialog", { name: "Disable Ana Analyst?" })).getByRole("button", { name: "Disable" })));
-    await waitFor(() => expect(within(row).getByText("Disabled")).toBeTruthy());
-    expect((await api.users.list()).find((user) => user.id === "ana")).toMatchObject({ roles: ["analyst", "viewer"], enabled: false });
-  });
-
-  it("lists users for an admin who may not read the Datasets section", async () => {
-    vi.spyOn(api.datasets, "list").mockRejectedValue(new Error("this console section needs the pack_reviewer role"));
-    show("users", <UsersSection />);
-
-    expect(await screen.findByText("Ana Analyst")).toBeTruthy();
-  });
-
-  it("does not let the signed-in admin change their own roles or disable themselves", async () => {
-    show("users", <UsersSection />);
-    const row = (await screen.findByText("Ada Admin", { selector: "b" })).closest("tr") as HTMLElement;
-
-    expect(within(row).getByRole("button", { name: "analyst" }).hasAttribute("disabled")).toBe(true);
-    expect(within(row).queryByRole("button", { name: "Disable" })).toBeNull();
-  });
-
-  it("offers only the pack's roles, which are the only roles the api changes", async () => {
-    show("users", <UsersSection />);
-    const row = (await screen.findByText("Ana Analyst")).closest("tr") as HTMLElement;
-
-    expect(within(row).getAllByRole("button").map((button) => button.textContent)).toEqual(expect.arrayContaining(["analyst", "viewer"]));
-    expect(within(row).queryByRole("button", { name: "admin" })).toBeNull();
-    expect(within(row).queryByRole("button", { name: "pack_reviewer" })).toBeNull();
+      expect(within(totals).getByText("$1.75")).toBeTruthy();
+      expect(screen.getByRole("region", { name: "By task" })).toBeTruthy();
+      expect(screen.getByText("model-large")).toBeTruthy();
+      expect(screen.getByText(/Estimated from token counts/)).toBeTruthy();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

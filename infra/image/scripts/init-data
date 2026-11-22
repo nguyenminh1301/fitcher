@@ -1,0 +1,10 @@
+#!/command/with-contenv sh
+# Data layout, generated secrets and the embedded ClickHouse configuration (jobs/init_data.py), written as `app`.
+# Runs as root first: /data and /run/fitcher belong to `app` and are closed to every other user, the web server's
+# included, whatever the volume brought (a bind mount owned by root, an older volume with mode 0755).
+set -e
+[ "$(stat -c %u /data)" = 0 ] && chown app:app /data
+chmod 0700 /data
+install -d -m 0700 -o app -g app /run/fitcher /tmp/app
+cd /app
+exec env HOME=/home/app TMPDIR=/tmp/app /command/s6-setuidgid app python -m jobs.init_data

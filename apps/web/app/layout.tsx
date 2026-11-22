@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { connection } from "next/server";
 import { Inter } from "next/font/google";
 import type { ReactNode } from "react";
 
@@ -15,7 +16,9 @@ export const metadata: Metadata = {
   icons: { icon: "/brand/favicon.svg" },
 };
 
-export default function RootLayout({ children }: { children: ReactNode }) {
+// Every page renders per request, so each one carries the nonce of its Content-Security-Policy (proxy.ts).
+export default async function RootLayout({ children }: { children: ReactNode }) {
+  await connection();
   return (
     <html lang="en" className={inter.variable} suppressHydrationWarning>
       <body>

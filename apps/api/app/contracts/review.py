@@ -18,7 +18,7 @@ class ReviewEvidence(ContractModel):
 
 
 class EvidenceRef(ContractModel):
-    kind: Literal["manual", "profile", "doc", "error", "trace"]
+    kind: Literal["manual", "profile", "doc", "error", "trace", "source"]
     ref: str
 
 
@@ -55,6 +55,8 @@ class ReviewItem(ContractModel):
     evidence: ReviewEvidence | None = None
     evidence_refs: list[EvidenceRef] = []
     test_result: Result | None = None
+    # False on an item an instant pack approved without a person, until a reviewer confirms it (DECISIONS §5).
+    reviewed: bool | None = None
     # A proposal's spec: the run's, until the reviewer edits it; only a reviewed spec is approved into the example.
     spec: ReviewedSpec | None = None
     spec_reviewed: bool = False
@@ -79,7 +81,7 @@ class DatasetView(ContractModel):
     id: str
     description: str
     grain: str
-    time_column: str
+    time_column: str | None = None
     # Pack roles granted the dataset in policies.yaml, aggregate-only grants included.
     readable_roles: list[str]
     columns: list[DatasetColumnView]

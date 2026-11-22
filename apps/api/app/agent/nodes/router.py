@@ -14,6 +14,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.agent.nodes.load_context import spec_json, turn_lines
+from app.agent.nodes.screen import language_of
 from app.agent.prompts import render
 from app.agent.state import AgentDeps, AgentState
 from app.contracts.chart_spec import ChartType
@@ -36,6 +37,9 @@ class Routing(BaseModel):
 
 
 def router(state: AgentState, deps: AgentDeps) -> dict:
+    if state.get("choices"):
+        # A picked clarifying option answers a data question the router already read.
+        return {"intent": "data_query", "intent_fallback": False, "language": language_of(state["question"]), "chart_type": None}
     profile = deps.compiled.pack.business_profile
     prompt = render(
         PROMPT,

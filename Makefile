@@ -16,6 +16,6 @@ ps:
 logs:
 	$(COMPOSE) logs --follow --tail=200
 
-# One explicit, billable request to the fast alias through LiteLLM.
+# One explicit request per mapped model through the gateway; billable for a hosted provider.
 smoke:
 	$(COMPOSE) exec -T api python -m jobs.smoke_llm

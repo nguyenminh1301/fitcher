@@ -5,6 +5,7 @@ directory and edit one YAML file at a time to produce each failure.
 """
 
 from collections.abc import Callable
+import os
 from pathlib import Path
 import shutil
 from typing import Any
@@ -13,6 +14,21 @@ import pytest
 import yaml
 
 from app.packs.loader import read_yaml
+
+# Tests that import litellm read its bundled price table instead of downloading one.
+os.environ.setdefault("LITELLM_LOCAL_MODEL_COST_MAP", "True")
+# Tests that import litellm directly must not load the repository's .env into the test process.
+os.environ.setdefault("LITELLM_MODE", "PRODUCTION")
+
+@pytest.fixture(autouse=True)
+def _address_checks_pass(request, monkeypatch):
+    """Requests of the API tests come from TestClient's own host; the address checks have their own tests."""
+    if request.node.get_closest_marker("address_checks") is None:
+        from app.auth import origin
+        monkeypatch.setattr(origin, "refusal", lambda *args, **kwargs: None)
+        # TestClient's host is "testserver"; to the owner-password gate it would be another machine.
+        monkeypatch.setattr(origin, "remote", lambda browser_host: False)
+
 
 FIXTURE_PACK = Path(__file__).parent / "fixtures" / "packs" / "minimal"
 SCHEMA_DIR = Path(__file__).resolve().parents[3] / "packs" / "_schema"
@@ -52,3 +68,27 @@ def edit_pack(pack_dir: Path) -> Callable[[str, Callable[[Any], None]], None]:
         path.write_text(yaml.safe_dump(data, allow_unicode=True, sort_keys=False), encoding="utf-8")
 
     return edit
+
+
+@pytest.fixture(autouse=True)
+def no_local_model_download(monkeypatch):
+    """No test downloads or loads a real local embedding model; a test that needs one passes a fake loader."""
+    from app.llm import local_embeddings
+
+    def refuse(name, cache_dir):
+        raise AssertionError(f"a test tried to load the local embedding model {name}")
+
+    monkeypatch.setattr(local_embeddings, "_fastembed", refuse)
+
+
+@pytest.fixture(autouse=True)
+def isolated_data_dir(tmp_path, monkeypatch):
+    """Keep the app state of any test that starts the app out of the real data directory."""
+    from app.state.db import reset_shared_state
+
+    monkeypatch.setenv("FITCHER_DATA_DIR", str(tmp_path / "fitcher-data"))
+    reset_shared_state()
+    yield
+    reset_shared_state()
+
+

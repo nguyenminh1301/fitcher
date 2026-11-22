@@ -10,14 +10,22 @@ import type { FitcherApi } from "../client";
 import type { AskEvent } from "../events";
 import type { ScenarioFile } from "../provisional";
 
+/** The api answered before any event: the run never started, and ``reason`` says why. */
+export class AskRefused extends Error {
+  constructor(readonly status: number, readonly reason: string) {
+    super(`The api answered ${status}${reason ? `: ${reason}` : ""}`);
+    this.name = "AskRefused";
+  }
+}
+
 /** Why the api did not start an answer, from its JSON error body. */
-async function refusal(response: Response): Promise<string> {
+async function refusal(response: Response): Promise<AskRefused> {
   try {
     const body = (await response.json()) as { detail?: unknown; error?: unknown };
     const reason = typeof body.detail === "string" ? body.detail : typeof body.error === "string" ? body.error : "";
-    return `The api answered ${response.status}${reason ? `: ${reason}` : ""}`;
+    return new AskRefused(response.status, reason);
   } catch {
-    return `The api answered ${response.status}`;
+    return new AskRefused(response.status, "");
   }
 }
 
@@ -36,7 +44,7 @@ export function createHttpChat(fetcher: typeof fetch = (...args) => fetch(...arg
         yield stopped();
         return;
       }
-      if (!response.ok || !response.body) throw new Error(await refusal(response));
+      if (!response.ok || !response.body) throw await refusal(response);
       const started = response.headers.get("x-conversation-id");
       if (started) onConversation?.(started);
       try {
@@ -55,10 +63,18 @@ export function createHttpChat(fetcher: typeof fetch = (...args) => fetch(...arg
       }
       throw new Error("The answer stream ended before the answer was complete.");
     },
-    // The pack's suggested questions are pack content kept with its sample data; the answers come from the api.
+    // A run outlives its stream, so the Stop button asks the api to stop it; 404 means it already ended.
+    stop: async (conversationId) => {
+      await fetcher(`/api/conversations/${encodeURIComponent(conversationId)}/stop`, { method: "POST" });
+    },
+    // A hand-written pack keeps its suggested questions with its sample data; a pack built from a source has none,
+    // so the api offers its first example questions (DECISIONS §11 step 0). The answers always come from the api.
     suggestions: async () => {
       const response = await fetcher("/api/sample/scenarios");
-      return response.ok ? ((await response.json()) as ScenarioFile).suggestions : [];
+      const sample = response.ok ? ((await response.json()) as ScenarioFile).suggestions : [];
+      if (sample.length) return sample;
+      const generated = await fetcher("/api/pack/suggestions", { cache: "no-store" });
+      return generated.ok ? ((await generated.json()) as { text: string; lang: string }[]) : [];
     },
   };
 }

@@ -2,17 +2,17 @@
 
 ``run_span`` opens the root span of a run; its 32-hex trace id is the run's
 ``trace_id`` everywhere: graph state, ``log_comment`` on ClickHouse queries,
-``agent_logs`` rows and LiteLLM request metadata. ``node_span`` opens a child
-span per graph node. The provider has no exporter: the lab keeps traces in
-``agent_logs`` (DECISIONS §10), not in a tracing backend.
+``agent_logs`` rows and the ``llm_calls`` row of each model gateway call.
+``node_span`` opens a child span per graph node. The provider has no
+exporter: traces are kept in ``agent_logs`` (DECISIONS §10), not in a tracing
+backend.
 
-The current run travels in a context variable, so the LLM clients can tag
-their requests without any change to node signatures. Every gateway request
-also carries ``screening`` metadata, which the LiteLLM guardrail requires
-(DECISIONS §9): inside a run it is the verdict the ``screen`` node recorded
-(``allow`` or ``flag``), and calls on reviewed pack content outside a run
-(compiles, smoke tests) run inside ``trusted_pack_calls``. A request with
-neither is sent without it and the gateway rejects it.
+The current run travels in a context variable, so the model gateway tags its
+calls without any change to node signatures. Every gateway call needs
+``screening`` metadata (DECISIONS §9): inside a run it is the verdict the
+``screen`` node recorded (``allow`` or ``flag``), and calls on reviewed pack
+content outside a run (compiles, smoke tests) run inside
+``trusted_pack_calls``. A call with neither is refused by the gateway.
 """
 
 from collections.abc import Iterator
@@ -80,7 +80,7 @@ def trusted_pack_calls() -> Iterator[None]:
 
 
 def llm_metadata() -> dict:
-    """Count one gateway request of the current run and return its LiteLLM metadata.
+    """Count one gateway call of the current run and return its log and screening metadata.
 
     Outside a run the metadata is ``trusted_pack`` screening inside ``trusted_pack_calls`` and empty otherwise.
     """

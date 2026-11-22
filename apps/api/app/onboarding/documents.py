@@ -32,8 +32,7 @@ from app.llm.embeddings import EmbeddingClient
 from app.observability.tracing import trusted_pack_calls
 from app.onboarding.chunker import DEFAULT_MAX_CHARS, Chunk, chunk_sections
 from app.onboarding.docs_parser import DocumentRejected, detect_media_type, parse_document
-from app.packs.search_indices import alias_name, physical_name, points
-from app.search.client import document_filter
+from app.packs.search_indices import alias_name, points
 
 KB_DOCS = "kb_docs"
 CHUNK_TYPE = "doc_chunk"
@@ -183,8 +182,7 @@ def _first_line(error: BaseException) -> str:
 
 def live_chunks(search, pack: str, document_id: str | None = None) -> list[dict]:
     """Payloads of the live ``kb_docs`` chunks, of one document or of all, in document and chunk order."""
-    flt = document_filter(document_id) if document_id else None
-    payloads = [point["payload"] for point in search.scroll(alias_name(pack, KB_DOCS), flt)]
+    payloads = [point["payload"] for point in search.live_points(alias_name(pack, KB_DOCS), document_id)]
     return sorted(payloads, key=lambda payload: (payload["document_id"], int(payload["id"].rsplit("#", 1)[1])))
 
 
@@ -202,7 +200,7 @@ def chunk_payloads(record: DocumentRecord, chunks: Sequence[Chunk]) -> list[dict
 
 
 def screen_chunks(screener, chunks: Sequence[Chunk]) -> tuple[list[Chunk], int]:
-    """Chunks screening lets through, and how many it blocked (``block`` or, without the classifier, ``unavailable``)."""
+    """Chunks screening lets through, and how many it blocked (``block``, or ``unavailable`` while the classifier is on but cannot run)."""
     verdicts = screener.screen_many([chunk.text for chunk in chunks], "document")
     kept = [chunk for chunk, verdict in zip(chunks, verdicts, strict=True) if verdict.verdict not in ("block", "unavailable")]
     return kept, len(chunks) - len(kept)
@@ -248,8 +246,9 @@ class DocumentService:
         return self.store_dir / self.pack / document_id
 
     def _check_roles(self, roles: Sequence[str]) -> list[str]:
+        # A pack has one reader role (DECISIONS §9): a document uploaded without roles is read by every role.
         if not roles:
-            raise DocumentRejected("choose at least one role that may read the document")
+            return list(self.pack_roles)
         unknown = sorted(set(roles) - set(self.pack_roles))
         if unknown:
             raise DocumentRejected(f"not roles of this pack: {', '.join(unknown)}")
@@ -309,22 +308,21 @@ class DocumentService:
         # The chunks were screened above, so the gateway takes them as checked content (DECISIONS §9).
         with trusted_pack_calls():
             vectors = self.embeddings.embed([document["embedding_text"] for document in documents])
-        self._ensure_alias()
-        self.search.upsert(self.alias, points(self.alias, documents, vectors))
+        self._ensure_live()
+        self.search.write(self.alias, points(self.alias, documents, vectors))
         return self._save(record, status="indexed", chunk_count=len(kept), blocked_chunks=blocked)
 
-    def _ensure_alias(self) -> None:
-        """Give a pack that was never compiled a ``kb_docs`` generation 0; its first compile replaces it."""
-        if self.alias in self.search.alias_targets():
+    def _ensure_live(self) -> None:
+        """Give a pack that was never compiled a live ``kb_docs`` generation 0; its first compile replaces it."""
+        if self.alias in self.search.live():
             return
-        name = physical_name(self.pack, KB_DOCS, 0)
-        if name not in self.search.list_collections():
-            self.search.create_collection(name, self.embeddings.dimensions)
-        self.search.update_aliases([{"create_alias": {"collection_name": name, "alias_name": self.alias}}])
+        if 0 not in self.search.generations(self.alias):
+            self.search.create(self.alias, 0, self.embeddings.dimensions)
+        self.search.switch_live({self.alias: 0})
 
     def _discard(self, record: DocumentRecord) -> None:
         try:
-            self.search.delete_points(self.alias, document_filter(record.id))
+            self.search.delete_document(self.alias, record.id)
         except Exception:  # noqa: BLE001, S110 - cleanup must not hide the original failure
             pass
         self.stored_path(record.id).unlink(missing_ok=True)
@@ -333,7 +331,7 @@ class DocumentService:
         with self._changes:
             self._guard()
             record = self._live(document_id)
-            self.search.delete_points(self.alias, document_filter(document_id))
+            self.search.delete_document(self.alias, document_id)
             self.stored_path(document_id).unlink(missing_ok=True)
             self._save(record, deleted_at=self.clock())
 
@@ -343,7 +341,7 @@ class DocumentService:
             record = self._live(document_id)
             roles = self._check_roles(allowed_roles)
             if record.status == "indexed":
-                self.search.set_payload(self.alias, {"allowed_roles": roles}, document_filter(document_id))
+                self.search.set_document_roles(self.alias, document_id, roles)
             return self._save(record, allowed_roles=roles)
 
     def chunks(self, document_id: str | None = None) -> list[dict]:

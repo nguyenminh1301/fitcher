@@ -18,9 +18,26 @@ function records(result: Result): Row[] {
   return result.rows.map((row) => Object.fromEntries(result.columns.map((column, index) => [column.name, row[index]])));
 }
 
+const DATE_LOCALES: Record<Locale, string> = { en: "en-US", vi: "vi-VN" };
+
+/**
+ * A date of a column grouped to a grain as people name that period ("Jan 2026", "Q1 2026", "2026"), in the
+ * interface language; a date without a grain keeps its ISO form, which reads the same in both languages.
+ */
+export function formatDate(value: string, grain: ColumnInfo["grain"], locale: Locale): string {
+  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(value);
+  if (!match || !grain || grain === "day" || grain === "week") return value;
+  const [year, month] = [Number(match[1]), Number(match[2])];
+  if (grain === "year") return String(year);
+  if (grain === "quarter") return locale === "vi" ? `Quý ${Math.ceil(month / 3)} ${year}` : `Q${Math.ceil(month / 3)} ${year}`;
+  return new Intl.DateTimeFormat(DATE_LOCALES[locale], { month: "short", year: "numeric", timeZone: "UTC" })
+    .format(new Date(Date.UTC(year, month - 1, 1)));
+}
+
 /** A cell for people: numbers by the column's format in the interface language, the rest as text. */
-export function formatCell(value: unknown, column: Pick<ColumnInfo, "type" | "format"> | undefined, locale: Locale): string {
+export function formatCell(value: unknown, column: Pick<ColumnInfo, "type" | "format" | "grain"> | undefined, locale: Locale): string {
   if (value === null || value === undefined) return "";
+  if (typeof value === "string" && (column?.type === "date" || column?.type === "datetime")) return formatDate(value, column.grain, locale);
   if (typeof value !== "number") return String(value);
   switch (column?.format) {
     case "percent":
@@ -103,12 +120,20 @@ export function toEChartsOption(spec: ChartSpec, result: Result, palette: string
     }));
   } else {
     categories = rows.map((row) => String(row[spec.x]));
-    series = spec.y.map((name) => ({ name, data: rows.map((row) => row[name]) }));
+    series = spec.y.map((name) => ({ name: columns[name]?.label ?? name, data: rows.map((row) => row[name]) }));
   }
 
   const kind = spec.type === "line" ? "line" : "bar";
   const horizontal = kind === "bar" && spec.orientation === "horizontal";
-  const categoryAxis = { type: "category", data: categories, axisLabel: { hideOverlap: true } };
+  // A long category is cut with an ellipsis inside the chart instead of running past its edge; the axis tooltip
+  // still names it in full.
+  const categoryAxis = {
+    type: "category", data: categories,
+    axisLabel: {
+      hideOverlap: true, width: horizontal ? 140 : 96, overflow: "truncate", ellipsis: "…",
+      formatter: (value: string) => formatCell(value, columns[spec.x], locale),
+    },
+  };
   const valueAxis = { type: "value", axisLabel: valueLabel, splitLine: { lineStyle: { color: gridColor } } };
   return {
     tooltip: { trigger: "axis", valueFormatter: (value: number) => formatCell(value, measure, locale) },
@@ -125,13 +150,25 @@ export function toEChartsOption(spec: ChartSpec, result: Result, palette: string
   };
 }
 
-/** The result as CSV: a header row, then one line per row; commas, quotes and line breaks are quoted. */
+// A spreadsheet runs a cell that starts with one of these as a formula (OWASP, CSV injection).
+const FORMULA_START = /^[=+\-@\t\r]/;
+const PLAIN_NUMBER = /^[+-]?(\d+(\.\d*)?|\.\d+)([eE][+-]?\d+)?$/;
+/** Excel reads a CSV file as UTF-8 only when it starts with a byte order mark. */
+const UTF8_BOM = "\uFEFF";
+
+/**
+ * The result as CSV for a spreadsheet: a byte order mark, a header row, then one CRLF-terminated line per row.
+ * Commas, quotes and line breaks are quoted, and a text that a spreadsheet would run as a formula gets a leading
+ * `'` so it is shown as written; a plain number such as `-5` is left as it is.
+ */
 export function toCsv(result: Result): string {
   const quote = (value: unknown) => {
-    const text = value === null || value === undefined ? "" : String(value);
-    return /[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+    let text = value === null || value === undefined ? "" : String(value);
+    if (FORMULA_START.test(text) && !PLAIN_NUMBER.test(text)) text = `'${text}`;
+    return /[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
   };
-  return [result.columns.map((column) => quote(column.name)).join(","), ...result.rows.map((row) => row.map(quote).join(","))].join("\n");
+  const lines = [result.columns.map((column) => quote(column.name)), ...result.rows.map((row) => row.map(quote))];
+  return UTF8_BOM + lines.map((line) => `${line.join(",")}\r\n`).join("");
 }
 
 /** Start a download of ``blob`` as ``name`` in the browser. */

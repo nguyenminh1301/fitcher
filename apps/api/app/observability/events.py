@@ -1,9 +1,9 @@
 """Typed rows of the ``agent_logs`` tables the api writes.
 
 Field names and order equal the table columns in
-``infra/clickhouse/initdb/010-agent-logs.sql``; a test compares them. The
-LiteLLM callback writes ``llm_calls`` itself, and later phases add records for
-the tables they start writing.
+``infra/clickhouse/changes/0002_agent_logs.sql`` and the later changes that add
+columns; a test compares them. Later phases add records for the tables they
+start writing.
 """
 
 from datetime import datetime, UTC
@@ -57,6 +57,33 @@ class EventRecord(LogRecord):
     duration_ms: int
     payload: str
     payload_truncated: bool
+
+
+class LlmCallRecord(LogRecord):
+    """One provider call of the model gateway (``app/llm/gateway.py``), including a refused one."""
+
+    TABLE: ClassVar[str] = "llm_calls"
+
+    trace_id: str
+    ts: datetime
+    node: str
+    # Catalog alias of the proxy era; empty for gateway rows, which name the provider instead.
+    alias: str
+    tier: str
+    provider: str
+    model: str
+    call_id: str
+    prompt_tokens: int
+    completion_tokens: int
+    total_tokens: int
+    # Estimated from the SDK's price table; None when the model has no known price.
+    cost_usd: float | None
+    latency_ms: int
+    # success, failure or blocked
+    status: str
+    error: str
+    # The call id of the failed call of the tier's chain this call replaced; empty for a first attempt.
+    fallback_of: str = ""
 
 
 class SqlRunRecord(LogRecord):
@@ -177,6 +204,9 @@ class ConversationRecord(LogRecord):
     title: str
     pinned: bool
     group_id: str
+    # The pack of the source the conversation was started on; empty for a conversation stored before packs per
+    # conversation, which keeps the pack the instance used then.
+    pack: str = ""
     deleted: bool
     created_at: datetime
     updated_at: datetime

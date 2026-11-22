@@ -14,17 +14,24 @@ pass UTC (DECISIONS §6).
 
 from collections.abc import Sequence
 from datetime import UTC, date, datetime, timedelta
+import re
 from typing import TYPE_CHECKING, Literal, Self
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from app.agent.nodes.clarify import chosen
 from app.contracts.query_spec import Period
 
 if TYPE_CHECKING:
     from app.agent.state import AgentDeps, AgentState
 
 Unit = Literal["day", "week", "month", "quarter", "year"]
+
+
+# The first and last days a period may span, the years the extraction accepts.
+EARLIEST = date(1900, 1, 1)
+LATEST = date(2200, 12, 31)
 
 
 class TimeResolutionError(ValueError):
@@ -168,7 +175,11 @@ def resolve_period(descriptor: PeriodDescriptor, today: date, fiscal_start_month
         start = date(d.year, d.month, 1)
         return Period(label=start.strftime("%Y-%m"), start=start, end=_add_months(start, 1))
     if d.kind == "range":
-        return Period(label=f"{d.start.isoformat()} to {d.end.isoformat()}", start=d.start, end=d.end + timedelta(days=1))
+        # "All time" can come back as a range to 9999-12-31; the range is held to the dates a period may span.
+        start, last = max(d.start, EARLIEST), min(d.end, LATEST)
+        if last < start:
+            raise TimeResolutionError(f"the range {d.start} to {d.end} is outside the dates a period may span")
+        return Period(label=f"{start.isoformat()} to {last.isoformat()}", start=start, end=last + timedelta(days=1))
     if d.kind == "relative":
         start = _shift(d.unit, _unit_start(d.unit, today, cal), d.offset)
         return Period(label=_unit_label(d.unit, start, cal), start=start, end=_shift(d.unit, start, 1))
@@ -193,6 +204,95 @@ def resolve_periods(
     if len(set(labels)) != len(labels):
         raise TimeResolutionError(f"the question names the same period twice: {labels}")
     return periods
+
+
+_YEAR = r"((?:19|20|21)\d{2})"
+_MONTH_NAMES = ("january", "february", "march", "april", "may", "june", "july", "august", "september", "october",
+                "november", "december")
+# Spelled-out periods in English and Vietnamese, most specific first: a quarter or month claims its year.
+_EXPLICIT = (
+    ("quarter", re.compile(rf"\b(?:q|quý|quy)\s*([1-4])\s*(?:/|-|,|năm|nam|of)?\s*{_YEAR}\b", re.IGNORECASE)),
+    ("month", re.compile(rf"\b(?:tháng|thang)\s*(1[0-2]|0?[1-9])\s*(?:/|-|,|năm|nam)?\s*{_YEAR}\b", re.IGNORECASE)),
+    ("month_name", re.compile(rf"\b({'|'.join(_MONTH_NAMES)})\s*,?\s*{_YEAR}\b", re.IGNORECASE)),
+    ("year", re.compile(rf"\b(?:năm|nam|year|fy|in)\s*{_YEAR}\b", re.IGNORECASE)),
+)
+
+
+def explicit_periods(question: str) -> list[PeriodDescriptor]:
+    """Years, quarters and months the question names outright ("năm 2026", "Q1 2025", "March 2024"), in order.
+
+    Only used when the extraction returned no period: relative phrases stay with the model, and a year that is
+    part of a quarter or month is not counted again. Duplicates are dropped.
+    """
+    found: list[tuple[int, PeriodDescriptor]] = []
+    claimed: list[range] = []
+    for kind, pattern in _EXPLICIT:
+        for match in pattern.finditer(question or ""):
+            if any(match.start() in span for span in claimed):
+                continue
+            claimed.append(range(match.start(), match.end()))
+            if kind == "quarter":
+                descriptor = PeriodDescriptor(kind="quarter", quarter=int(match[1]), year=int(match[2]))
+            elif kind == "month":
+                descriptor = PeriodDescriptor(kind="month", month=int(match[1]), year=int(match[2]))
+            elif kind == "month_name":
+                descriptor = PeriodDescriptor(kind="month", month=_MONTH_NAMES.index(match[1].lower()) + 1, year=int(match[2]))
+            else:
+                descriptor = PeriodDescriptor(kind="year", year=int(match[1]))
+            found.append((match.start(), descriptor))
+    unique: list[PeriodDescriptor] = []
+    for _, descriptor in sorted(found, key=lambda item: item[0]):
+        if descriptor not in unique:
+            unique.append(descriptor)
+    return unique
+
+
+_GRAIN_WORDS = {
+    "day": ("ngày", "ngay", "day", "daily"), "week": ("tuần", "tuan", "week", "weekly"),
+    "month": ("tháng", "thang", "month", "monthly"), "quarter": ("quý", "quy", "quarter", "quarterly"),
+    "year": ("năm", "nam", "year", "yearly", "annually"),
+}
+_GRAIN = re.compile(
+    r"\b(?:(?:theo|từng|tung|mỗi|moi|hàng|hang|by|per|each)\s+(\w+)|(daily|weekly|monthly|quarterly|yearly|annually))\b",
+    re.IGNORECASE,
+)
+
+
+def explicit_time_grain(question: str) -> Unit | None:
+    """The time grain a question asks for outright ("theo tháng", "by quarter", "monthly"), or None.
+
+    Used only when the extraction returned no grain. A word right after "theo"/"by" that is not a time unit
+    ("theo khu vực", "by region") is ignored.
+    """
+    for match in _GRAIN.finditer(question or ""):
+        word = (match[1] or match[2]).lower()
+        for grain, words in _GRAIN_WORDS.items():
+            if word in words:
+                return grain  # type: ignore[return-value]
+    return None
+
+
+# The period options of a clarifying question (``clarify.PERIODS``) as descriptors; "all" is handled apart.
+CHOSEN_PERIODS: dict[str, PeriodDescriptor] = {
+    "this_month": PeriodDescriptor(kind="relative", unit="month", offset=0),
+    "last_month": PeriodDescriptor(kind="relative", unit="month", offset=-1),
+    "this_quarter": PeriodDescriptor(kind="relative", unit="quarter", offset=0),
+    "last_quarter": PeriodDescriptor(kind="relative", unit="quarter", offset=-1),
+    "this_year": PeriodDescriptor(kind="relative", unit="year", offset=0),
+    "last_year": PeriodDescriptor(kind="relative", unit="year", offset=-1),
+}
+
+# Words that say a question covers all of the data, in English and Vietnamese.
+_ALL_TIME = re.compile(
+    r"\b(?:all[- ]time|of all time|overall|ever|in total|so far|to date)\b"
+    r"|toàn bộ|tất cả thời gian|từ trước (?:đến|tới) nay|từ trước giờ|tổng cộng|tính đến nay",
+    re.IGNORECASE,
+)
+
+
+def says_all_time(question: str) -> bool:
+    """The question asks about all of the data ("in total", "overall", "tổng cộng"), so it needs no period."""
+    return bool(_ALL_TIME.search(question or ""))
 
 
 class PeriodShift(BaseModel):
@@ -230,12 +330,23 @@ def resolve_time(state: "AgentState", deps: "AgentDeps") -> dict:
     extraction = state["extraction"]
     fiscal_start_month = deps.compiled.pack.business_profile.fiscal_year_start_month
     previous = state.get("previous_spec")
-    if not extraction.periods:
+    descriptors = list(extraction.periods)
+    if not descriptors:
+        # A period option the user picked is applied as it is, without a model reading its label.
+        picked = chosen(state.get("choices"), "period")
+        if picked and picked[-1] == "all":
+            return {"periods": [], "all_time": True}
+        if picked and picked[-1] in CHOSEN_PERIODS:
+            descriptors = [CHOSEN_PERIODS[picked[-1]]]
+    if not descriptors:
         if extraction.previous_periods is not None and previous is not None:
             return {"periods": shift_periods(previous.periods, extraction.previous_periods, fiscal_start_month)}
-        return {"periods": []}
+        # The extraction model can miss a period the question spells out; asking back for it would be wrong.
+        descriptors = explicit_periods(state.get("question", ""))
+        if not descriptors:
+            return {"periods": [], "all_time": says_all_time(state.get("question", ""))}
     try:
-        periods = resolve_periods(extraction.periods, deps.today, fiscal_start_month)
+        periods = resolve_periods(descriptors, deps.today, fiscal_start_month)
     except TimeResolutionError as error:
         return {"rejection": f"the period cannot be resolved: {error}"}
     return {"periods": periods}

@@ -20,6 +20,17 @@ describe("interface strings", () => {
     );
   });
 
+  it("uses a singular text for a count of one where the language has one", () => {
+    const en = { a: { tables: "{count} tables", tables_one: "{count} table" } };
+    const vi = { a: { tables: "{count} bảng" } };
+
+    expect(translate(en, en, "a.tables", { count: 1 })).toBe("1 table");
+    expect(translate(en, en, "a.tables", { count: 2 })).toBe("2 tables");
+    expect(translate(en, vi, "a.tables", { count: 1 })).toBe("1 bảng");
+    expect(translate(en, en, "a.tables", { count: "1" })).toBe("1 table");
+    expect(translate(en, en, "a.tables", { count: "1,000" })).toBe("1,000 tables");
+  });
+
   it("formats numbers for the interface language", () => {
     expect(formatNumber(184320.5, "en")).toBe("184,320.5");
     expect(formatNumber(184320.5, "vi")).toBe("184.320,5");

@@ -11,7 +11,8 @@ dbt, exactly as ``jobs.refresh_data`` does:
 - column grants, row policies and aggregate-only views of the minimal test
   pack behave the same on marts that are views over live sources as on
   copied data, and an agent role reads neither ``src_*`` nor ``raw``;
-- no role but source_loader holds a grant on ``src_*``;
+- no role but the two source users (``source_loader`` for the manifests, ``source_admin`` for the Sources page) holds a
+  grant on ``src_*``;
 - no fixture password appears in DDL, the query log, dbt's files or
   ``system.named_collections``.
 
@@ -196,11 +197,11 @@ def test_rbac_holds_on_live_marts_as_on_copied_data(build, admin, probe_pack, na
     assert outcome == dict.fromkeys(outcome, True)
 
 
-def test_no_role_but_source_loader_is_granted_src_databases(build, admin):
+def test_no_role_but_the_source_users_is_granted_src_databases(build, admin):
     build("fixture_postgres", "live")
     grants = admin.query(
         "SELECT user_name, role_name, access_type, database, table FROM system.grants "
-        "WHERE startsWith(database, 'src_') AND ifNull(user_name, '') != 'source_loader'"
+        "WHERE startsWith(database, 'src_') AND ifNull(user_name, '') NOT IN ('source_loader', 'source_admin')"
     )
     assert grants == []
     agent_users = admin.query("SELECT name FROM system.users WHERE startsWith(name, 'fitcher_agent__')")

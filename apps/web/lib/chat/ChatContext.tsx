@@ -5,6 +5,8 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
+import { AccessRefused } from "@/lib/api/http/auth";
+import { AskRefused } from "@/lib/api/http/chat";
 import type { FitcherApi } from "@/lib/api/client";
 import type { Conversation, ConversationGroup, ConversationThread, Turn } from "@/lib/api/conversations";
 import type { Identity } from "@/lib/api/provisional";
@@ -14,14 +16,17 @@ import { langOf } from "@/lib/text";
 
 // A conversation's title is its first question cut to 80 characters (DECISIONS §15).
 const TITLE_LENGTH = 80;
+const FOLLOW_MS = 2000;
 
-export type AskOptions = { conversationId?: string; editOf?: number; retryOf?: number };
+/** ``clarifyOption`` is the id of the clarifying option the question picks, which the api applies as it is. */
+export type AskOptions = { conversationId?: string; editOf?: number; retryOf?: number; clarifyOption?: string };
 
 export type ChatState = {
   api: FitcherApi;
   sources: Partial<Sources>;
   identity: Identity | null;
-  identities: Identity[];
+  /** The api's reason when it refused this browser outright (see AccessRefused), else null. */
+  refused: string | null;
   pack: { name: string; display_name: string; roles: string[] } | null;
   conversations: Conversation[];
   groups: ConversationGroup[];
@@ -30,7 +35,6 @@ export type ChatState = {
   now: () => Date;
   navigate: (conversationId: string | null) => void;
   refresh: () => Promise<void>;
-  switchIdentity: (userId: string) => Promise<void>;
   /** Open conversations by id, with their turns as streamed so far. */
   threads: Record<string, ConversationThread>;
   /** The conversation whose answer is streaming, if any. */
@@ -38,7 +42,12 @@ export type ChatState = {
   loadThread: (id: string) => Promise<ConversationThread | null>;
   /** Ask in a conversation (a new one without ``conversationId``); edit or retry replace that turn and the ones after it. */
   ask: (question: string, options?: AskOptions) => Promise<string>;
-  stop: () => void;
+  /** Stop the answer of a conversation, the one streaming here by default. */
+  stop: (conversationId?: string) => void;
+  /** The pack (one per data source) a new conversation is answered from: the api's current pack. */
+  chosenPack: string | null;
+  /** Make a source's pack the current one on the api, for the console and a new conversation alike. */
+  choosePack: (name: string) => Promise<void>;
 };
 
 const ChatContext = createContext<ChatState | null>(null);
@@ -56,8 +65,13 @@ type ProviderProps = {
 
 export function ChatProvider({ api, navigate, activeId, sources = currentSources, now = () => new Date(), onSignedOut, children }: ProviderProps) {
   const [identity, setIdentity] = useState<Identity | null>(null);
-  const [identities, setIdentities] = useState<Identity[]>([]);
+  const [refused, setRefused] = useState<string | null>(null);
   const [pack, setPack] = useState<ChatState["pack"]>(null);
+  // The api keeps the current pack, so the chat, the console and other tabs agree on the source.
+  const chosenPack = pack?.name ?? null;
+  const choosePack = useCallback(async (name: string) => {
+    await api.auth.choosePack(name).then(setPack).catch(() => undefined);
+  }, [api]);
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [groups, setGroups] = useState<ConversationGroup[]>([]);
   const [loaded, setLoaded] = useState(false);
@@ -77,14 +91,21 @@ export function ChatProvider({ api, navigate, activeId, sources = currentSources
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const [current, all, packInfo] = await Promise.all([api.auth.current(), api.auth.identities(), api.auth.pack()]);
+      let answers;
+      try {
+        answers = await Promise.all([api.auth.current(), api.auth.pack()]);
+      } catch (error) {
+        if (!cancelled && error instanceof AccessRefused) setRefused(error.reason);
+        if (error instanceof AccessRefused) return;
+        throw error;
+      }
+      const [current, packInfo] = answers;
       if (cancelled) return;
       if (current === null && !isSample("auth", sources)) {
         onSignedOut?.();
         return;
       }
       setIdentity(current);
-      setIdentities(all);
       setPack(packInfo);
       await refresh();
     })();
@@ -98,14 +119,39 @@ export function ChatProvider({ api, navigate, activeId, sources = currentSources
     setThreads(threadsRef.current);
   }, []);
 
+  // A conversation the api is still answering, after this page was left and opened again, is read again until the
+  // answer is stored.
+  const followed = useRef(new Set<string>());
+  const follow = useCallback((id: string) => {
+    if (followed.current.has(id)) return;
+    followed.current.add(id);
+    const tick = async () => {
+      try {
+        const fresh = await api.conversations.get(id);
+        if (fresh && busyRef.current !== id) putThread(fresh);
+        if (fresh?.running) {
+          setTimeout(() => void tick(), FOLLOW_MS);
+          return;
+        }
+      } catch {
+        setTimeout(() => void tick(), FOLLOW_MS);
+        return;
+      }
+      followed.current.delete(id);
+      await refresh();
+    };
+    setTimeout(() => void tick(), FOLLOW_MS);
+  }, [api, putThread, refresh]);
+
   const loadThread = useCallback(
     async (id: string) => {
       if (threadsRef.current[id]) return threadsRef.current[id];
       const thread = await api.conversations.get(id);
       if (thread) putThread(thread);
+      if (thread?.running && busyRef.current !== id) follow(id);
       return thread;
     },
-    [api, putThread],
+    [api, putThread, follow],
   );
 
   const ask = useCallback(
@@ -117,7 +163,7 @@ export function ChatProvider({ api, navigate, activeId, sources = currentSources
       const stamp = now().toISOString();
       const conversation: Conversation = existing
         ? { ...existing.conversation, updated_at: stamp }
-        : { id, title: question.slice(0, TITLE_LENGTH), pinned: false, group_id: null, updated_at: stamp };
+        : { id, title: question.slice(0, TITLE_LENGTH), pinned: false, group_id: null, updated_at: stamp, pack: chosenPack };
       let turns = existing?.turns ?? [];
       const replaced = options.editOf ?? options.retryOf;
       let turn: Turn;
@@ -143,9 +189,12 @@ export function ChatProvider({ api, navigate, activeId, sources = currentSources
       const request: AskRequest = {
         question: turn.question,
         conversation_id: existing ? id : null,
+        // A conversation keeps the pack it started with; a new one starts from the chosen source.
+        pack: existing ? null : chosenPack,
         timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
         edit_of_turn: options.editOf ?? null,
         retry_of_turn: options.retryOf ?? null,
+        clarify_option: options.clarifyOption ?? null,
       };
       const named = (apiId: string) => {
         if (apiId === id) return;
@@ -167,7 +216,12 @@ export function ChatProvider({ api, navigate, activeId, sources = currentSources
           }
         } catch (error) {
           const last = thread.turns.at(-1) as Turn;
-          const failure = { event: "error" as const, kind: "network" as const, message: String(error), sql: null, error: null, trace_id: last.events.at(-1)?.trace_id ?? "" };
+          // A refusal before the stream started has the api's reason; anything else lost the stream.
+          const refused = error instanceof AskRefused;
+          const failure = {
+            event: "error" as const, kind: refused ? "refused" as const : "network" as const,
+            message: refused ? error.reason : String(error), sql: null, error: null, trace_id: last.events.at(-1)?.trace_id ?? "",
+          };
           thread = { ...thread, turns: [...thread.turns.slice(0, -1), { ...last, events: [...last.events, failure] }] };
           putThread(thread);
         } finally {
@@ -180,28 +234,21 @@ export function ChatProvider({ api, navigate, activeId, sources = currentSources
       })();
       return id;
     },
-    [api, loadThread, navigate, now, putThread, refresh],
+    [api, loadThread, navigate, now, putThread, refresh, chosenPack, pack],
   );
 
-  const stop = useCallback(() => controller.current?.abort(), []);
-
-  const switchIdentity = useCallback(
-    async (userId: string) => {
-      setIdentity(await api.auth.switchTo(userId));
-      threadsRef.current = {};
-      setThreads({});
-      navigate(null);
-      await refresh();
-    },
-    [api, navigate, refresh],
-  );
+  const stop = useCallback((conversationId?: string) => {
+    const target = conversationId ?? busyRef.current;
+    if (target) void api.chat.stop(target).catch(() => undefined);
+    if (!conversationId || conversationId === busyRef.current) controller.current?.abort();
+  }, [api]);
 
   const value = useMemo<ChatState>(
     () => ({
-      api, sources, identity, identities, pack, conversations, groups, loaded, activeId, now, navigate, refresh, switchIdentity,
-      threads, busy, loadThread, ask, stop,
+      api, sources, identity, refused, pack, conversations, groups, loaded, activeId, now, navigate, refresh,
+      threads, busy, loadThread, ask, stop, chosenPack, choosePack,
     }),
-    [api, sources, identity, identities, pack, conversations, groups, loaded, activeId, now, navigate, refresh, switchIdentity, threads, busy, loadThread, ask, stop],
+    [api, sources, identity, refused, pack, conversations, groups, loaded, activeId, now, navigate, refresh, threads, busy, loadThread, ask, stop, chosenPack, choosePack],
   );
   return <ChatContext.Provider value={value}>{children}</ChatContext.Provider>;
 }

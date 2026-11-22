@@ -8,19 +8,19 @@ import time
 import uuid
 
 from agent_fixtures import GOOD_SQL, compiled_fixture, deps, extraction_reply, good_output, routing_reply
-from auth_fixtures import token, verifier
 from fakes import FakeClassifier, FakeConversationClient, FakeRunner
 from fastapi.testclient import TestClient
 import pytest
 
 from app.agent.state import RunCancelled
-from app.api import runtime
+from app.api import ask as ask_api, runtime
 from app.api.agent import GraphRun, QueryIds
+from app.api.live_runs import LiveRuns
 from app.api.ask import AnswerEvents, event_stream
 from app.api.rate_limit import RateLimiter
 from app.contracts.events import AskEvent
 from app.conversation.store import ConversationStore
-from app.llm.client import GatewayBlocked
+from app.llm.client import GatewayBlocked, LLMError
 from app.screening.screen import Screener
 from app.data.clickhouse import QueryError, QueryStopper
 from app.main import app
@@ -44,16 +44,22 @@ class FakeAgent:
     # Other AgentDeps fields of every run, such as the screener and screen mode.
     overrides: dict = field(default_factory=dict)
     llms: list = field(default_factory=list)
+    # The LLM replies of each later run in turn, after the first run's ``llm_replies``.
+    later_replies: list = field(default_factory=list)
+    clarified: list = field(default_factory=list)
 
-    def start(self, *, role, user_id, today, history=()):
+    def start(self, *, role, user_id, today, history=(), clarified=None):
         self.started.append((role, user_id, today))
         self.histories.append(history)
-        agent_deps = deps(self.llm_replies, self.runner)
+        self.clarified.append(clarified)
+        replies = self.later_replies.pop(0) if len(self.started) > 1 and self.later_replies else self.llm_replies
+        agent_deps = deps(replies, self.runner)
         self.llms.append(agent_deps.llm)
+        overrides = {**self.overrides, **({"choices": clarified[1]} if clarified else {})}
         return GraphRun(replace(
             agent_deps, compiled=self.compiled or agent_deps.compiled, role=role, user_id=user_id, history=history,
-            **self.overrides,
-        ))
+            **overrides,
+        ), question=clarified[0] if clarified else None)
 
 
 def pack_with_refunds_clerk():
@@ -69,9 +75,13 @@ def serve(agent: FakeAgent, compiled, per_minute: int = 3, store: ConversationSt
     limiter = RateLimiter(per_minute)
     store = store or ConversationStore(FakeConversationClient())
     app.dependency_overrides[runtime.get_conversation_store] = lambda: store
-    app.dependency_overrides[runtime.get_verifier] = lambda: verifier()
     app.dependency_overrides[runtime.get_compiled] = lambda: compiled
+    app.dependency_overrides[runtime.get_compiled_or_none] = lambda: compiled
     app.dependency_overrides[runtime.get_agent] = lambda: agent
+    app.dependency_overrides[ask_api.get_compiled_for] = lambda: lambda pack: compiled
+    app.dependency_overrides[ask_api.get_agent_for] = lambda: lambda pack: agent
+    app.dependency_overrides[ask_api.get_remember_pack] = lambda: lambda pack: None
+    app.dependency_overrides[ask_api.get_last_used_pack] = lambda: compiled.pack.name
     app.dependency_overrides[runtime.get_rate_limiter] = lambda: limiter
 
 
@@ -103,7 +113,7 @@ def kinds(events: list[dict]) -> list[str]:
 
 
 def post(client, question=QUESTION, headers=None, **body):
-    return client.post("/ask", json={"question": question, **body}, headers={"Authorization": f"Bearer {token()}", **(headers or {})})
+    return client.post("/ask", json={"question": question, **body}, headers={**{}, **(headers or {})})
 
 
 def test_a_data_question_streams_status_sql_result_chart_summary_and_done(ask_client):
@@ -121,7 +131,7 @@ def test_a_data_question_streams_status_sql_result_chart_summary_and_done(ask_cl
     assert chart["type"] == "bar" and chart["allowed_types"] == ["bar", "table"]
     summary = next(event for event in events if event["event"] == "summary")
     assert (summary["text"], summary["lang"]) == ("Widget 0 led.", "en")
-    assert ask_client.agent.started[0][:2] == ("viewer", "lab.viewer")
+    assert ask_client.agent.started[0][:2] == ("reader", "owner")
 
 
 def test_every_node_streams_a_start_and_an_end_status_in_graph_order(ask_client):
@@ -161,13 +171,16 @@ def test_a_repaired_query_streams_each_sql_attempt_before_the_result():
 
 
 def test_a_role_without_permission_receives_a_deny_event():
+    # The owner runs as the first role of policies.yaml; here that role may read refunds only.
     compiled = pack_with_refunds_clerk()
+    policies = compiled.pack.policies
+    first_clerk = policies.model_copy(update={"roles": list(reversed(policies.roles))})
+    compiled = compiled.model_copy(update={"pack": compiled.pack.model_copy(update={"policies": first_clerk})})
     agent = FakeAgent([routing_reply(), extraction_reply()], compiled=compiled)
     serve(agent, compiled)
-    clerk = token(realm_access={"roles": ["refunds_clerk"]})
     try:
         with TestClient(app) as client:
-            response = client.post("/ask", json={"question": QUESTION}, headers={"Authorization": f"Bearer {clerk}"})
+            response = client.post("/ask", json={"question": QUESTION})
     finally:
         app.dependency_overrides.clear()
 
@@ -209,6 +222,13 @@ def test_a_question_the_flow_cannot_read_is_refused_without_options():
     assert (events[-2]["question"], events[-2]["options"]) == ("no value of widget_sales matches \'Mars\'", [])
 
 
+def test_a_model_that_does_not_answer_ends_with_a_model_error_instead_of_asking_back():
+    events = collect(FakeAgent([routing_reply(), LLMError("RateLimitError (the provider is limiting requests)")]))
+
+    assert kinds(events)[-1] == "error"
+    assert (events[-1]["kind"], events[-1]["error"]) == ("model", "RateLimitError (the provider is limiting requests)")
+
+
 class ScriptedRun:
     """A fake graph: reports ``nodes`` through progress, then returns ``state`` or raises ``error``."""
 
@@ -242,7 +262,7 @@ async def drain(stream) -> list[str]:
 def test_an_internal_error_is_the_last_event_and_hides_its_detail():
     run = ScriptedRun(error=ValueError("secret detail"))
 
-    chunks = asyncio.run(drain(event_stream(run, QUESTION, AnswerEvents("viewer"))))
+    chunks = asyncio.run(drain(event_stream(run, QUESTION, AnswerEvents("reader"))))
 
     events = parse("".join(chunks))
     assert kinds(events) == ["error"]
@@ -253,7 +273,7 @@ def test_an_internal_error_is_the_last_event_and_hides_its_detail():
 def test_nothing_follows_done():
     run = ScriptedRun(state={"result": object()})
 
-    events = parse("".join(asyncio.run(drain(event_stream(run, QUESTION, AnswerEvents("viewer"))))))
+    events = parse("".join(asyncio.run(drain(event_stream(run, QUESTION, AnswerEvents("reader"))))))
 
     assert kinds(events) == ["done"] and events[-1]["event"] == "done"
 
@@ -261,17 +281,68 @@ def test_nothing_follows_done():
 def test_a_slow_node_sends_heartbeat_comments():
     run = ScriptedRun(nodes=("execute",), state={"result": object()}, pause=0.25)
 
-    chunks = asyncio.run(drain(event_stream(run, QUESTION, AnswerEvents("viewer"), heartbeat_seconds=0.05)))
+    chunks = asyncio.run(drain(event_stream(run, QUESTION, AnswerEvents("reader"), heartbeat_seconds=0.05)))
 
     assert ": keep-alive\n\n" in chunks
     assert kinds(parse("".join(chunks))) == ["done"]
 
 
-def test_a_client_disconnect_stops_the_run_and_kills_its_query():
+class Answers:
+    def __init__(self):
+        self.stored = threading.Event()
+
+    def question(self):
+        pass
+
+    def answer(self, state, events):
+        self.stored.set()
+
+
+def test_a_conversation_keeps_answering_after_its_page_is_left_and_stores_the_answer():
+    run = ScriptedRun(nodes=("execute", "check"), state={"result": object()}, pause=0.1)
+    live, answers = LiveRuns(), Answers()
+
+    async def first_event_then_leave():
+        stream = event_stream(run, QUESTION, AnswerEvents("reader"), record=answers, live=(live, "owner", "c1"))
+        first = await anext(stream)
+        await stream.aclose()
+        return first
+
+    asyncio.run(first_event_then_leave())
+
+    assert live.running("owner", "c1") and not live.running("someone-else", "c1")
+    assert answers.stored.wait(3) and not run.cancelled.is_set()
+    deadline = time.monotonic() + 2
+    while live.running("owner", "c1") and time.monotonic() < deadline:
+        time.sleep(0.01)
+    assert not live.running("owner", "c1")
+
+
+def test_a_stop_request_stops_the_run_of_a_conversation_and_kills_its_query():
+    run = ScriptedRun(nodes=("execute", "check", "shape_result"), state={"result": object()}, pause=0.2)
+    live = LiveRuns()
+
+    async def start_then_stop():
+        stream = event_stream(run, QUESTION, AnswerEvents("reader"), live=(live, "owner", "c1"))
+        await anext(stream)
+        assert not live.stop("someone-else", "c1")
+        assert live.stop("owner", "c1")
+        await stream.aclose()
+
+    asyncio.run(start_then_stop())
+
+    assert run.cancelled.wait(2)
+    deadline = time.monotonic() + 2
+    while run.stopped_by is None and time.monotonic() < deadline:
+        time.sleep(0.01)
+    assert isinstance(run.stopped_by, RunCancelled)
+
+
+def test_a_client_disconnect_stops_a_run_no_conversation_can_find_again():
     run = ScriptedRun(nodes=("execute", "check", "shape_result"), state={"result": object()}, pause=0.2)
 
     async def first_event_then_disconnect():
-        stream = event_stream(run, QUESTION, AnswerEvents("viewer"))
+        stream = event_stream(run, QUESTION, AnswerEvents("reader"))
         first = await anext(stream)
         await stream.aclose()
         return first
@@ -286,25 +357,10 @@ def test_a_client_disconnect_stops_the_run_and_kills_its_query():
     assert isinstance(run.stopped_by, RunCancelled)
 
 
-def collect(agent: FakeAgent, role="viewer") -> list[dict]:
-    run = agent.start(role=role, user_id="lab.viewer", today=None)
+def collect(agent: FakeAgent, role="reader") -> list[dict]:
+    run = agent.start(role=role, user_id="owner", today=None)
     return parse("".join(asyncio.run(drain(event_stream(run, QUESTION, AnswerEvents(role))))))
 
-
-def test_a_missing_or_invalid_token_is_unauthorized_before_the_graph_starts(ask_client):
-    assert ask_client.post("/ask", json={"question": QUESTION}).status_code == 401
-    expired = ask_client.post("/ask", json={"question": QUESTION}, headers={"Authorization": f"Bearer {token(exp=1_000_000)}"})
-    assert expired.status_code == 401
-    assert ask_client.agent.started == []
-
-
-def test_a_token_without_a_pack_role_is_forbidden(ask_client):
-    response = ask_client.post(
-        "/ask", json={"question": QUESTION}, headers={"Authorization": f"Bearer {token(realm_access={'roles': ['admin']})}"},
-    )
-
-    assert response.status_code == 403
-    assert ask_client.agent.started == []
 
 
 def test_too_many_questions_are_refused_before_the_graph_starts(ask_client):
@@ -319,7 +375,7 @@ def test_too_many_questions_are_refused_before_the_graph_starts(ask_client):
 
 @pytest.mark.parametrize("body", [{"question": ""}, {"question": QUESTION, "timezone": "Mars/Base"}, {"question": QUESTION, "extra": 1}])
 def test_an_invalid_request_is_unprocessable(ask_client, body):
-    response = ask_client.post("/ask", json=body, headers={"Authorization": f"Bearer {token()}"})
+    response = ask_client.post("/ask", json=body, headers={})
 
     assert response.status_code == 422
     assert ask_client.agent.started == []
@@ -381,7 +437,7 @@ def test_a_first_question_starts_a_conversation_and_stores_both_turns():
     assert uuid.UUID(conversation_id).version == 4
     assert kinds(parse(response.text))[-1] == "done"
     [conversation] = client.tables["conversations"]
-    assert (conversation["user_id"], conversation["conversation_id"], conversation["title"]) == ("lab.viewer", conversation_id, QUESTION)
+    assert (conversation["user_id"], conversation["conversation_id"], conversation["title"]) == ("owner", conversation_id, QUESTION)
     asked, answered = client.tables["chat_messages"]
     assert (asked["role"], asked["content"], asked["turn"]) == ("user", QUESTION, 1)
     assert (answered["role"], answered["content"], answered["turn"]) == ("assistant", "Widget 0 led.", 1)
@@ -404,17 +460,35 @@ def test_a_follow_up_reads_the_previous_turn():
     assert [row["turn"] for row in client.tables["chat_messages"]] == [1, 1, 2, 2]
 
 
-def test_another_users_conversation_is_404_before_any_llm_call():
-    agent, client = answer(), FakeConversationClient()
+def test_a_picked_option_answers_the_clarified_question_with_that_choice():
+    first_run = [routing_reply(), extraction_reply(metric_terms=[], rank_term=None)]
+    # The second run reads the clarified question again; the router is not asked.
+    second_run = [extraction_reply(metric_terms=[], rank_term=None), GOOD_SQL, "Widget 0 led."]
+    agent, client = FakeAgent(first_run, later_replies=[second_run]), FakeConversationClient()
     store = ConversationStore(client)
-    theirs = store.open_turn("lab.analyst", None, "Their question")
-    store.question(theirs)
+    first = ask_with(agent, store, {})[0]
+    clarify = parse(first.text)[-2]
+    assert (clarify["about"], clarify["chosen"]) == (QUESTION, [])
 
-    [response] = ask_with(agent, store, {"conversation_id": theirs.conversation_id})
+    [second] = ask_with(agent, store, {
+        "question": "Widget revenue", "conversation_id": first.headers["x-conversation-id"],
+        "clarify_option": "metric:widget_revenue",
+    })
 
-    assert response.status_code == 404
-    assert agent.started == []
-    assert [row["user_id"] for row in client.tables["chat_messages"]] == ["lab.analyst"]
+    assert agent.clarified[1] == (QUESTION, ("metric:widget_revenue",))
+    assert kinds(parse(second.text))[-2:] == ["summary", "done"]
+    asked = [row["content"] for row in client.tables["chat_messages"] if row["role"] == "user"]
+    assert asked == [QUESTION, "Widget revenue"]
+
+
+def test_an_option_the_last_turn_did_not_offer_is_read_as_typed():
+    agent, store = answer(), ConversationStore(FakeConversationClient())
+    first = ask_with(agent, store, {})[0]
+
+    ask_with(agent, store, {"question": "This year", "conversation_id": first.headers["x-conversation-id"],
+                            "clarify_option": "period:this_year"})
+
+    assert agent.clarified[1] is None
 
 
 def test_an_unreachable_store_is_503():
@@ -544,3 +618,88 @@ def test_a_gateway_rejection_ends_with_the_blocked_reply_and_keeps_the_question(
     assert "failed the safety check" in events[-2]["message"]
     assert [row["role"] for row in client.tables["chat_messages"]] == ["user", "assistant"]
     assert client.tables["chat_messages"][-1]["content"] == events[-2]["message"]
+
+
+def test_the_sql_event_names_the_unreviewed_metrics_the_answer_uses():
+    from types import SimpleNamespace
+
+    events = AnswerEvents("reader", unreviewed_metrics=frozenset({"refunded_value"}))
+    state = {"trace_id": "t1", "attempts": [], "spec": SimpleNamespace(metric_ids=["widget_revenue", "refunded_value"])}
+
+    [_, sql] = events.node("guard", "end", state, {"attempts": [SimpleNamespace(sql="SELECT 1")]})
+
+    assert sql.event == "sql" and sql.unreviewed_metrics == ["refunded_value"]
+    assert AnswerEvents("reader").node("guard", "end", state, {"attempts": [SimpleNamespace(sql="SELECT 1")]})[1].unreviewed_metrics == []
+
+
+def test_a_question_beyond_the_limit_streams_a_queue_status_until_it_gets_a_place():
+    from app.api.limits import QuestionGate
+
+    gate = QuestionGate(lambda: 1, poll_seconds=0.01)
+    gate.enter(lambda: None, lambda: False)
+    threading.Timer(0.1, gate.leave).start()
+
+    events = parse("".join(asyncio.run(drain(event_stream(ScriptedRun(), QUESTION, AnswerEvents("reader"), gate=gate)))))
+
+    queue = [(e["node"], e["phase"]) for e in events if e.get("event") == "status" and e["node"] == "queue"]
+    assert queue == [("queue", "start"), ("queue", "end")] and events[0]["node"] == "queue"
+    assert gate.running == 0
+
+
+def ask_on_packs(store: ConversationStore, *bodies: dict) -> tuple[list, list[str], list[str]]:
+    """Ask with a compiled pack per name; returns the responses, the packs served and the packs remembered."""
+    served, remembered = [], []
+    agent = FakeAgent([reply for _ in bodies for reply in (routing_reply(), extraction_reply(), GOOD_SQL, "Done.")])
+    serve(agent, compiled_fixture(), store=store)
+    app.dependency_overrides[ask_api.get_compiled_for] = lambda: lambda pack: served.append(pack) or compiled_fixture()
+    app.dependency_overrides[ask_api.get_remember_pack] = lambda: remembered.append
+    app.dependency_overrides[ask_api.get_last_used_pack] = lambda: "shop"
+    try:
+        with TestClient(app) as client:
+            responses = []
+            for body in bodies:
+                body = dict(body)
+                if body.get("conversation_id") == "FIRST":
+                    body["conversation_id"] = responses[0].headers["x-conversation-id"]
+                responses.append(post(client, **body))
+            return responses, served, remembered
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_a_new_conversation_is_answered_from_the_pack_it_names_and_keeps_it():
+    client = FakeConversationClient()
+
+    responses, served, remembered = ask_on_packs(
+        ConversationStore(client), {"pack": "music"}, {"conversation_id": "FIRST", "pack": "shop"},
+    )
+
+    assert [response.status_code for response in responses] == [200, 200]
+    assert served == ["music", "music"] and remembered == ["music", "music"]
+    assert {row["pack"] for row in client.tables["conversations"]} == {"music"}
+
+
+def test_a_new_conversation_without_a_pack_starts_on_the_pack_used_last():
+    client = FakeConversationClient()
+
+    [response], served, _ = ask_on_packs(ConversationStore(client), {})
+
+    assert response.status_code == 200 and served == ["shop"]
+    assert client.tables["conversations"][0]["pack"] == "shop"
+
+
+def test_a_conversation_stored_before_packs_per_conversation_keeps_the_earlier_pack():
+    client = FakeConversationClient()
+    store = ConversationStore(client, earlier_pack=lambda: "chinook")
+    opened = store.open_turn("owner", None, "Earlier question", pack="")
+
+    [response], served, _ = ask_on_packs(store, {"conversation_id": opened.conversation_id})
+
+    assert response.status_code == 200 and served == ["chinook"]
+    assert store.conversations("owner", limit=5, offset=0)[0].pack == "chinook"
+
+
+def test_an_invalid_pack_name_is_refused():
+    [response], served, _ = ask_on_packs(ConversationStore(FakeConversationClient()), {"pack": "../music"})
+
+    assert response.status_code == 422 and served == []

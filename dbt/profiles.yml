@@ -1,8 +1,8 @@
 # Connection settings come from the environment of the jobs Compose service.
 fitcher:
-  target: lab
+  target: dev
   outputs:
-    lab:
+    dev:
       type: clickhouse
       driver: http
       host: "{{ env_var('CLICKHOUSE_HOST', 'clickhouse') }}"

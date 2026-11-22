@@ -109,17 +109,30 @@ def build_graph(deps: AgentDeps):
     return graph.compile()
 
 
+def _asked_for(need) -> str:
+    if need is None:
+        return ""
+    wanted = {"metric": "a measure", "column": "a column", "period": "a period"}[need.kind]
+    return f'asked for {wanted} for "{need.term}"' if need.term else f"asked for {wanted}"
+
+
 def _outcome(state: AgentState) -> tuple[str, str, str]:
     """Status, intent and error of a finished run for its ``runs`` row."""
     intent = state.get("intent", "")
     if state.get("blocked"):
         return "blocked", intent, f"blocked: {state['blocked']}"
+    if state.get("model_error"):
+        return "failed", intent, state["model_error"]
     if state.get("rejection"):
         return "rejected", intent, state["rejection"]
     if state.get("clarification"):
-        return "clarified", intent, ""
+        # What was asked back, so the trace says why the question got no answer.
+        return "clarified", intent, _asked_for(state.get("need"))
     if state.get("denial"):
         return "denied", intent, state["denial"].message
+    if intent == "out_of_scope" and state.get("reply") is not None:
+        # Declined, not answered: it returned no result and must not count as one.
+        return "declined", intent, ""
     if state.get("result") is not None or state.get("reply") is not None:
         return "succeeded", intent, ""
     errors = state.get("errors", [])
@@ -143,13 +156,16 @@ def run_question(question: str, deps: AgentDeps) -> AgentState:
         initial: AgentState = {
             "question": question,
             "trace_id": run.trace_id,
+            "choices": list(deps.choices),
+            "asked": deps.asked,
+            "all_time": False,
             "attempts": [],
             "errors": [],
             "warnings": [],
         }
         if deps.logs is None:
             return _invoke(initial, deps)
-        log = RunLog(deps.logs, run, user_id=deps.user_id, pack=deps.compiled.pack.name, question=question)
+        log = RunLog(deps.logs, run, user_id=deps.user_id, pack=deps.compiled.pack.name, question=deps.asked or question)
         deps = replace(deps, runner=LoggingRunner(deps.runner, deps.logs))
         try:
             state = _invoke(initial, deps)

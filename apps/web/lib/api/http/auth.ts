@@ -1,37 +1,53 @@
-// Sign-in through Keycloak (Phase 7): the web server holds the session (app/auth/*) and answers who is
-// signed in from the api's /me (app/api/session). There is one identity per browser session, so there is
-// nothing to switch to.
+// Who the app acts as (DECISIONS §9): fitcher is a personal app, so /api/session answers the owner. There is
+// one identity, so there is nothing to switch to.
 
 import type { FitcherApi } from "../client";
 import type { Identity } from "../provisional";
 
+/**
+ * The api refused this browser before signing in could help (403 from its address checks): a name missing from
+ * FITCHER_ALLOWED_HOSTS, a reverse proxy relaying a loopback host, or another machine before a password is set.
+ * `reason` is the api's own explanation, which says what to change.
+ */
+export class AccessRefused extends Error {
+  constructor(readonly reason: string) {
+    super(reason);
+  }
+}
+
 async function json<T>(response: Response): Promise<T> {
+  if (response.status === 403) {
+    const body = (await response.json().catch(() => ({}))) as { detail?: unknown };
+    throw new AccessRefused(typeof body.detail === "string" ? body.detail : "");
+  }
   if (!response.ok) throw new Error(`${response.url || "request"} answered ${response.status}`);
   return (await response.json()) as T;
 }
 
 export function createHttpAuth(fetcher: typeof fetch = (...args) => fetch(...args)): FitcherApi["auth"] {
-  // The signed-in user is read once per page load and shared by every caller.
+  // The signed-in user is read once per page load and shared by every caller. A signed-out answer is not kept:
+  // after signing in, the app moves to the chat without loading the page again, and must see the new session.
   let current: Promise<Identity | null> | null = null;
   const load = () =>
-    (current ??= fetcher("/api/session", { cache: "no-store" }).then((response) => (response.status === 401 ? null : json<Identity>(response))).catch((error) => {
+    (current ??= fetcher("/api/session", { cache: "no-store" }).then((response) => {
+      if (response.status !== 401) return json<Identity>(response);
+      current = null;
+      return null;
+    }).catch((error) => {
       current = null;
       throw error;
     }));
   return {
     current: load,
-    identities: async () => {
-      const identity = await load();
-      return identity ? [identity] : [];
+    // 503 means no pack is active yet; 401 means the owner password asks for a session first, which the
+    // session check sends to the sign-in page.
+    pack: async () => {
+      const response = await fetcher("/api/pack", { cache: "no-store" });
+      return response.status === 503 || response.status === 401 ? null : json(response);
     },
-    switchTo: async () => {
-      throw new Error("A Keycloak session has one identity; sign out to use another account.");
-    },
-    pack: async () => json(await fetcher("/api/pack", { cache: "no-store" })),
-    signOut: async () => {
-      current = null;
-      return (await json<{ url: string }>(await fetcher("/auth/sign-out", { method: "POST" }))).url;
-    },
+    choosePack: async (name) => json(await fetcher("/api/pack", {
+      method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ name }),
+    })),
   };
 }
 

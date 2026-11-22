@@ -1,0 +1,95 @@
+"""Typed settings by group and key, stored as JSON in the app state.
+
+Every setting has a spec (type, default and optional choices); reading an
+unset setting returns its default and writing a value of the wrong type or
+outside its choices is refused. Each later phase adds the specs of its own
+settings to ``SPECS``.
+"""
+
+from dataclasses import dataclass
+from datetime import UTC, datetime
+import json
+from typing import Any
+
+from app.state.db import StateDb
+
+
+class SettingError(ValueError):
+    """The setting is unknown or the value does not fit its spec."""
+
+
+@dataclass(frozen=True)
+class SettingSpec:
+    type: type
+    default: Any = None
+    choices: tuple[Any, ...] | None = None
+
+
+SPECS: dict[tuple[str, str], SettingSpec] = {
+    ("setup", "complete"): SettingSpec(bool, False),
+    # The embed tier's model and vector size; changing them needs a full reindex (DECISIONS §14).
+    # The optional prompt-injection classifier (DECISIONS §9); the EN/VI rules always run.
+    ("screening", "classifier_enabled"): SettingSpec(bool, False),
+    # Where the classifier runs: through a provider (the default) or on this computer (app/screening/engines.py).
+    ("screening", "classifier_engine"): SettingSpec(str, "provider", ("provider", "local_onnx")),
+    ("screening", "classifier_provider_id"): SettingSpec(str),
+    ("screening", "classifier_model"): SettingSpec(str, "meta-llama/llama-prompt-guard-2-86m"),
+    # Unset until a provider proposes its embedding model or an admin chooses one.
+    ("llm.embedding", "backend"): SettingSpec(str, None, ("local", "provider")),
+    ("llm.embedding", "provider_id"): SettingSpec(str),
+    ("llm.embedding", "model"): SettingSpec(str),
+    ("llm.embedding", "dimensions"): SettingSpec(int),
+    # Company documents (DECISIONS §5, §15), off until the owner turns them on on the Documents page: off makes
+    # the documents endpoints answer 404 and the compiler index no chunks; the stored files and the registry are
+    # kept.
+    ("documents", "enabled"): SettingSpec(bool, False),
+    # Questions answered at once by the one api process; the rest wait in order (app/api/limits.py).
+    ("limits", "concurrent_questions"): SettingSpec(int, 4),
+    # The pack used last, where a new chat starts; ACTIVE_PACK wins when set (app/packs/active.py).
+    ("pack", "active"): SettingSpec(str),
+    # The pack conversations started before each conversation kept its own pack were answered from.
+    ("pack", "earlier_conversations"): SettingSpec(str),
+}
+
+
+class Settings:
+    def __init__(self, db: StateDb, extra: dict[tuple[str, str], SettingSpec] | None = None):
+        self._db = db
+        self._specs = {**SPECS, **(extra or {})}
+
+    def _spec(self, group: str, key: str) -> SettingSpec:
+        try:
+            return self._specs[(group, key)]
+        except KeyError:
+            raise SettingError(f"unknown setting {group}.{key}") from None
+
+    def get(self, group: str, key: str) -> Any:
+        spec = self._spec(group, key)
+        row = self._db.connection().execute(
+            "SELECT value FROM settings WHERE group_name = ? AND key = ?", (group, key)
+        ).fetchone()
+        return spec.default if row is None else json.loads(row[0])
+
+    def set(self, group: str, key: str, value: Any) -> None:
+        spec = self._spec(group, key)
+        if type(value) is not spec.type:
+            raise SettingError(f"{group}.{key} must be {spec.type.__name__}")
+        if spec.choices is not None and value not in spec.choices:
+            raise SettingError(f"{group}.{key} must be one of {', '.join(map(str, spec.choices))}")
+        with self._db.write() as conn:
+            conn.execute(
+                "INSERT INTO settings (group_name, key, value, updated_at) VALUES (?, ?, ?, ?) "
+                "ON CONFLICT(group_name, key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at",
+                (group, key, json.dumps(value), datetime.now(UTC).isoformat()),
+            )
+
+    def unset(self, group: str, key: str) -> None:
+        """Forget the stored value, so reading it returns its default again."""
+        self._spec(group, key)
+        with self._db.write() as conn:
+            conn.execute("DELETE FROM settings WHERE group_name = ? AND key = ?", (group, key))
+
+
+def documents_enabled(db: StateDb) -> bool:
+    """Whether company documents are on (DECISIONS §15); they are unless an admin turned them off."""
+    return Settings(db).get("documents", "enabled")

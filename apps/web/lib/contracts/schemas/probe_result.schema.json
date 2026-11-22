@@ -1,0 +1,248 @@
+{
+  "$defs": {
+    "ColumnView": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "type": {
+          "title": "Type",
+          "type": "string"
+        },
+        "nullable": {
+          "title": "Nullable",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "name",
+        "type",
+        "nullable"
+      ],
+      "title": "ColumnView",
+      "type": "object"
+    },
+    "ForeignKeyView": {
+      "additionalProperties": false,
+      "properties": {
+        "columns": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Columns",
+          "type": "array"
+        },
+        "ref_table": {
+          "title": "Ref Table",
+          "type": "string"
+        },
+        "ref_columns": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Ref Columns",
+          "type": "array"
+        }
+      },
+      "required": [
+        "columns",
+        "ref_table",
+        "ref_columns"
+      ],
+      "title": "ForeignKeyView",
+      "type": "object"
+    },
+    "TableView": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "table",
+            "view"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "rows": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Rows"
+        },
+        "size_bytes": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Size Bytes"
+        },
+        "columns": {
+          "items": {
+            "$ref": "#/$defs/ColumnView"
+          },
+          "title": "Columns",
+          "type": "array"
+        },
+        "primary_key": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Primary Key",
+          "type": "array"
+        },
+        "foreign_keys": {
+          "items": {
+            "$ref": "#/$defs/ForeignKeyView"
+          },
+          "title": "Foreign Keys",
+          "type": "array"
+        },
+        "unusual_columns": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Unusual Columns",
+          "type": "array"
+        },
+        "selected": {
+          "title": "Selected",
+          "type": "boolean"
+        },
+        "mode": {
+          "enum": [
+            "live",
+            "copy"
+          ],
+          "title": "Mode",
+          "type": "string"
+        },
+        "proposed_mode": {
+          "enum": [
+            "live",
+            "copy"
+          ],
+          "title": "Proposed Mode",
+          "type": "string"
+        },
+        "reason": {
+          "title": "Reason",
+          "type": "string"
+        },
+        "slow": {
+          "title": "Slow",
+          "type": "boolean"
+        },
+        "interval_seconds": {
+          "title": "Interval Seconds",
+          "type": "integer"
+        },
+        "cursor_column": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Cursor Column"
+        },
+        "cursor_candidates": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Cursor Candidates",
+          "type": "array"
+        },
+        "last_synced_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Last Synced At"
+        },
+        "last_rows": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Last Rows"
+        },
+        "next_run_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Next Run At"
+        }
+      },
+      "required": [
+        "name",
+        "kind",
+        "rows",
+        "size_bytes",
+        "columns",
+        "primary_key",
+        "foreign_keys",
+        "unusual_columns",
+        "selected",
+        "mode",
+        "proposed_mode",
+        "reason",
+        "slow",
+        "interval_seconds",
+        "cursor_column",
+        "cursor_candidates",
+        "last_synced_at",
+        "last_rows",
+        "next_run_at"
+      ],
+      "title": "TableView",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "tables": {
+      "items": {
+        "$ref": "#/$defs/TableView"
+      },
+      "title": "Tables",
+      "type": "array"
+    }
+  },
+  "required": [
+    "tables"
+  ],
+  "title": "ProbeResult",
+  "type": "object"
+}

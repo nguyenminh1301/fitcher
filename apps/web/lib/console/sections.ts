@@ -1,44 +1,60 @@
-// The workspace console's sections and which console role opens each (DECISIONS §15). The api
-// enforces the same rule on every endpoint; this list only decides what the navigation shows.
+// The console's pages (DECISIONS §15). fitcher is a personal app with one owner, so the sidebar keeps six areas
+// and a page that belongs with another one is a tab of that area: Datasets beside Sources; Feedback and
+// Evaluation beside Review under Quality; Query log and Costs beside Runs under Activity; Models and Security
+// under Settings. Every page keeps its own path, so links to it still work.
 
 import type { Feature } from "@/lib/api/client";
 
-export type SectionGroup = "knowledge" | "observe" | "quality" | "administration";
-
 export type Section = {
   key: string;
-  group: SectionGroup;
   path: string;
   icon: string;
-  roles: string[];
   /** The api feature the section reads, which decides its Sample data badge. */
-  feature: Feature;
+  feature: Feature | null;
 };
 
-const REVIEWER = "pack_reviewer";
-const ADMIN = "admin";
+export type Area = {
+  key: string;
+  icon: string;
+  /** The pages of the area in tab order; the first one is where the sidebar link goes. */
+  pages: string[];
+};
 
-/** In navigation order; groups appear in this order too. */
 export const SECTIONS: Section[] = [
-  { key: "review", group: "knowledge", path: "/console/review", icon: "clipboardCheck", roles: [REVIEWER], feature: "review" },
-  { key: "documents", group: "knowledge", path: "/console/documents", icon: "fileText", roles: [REVIEWER], feature: "documents" },
-  { key: "datasets", group: "knowledge", path: "/console/datasets", icon: "table", roles: [REVIEWER], feature: "datasets" },
-  { key: "feedback", group: "knowledge", path: "/console/feedback", icon: "thumbsUp", roles: [REVIEWER], feature: "feedbackReview" },
-  { key: "runs", group: "observe", path: "/console/runs", icon: "activity", roles: [ADMIN], feature: "runs" },
-  { key: "audit", group: "observe", path: "/console/audit", icon: "shieldCheck", roles: [ADMIN], feature: "audit" },
-  { key: "costs", group: "observe", path: "/console/costs", icon: "coins", roles: [ADMIN], feature: "costs" },
-  { key: "evaluation", group: "quality", path: "/console/evaluation", icon: "gauge", roles: [REVIEWER, ADMIN], feature: "evaluation" },
-  { key: "users", group: "administration", path: "/console/users", icon: "users", roles: [ADMIN], feature: "users" },
-  { key: "models", group: "administration", path: "/console/models", icon: "compass", roles: [ADMIN], feature: "models" },
+  { key: "overview", path: "/console", icon: "home", feature: null },
+  { key: "sources", path: "/console/sources", icon: "database", feature: "sources" },
+  { key: "datasets", path: "/console/datasets", icon: "table", feature: "datasets" },
+  { key: "documents", path: "/console/documents", icon: "fileText", feature: "documents" },
+  { key: "review", path: "/console/review", icon: "clipboardCheck", feature: "review" },
+  { key: "feedback", path: "/console/feedback", icon: "thumbsUp", feature: "feedbackReview" },
+  { key: "evaluation", path: "/console/evaluation", icon: "gauge", feature: "evaluation" },
+  { key: "runs", path: "/console/runs", icon: "activity", feature: "runs" },
+  { key: "audit", path: "/console/audit", icon: "shieldCheck", feature: "audit" },
+  { key: "costs", path: "/console/costs", icon: "coins", feature: "costs" },
+  { key: "models", path: "/console/models", icon: "cpu", feature: "models" },
+  { key: "security", path: "/console/security", icon: "lock", feature: "owner" },
 ];
 
-/** The sections these roles may open, in navigation order; empty for a role without console access. */
-export function allowedSections(roles: string[]): Section[] {
-  return SECTIONS.filter((section) => section.roles.some((role) => roles.includes(role)));
+export const AREAS: Area[] = [
+  { key: "overview", icon: "home", pages: ["overview"] },
+  { key: "sources", icon: "database", pages: ["sources", "datasets"] },
+  { key: "documents", icon: "fileText", pages: ["documents"] },
+  { key: "quality", icon: "clipboardCheck", pages: ["review", "feedback", "evaluation"] },
+  { key: "activity", icon: "activity", pages: ["runs", "audit", "costs"] },
+  { key: "settings", icon: "wrench", pages: ["models", "security"] },
+];
+
+export function sectionPath(key: string): string {
+  return SECTIONS.find((section) => section.key === key)?.path ?? "/console";
 }
 
-/** The section key of a console path such as ``/console/runs/abc``, or null for ``/console``. */
-export function sectionOf(pathname: string): string | null {
+/** The area a page belongs to. */
+export function areaOf(section: string): Area {
+  return AREAS.find((area) => area.pages.includes(section)) ?? AREAS[0];
+}
+
+/** The section key of a console path such as ``/console/runs/abc``; ``/console`` itself is the Overview. */
+export function sectionOf(pathname: string): string {
   const match = /^\/console\/([^/]+)/.exec(pathname);
-  return match ? match[1] : null;
+  return match ? match[1] : "overview";
 }

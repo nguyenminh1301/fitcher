@@ -7,6 +7,7 @@ fails, a fixed reply in the question's language, or English, is used.
 
 import json
 
+from app.agent.nodes.screen import question_language
 from app.agent.prompts import render
 from app.agent.state import AgentDeps, AgentState
 from app.llm.client import LLMError
@@ -20,7 +21,7 @@ FALLBACK = {
 
 
 def out_of_scope(state: AgentState, deps: AgentDeps) -> dict:
-    language = state.get("language") or "en"
+    language = question_language(state)
     prompt = render(
         PROMPT,
         language=language,

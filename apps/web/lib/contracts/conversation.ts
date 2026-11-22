@@ -5,6 +5,7 @@ export type Title = string;
 export type Pinned = boolean;
 export type GroupId = string | null;
 export type UpdatedAt = string;
+export type Pack = string | null;
 
 export interface Conversation {
   id: Id;
@@ -12,4 +13,5 @@ export interface Conversation {
   pinned: Pinned;
   group_id: GroupId;
   updated_at: UpdatedAt;
+  pack?: Pack;
 }

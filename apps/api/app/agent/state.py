@@ -4,7 +4,7 @@ Each node is a function of ``(state, deps)`` that returns the state fields it
 changes, so it can be tested alone with fake dependencies (DECISIONS §13).
 """
 
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from datetime import date
 from typing import Literal, Protocol, TypedDict
@@ -23,13 +23,9 @@ from app.observability.log_writer import FlushResult
 from app.packs.compiler import CompiledPack
 from app.packs.models import BusinessProfile
 from app.screening.screen import ScreenMode, Screener, Verdict
+from app.search.engine import SearchEngine
 
 TimeGrain = Literal["day", "week", "month", "quarter", "year"]
-
-
-class SearchClient(Protocol):
-    def query(self, alias: str, text: str, vector: Sequence[float], roles: Sequence[str], size: int) -> list[dict]:
-        """Hybrid keyword and semantic hits of ``alias`` readable by ``roles``, as ``{id, score, source}``."""
 
 
 class LogWriter(Protocol):
@@ -59,7 +55,7 @@ Progress = Callable[[str, Literal["start", "end"], "AgentState", Mapping | None]
 @dataclass(frozen=True)
 class AgentDeps:
     llm: LLMClient
-    search: SearchClient
+    search: SearchEngine
     embeddings: EmbeddingClient
     runner: QueryRunner
     compiled: CompiledPack
@@ -79,6 +75,12 @@ class AgentDeps:
     screener: Screener | None = None
     # log lets a blocked question continue and records it; enforce stops it.
     screen_mode: ScreenMode = "log"
+    # Company documents are on (DECISIONS §15); off, metadata_qa answers without searching kb_docs.
+    documents_enabled: bool = True
+    # The clarifying options picked for ``question``, oldest first; the question is then the one that was clarified.
+    choices: tuple[str, ...] = ()
+    # What the user sent for this turn when it differs from ``question`` (the label of a picked option).
+    asked: str = ""
 
 
 class Attempt(BaseModel):
@@ -101,6 +103,12 @@ BlockedReason = Literal["screened", "unavailable", "gateway"]
 class AgentState(TypedDict, total=False):
     question: str
     trace_id: str
+    # What the user sent when it differs from ``question``: the label of a clarifying option they picked.
+    asked: str
+    # The clarifying options the user picked for this question, as their ids ("period:this_year"), oldest first.
+    choices: list[str]
+    # The question covers all of the data: it said so, or the user picked "All data" for its period.
+    all_time: bool
     # The screen node's verdict on the question, and why the run was stopped, if it was.
     screening: Verdict | None
     blocked: BlockedReason | None
@@ -139,6 +147,8 @@ class AgentState(TypedDict, total=False):
     summary: str | None
     # Why the CLI entry point refused the question before any SQL was generated.
     rejection: str | None
+    # The model call that reads the question failed (rate limit, outage); the run stops as a failure, not a refusal.
+    model_error: str | None
     # The gate's denial: what the asking role may not read, and the message for the user.
     denial: BaseModel | None
     # What build_spec could not settle, and the gate's clarifying question about it.
