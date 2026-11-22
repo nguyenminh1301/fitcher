@@ -4,6 +4,7 @@
 
 ### Fixed
 
+- A long category label of a horizontal bar chart, such as "Iced Caramel Latte", is no longer cut off at the chart's left edge: charts measured their labels with the font name "inherit", which ECharts cannot measure, so the room they left was sized for a default font while the labels were drawn in Inter. Charts now measure with the page's font once it has loaded.
 - A model that refuses a JSON-schema response format, such as DeepSeek's own API (`api.deepseek.com`), answers in JSON-object mode with the schema in its instructions instead of being skipped: every question and the provider check used to fall back to the next model with HTTP 400. The api remembers such a model for later calls.
 
 ## 1.0.0 - 2026-11-21

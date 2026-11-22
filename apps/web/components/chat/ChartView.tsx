@@ -45,9 +45,27 @@ function usePalette(): { palette: string[]; grid: string } {
   return palette;
 }
 
+/**
+ * The page's font family once its web fonts have loaded. ECharts measures axis labels with this name to leave room
+ * for them; "inherit" is not a font it can measure, so it measured with a default font and a long label drawn in
+ * Inter ran past the chart's left edge.
+ */
+function useFontFamily(): string {
+  const [family, setFamily] = useState("sans-serif");
+  useEffect(() => {
+    let live = true;
+    const read = () => { if (live) setFamily(getComputedStyle(document.body).fontFamily || "sans-serif"); };
+    read();
+    void document.fonts?.ready.then(read);
+    return () => { live = false; };
+  }, []);
+  return family;
+}
+
 export function ChartView({ spec, result, onReady }: { spec: ChartSpec; result: Result; onReady?: (chart: EChartsInstance) => void }) {
   const { t, locale } = useI18n();
   const { palette, grid } = usePalette();
+  const fontFamily = useFontFamily();
 
   if (spec.type === "kpi") {
     const column = result.columns.find((item) => item.name === spec.y[0]) ?? result.columns[0];
@@ -65,7 +83,7 @@ export function ChartView({ spec, result, onReady }: { spec: ChartSpec; result: 
   return (
     <div role="img" aria-label={description} style={{ width: "100%" }}>
       <ReactECharts
-        option={{ ...option, textStyle: { fontFamily: "inherit" }, animationDuration: 300 }}
+        option={{ ...option, textStyle: { fontFamily }, animationDuration: 300 }}
         notMerge
         style={{ height: 300, width: "100%" }}
         opts={{ renderer: "svg" }}
