@@ -354,3 +354,47 @@ def test_a_single_model_with_a_reply_that_cannot_be_read_fails_with_a_model_erro
 
     with pytest.raises(LLMError, match="does not match Answer"):
         gateway([[GEMINI]], sdk).structured("fast", PROMPT, Answer)
+
+
+class Check(BaseModel):
+    ok: bool
+
+
+@pytest.fixture
+def no_schema_memory():
+    from app.llm import gateway as gateway_module
+
+    gateway_module.JSON_OBJECT_ONLY.clear()
+    yield gateway_module.JSON_OBJECT_ONLY
+    gateway_module.JSON_OBJECT_ONLY.clear()
+
+
+def schema_refused(call):
+    # DeepSeek's own API: 400 "This response_format type is unavailable now" for a JSON schema.
+    if call.get("response_format", {}).get("type") == "json_schema":
+        return litellm.BadRequestError("This response_format type is unavailable now", "deepseek-flash", "openai")
+    return reply('{"ok": true}')
+
+
+def test_a_model_without_json_schema_mode_answers_in_json_object_mode_and_is_remembered(no_schema_memory):
+    sdk = Sdk(schema_refused)
+    chat = gateway([[GEMINI], [LOCAL]], sdk)
+
+    assert chat.structured("fast", PROMPT, Check) == Check(ok=True)
+    asked = sdk.calls[-1]
+    assert asked["model"] == GEMINI.model and asked["response_format"] == {"type": "json_object"}
+    assert "matches this JSON schema" in asked["messages"][0]["content"] and '"ok"' in asked["messages"][0]["content"]
+    assert len(sdk.calls) == 2
+
+    chat.structured("fast", PROMPT, Check)
+
+    assert len(sdk.calls) == 3 and sdk.calls[-1]["response_format"] == {"type": "json_object"}
+
+
+def test_a_model_that_refuses_both_modes_moves_on_and_is_not_remembered(no_schema_memory):
+    sdk = Sdk(lambda call: litellm.BadRequestError("bad", "m", "p") if call["model"] == GEMINI.model else reply('{"ok": true}'))
+
+    assert gateway([[GEMINI], [LOCAL]], sdk).structured("fast", PROMPT, Check) == Check(ok=True)
+
+    assert [call["model"] for call in sdk.calls] == [GEMINI.model, GEMINI.model, LOCAL.model]
+    assert not no_schema_memory

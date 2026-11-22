@@ -224,6 +224,9 @@ REQUEST_REJECTED = frozenset({
     "UnsupportedParamsError",
 })
 EMPTY_REPLY = "EmptyReply"
+# Models that refused a JSON-schema response format (DeepSeek's own API answers 400 "This response_format type is
+# unavailable") and answered in JSON-object mode instead, by provider and model; kept for the process's life.
+JSON_OBJECT_ONLY: set[tuple[str, str]] = set()
 INVALID_REPLY = "InvalidReply"
 # What the chain does next after a failure it recovered from.
 _NEXT_KEY, _NEXT_MODEL = object(), object()
@@ -404,6 +407,16 @@ class Gateway:
         self._complete(tier, prompt, response_format, accept, schema.__name__)
         return parsed[-1]
 
+    @staticmethod
+    def _json_object(request: dict) -> dict:
+        """``request`` with JSON-object mode in place of its JSON schema, which moves into the system message."""
+        schema = request["response_format"]["json_schema"]["schema"]
+        system, *rest = request["messages"]
+        instruction = ("\n\nAnswer with one JSON object, and nothing else, that matches this JSON schema:\n"
+                       + json.dumps(schema, ensure_ascii=False))
+        messages = [{**system, "content": system["content"] + instruction}, *rest]
+        return {**request, "messages": messages, "response_format": {"type": "json_object"}}
+
     def text(self, tier: str, prompt: Prompt) -> str:
         return self._complete(tier, prompt, None)[1]
 
@@ -449,14 +462,23 @@ class Gateway:
                 continue
             for route in usable:
                 tries = 2 if single else 1
+                schema_request = request.get("response_format", {}).get("type") == "json_schema"
+                model_key = (route.provider, route.model)
+                object_mode = schema_request and model_key in JSON_OBJECT_ONLY
                 while tries:
                     tries -= 1
+                    sent = self._json_object(request) if object_mode else request
                     try:
-                        content, previous = self._ask(tier, route, prompt, request, timeout, previous)
+                        content, previous = self._ask(tier, route, prompt, sent, timeout, previous)
                     except _ProviderFailure as failure:
                         previous = failure.call_id
                         kind = failure.error_type
                         if tries and kind in RETRY_SAME:
+                            continue
+                        if kind == "BadRequestError" and schema_request and not object_mode:
+                            # The model may only lack JSON-schema mode: ask it once more in JSON-object mode.
+                            object_mode = True
+                            tries += 1
                             continue
                         attempts.append((route.model, kind))
                         self._after_failure(route, failure)
@@ -483,6 +505,8 @@ class Gateway:
                                        tuple(attempts))
                     break
                 self._keys.answered(route)
+                if object_mode:
+                    JSON_OBJECT_ONLY.add(model_key)
                 return route.model, content
         raise LLMError(_attempts_text(tier, attempts), tuple(attempts))
 
