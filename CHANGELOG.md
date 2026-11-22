@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Fixed
+
+- A long category label of a horizontal bar chart, such as "Iced Caramel Latte", is no longer cut off at the chart's left edge: charts measured their labels with the font name "inherit", which ECharts cannot measure, so the room they left was sized for a default font while the labels were drawn in Inter. Charts now measure with the page's font once it has loaded.
+
 ## 1.0.0 - 2026-11-21
 
 ### Added
