@@ -2,7 +2,8 @@
 
 // The two flows the Sources page opens on their own page (/console/sources/new and /console/sources/[id]/pack), built from the setup's steps: adding a source (the
 // Data step, starting on a file or a database) and building or rebuilding a source's pack (the Start step,
-// with the paid model call confirmed first). Both end back on the Sources page.
+// with the paid model call confirmed first). Both end back on the Sources page. The public demo shows the
+// adding flow locked, since it has nothing to connect to.
 
 import { useEffect, useState } from "react";
 
@@ -10,6 +11,7 @@ import { Icon } from "@/components/brand/Icon";
 import { useConsole } from "@/components/console/ConsoleLayout";
 import { DataStep, type Chosen } from "@/components/setup/DataStep";
 import { StartStep } from "@/components/setup/StartStep";
+import { DemoLocked } from "@/components/ui/DemoLock";
 import { keepQuestion } from "@/lib/chat/pendingQuestion";
 import { useChat } from "@/lib/chat/ChatContext";
 import { useI18n } from "@/lib/i18n/react";
@@ -44,8 +46,10 @@ export function AddSourcePage({ kind }: { kind: "file" | "database" }) {
   return (
     <Frame>
       {chosen ? <Build chosen={chosen} /> : (
-        <DataStep sources={api.sources} meta={null} initial={kind === "database" ? "database" : "choose"}
-          onBack={() => navigate("/console/sources")} onChosen={setChosen} />
+        <DemoLocked>
+          <DataStep sources={api.sources} meta={null} initial={kind === "database" ? "database" : "choose"}
+            onBack={() => navigate("/console/sources")} onChosen={setChosen} />
+        </DemoLocked>
       )}
     </Frame>
   );

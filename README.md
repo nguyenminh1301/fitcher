@@ -45,6 +45,8 @@ To look around without a model key, the sample-data demo runs the web app with m
 docker run -p 127.0.0.1:3000:3000 ghcr.io/nguyenminh1301/fitcher-demo
 ```
 
+The same demo deploys to Vercel's free plan; [docs/install.md](docs/install.md#public-demo-on-vercel) gives the settings. Its key and password fields are locked, so nobody types a key into a public page.
+
 ## How it works
 
 ![How the pieces fit together](docs/architecture/system.svg)

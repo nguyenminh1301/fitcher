@@ -3,12 +3,13 @@
 // The Security page (DECISIONS §9, §15): set, change or remove the optional owner password. Without one the
 // instance answers this computer only; with one every browser signs in. An instance reachable from other machines
 // (FITCHER_ALLOWED_HOSTS) needs a password, says so until one is set, and keeps it while it stays reachable. A
-// forgotten password cannot be recovered, and the page says so.
+// forgotten password cannot be recovered, and the page says so. The public demo shows the forms locked.
 
 import { type FormEvent, useCallback, useState } from "react";
 
 import { Icon } from "@/components/brand/Icon";
 import { ListPage } from "@/components/console/ListPage";
+import { DemoLocked } from "@/components/ui/DemoLock";
 import { errorText } from "@/lib/api/errorText";
 import { useChat } from "@/lib/chat/ChatContext";
 import { useLoad } from "@/lib/console/useLoad";
@@ -91,41 +92,43 @@ export function SecuritySection() {
             <div className="fc-banner fc-banner-danger" role="alert"><Icon name="alert" /><div>{t("owner.exposedNeedsPassword")}</div></div>
           ) : null}
           <p style={{ margin: 0 }}>{set ? t("owner.statusOn") : t("owner.statusOff")}</p>
-          <form className="box" aria-labelledby="password-title" onSubmit={save}>
-            <div className="box-head"><h2 id="password-title" className="box-title">{title}</h2></div>
-            <div className="box-body">
-              {set ? <Field id="owner-current" label={t("owner.currentPassword")} autoComplete="current-password" value={current} disabled={busy} onChange={setCurrent} /> : null}
-              <Field id="owner-new" label={t("owner.newPassword")} autoComplete="new-password" value={next} disabled={busy}
-                help={t("owner.rule", { count: MIN_LENGTH })} error={short ? t("owner.tooShort", { count: MIN_LENGTH }) : undefined} onChange={setNext} />
-              {next.length > 0 && strength !== "short" ? (
-                <p className="fc-field-help" role="status" style={{ margin: 0 }}>{t(`owner.strength_${strength}`)}</p>
-              ) : null}
-              <Field id="owner-again" label={t("owner.repeatPassword")} autoComplete="new-password" value={again} disabled={busy}
-                error={mismatch ? t("owner.mismatch") : undefined} onChange={setAgain} />
-              <div>
-                <button type="submit" className="fc-btn fc-btn-primary" disabled={busy || next.length < MIN_LENGTH || next !== again || (set && !current)}>
-                  {set ? t("owner.change") : t("owner.setButton")}
-                </button>
-              </div>
-              {line}
-            </div>
-          </form>
-          {set ? (
-            <section className="box" aria-labelledby="remove-title">
-              <div className="box-head"><h2 id="remove-title" className="box-title">{t("owner.removeTitle")}</h2></div>
+          <DemoLocked>
+            <form className="box" aria-labelledby="password-title" onSubmit={save}>
+              <div className="box-head"><h2 id="password-title" className="box-title">{title}</h2></div>
               <div className="box-body">
-                <p className="fc-muted" style={{ margin: 0 }}>{t("owner.removeHint")}</p>
+                {set ? <Field id="owner-current" label={t("owner.currentPassword")} autoComplete="current-password" value={current} disabled={busy} onChange={setCurrent} /> : null}
+                <Field id="owner-new" label={t("owner.newPassword")} autoComplete="new-password" value={next} disabled={busy}
+                  help={t("owner.rule", { count: MIN_LENGTH })} error={short ? t("owner.tooShort", { count: MIN_LENGTH }) : undefined} onChange={setNext} />
+                {next.length > 0 && strength !== "short" ? (
+                  <p className="fc-field-help" role="status" style={{ margin: 0 }}>{t(`owner.strength_${strength}`)}</p>
+                ) : null}
+                <Field id="owner-again" label={t("owner.repeatPassword")} autoComplete="new-password" value={again} disabled={busy}
+                  error={mismatch ? t("owner.mismatch") : undefined} onChange={setAgain} />
                 <div>
-                  <button type="button" className="fc-btn" disabled={busy || !current || status.exposed}
-                    aria-describedby={status.exposed ? "remove-why" : undefined}
-                    onClick={() => void run(() => api.owner.removePassword(current), t("owner.removed"))}>{t("owner.remove")}</button>
-                  {status.exposed ? <span className="fc-field-help" id="remove-why" style={{ marginLeft: 8 }}>{t("owner.removeExposed")}</span> : null}
+                  <button type="submit" className="fc-btn fc-btn-primary" disabled={busy || next.length < MIN_LENGTH || next !== again || (set && !current)}>
+                    {set ? t("owner.change") : t("owner.setButton")}
+                  </button>
                 </div>
+                {line}
               </div>
-            </section>
-          ) : null}
-          <p className="fc-field-help forgot-line"><Icon name="info" />{t("owner.forgottenConsole")}</p>
-          <QuestionLimit />
+            </form>
+            {set ? (
+              <section className="box" aria-labelledby="remove-title">
+                <div className="box-head"><h2 id="remove-title" className="box-title">{t("owner.removeTitle")}</h2></div>
+                <div className="box-body">
+                  <p className="fc-muted" style={{ margin: 0 }}>{t("owner.removeHint")}</p>
+                  <div>
+                    <button type="button" className="fc-btn" disabled={busy || !current || status.exposed}
+                      aria-describedby={status.exposed ? "remove-why" : undefined}
+                      onClick={() => void run(() => api.owner.removePassword(current), t("owner.removed"))}>{t("owner.remove")}</button>
+                    {status.exposed ? <span className="fc-field-help" id="remove-why" style={{ marginLeft: 8 }}>{t("owner.removeExposed")}</span> : null}
+                  </div>
+                </div>
+              </section>
+            ) : null}
+            <p className="fc-field-help forgot-line"><Icon name="info" />{t("owner.forgottenConsole")}</p>
+            <QuestionLimit />
+          </DemoLocked>
         </>
       ) : null}
     </ListPage>
