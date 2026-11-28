@@ -17,6 +17,16 @@ function documentView(row: SampleDocument): DocumentView {
   return { media_type: "", chunk_count: 0, blocked_chunks: 0, uploaded_by: "sample", ...row };
 }
 
+const SAMPLE_EMBEDDING = {
+  backend: "local" as const, provider_id: null, model: "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",
+  dimensions: 384, needs_reindex: false,
+};
+
+/** Methods that need the api and refuse with ``message`` in the sample instance. */
+function refuseAll<T>(names: (keyof T)[], message: string): Partial<T> {
+  return Object.fromEntries(names.map((name) => [name, () => Promise.reject(new Error(message))])) as Partial<T>;
+}
+
 function delay<T>(value: T, ms = 150): Promise<T> {
   return new Promise((resolve) => setTimeout(() => resolve(value), ms));
 }
@@ -133,16 +143,28 @@ export function createMockApi(options: { latencyMs?: number; identity?: () => Pr
     },
     audit: { list: async () => wait((await load()).console.audit), screening: async () => wait([]) },
     costs: { list: async () => wait((await load()).console.costs) },
-    // The Models page has no sample data: providers, keys and tiers live in the instance's app state.
-    models: Object.fromEntries([
-      "providers", "addProvider", "changeProvider", "removeProvider", "providerModels", "testProvider", "tiers", "setTier",
-      "catalog", "setMode", "setEmbedding", "classifier", "setClassifier", "changeClassifier",
-      "startClassifierDownload", "classifierDownload", "cancelClassifierDownload",
-    ].map((name) => [name, () => Promise.reject(new Error("The Models page needs the api; it has no sample data."))])) as unknown as FitcherApi["models"],
-    sources: Object.fromEntries([
-      "list", "test", "create", "update", "remove", "tables", "changeTables", "sync", "cancel", "syncs", "upload", "loadFile",
-      "drift", "instantEstimate", "instantStart", "instantJob",
-    ].map((name) => [name, () => Promise.reject(new Error("The Sources page needs the api; it has no sample data."))])) as unknown as FitcherApi["sources"],
+    // The Models page has no sample data: providers, keys and tiers live in the instance's app state. The sample
+    // instance reads as one with no provider and the default local embedding, and refuses every change, so the
+    // page shows its layout with its controls locked (components/ui/DemoLock.tsx).
+    models: {
+      ...refuseAll<FitcherApi["models"]>([
+        "addProvider", "changeProvider", "removeProvider", "providerModels", "testProvider", "setTier",
+        "catalog", "setMode", "setEmbedding", "setClassifier", "changeClassifier",
+        "startClassifierDownload", "cancelClassifierDownload",
+      ], "The Models page needs the api; it has no sample data."),
+      providers: async () => wait([]),
+      tiers: async () => wait({ tiers: [], mode: "manual", embedding: SAMPLE_EMBEDDING }),
+      classifier: async () => wait({ enabled: false, model_present: false, version: null, engine: "local_onnx" }),
+      classifierDownload: async () => wait({ state: "idle", bytes_done: 0, bytes_total: 0 }),
+    } as FitcherApi["models"],
+    // Sources are the instance's own connections, so the sample instance lists none and refuses every change.
+    sources: {
+      ...refuseAll<FitcherApi["sources"]>([
+        "test", "create", "update", "remove", "tables", "changeTables", "sync", "cancel", "syncs", "upload", "loadFile",
+        "drift", "instantEstimate", "instantStart", "instantJob",
+      ], "The Sources page needs the api; it has no sample data."),
+      list: async () => wait([]),
+    } as FitcherApi["sources"],
     // The demo has no owner password, so it never asks to sign in.
     owner: {
       status: async () => ({ password_set: false, signed_in: false, exposed: false }),

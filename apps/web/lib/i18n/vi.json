@@ -18,7 +18,9 @@
     "badge": "Dữ liệu mẫu",
     "tooltip": "Phần này đang chạy trên dữ liệu mẫu cho đến khi dịch vụ của nó được kết nối.",
     "unmatched": "Bản demo này chỉ trả lời các câu hỏi mẫu cho đến khi phần trò chuyện được kết nối với dữ liệu của bạn. Hãy thử một câu hỏi gợi ý.",
-    "continue": "Tiếp tục với dữ liệu mẫu"
+    "continue": "Tiếp tục với dữ liệu mẫu",
+    "keyLocked": "Đừng nhập API key của bạn vào một trang web lạ 🙂",
+    "locked": "Đây là bản demo trên dữ liệu mẫu nên không kết nối hay thay đổi được gì ở đây. Hãy cài fitcher để dùng với dữ liệu và mô hình của bạn."
   },
   "common": {
     "close": "Đóng",

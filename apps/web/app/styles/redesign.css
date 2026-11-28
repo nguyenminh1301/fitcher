@@ -557,3 +557,7 @@ button.fc-composer-pack.src-switch:hover { background: var(--control-transparent
 @container (max-width: 480px) { .gs-list { grid-template-columns: 1fr; } }
 
 .file-title .file-path { font-size: 12px; font-weight: 400; margin-left: 8px; }
+
+/* The public demo's locked forms (components/ui/DemoLock.tsx): a fieldset that adds no box of its own. */
+.demo-locked { display: contents; border: 0; margin: 0; padding: 0; min-width: 0; }
+.demo-key-note { display: inline-flex; align-items: center; gap: 6px; }

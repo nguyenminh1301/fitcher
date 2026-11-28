@@ -7,7 +7,8 @@
 // of models in order; the chains are chosen automatically from free or from the best models, or by hand in a
 // picker that searches and filters every provider's catalog and marks the models that suit the task. The
 // evaluation informs the choice and never blocks it. Changing the embedding is
-// confirmed, because the pack must be compiled again. No key is ever shown.
+// confirmed, because the pack must be compiled again. No key is ever shown. The public demo shows the page with
+// no provider and every control locked.
 
 import { useCallback, useEffect, useState } from "react";
 
@@ -20,9 +21,11 @@ import { ProviderLogo } from "@/components/models/ProviderLogo";
 import { ClassifierBox } from "@/components/models/ClassifierBox";
 import { TierChainDialog, TierChainRow, useCatalogs } from "@/components/models/TierChainPicker";
 import { Segmented } from "@/components/ui/controls";
+import { DemoLocked, DemoLockedBanner } from "@/components/ui/DemoLock";
 import { Dialog } from "@/components/ui/overlay";
 import type { FitcherApi } from "@/lib/api/client";
 import { errorText } from "@/lib/api/errorText";
+import { DEMO } from "@/lib/api/sources";
 import { useChat } from "@/lib/chat/ChatContext";
 import { useLoad } from "@/lib/console/useLoad";
 import type { ClassifierStatus, EmbeddingChange, ModeChange, ModelTiersView, ProviderTestResult, ProviderView, TierView } from "@/lib/contracts";
@@ -76,12 +79,13 @@ function AddDialog({ models, onClose, onAdded }: { models: Models; onClose: () =
   return (
     <Dialog open wide title={t("modelsPage.addTitle")} closeLabel={t("common.close")} onClose={onClose}
       actions={<>
-        {cost === "billed" ? <span className="fc-muted dlg-status">{t("onboarding.paidCheck", { name })}</span> : null}
+        {cost === "billed" && !DEMO ? <span className="fc-muted dlg-status">{t("onboarding.paidCheck", { name })}</span> : null}
         <button type="button" className="fc-btn" onClick={onClose}>{t("common.cancel")}</button>
-        <button type="button" className="fc-btn fc-btn-primary" disabled={busy || presetIncomplete(preset, apiKey, address, providerName)} onClick={() => void add()}>
+        <button type="button" className="fc-btn fc-btn-primary" disabled={DEMO || busy || presetIncomplete(preset, apiKey, address, providerName)} onClick={() => void add()}>
           {busy ? <span className="fc-spin fc-spinning" aria-hidden="true" /> : null}{t("modelsPage.checkAndAdd")}
         </button>
       </>}>
+      {DEMO ? <DemoLockedBanner /> : null}
       <ProviderPicker presetId={presetId} onPreset={(id) => { setPresetId(id); setAddress(presetById(id).suggestedUrl ?? ""); setError(null); }}
         apiKey={apiKey} onApiKey={setApiKey} address={address} onAddress={setAddress} name={providerName} onName={setProviderName}
         error={error} disabled={busy} />
@@ -363,11 +367,11 @@ export function ModelsSection() {
               <dt>{t("models.embeddingModel")}</dt><dd className="fc-mono">{view.model}</dd>
               <dt>{t("models.dimensions")}</dt><dd>{view.dimensions}</dd>
             </dl>
-            <div><button type="button" className="fc-btn fc-btn-sm" onClick={() => setEmbedding(true)}>{t("models.changeEmbedding")}</button></div>
+            <div><button type="button" className="fc-btn fc-btn-sm" disabled={DEMO} onClick={() => setEmbedding(true)}>{t("models.changeEmbedding")}</button></div>
           </div>
         </section>
       ) : null}
-      {data ? <ClassifierBox models={models} status={data.classifier} providers={data.providers} onChanged={changed} /> : null}
+      {data ? <DemoLocked banner={false}><ClassifierBox models={models} status={data.classifier} providers={data.providers} onChanged={changed} /></DemoLocked> : null}
       {adding ? <AddDialog models={models} onClose={() => setAdding(false)} onAdded={(provider) => { setAdding(false); void changed(t("models.added", { name: provider.name })); }} /> : null}
       {picking && data && catalogs.entries ? (
         <TierChainDialog models={models} tier={picking} providers={data.providers} entries={catalogs.entries}

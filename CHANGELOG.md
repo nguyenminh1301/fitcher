@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### Added
+
+- The public demo (the web app built with `NEXT_PUBLIC_FITCHER_DEMO=1`) shows the Models, Sources and Security pages instead of an error, as an instance with no provider and no source: every API key field is locked and empty with the note "Don't put your api key on a random website 🙂", and the add-provider, add-source, embedding, classifier, owner password and question limit controls are disabled with a note to install fitcher. The installed app keeps every field editable.
+- The demo can be deployed to Vercel from `apps/web`; [docs/install.md](docs/install.md#public-demo-on-vercel) gives the settings.
+
 ### Changed
 
 - The README describes the 1.0.0 product as a user meets it: sources made ready to answer in one click, model chains picked from free or best models, the six console areas, the one-container layout and the `clarify_option` and question-limit API. A new light and dark animation of a question becoming a chart and its SQL replaces the two recordings of the 0.0.x interface.

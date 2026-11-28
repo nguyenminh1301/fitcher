@@ -160,6 +160,17 @@ docker compose -f deploy/compose.external-clickhouse.yaml --env-file deploy/.env
 
 Only `http://` is accepted for now.
 
+## Public demo on Vercel
+
+The demo is the web app built with every feature on a pack's hand-written sample data and no api, model or key behind it (DECISIONS §15). A suggested question streams its steps, chart, table and SQL from the sample data; the Models, Sources and Security pages show their layout with every key, password and connection field locked. It deploys to Vercel's free Hobby plan from this repository:
+
+1. On vercel.com, sign in with GitHub, choose **Add New → Project** and import the repository.
+2. Set **Root Directory** to `apps/web` and keep the Next.js preset and its build command (`npm run build`).
+3. Add two environment variables: `NEXT_PUBLIC_FITCHER_DEMO` = `1` and `ACTIVE_PACK` = `ecommerce_twin`.
+4. Deploy. The build copies the pack's `sample_data/console.json` and `scenarios.json` into `public/sample/` and fails if they are missing, so a deploy never goes live with empty pages.
+
+Leave **Include files outside the root directory in the Build Step** on (the default), because the sample data lives in `packs/` at the repository root. Every push to the production branch redeploys, and each pull request gets a preview. The same build without `NEXT_PUBLIC_FITCHER_DEMO=1` is the normal web app, whose fields stay editable.
+
 ## Logs and restarts
 
 `docker logs fitcher` shows every process. A process that exits is restarted; one that exits five times within a minute stops the container with its exit code. `docker stop` shuts ClickHouse down cleanly within Docker's default stop timeout.

@@ -3,13 +3,16 @@
 // The provider list of the setup's Models step (DECISIONS §2, §15) as radio cards. The five most used
 // providers show first; the rest open under "More providers", grouped as model services, servers on this
 // computer and any other OpenAI-compatible endpoint. The chosen card opens its fields underneath: a key with
-// a link to the page that creates it, the address of a server, and OpenRouter's note on free models.
+// a link to the page that creates it, the address of a server, and OpenRouter's note on free models. The public
+// demo locks the key field and says why (components/ui/DemoLock.tsx).
 
 import { useId, useState } from "react";
 
 import { Icon } from "@/components/brand/Icon";
 import { asksAddress, asksName, PRESETS, presetById, type ProviderPreset } from "@/components/models/presets";
 import { ProviderLogo } from "@/components/models/ProviderLogo";
+import { DemoKeyNotice } from "@/components/ui/DemoLock";
+import { DEMO } from "@/lib/api/sources";
 import { useI18n } from "@/lib/i18n/react";
 
 const MAIN = ["openrouter", "ollama", "gemini", "openai", "anthropic"];
@@ -43,9 +46,11 @@ type Props = {
   /** Why the last check failed, said under the key or address field. */
   error?: string | null;
   disabled?: boolean;
+  /** The public demo: the key field is locked and empty. */
+  demo?: boolean;
 };
 
-export function ProviderPicker({ presetId, onPreset, apiKey, onApiKey, address, onAddress, name, onName, error, disabled }: Props) {
+export function ProviderPicker({ presetId, onPreset, apiKey, onApiKey, address, onAddress, name, onName, error, disabled, demo = DEMO }: Props) {
   const { t } = useI18n();
   const chosen = presetById(presetId);
   const [more, setMore] = useState(!MAIN.includes(chosen.id));
@@ -68,7 +73,7 @@ export function ProviderPicker({ presetId, onPreset, apiKey, onApiKey, address, 
     return (
       <div key={preset.id} className="opt-group">
         {button}
-        <div className="opt-more"><Fields preset={preset} apiKey={apiKey} onApiKey={onApiKey} address={address} onAddress={onAddress} name={name} onName={onName} error={error} disabled={disabled} /></div>
+        <div className="opt-more"><Fields preset={preset} apiKey={apiKey} onApiKey={onApiKey} address={address} onAddress={onAddress} name={name} onName={onName} error={error} disabled={disabled} demo={demo} /></div>
       </div>
     );
   };
@@ -92,7 +97,7 @@ export function ProviderPicker({ presetId, onPreset, apiKey, onApiKey, address, 
   );
 }
 
-function Fields({ preset, apiKey, onApiKey, address, onAddress, name, onName, error, disabled }: Omit<Props, "presetId" | "onPreset"> & { preset: ProviderPreset }) {
+function Fields({ preset, apiKey, onApiKey, address, onAddress, name, onName, error, disabled, demo }: Omit<Props, "presetId" | "onPreset"> & { preset: ProviderPreset }) {
   const { t } = useI18n();
   const id = useId();
   const nameId = `${id}-name`;
@@ -135,12 +140,12 @@ function Fields({ preset, apiKey, onApiKey, address, onAddress, name, onName, er
           </div>
           <div className="fc-input-wrap">
             <Icon name="key" />
-            <input id={keyId} className="fc-input" type="password" value={apiKey} placeholder={t("onboarding.keyPlaceholder")}
-              autoComplete="off" spellCheck={false} disabled={disabled} aria-invalid={error ? true : undefined}
+            <input id={keyId} className="fc-input" type="password" value={demo ? "" : apiKey} placeholder={t("onboarding.keyPlaceholder")}
+              autoComplete="off" spellCheck={false} disabled={disabled || demo} aria-invalid={error ? true : undefined}
               aria-describedby={`${error ? `${errorId} ` : ""}${keyId}-help`} onChange={(event) => onApiKey(event.target.value)} />
           </div>
           {errorLine}
-          <span className="fc-field-help" id={`${keyId}-help`}>{t("onboarding.keyHelp")}</span>
+          {demo ? <DemoKeyNotice id={`${keyId}-help`} /> : <span className="fc-field-help" id={`${keyId}-help`}>{t("onboarding.keyHelp")}</span>}
         </div>
       )}
       {preset.id === "openrouter" ? (
