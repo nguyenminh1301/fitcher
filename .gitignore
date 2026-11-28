@@ -39,3 +39,6 @@ build/
 
 # Written by `next dev` on every start; the repository keeps agent instructions in AGENTS.md and .agents/ only.
 apps/web/AGENTS.md
+
+# Sample data copied into the web app by the demo build (apps/web/scripts/copy-demo-sample.mjs)
+apps/web/public/sample/

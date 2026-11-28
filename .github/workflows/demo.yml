@@ -8,10 +8,10 @@ name: Demo
 
 on:
   pull_request:
-    paths: ["apps/web/**", ".github/workflows/demo.yml"]
+    paths: ["apps/web/**", "packs/ecommerce_twin/sample_data/**", ".github/workflows/demo.yml"]
   push:
     branches: [main]
-    paths: ["apps/web/**", ".github/workflows/demo.yml"]
+    paths: ["apps/web/**", "packs/ecommerce_twin/sample_data/**", ".github/workflows/demo.yml"]
   workflow_dispatch:
 
 permissions:
@@ -33,6 +33,12 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
+      # The image is built from apps/web alone, so the sample data is copied in before the build.
+      - name: Copy the sample data into the web app
+        env:
+          NEXT_PUBLIC_FITCHER_DEMO: "1"
+          ACTIVE_PACK: ecommerce_twin
+        run: node apps/web/scripts/copy-demo-sample.mjs
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
       - if: github.event_name != 'pull_request'
         uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0

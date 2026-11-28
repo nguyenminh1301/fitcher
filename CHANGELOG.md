@@ -9,6 +9,7 @@
 
 ### Fixed
 
+- The `fitcher-demo` image and any other demo build show the sample conversations and answers again: the build was made from `apps/web` alone, so the active pack's sample data under `packs/` was missing and every page was empty. The demo build now copies `console.json` and `scenarios.json` of `ACTIVE_PACK` into `public/sample/` (`apps/web/scripts/copy-demo-sample.mjs`) and fails when they are missing.
 - A long category label of a horizontal bar chart, such as "Iced Caramel Latte", is no longer cut off at the chart's left edge: charts measured their labels with the font name "inherit", which ECharts cannot measure, so the room they left was sized for a default font while the labels were drawn in Inter. Charts now measure with the page's font once it has loaded.
 - A model that refuses a JSON-schema response format, such as DeepSeek's own API (`api.deepseek.com`), answers in JSON-object mode with the schema in its instructions instead of being skipped: every question and the provider check used to fall back to the next model with HTTP 400. The api remembers such a model for later calls.
 

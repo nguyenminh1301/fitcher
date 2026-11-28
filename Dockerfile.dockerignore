@@ -25,4 +25,6 @@ infra/sources
 **/*.parquet
 apps/api/tests
 apps/web/tests
+# Sample data a local demo build copied in; the release image has no sample pack.
+apps/web/public/sample
 jobs/tests
